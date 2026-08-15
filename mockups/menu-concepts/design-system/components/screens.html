@@ -1,0 +1,158 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<meta charset="utf-8">
+<title>The six screens that exist</title>
+<style>
+  :root {
+    --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { background: #10131e; color: var(--washi); font-family: var(--lat-ui);
+    font-weight: 600; letter-spacing: 0.03em; padding: 34px 40px 60px; }
+  h1 { font-family: var(--lat); font-style: italic; font-size: 26px; margin-bottom: 10px; }
+  .lede { max-width: 1000px; font-size: 13px; line-height: 1.75;
+    color: rgba(242,234,216,0.82); }
+  .lede + .lede { margin-top: 8px; }
+  .lede b { color: var(--gold-hi); }
+  .warn { color: #ff9d86; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 34px 0 14px; }
+  figure { margin-bottom: 30px; background: rgba(255,255,255,0.03);
+    box-shadow: inset 0 0 0 1px rgba(242,234,216,0.13); }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 14px 18px 18px; }
+  .name { display: flex; align-items: baseline; gap: 13px; flex-wrap: wrap; margin-bottom: 8px; }
+  .name b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px; }
+  .name i { font-style: normal; font-size: 9px; letter-spacing: 0.2em;
+    color: rgba(242,234,216,0.45); }
+  .name u { text-decoration: none; font-size: 9px; letter-spacing: 0.16em; padding: 2px 8px;
+    background: rgba(207,164,92,0.16); color: var(--gold-hi); }
+  figcaption p { font-size: 12px; line-height: 1.7; color: rgba(242,234,216,0.76);
+    max-width: 1000px; }
+  figcaption p + p { margin-top: 7px; }
+  code { font-family: ui-monospace, Consolas, monospace; color: var(--gold-hi);
+    letter-spacing: 0; font-size: 11px; }
+  .note { margin: 6px 0 30px; padding: 15px 18px; background: rgba(227,74,51,0.1);
+    box-shadow: inset 0 0 0 1px rgba(227,74,51,0.4); max-width: 1000px;
+    font-size: 12px; line-height: 1.7; }
+  .note b { color: #ff9d86; }
+  table { border-collapse: collapse; font-size: 11.5px; margin-top: 10px; }
+  td, th { text-align: left; padding: 5px 16px 5px 0; vertical-align: top; }
+  th { color: var(--gold-hi); font-size: 9.5px; letter-spacing: 0.18em; font-weight: 700; }
+  td { color: rgba(242,234,216,0.76); }
+</style>
+
+<h1>The six screens that exist</h1>
+<p class="lede">
+  <code>built.html</code> documents five OBJECTS — the menu row, the road tablet, the hero card,
+  the heading slab, the caption chip. It is still correct about those. What it no longer covers
+  is which SCREENS exist, because five have been built since it was written.
+</p>
+<p class="lede">
+  <b>Read its section B&amp;C with that in mind.</b> It is headed "the road, levels two and three,
+  every section", and that is no longer true: the road now carries three sections, and STUDY's
+  level two stopped being a road at all.
+</p>
+
+<div class="note">
+  <b>Eleven screens, three levels.</b>
+  <table>
+    <tr><th>LEVEL 1</th><td>the standing menu — a vertical column of six section rows,
+      one open at a time. Documented in <code>built.html</code> section A.</td></tr>
+    <tr><th>LEVEL 2</th><td>six, one per section: STUDY path · DAILY road · READING library ·
+      DRILLS road · JLPT ascent · RECORDS ledger</td></tr>
+    <tr><th>LEVEL 3</th><td>four: STUDY deck · STUDY feed · DAILY road · DRILLS road</td></tr>
+  </table>
+</div>
+
+<h2>THE FOUR SHAPES</h2>
+<p class="lede" style="margin-bottom:18px">
+  Every screen below is one of four shapes, and the shape follows the DATA rather than the
+  section. <b>Chain</b> — ordered and gated, exactly one item open. <b>Peers</b> — a small
+  unordered set, all available. <b>List</b> — a large flat set, all available, no order.
+  <b>Dashboard</b> — figures you read, not places you go. Choosing the wrong one is the mistake
+  this menu has made twice.
+</p>
+
+<figure>
+  <img src="../assets/screen-path.png" alt="STUDY level two, the course">
+  <figcaption>
+    <div class="name"><b>THE CHAIN</b><i>STUDY · LEVEL 2 · 16 STEPS</i><u>chain</u></div>
+    <p>Behind you / here / ahead, and a proportional rail of the whole run beneath. Only the OPEN
+      item acts; everything else is context. Classes are <code>.dk-*</code>, shared with the deck
+      screen through <code>chainMarkup</code>.</p>
+    <p>This replaced a browsable road of sixteen doors. Ten of those sixteen could only throw you
+      at another section — a curriculum node is a milestone, not a door.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-deck.png" alt="A deck's blocks">
+  <figcaption>
+    <div class="name"><b>THE CHAIN, AGAIN</b><i>STUDY · LEVEL 3 · UP TO 76 BLOCKS</i><u>chain</u></div>
+    <p>The same drawing and the same classes, holding a different chain. <b>One drawing has to
+      hold 6 and 76</b> — kanji N5 has six blocks, kanji N1 has seventy-six — which is why the
+      rail's segments divide the width rather than each claiming a fixed size.</p>
+    <p>The pile behind you opens as a paged grid, so any cleared item is one keypress away rather
+      than seventy.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-library.png" alt="READING, the library">
+  <figcaption>
+    <div class="name"><b>THE LIST</b><i>READING · LEVEL 2 · 30 TEXTS</i><u>list</u></div>
+    <p>Thirty items, all open, none unlocking another, no correct order. The selected row grows
+      38&rarr;100px and only then admits its detail; four difficulty bands announce themselves
+      with rules that stick to the top edge. Classes are <code>.lb-*</code>.</p>
+    <p>The only screen in the menu where the question is "what do I feel like" rather than
+      "what is next".</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-feed.png" alt="Today's words">
+  <figcaption>
+    <div class="name"><b>THE QUEUE</b><i>STUDY · LEVEL 3 · TODAY&rsquo;S WORDS</i><u>peers</u></div>
+    <p>Not a chain: a queue that is REPLACED tomorrow, and emptying it is the point. The budget
+      control — none / 5 / 10 / 20 / 40 — is the number the whole screen is generated from, so it
+      is on the screen rather than in a setting. Classes are <code>.fd-*</code>.</p>
+    <p>Its two denominators are load-bearing: "291 of 744 readable" and "67 kanji known". Without
+      them "here are ten words" is a card trick.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-ledger.png" alt="RECORDS, the ledger">
+  <figcaption>
+    <div class="name"><b>THE DASHBOARD</b><i>RECORDS · LEVEL 2</i><u>dashboard</u></div>
+    <p>Figures you read, not places you go — there is nothing inside a streak to open. The current
+      run large with your best behind it in the same type at 15% ink; a year of daily activity as
+      52 weekly bars, height for volume and colour for accuracy. Classes are <code>.lg-*</code>.</p>
+    <p>It must survive a bad week: press W in the mockup for a streak of one and a year mostly
+      empty. A records screen that only looks good on a good account has not been tested.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-ascent.png" alt="JLPT, the ascent">
+  <figcaption>
+    <div class="name"><b>THE LADDER</b><i>JLPT · LEVEL 2 · 5 LEVELS</i><u>chain</u></div>
+    <p>Five columns whose HEIGHT is readiness, a 0&ndash;100 measure at the left, and both
+      thresholds drawn straight across all five as deliberately different marks — 30% dashed
+      (opens the next level), 80% solid (ready to sit). Classes are <code>.as-*</code>.</p>
+    <p class="warn">This is the screen that proves the backdrops card. Its dark columns vanished
+      into the pagoda scene and needed a crush layer added afterwards, because it was designed on
+      the sunset plate and renders at the certification hall.</p>
+  </figcaption>
+</figure>
+
+<h2>AND THE ROAD, WHICH STILL EXISTS</h2>
+<p class="lede">
+  The carousel from <code>built.html</code> B&amp;C is unchanged and still carries six screens:
+  DAILY and DRILLS at level two and three, and READING at level three until its library goes one
+  level deeper. It is the right shape for a <b>small unordered set</b> — four games you pick
+  between — and the wrong one for an ordered gated run, which is what it was doing at STUDY.
+</p>
