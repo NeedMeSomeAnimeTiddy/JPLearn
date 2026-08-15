@@ -3968,53 +3968,46 @@
      it needs to look like a button.
      ================================================================================ */
   /* ================================================================================
-     AND NOW IT WEARS THE CAP THE REST OF THE INTERFACE WEARS.
+     THE BACK CONTROL IS ONE BOX.
 
-     The note above is still right that the old filled slab was left over from an older
-     screen -- but the fix went one step too far. Stripping it to bare type made it the
-     only control on screen with no button language at all, while its own twin in the
-     opposite corner, the ESC hint, is a washi keycap. Two treatments of one action, one
-     of which does not look pressable.
+     It has been three things now. A filled slab with a coloured edge, which was right when
+     the interface was made of slabs. Then bare type, which went too far -- it became the
+     only control on screen with no button language at all. Then a keycap plus two words
+     floating beside it, which matched the hint row so exactly that it rendered as a
+     duplicate of it.
 
-     So it takes `.hints`' grammar exactly: cap, Latin word, Japanese label, in that
-     order, at those sizes, with the cap carrying the one skew and the one hard shadow
-     this file allows. The section colour it used to spend on the arrow becomes the HOVER
-     fill -- which is what the note below already argued for, "the only moment it needs to
-     look like a button", now said in the same language as everything else.
+     This is the version that is actually a button: ONE washi box carrying both words, the
+     English in ink and the Japanese in the same ink at 45%, which is what every other
+     secondary label on a cream ground in this file uses. It keeps the one skew and the one
+     hard shadow, so it belongs to the same family as the caps and the chips without
+     pretending to be a key you press. The section colour it used to spend on an arrow is
+     the hover fill.
      ================================================================================ */
   .back-tab button {
-    display: flex; align-items: baseline;
-    background: none; border: 0; padding: 4px 8px 4px 0;
-    transform: none; cursor: pointer;
-    font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; letter-spacing: 0.14em;
-    color: rgba(242, 234, 216, 0.86);
-    text-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.34 + 0.24 * var(--sky))), var(--halo-soft);
-  }
-  /* The cap is identical to `.hints b` -- same face, size, tracking, padding, skew and shadow
-     -- but it carries a POINTER, not a key name. Wearing "ESC" it rendered pixel for pixel the
-     same as the ESC hint in the opposite corner, which is one action drawn twice on one screen.
-     The mark is what separates them: the corner you click, and the key you press. */
-  .back-tab .bt-key {
-    font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
-    background: var(--washi); color: var(--ink);
-    padding: 3px 9px; margin-right: 8px; min-width: 46px; text-align: center;
-    transform: skewX(-8deg) rotate(-1.2deg); display: inline-block;
+    display: flex; align-items: baseline; gap: 9px;
+    background: var(--washi); border: 0; padding: 6px 14px 7px;
+    cursor: pointer;
+    transform: skewX(-8deg) rotate(-1.2deg);
     box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+    /* dark on light needs no halo -- the drop shadow is what lifts it off the world */
     text-shadow: none;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition: background 0.2s ease;
+  }
+  .back-tab .bt-en {
+    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.16em;
+    color: var(--ink);
+    transition: color 0.2s ease;
   }
   .back-tab .bt-jp {
     font-family: var(--jp-go); font-weight: 400; font-style: normal;
-    font-size: 10px; letter-spacing: 0.1em;
-    color: rgba(242, 234, 216, 0.45); margin-left: 7px;
-    transition: color 0.24s ease;
+    font-size: 10.5px; letter-spacing: 0.1em;
+    color: rgba(20, 17, 13, 0.45);
+    transition: color 0.2s ease;
   }
-  .back-tab .bt-en { transition: color 0.24s ease; }
-  /* THE SECTION'S OWN COLOUR, SPENT WHERE IT COUNTS. `--sec` is already set on this element
-     by `ftBuildL2`, so the cap previews the room you would be returning from. */
-  .back-tab button:hover .bt-key { background: var(--sec, var(--hi)); color: var(--washi); }
+  /* `--sec` is set on this element by `ftBuildL2`, so the box previews the room it returns from */
+  .back-tab button:hover { background: var(--sec, var(--hi)); }
   .back-tab button:hover .bt-en { color: var(--washi); }
-  .back-tab button:hover .bt-jp { color: rgba(242, 234, 216, 0.8); }
+  .back-tab button:hover .bt-jp { color: rgba(242, 234, 216, 0.75); }
 
   /* ── STUDY · torn shards, the word knocked out of the black ──────────────────── */
   .w-shard { width: 460px; height: 210px; }
@@ -4862,7 +4855,7 @@
   <span class="cb-read"><b id="clockRead">--:--</b><i id="clockSun">--</i></span>
 </div>
 <div class="chrome back-tab" id="backTab">
-  <button type="button"><b class="bt-key">&#9666;</b><span class="bt-en">Back</span><em class="bt-jp">&#25147;&#12427;</em></button>
+  <button type="button"><b class="bt-en">Back</b><em class="bt-jp">&#25147;&#12427;</em></button>
 </div>
 <div class="chrome hints">
   <span><b>↑↓</b>Select<em>選択</em></span>
