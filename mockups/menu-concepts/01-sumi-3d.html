@@ -1966,7 +1966,13 @@
   .lg-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
 
   /* ---- the streak, and the ghost of your best ---- */
-  .lg-streak { left: 56px; top: 24px; width: 648px; height: 210px;
+  /* ---- THE FRAME CONTRACT, ON THE LEDGER. The stage is 384 tall and the skew spends 51 of
+     it: a plate rolled -1.2deg rises 0.0105 x its own WIDTH at each end, so the 944-wide year
+     band is 20px taller painted than it is authored. Four plates do not fit inside that.
+     The level bar goes to the FOOT BAND, which is what the band is for -- it is the account's
+     running total, the same species as the library's strip, and the two cards and the year
+     keep the stage to themselves. ---- */
+  .lg-streak { left: 173px; top: 34px; width: 540px; height: 210px;
     display: flex; flex-direction: column; }
   .lg-run { display: flex; align-items: flex-end; gap: 22px; padding: 16px 24px 0; }
   .lg-now {
@@ -2000,7 +2006,7 @@
   .lg-frz u { margin-left: auto; text-decoration: none; color: rgba(20, 17, 13, 0.8); }
 
   /* ---- the other three figures ---- */
-  .lg-rest { position: absolute; left: 744px; top: 24px; width: 440px; height: 210px;
+  .lg-rest { position: absolute; left: 745px; top: 34px; width: 362px; height: 210px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
       rgba(203,193,164,var(--paper)) 100%);
@@ -2029,7 +2035,7 @@
     font-size: 32px; line-height: 1; letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.5); }
 
   /* ---- the year ---- */
-  .lg-year { left: 56px; top: 250px; width: 1128px; height: 120px;
+  .lg-year { left: 168px; top: 282px; width: 944px; height: 120px;
     display: flex; flex-direction: column; }
   .lg-bars { flex: 1; display: flex; align-items: flex-end; gap: 3px;
     padding: 9px 16px 10px; }
@@ -2042,7 +2048,9 @@
   .lg-bars i.none { background: rgba(20, 17, 13, 0.13); box-shadow: none; }
 
   /* ---- the level strip ---- */
-  .lg-lv { left: 56px; top: 384px; width: 1128px; height: 54px;
+  /* narrower than the year on purpose: it is the one plate below the stage, and at 944 its
+     right end ran under the key hints in the corner */
+  .lg-lv { left: 200px; top: 424px; width: 880px; height: 44px;
     display: flex; align-items: stretch; background: rgba(10, 9, 6, 0.86);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
     transform: skewX(-8deg) rotate(-1.2deg); }
@@ -2084,7 +2092,9 @@
   .lg-frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
     zoom: var(--u); pointer-events: none; }
   .lg-frame > * { pointer-events: auto; }
-  .lg-sheet { position: absolute; left: 310px; top: 108px; width: 660px;
+  /* frame space, like the deck's sheet -- centred on the STAGE rather than on the frame,
+     so a modal opens where the screen under it lives */
+  .lg-sheet { position: absolute; left: 310px; top: 205px; width: 660px;
     display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
     background: var(--washi);
     box-shadow: 12px 14px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
