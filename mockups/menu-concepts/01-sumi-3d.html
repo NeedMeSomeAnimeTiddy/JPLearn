@@ -87,6 +87,17 @@
        `#typeShade`: past about a quarter this stops being depth and becomes a hole cut in the
        valley. */
     --crush: 0.25;
+    /* HOW MUCH OF THE VALLEY COMES THROUGH THE PAPER. 1 is the design as drawn; lower lets the
+       world show. A variable rather than a decision, because `foundations/legibility.html`
+       argues the plates ARE the ground the type stands on, and the honest way to find out how
+       much ground can be given away is to turn it over the busiest pose and look.
+       NOT CALLED `--glass`: that name is already taken, six times over, by the per-section
+       backdrop tints at line 3825 onward. Those are inherited by everything inside `.hud`, so
+       `rgba(251,248,241,var(--paper))` resolved to a colour nested inside a colour, which is
+       invalid -- and an invalid background is not ignored, it is NONE. Every plate I touched
+       went fully transparent at every setting including 1, which is why the "before" frame
+       looked exactly as broken as the "after" one. */
+    --paper: 1;
     --washi: #f2ead8;
     --washi-dim: #cfc6ae;
     --ink: #14110d;
@@ -1921,7 +1932,8 @@
   .lg-f.on::after { opacity: 1; }
 
   .lg-plate {
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
     box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
     transform: skewX(-8deg) rotate(-1.2deg);
   }
@@ -1969,7 +1981,8 @@
   /* ---- the other three figures ---- */
   .lg-rest { position: absolute; left: 744px; top: 24px; width: 440px; height: 210px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .lg-resthead { flex: none; padding: 6px 18px 7px; background: rgba(20, 17, 13, 0.86);
@@ -2206,7 +2219,8 @@
   /* ---- the selected level, in detail ---- */
   .as-panel { position: absolute; left: 900px; top: 46px; width: 340px; height: 404px;
     display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
     box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22); }
   .as-banner { padding: 6px 0 7px; text-align: center; white-space: nowrap;
     font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.2em; }
@@ -2299,7 +2313,8 @@
   /* ---- what is behind you ---- */
   .dk-behind { left: 56px; top: 30px; width: 226px; height: 236px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .dk-bignum { flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -2316,7 +2331,8 @@
   /* ---- the one you can actually study ---- */
   .dk-here { left: 300px; top: 30px; width: 560px; height: 236px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
     box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .dk-body { flex: 1; display: flex; flex-direction: column; padding: 16px 24px 0; }
@@ -2355,7 +2371,8 @@
 
   /* ---- what is ahead, and cannot be pressed ---- */
   .dk-ahead { position: absolute; left: 878px; top: 30px; width: 306px; height: 236px;
-    display: flex; flex-direction: column; background: rgba(10, 9, 6, 0.86);
+    display: flex; flex-direction: column;
+    background: rgba(10, 9, 6, calc(0.86 * var(--paper)));
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .dk-next { flex: 1; display: flex; flex-direction: column; justify-content: center;
@@ -2383,7 +2400,8 @@
   body.is-dragging { user-select: none; -webkit-user-select: none; }
   .dk-rail { position: absolute; left: 56px; top: 296px; width: 1128px; height: 96px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
     transform: skewX(-8deg) rotate(-1.2deg); }
   /* SEGMENTS DIVIDE THE WIDTH, they do not each claim a fixed number of pixels. That single
@@ -2475,7 +2493,8 @@
   /* ---- the word you would do now ---- */
   .fd-hero { left: 56px; top: 30px; width: 620px; height: 246px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
     box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .fd-body { flex: 1; display: flex; flex-direction: column; padding: 14px 24px 0; }
@@ -2509,7 +2528,8 @@
   /* ---- how much today, and what that is a fraction of ---- */
   .fd-today { position: absolute; left: 694px; top: 30px; width: 490px; height: 246px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .fd-count { display: flex; align-items: baseline; gap: 12px; padding: 12px 20px 0; }
@@ -2549,7 +2569,8 @@
   /* ---- today's list, which empties ---- */
   .fd-rail { position: absolute; left: 56px; top: 296px; width: 1128px; height: 104px;
     display: flex; flex-direction: column;
-    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
     transform: skewX(-8deg) rotate(-1.2deg); }
   .fd-segrow { flex: 1; display: flex; align-items: stretch; gap: 4px; padding: 12px 16px 8px; }
@@ -15050,6 +15071,13 @@ let flownTo = 0;
 window.NAV = { get state() { return state; }, get busy() { return busy; },
   /* how sensitive the mouse is: `NAV.feel()` reports, `NAV.feel(wheel, drag)` sets. Lower is
      more sensitive. Wheel is deltaY per step (100 = one mouse notch), drag is px per step. */
+  /* how much valley comes through the paper: 1 opaque (as drawn), 0.85 is glass. `NAV.glass()`
+     reports. Turn it while standing at the certification hall -- the brightest, busiest pose in
+     the world -- because that is where it either works or does not. */
+  glass: (v) => {
+    if (v !== undefined) document.documentElement.style.setProperty('--paper', String(v));
+    return +getComputedStyle(document.documentElement).getPropertyValue('--paper');
+  },
   feel: (w, d, r) => {
     if (w) WHEEL_STEP = w;
     if (d) DRAG_STEP = d;
