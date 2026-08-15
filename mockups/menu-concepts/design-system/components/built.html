@@ -137,15 +137,20 @@
   .h-no { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 24px;
     color: var(--ink); }
   .h-jp { margin-top: auto; padding: 0 12px; font-family: var(--jp); font-weight: 400;
-    font-size: 66px; line-height: 1; text-align: center; color: var(--ink); }
-  .h-en { padding: 6px 12px 0; font-family: var(--lat); font-style: italic; font-weight: 900;
-    font-size: 24px; text-align: center; color: var(--hi-deep); }
-  .h-foot { margin-top: auto; padding: 0 15px; }
-  .h-gate { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-    font-family: var(--lat-ui); font-weight: 700; margin-bottom: 7px; }
+    font-size: 66px; line-height: 1.15; text-align: center; color: var(--ink); }
+  .h-en { padding: 2px 18px 0; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 28px; letter-spacing: 0.01em; text-align: center; color: var(--hi-deep); }
+  .h-foot { margin-top: auto; padding: 0 18px 15px; display: flex; flex-direction: column;
+    gap: 8px; }
+  .h-gate { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    font-family: var(--lat-ui); font-weight: 700; }
   .h-gate b { font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20,17,13,0.45); }
   .h-gate i { font-style: normal; font-size: 10px; letter-spacing: 0.1em;
     color: rgba(20,17,13,0.8); }
+  /* A SIBLING OF THE FOOT, NOT A CHILD OF IT. `.cs-hfoot` closes after the gauge row and the
+     slab wrap follows it as its own child of the card — which is the whole reason `-1px` is
+     enough to bleed it past the 1px inset keyline to both edges. Nested inside the foot it
+     inherits 18px of padding on each side and stops being the card's floor. */
   .h-slab { margin: 10px -1px -1px; height: 38px; padding: 11px 14px; background: var(--hi); }
   .h-slab i { display: block; font-family: var(--lat-ui); font-style: normal; font-weight: 700;
     font-size: 12px; line-height: 16px; letter-spacing: 0.16em; text-align: center;
@@ -259,8 +264,8 @@
       <span class="h-foot">
         <span class="h-gate"><b>GATE TO CLEAR</b><i>80 CHARACTERS</i></span>
         <span class="gaugerow"><span class="segs"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><b class="pct" style="font-size:22px">45%</b></span>
-        <span class="h-slab"><i>START THIS STEP &#9656;</i></span>
       </span>
+      <span class="h-slab"><i>START THIS STEP &#9656;</i></span>
     </div>
     <div class="tab locked"><span class="tab-dest">&#8594; JLPT</span><b class="tab-no">12</b>
       <span class="tab-hair"></span><span class="tab-vjp">&#26908;&#23450;</span>
