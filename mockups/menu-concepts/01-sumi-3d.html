@@ -1516,7 +1516,8 @@
   .hud[data-t="midashi"] .ledger,
   .hud[data-t="midashi"] .ascent,
   .hud[data-t="midashi"] .deck,
-  .hud[data-t="midashi"] .feed { zoom: var(--u); }
+  .hud[data-t="midashi"] .feed,
+  .hud[data-t="midashi"] .path { zoom: var(--u); }
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
@@ -2080,7 +2081,8 @@
   .hud[data-screen="ledger"] .hud-detail,
   .hud[data-screen="ascent"] .hud-detail,
   .hud[data-screen="deck"] .hud-detail,
-  .hud[data-screen="feed"] .hud-detail { display: none; }
+  .hud[data-screen="feed"] .hud-detail,
+  .hud[data-screen="path"] .hud-detail { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2277,7 +2279,7 @@
      one is one keypress into a paged grid. Nothing is seventy keypresses away, because
      nothing that far away was ever reachable.
      ================================================================================ */
-  .deck {
+  .deck, .path {
     position: relative; margin-top: 6px;
     margin-left: -52px; width: calc(100vw / var(--u)); height: 440px;
   }
@@ -2333,8 +2335,12 @@
   .dk-segs i.got { background: var(--gold); box-shadow: none; }
   .dk-gauge b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
     color: var(--ink); }
-  .dk-gate { display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 24px 11px; background: rgba(20, 17, 13, 0.06);
+  /* NOT FLEX ANY MORE. It carries one statement now, and as a flex container the space between
+     "WANTS" and its <em> was a whitespace-only text node between two flex items -- which is not
+     rendered, so the card read "WANTS80 CHARACTERS". */
+  .dk-gate { display: block;
+    /* right padding clears the action slab, which overhangs this row's right end */
+    padding: 9px 190px 11px 24px; background: rgba(20, 17, 13, 0.06);
     box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16);
     font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
     color: rgba(20, 17, 13, 0.6); white-space: nowrap; }
@@ -18868,6 +18874,7 @@ function hudRows() {
   if (hudBespoke() === 'ascent') return ascentRows();
   if (hudBespoke() === 'deck') return deckRows();
   if (hudBespoke() === 'feed') return feedRows();
+  if (hudBespoke() === 'path') return paRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -19428,65 +19435,101 @@ function deckRows() {
     next: ['', '', ''] }));
 }
 
+/* ================================================================================================
+   ONE DRAWING, TWO CHAINS.
+
+   A deck's blocks and STUDY's curriculum are the same object wearing different words: an ordered
+   run where exactly one item is open, everything before it is finished and everything after is
+   locked. They were drawn two completely different ways -- the blocks as behind/here/ahead, the
+   curriculum as a browsable road of sixteen doors -- and the road was wrong for a reason worth
+   writing down.
+
+   A CURRICULUM NODE IS A MILESTONE, NOT A DOOR. `JPLEARN_GRAPH` has sixteen nodes and only six of
+   them are decks this section owns; the rest are statements about progress -- Reading, Listening,
+   JLPT N5 through N1. Rendered as a menu, the only thing such an entry can do is throw you at
+   another section, so ten of sixteen steps did exactly that, five of them at the same screen. The
+   JLPT ladder one keypress away already draws those five, better.
+
+   The fix is not new copy, it is the shape: when only the OPEN item is actionable, the other
+   fifteen stop being doors and become what they always were -- context. Nothing had to be deleted
+   from the curriculum to fix it.
+   ================================================================================================ */
+function chainMarkup(c) {
+  const segs = c.items.map((it, i) => {
+    const cls = i === c.at && c.revisit ? 'pick'
+      : i === c.here ? 'here' : i < c.cleared ? 'done' : 'locked';
+    const state = i > c.here ? 'locked' : i === c.here ? 'open now' : 'done';
+    return `<i class="${cls}" data-b="${i}" title="${String(i + 1).padStart(2, '0')} `
+      + `${it.title} — ${state}"></i>`;
+  }).join('');
+  const size = Math.max(26, Math.min(c.maxName || 46,
+    Math.floor(560 / (String(c.hero.name).length * (c.nameWide ? 1.06 : 0.62)))));
+  return `<div class="dk-wrap">`
+    + `<button class="dk-f dk-behind" data-i="1">`
+      + `<span class="dk-cap"><b>BEHIND YOU</b><i>ALL REVISITABLE</i></span>`
+      + `<span class="dk-bignum"><b>${c.cleared}</b><i>${c.behindLabel}</i></span>`
+      + `<span class="dk-act">ENTER · OPEN THEM</span></button>`
+    + `<button class="dk-f dk-here" data-i="0">`
+      + `<span class="dk-cap"><b>${c.hero.cap}</b><i>${c.hero.capRight}</i></span>`
+      + `<span class="dk-body">`
+        + `<span class="dk-name"${c.nameWide ? ' lang="ja"' : ''} `
+        + `style="font-size:${size}px${c.nameWide ? ';font-family:var(--jp)' : ''}">`
+        + `${c.hero.name}</span>`
+        + `<span class="dk-sub"><span>${c.hero.subLeft}</span>`
+        + `<span>${c.hero.subRight}</span></span>`
+        + `<span class="dk-gauge"><span class="dk-segs">`
+        + Array.from({ length: 12 }, (_, k) =>
+          `<i class="${k < Math.round(c.hero.pct / 100 * 12) ? 'got' : ''}"></i>`).join('')
+        + `</span><b>${c.hero.pct}%</b></span></span>`
+      + `<span class="dk-gate">${c.hero.gate}</span>`
+      + `<span class="dk-slab"><em>${c.hero.slabEm}</em><b>${c.hero.slabB} ▸</b></span>`
+      + `</button>`
+    + `<div class="dk-ahead">`
+      + `<span class="dk-cap"><b>AHEAD</b><i>NOT YET CHOOSABLE</i></span>`
+      + `<span class="dk-next"><span>${c.ahead.kicker}</span>`
+      + `<b>${c.ahead.name}</b><i>${c.ahead.meta}</i></span>`
+      + `<span class="dk-locked"><span>LOCKED BEHIND IT</span>`
+      + `<b>${c.ahead.locked}</b></span></div>`
+    + `<div class="dk-rail">`
+      + `<span class="dk-segrow">${segs}</span>`
+      + `<span class="dk-railcap"><span>${c.rail.left}</span>`
+      + `<span>${c.rail.mid}</span><span>${c.rail.right}</span></span></div>`
+    + `</div>`;
+}
+
 function deckMarkup() {
   const B = dkBlocks(), n = B.length, cleared = dkCleared(), here = dkHere(), at = dkShown();
   const [name, cards] = B[at] || ['', 0];
   const revisit = DK_PICK >= 0;
-  const ahead = n - here - 1;
   const nextUp = B[here + 1];
-  /* the mastery of the block being shown: a cleared one is done, the open one is partway */
-  const pct = revisit ? 100 : 40;
-  const size = Math.max(26, Math.min(46, Math.floor(560 / (name.length * 0.62))));
-
-  const segs = B.map((b, i) => {
-    const locked = i > here;
-    const cls = i === at && revisit ? 'pick' : i === here ? 'here' : i < cleared ? 'done' : 'locked';
-    /* A SEGMENT IS 12.8px WIDE ON KANJI N1, so the name cannot be written on it -- the title
-       is the only way a mouse user learns which block they are about to press. */
-    const state = locked ? 'locked' : i === here ? 'open now' : 'cleared';
-    return `<i class="${cls}" data-b="${i}" title="${String(i + 1).padStart(2, '0')} `
-      + `${b[0]} — ${b[1]} cards, ${state}"></i>`;
-  }).join('');
-
-  return `<div class="dk-wrap">`
-    + `<button class="dk-f dk-behind" data-i="1">`
-      + `<span class="dk-cap"><b>BEHIND YOU</b><i>ALL REVISITABLE</i></span>`
-      + `<span class="dk-bignum"><b>${cleared}</b><i>BLOCK${cleared === 1 ? '' : 'S'} CLEARED</i></span>`
-      + `<span class="dk-act">ENTER · OPEN THEM</span></button>`
-    + `<button class="dk-f dk-here" data-i="0">`
-      + `<span class="dk-cap"><b>${revisit ? 'REVISITING' : 'OPEN NOW'} · `
-      + `BLOCK ${at + 1} OF ${n}</b><i>${dkSlug().replace('_', ' ').toUpperCase()}</i></span>`
-      + `<span class="dk-body">`
-        + `<span class="dk-name" style="font-size:${size}px">${name}</span>`
-        + `<span class="dk-sub"><span>${cards} CARDS</span>`
-        + `<span>${revisit ? 'CLEARED' : 'IN PROGRESS'}</span></span>`
-        + `<span class="dk-gauge"><span class="dk-segs">`
-        + Array.from({ length: 12 }, (_, k) =>
-          `<i class="${k < Math.round(pct / 100 * 12) ? 'got' : ''}"></i>`).join('')
-        + `</span><b>${pct}%</b></span></span>`
-      /* WHAT THE GATE IS FOR IS THE NEXT BLOCK, and saying so is the only thing that makes the
-         percentage mean anything -- 70% of this one is not a score, it is a key. */
-      + `<span class="dk-gate">${revisit
-        ? `<span>ALREADY CLEARED · STUDYING IT AGAIN CHANGES NOTHING AHEAD</span>`
-        : `<span>OPENS BLOCK ${here + 2 > n ? n : here + 2} AT <em>${dkGate()}%</em></span>`
-          + `<span>${cards} CARDS ANSWERED ONCE</span>`}</span>`
-      + `<span class="dk-slab"><em>${revisit ? 'BLOCK ' + (at + 1) : 'THE ONLY WAY ON'}</em>`
-      + `<b>${revisit ? 'REVISIT THIS BLOCK' : 'START THIS BLOCK'} ▸</b></span>`
-      + `</button>`
-    + `<div class="dk-ahead">`
-      + `<span class="dk-cap"><b>AHEAD</b><i>NOT YET CHOOSABLE</i></span>`
-      + `<span class="dk-next"><span>NEXT, WHEN THIS ONE OPENS IT</span>`
-      + `<b>${nextUp ? nextUp[0] : 'THE DECK IS DONE'}</b>`
-      + `<i>${nextUp ? nextUp[1] + ' CARDS' : 'NOTHING LOCKED'}</i></span>`
-      + `<span class="dk-locked"><span>LOCKED BEHIND IT</span>`
-      + `<b>${Math.max(0, ahead - 1)}</b></span></div>`
-    + `<div class="dk-rail">`
-      + `<span class="dk-segrow">${segs}</span>`
-      + `<span class="dk-railcap"><span>BLOCK 01</span>`
-      + `<span>${n} BLOCKS · ${B.reduce((a, b) => a + b[1], 0)} CARDS · `
-      + `${Math.round(cleared / n * 100)}% CLEARED</span>`
-      + `<span>BLOCK ${String(n).padStart(2, '0')}</span></span></div>`
-    + `</div>`;
+  return chainMarkup({
+    items: B.map((b) => ({ title: `${b[0]} — ${b[1]} cards` })),
+    n, cleared, here, at, revisit,
+    behindLabel: `BLOCK${cleared === 1 ? '' : 'S'} CLEARED`,
+    hero: {
+      cap: `${revisit ? 'REVISITING' : 'OPEN NOW'} · BLOCK ${at + 1} OF ${n}`,
+      capRight: dkSlug().replace('_', ' ').toUpperCase(),
+      name, subLeft: `${cards} CARDS`, subRight: revisit ? 'CLEARED' : 'IN PROGRESS',
+      pct: revisit ? 100 : 40,
+      /* WHAT THE GATE IS FOR IS THE NEXT BLOCK -- 70% of this one is not a score, it is a key */
+      /* ONE STATEMENT, NOT TWO. The second span sat under the action slab and was never
+         visible; the card count it carried is already in the line above. */
+      gate: revisit
+        ? `ALREADY CLEARED · STUDYING IT AGAIN CHANGES NOTHING AHEAD`
+        : `OPENS BLOCK ${here + 2 > n ? n : here + 2} AT <em>${dkGate()}%</em> `
+          + `· ${cards} CARDS ANSWERED ONCE`,
+      slabEm: revisit ? `BLOCK ${at + 1}` : 'THE ONLY WAY ON',
+      slabB: revisit ? 'REVISIT THIS BLOCK' : 'START THIS BLOCK',
+    },
+    ahead: { kicker: 'NEXT, WHEN THIS ONE OPENS IT',
+      name: nextUp ? nextUp[0] : 'THE DECK IS DONE',
+      meta: nextUp ? `${nextUp[1]} CARDS` : 'NOTHING LOCKED',
+      locked: Math.max(0, n - here - 2) },
+    rail: { left: 'BLOCK 01',
+      mid: `${n} BLOCKS · ${B.reduce((a, b) => a + b[1], 0)} CARDS · `
+        + `${Math.round(cleared / n * 100)}% CLEARED`,
+      right: `BLOCK ${String(n).padStart(2, '0')}` },
+  });
 }
 
 /* the cleared blocks, paged. THIS is what makes any one of them reachable without walking the
@@ -19688,19 +19731,27 @@ let RAIL_DEAD = 22;
 
 /* THE DRAG IS CLAMPED WHERE THE CLICK IS REFUSED. Scrubbing past the open block would let the
    pointer reach blocks the keyboard and the mouse both decline to open. */
+/* BOTH CHAINS SCRUB THE SAME WAY. The rail is the rail whichever screen it is on, so the only
+   thing that differs is which "here" clamps it and which pick it writes. */
+function chainScrub(i) {
+  const path = hudBespoke() === 'path';
+  const here = path ? paHere() : dkHere();
+  i = Math.max(0, Math.min(i, here));
+  const want = i === here ? -1 : i;
+  if (want === (path ? PA_PICK : DK_PICK)) return false;
+  if (path) { PA_PICK = want; PA_OPEN = false; } else { DK_PICK = want; DK_OPEN = false; }
+  HUD.cur = 0;
+  hudDraw();
+  return true;
+}
+
 function dragPickDeck(x, force) {
   if (!DRAG || !DRAG.bands) return;
   /* the first press commits immediately; after that the pointer must clear the deadband */
   if (!force && DRAG.armed !== undefined && Math.abs(x - DRAG.armed) < RAIL_DEAD) return;
   let i = 0;
   for (let k = 0; k < DRAG.bands.length; k++) if (x >= DRAG.bands[k]) i = k;
-  const here = dkHere();
-  i = Math.max(0, Math.min(i, here));
-  const want = i === here ? -1 : i;
-  if (want === DK_PICK) return;
-  DRAG.armed = x;
-  DK_PICK = want; DK_OPEN = false; HUD.cur = 0;
-  hudDraw();
+  if (chainScrub(i)) DRAG.armed = x;
 }
 
 addEventListener('pointermove', (e) => {
@@ -19726,7 +19777,7 @@ addEventListener('pointerup', () => {
 
 function hudWheel(e) {
   const bespoke = hudBespoke();
-  const onDeck = bespoke === 'deck';
+  const onDeck = bespoke === 'deck' || bespoke === 'path';
   const onRoad = !bespoke && courseShaped();
   if (!onDeck && !onRoad) return;
   e.preventDefault();
@@ -19739,18 +19790,134 @@ function hudWheel(e) {
      one flick. Capping per event turns a hard push into a fast scroll instead of a teleport. */
   step = Math.max(-1, Math.min(1, step));
   if (onDeck) {
-    const here = dkHere();
-    const from = DK_PICK < 0 ? here : DK_PICK;
-    const to = Math.max(0, Math.min(from + step, here));
-    const want = to === here ? -1 : to;
-    if (want === DK_PICK) return;
-    DK_PICK = want; DK_OPEN = false; HUD.cur = 0;
-    hudDraw();
+    const path = bespoke === 'path';
+    const here = path ? paHere() : dkHere();
+    const pick = path ? PA_PICK : DK_PICK;
+    chainScrub((pick < 0 ? here : pick) + step);
   } else {
     pathGo(HUD.cur + step, 0.26);
   }
 }
 hudEl.addEventListener('wheel', hudWheel, { passive: false });
+
+/* ================================================================================================
+   STUDY'S LEVEL TWO, ON THE CHAIN SHAPE.
+
+   Sixteen curriculum steps, exactly one of them current. See the note above `chainMarkup` for why
+   this stopped being a road. What matters at the keyboard: ONLY THE OPEN STEP ACTS. The other
+   fifteen are behind you or ahead of you, and the five JLPT steps that used to be five doors onto
+   one screen are now five grey segments on the rail, which is what they always were.
+   ================================================================================================ */
+let PA_PICK = -1, PA_OPEN = false, PA_PAGE = 0, PA_CELL = 0;
+
+function paRows() { return pathRows(); }
+function paHere() {
+  const rows = paRows();
+  const i = rows.findIndex((r) => r.state === 'here');
+  return i < 0 ? Math.max(0, rows.length - 1) : i;
+}
+function paCleared() { return paRows().filter((r) => r.state === 'done').length; }
+function paShown() { return PA_PICK >= 0 ? PA_PICK : paHere(); }
+
+function pathScreenMarkup() {
+  const rows = paRows(), n = rows.length;
+  const here = paHere(), cleared = paCleared(), at = paShown();
+  const r = rows[at] || {}, revisit = PA_PICK >= 0;
+  const nextUp = rows[here + 1];
+  /* WHAT THE STEP WANTS is the curriculum's own words -- `MasteryRequirement` said plainly, which
+     is the course's equivalent of a block's 70% gate. */
+  /* `pathRows` puts the step's MasteryRequirement in `meta`, not in `want` -- reading the wrong
+     field printed "NOTHING TO CLEAR" on every step in the course, including ones that plainly
+     want eighty characters. */
+  const want = r.meta ? String(r.meta).toUpperCase() : '';
+  const dest = r.kind === 'goto' ? (r.to || null) : null;
+  const slabB = revisit ? 'STUDY IT AGAIN'
+    : r.kind === 'deck' ? 'OPEN ITS BLOCKS'
+      : dest ? `GO TO ${dest}`
+        : 'NOT BUILT YET';
+  return chainMarkup({
+    items: rows.map((x) => ({ title: `${x.en}${x.meta ? ' — ' + x.meta : ''}` })),
+    n, cleared, here, at, revisit,
+    nameWide: true, maxName: 66,
+    behindLabel: `STEP${cleared === 1 ? '' : 'S'} DONE`,
+    hero: {
+      cap: `${revisit ? 'REVISITING' : 'YOU ARE HERE'} · STEP ${at + 1} OF ${n}`,
+      /* WHERE A STEP LIVES BELONGS IN THE CAP. It used to sit at the right of the gate row --
+         which is exactly where the action slab hangs, so it was drawn underneath it and never
+         once seen. Same trap the feed hit. */
+      capRight: dest ? `LIVES IN ${dest}`
+        : r.kind === 'deck' ? 'STUDIED HERE' : 'NOT BUILT YET',
+      name: r.jp || r.en || '', subLeft: r.en || '',
+      subRight: revisit ? 'DONE' : 'IN PROGRESS',
+      pct: revisit ? 100 : (r.pct || 0),
+      gate: revisit
+        ? `ALREADY DONE · GOING BACK CHANGES NOTHING AHEAD`
+        : (want ? `WANTS <em>${want}</em>` : 'NOTHING TO CLEAR'),
+      slabEm: revisit ? `STEP ${at + 1}` : 'THE ONLY WAY ON',
+      slabB,
+    },
+    ahead: { kicker: 'NEXT, WHEN THIS ONE IS DONE',
+      name: nextUp ? (nextUp.jp || nextUp.en) : 'THE COURSE IS DONE',
+      meta: nextUp ? (nextUp.en || '') : 'NOTHING LOCKED',
+      locked: Math.max(0, n - here - 2) },
+    rail: { left: 'STEP 01',
+      mid: `${n} STEPS · ${cleared} DONE · ${Math.round(cleared / n * 100)}% OF THE COURSE`,
+      right: `STEP ${String(n).padStart(2, '0')}` },
+  });
+}
+
+/* THE OPEN STEP DOES THE THING. A deck opens its blocks, a hand-off flies to the section that
+   owns it, and a step with nowhere to go refuses out loud instead of pretending. This is the same
+   three answers `hudPick` gave, minus the part where fifteen other rows could also trigger them. */
+function pathEnter() {
+  const rows = paRows(), i = paShown(), r = rows[i];
+  if (!r) return;
+  if (r.state === 'ahead') { doFlash(0.2); punchShake(0.24); return; }
+  if (r.kind === 'goto') {
+    const gi = r.to ? ITEMS.findIndex((x) => x.en === r.to) : -1;
+    if (gi >= 0) { handOff(gi); return; }
+    doFlash(0.2); punchShake(0.24); return;
+  }
+  if (r.kind !== 'deck') { doFlash(0.2); punchShake(0.24); return; }
+  /* `hudPick` reads the row at `HUD.cur`, so the cursor is pointed at the step for one call */
+  HUD.cur = i;
+  hudPick();
+}
+
+function pathSheet() {
+  const rows = paRows(), cleared = paCleared();
+  const pages = Math.max(1, Math.ceil(cleared / DK_PER_PAGE));
+  PA_PAGE = Math.max(0, Math.min(PA_PAGE, pages - 1));
+  const lo = PA_PAGE * DK_PER_PAGE, hi = Math.min(cleared, lo + DK_PER_PAGE);
+  const cells = [];
+  for (let i = lo; i < hi; i++) {
+    cells.push(`<button class="dk-cell${i - lo === PA_CELL ? ' on' : ''}" data-b="${i}">`
+      + `<b>${String(i + 1).padStart(2, '0')}</b><em>${rows[i].en}</em>`
+      + `<i>${rows[i].meta || ''}</i></button>`);
+  }
+  return `<button class="dk-scrim" data-close="1"></button><div class="dk-frame">`
+    + `<div class="dk-sheet"><span class="dk-cap"><b>STEPS DONE · ${cleared} OF ${rows.length}`
+    + `</b><i>ENTER TO GO BACK TO ONE</i></span>`
+    + `<div class="dk-grid">${cells.join('')}</div>`
+    + `<span class="dk-pager"><span>PAGE ${PA_PAGE + 1} / ${pages}</span>`
+    + `<span>← → MOVE · ESC CLOSE</span></span></div></div>`;
+}
+
+function pathScreenLayout() {
+  hudEl.querySelectorAll('.dk-f').forEach((b) => {
+    b.classList.toggle('on', +b.dataset.i === HUD.at);
+  });
+  const open = hudEl.querySelector('.dk-open');
+  if (!open) return;
+  open.hidden = !PA_OPEN;
+  open.innerHTML = PA_OPEN ? pathSheet() : '';
+  if (!PA_OPEN) return;
+  const scrim = open.querySelector('.dk-scrim');
+  if (scrim) scrim.addEventListener('click', () => { PA_OPEN = false; hudDraw(); });
+  open.querySelectorAll('.dk-cell').forEach((b) => {
+    b.addEventListener('click', () => { PA_PICK = +b.dataset.b; PA_OPEN = false; hudDraw(); });
+  });
+}
 
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
@@ -19761,6 +19928,9 @@ function hudBespoke() {
     return null;
   }
   if (HUD.level !== 2) return null;
+  /* THE COURSE STOPS BEING A ROAD. Sixteen milestones, one of them current -- the same chain the
+     deck screen draws, and for the same reason. */
+  if (HUD.sec === 'STUDY') return 'path';
   if (HUD.sec === 'RECORDS') return 'ledger';
   if (HUD.sec === 'JLPT') return 'ascent';
   return null;
@@ -19783,7 +19953,8 @@ function hudDraw(force) {
        because the rail and the grid are drawn from them, but the cursor only ever addresses the
        hero and the cleared pile -- so it is clamped to those rather than to the row count. */
     /* the feed's cursor addresses the hero plus five budget steps, never its word list */
-    const span = bespoke === 'deck' ? 2 : bespoke === 'feed' ? 6 : all.length;
+    const span = bespoke === 'deck' || bespoke === 'path' ? 2
+      : bespoke === 'feed' ? 6 : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -19799,6 +19970,7 @@ function hudDraw(force) {
     rows.length, HUD.lo, all.length, courseShaped() ? HUD.c : '',
     bespoke || '', bespoke ? String(LG_WEAK) : '',
     bespoke === 'deck' ? String(DK_PICK) : '',
+    bespoke === 'path' ? PA_PICK + '/' + paHere() : '',
     bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
@@ -19906,7 +20078,9 @@ function hudBuild(rows) {
         ? `<div class="deck">${deckMarkup()}</div>`
         : bespoke === 'feed'
           ? `<div class="feed">${feedMarkup()}</div>`
-          : shaped
+          : bespoke === 'path'
+            ? `<div class="path">${pathScreenMarkup()}</div>`
+            : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
@@ -19916,7 +20090,7 @@ function hudBuild(rows) {
     /* OUTSIDE THE PANEL ON PURPOSE -- see the note by `.lg-open`. It has to dim the heading and
        the key hints as well as the figures, and inside `.ledger` it could reach neither. */
     + (bespoke === 'ledger' ? `<div class="lg-open" hidden></div>` : '')
-    + (bespoke === 'deck' ? `<div class="dk-open" hidden></div>` : '')
+    + (bespoke === 'deck' || bespoke === 'path' ? `<div class="dk-open" hidden></div>` : '')
     + (footed ? `<div class="hud-foot">${detail}</div>` : '')
     /* NO BENCH TAG. V, B and A still cycle treatment, frame and the place's colour -- but
        MIDASHI is the design now and the other twelve are a comparison nobody needs printed over
@@ -19966,7 +20140,26 @@ function hudBuild(rows) {
      hero back where it belongs, and a locked one refuses out loud rather than doing nothing --
      silence is indistinguishable from a broken click. */
   /* the rail and the road each take a pointerdown and nothing else -- see the note by `DRAG` */
-  const dkRail = hudEl.querySelector('.dk-rail');
+  if (bespoke === 'path') {
+    hudEl.querySelectorAll('.dk-f').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (performance.now() - dragEnded < 140) return;
+        const to = +b.dataset.i;
+        if (to === 1) { PA_OPEN = true; PA_CELL = 0; PA_PAGE = 0; }
+        HUD.cur = to; hudDraw();
+      });
+    });
+    hudEl.querySelectorAll('.dk-segrow i').forEach((el) => {
+      el.addEventListener('click', () => {
+        if (performance.now() - dragEnded < 140) return;
+        const i = +el.dataset.b, here = paHere();
+        if (i > here) { doFlash(0.2); punchShake(0.24); return; }
+        PA_PICK = i === here ? -1 : i;
+        PA_OPEN = false; HUD.cur = 0; hudDraw();
+      });
+    });
+  }
+  const dkRail = bespoke === 'deck' || bespoke === 'path' ? hudEl.querySelector('.dk-rail') : null;
   if (dkRail) dkRail.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     const segs = [...dkRail.querySelectorAll('.dk-segrow i')];
@@ -19982,7 +20175,10 @@ function hudBuild(rows) {
     DRAG = { kind: 'road', lastX: e.clientX, moved: 0 };
     document.body.classList.add('is-dragging');
   });
-  hudEl.querySelectorAll('.dk-segrow i').forEach((el) => {
+  /* SCOPED TO THE DECK. The path screen reuses every `.dk-*` class, so an unguarded query here
+     bound a second, deck-flavoured handler to its plates -- pressing "behind you" on the course
+     opened the DECK's grid over it. */
+  if (bespoke === 'deck') hudEl.querySelectorAll('.dk-segrow i').forEach((el) => {
     el.addEventListener('click', () => {
       if (performance.now() - dragEnded < 140) return;
       const i = +el.dataset.b, here = dkHere();
@@ -19992,8 +20188,9 @@ function hudBuild(rows) {
       hudDraw();
     });
   });
-  hudEl.querySelectorAll('.dk-f').forEach((b) => {
+  if (bespoke === 'deck') hudEl.querySelectorAll('.dk-f').forEach((b) => {
     b.addEventListener('click', () => {
+      if (performance.now() - dragEnded < 140) return;
       const to = +b.dataset.i;
       if (to === 1) { DK_OPEN = true; DK_CELL = 0; }
       HUD.cur = to; hudDraw();
@@ -20091,6 +20288,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'ascent') { ascentLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'deck') { deckLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'feed') { feedLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'path') { pathScreenLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -20409,6 +20607,46 @@ addEventListener('keydown', (e) => {
         FD_DONE = Math.min(FD_DONE, FD_BUDGET);
         hudDraw();
       } else { doFlash(0.18); }
+      e.preventDefault(); return;
+    }
+  }
+  /* ---- STUDY'S COURSE, SAME KEYS AS THE DECK SCREEN ----
+     Deliberately identical: two focusables, Enter acts on the open step, left opens what is
+     behind you, Escape unwinds the grid then the detour then the section. Two screens one
+     keypress apart should not need learning twice. */
+  if (hudBespoke() === 'path') {
+    const back = e.key === 'Escape' || e.key === 'Backspace';
+    if (PA_OPEN) {
+      const cleared = paCleared();
+      const shown = Math.min(DK_PER_PAGE, cleared - PA_PAGE * DK_PER_PAGE);
+      const pages = Math.max(1, Math.ceil(cleared / DK_PER_PAGE));
+      if (back) { PA_OPEN = false; hudDraw(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (e.key === 'ArrowRight') {
+        if (PA_CELL + 1 < shown) PA_CELL++;
+        else if (PA_PAGE + 1 < pages) { PA_PAGE++; PA_CELL = 0; }
+        hudDraw(); e.preventDefault(); return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (PA_CELL > 0) PA_CELL--;
+        else if (PA_PAGE > 0) { PA_PAGE--; PA_CELL = DK_PER_PAGE - 1; }
+        hudDraw(); e.preventDefault(); return;
+      }
+      if (e.key === 'ArrowDown') { PA_CELL = Math.min(shown - 1, PA_CELL + 6); hudDraw(); e.preventDefault(); return; }
+      if (e.key === 'ArrowUp') { PA_CELL = Math.max(0, PA_CELL - 6); hudDraw(); e.preventDefault(); return; }
+      if (e.key === 'Enter') {
+        PA_PICK = PA_PAGE * DK_PER_PAGE + PA_CELL; PA_OPEN = false; HUD.cur = 0;
+        hudDraw(); e.preventDefault(); return;
+      }
+      e.preventDefault(); return;
+    }
+    if (back && PA_PICK >= 0) {
+      PA_PICK = -1; hudDraw(); e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { HUD.cur = 1; hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { HUD.cur = 0; hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'Enter') {
+      if (HUD.cur === 1) { PA_OPEN = true; PA_CELL = 0; PA_PAGE = 0; hudDraw(); }
+      else pathEnter();
       e.preventDefault(); return;
     }
   }
