@@ -1403,6 +1403,10 @@
   .hud.on { opacity: 1; }
   .hud[hidden] { display: none; }
   .hud-panel { position: fixed; background: var(--panel); pointer-events: auto; }
+  /* MIDASHI'S TWO, AND NOBODY ELSE'S. `display: contents` removes the wrapper from layout
+     altogether, so every other treatment lays its head out as though these were never added. */
+  .hud-mark { display: none; }
+  .hud-headtext { display: contents; }
   /* the diagonal is drawn as a sibling, not as a clip on the panel, so the panel can still scroll
      its own content and the cut stays crisp at any height */
   .hud-cut { position: fixed; pointer-events: none; background: var(--sec, var(--hi)); }
@@ -1512,15 +1516,51 @@
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
-  /* ---- the heading is the item you just picked, in the form you picked it ---- */
+  /* ================================================================================
+     THE HEADING IS THE CARD YOU PRESSED TO GET HERE.
+
+     It was the last thing on this screen still standing on nothing: bare cream type with a halo
+     and a three-pixel accent rule under it, from when everything around it was also bare type on
+     a valley. It is not any more. The menu is six washi slabs with an accent block on the leading
+     edge; the road is washi tablets and a washi hero; the chips, the keycaps and the back tab are
+     all small washi slabs. One piece of unhoused type in the corner reads as left over, which is
+     what it was.
+
+     SO IT TAKES THE MENU ROW'S OWN ANATOMY -- accent block carrying the section's mark, then the
+     name -- because that IS the object it names. You pressed a slab with 学 on a gold block and
+     STUDY beside it; the screen it opens says the same thing in the same shape, one size down and
+     in the corner. Nothing new is invented and the two levels stop looking like two projects.
+
+     AND THE TYPE LOSES ITS HALO, because it has a ground now. The hard shadow plus soft aura on
+     `.hud-title b` is what holds cream against an open valley; on cream paper it is ink on light
+     and the halo is just stroke weight -- the same trade the menu's own word made when it moved
+     onto a card.
+     ================================================================================ */
   .hud[data-t="midashi"] .hud-head {
-    background: none; width: auto; padding: 0 0 10px 4px; clip-path: none;
+    align-self: flex-start; width: max-content; max-width: 560px;
+    display: flex; flex-direction: row; align-items: stretch; gap: 0;
+    padding: 0; clip-path: none;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
+    transform: skewX(-8deg) rotate(-1.2deg);
+  }
+  /* the mark, on the leading edge, exactly where the menu row puts it */
+  .hud[data-t="midashi"] .hud-mark {
+    flex: none; width: 54px; display: grid; place-items: center;
+    background: var(--sec, var(--hi)); color: var(--ink);
+    font-family: var(--jp); font-weight: 400; font-size: 30px; line-height: 1;
+    box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.2);
+  }
+  .hud[data-t="midashi"] .hud-headtext {
+    display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
+    padding: 10px 18px 11px;
   }
   /* the description goes, the way it goes on every other treatment that is short of room. It is
      the line nobody reads and it costs 18 of the 47 pixels this needed to find. */
   .hud[data-t="midashi"] .hud-sub { display: none; }
   .hud[data-t="midashi"] .hud-kick {
-    text-shadow: var(--halo); margin-bottom: 4px;
+    text-shadow: none; color: rgba(20, 17, 13, 0.5); margin-bottom: 5px;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.22em;
   }
   /* ================================================================================
      THE HEADING IS NOT AN ITEM, AND IT HAS TO SAY SO IN THE TYPE.
@@ -1542,15 +1582,13 @@
     margin-bottom: 0;
   }
   .hud[data-t="midashi"] .hud-title b {
-    font-family: var(--jp); font-weight: 700; font-size: 44px; letter-spacing: 0.15em;
-    color: var(--washi); line-height: 1;
-    text-shadow: 3px 3px 0 rgba(0, 0, 0, calc(0.44 + 0.26 * var(--sky))),
-                 0 0 calc(11px + 14px * var(--sky)) rgba(6, 9, 15, calc(0.46 + 0.38 * var(--sky)));
+    font-family: var(--jp); font-weight: 700; font-size: 34px; letter-spacing: 0.13em;
+    color: var(--ink); line-height: 1; text-shadow: none;
   }
   .hud[data-t="midashi"] .hud-title i {
     font-family: var(--lat-ui); font-weight: 700; font-style: normal;
-    font-size: 16px; letter-spacing: 0.36em; color: var(--washi-dim); transform: none;
-    text-shadow: var(--halo);
+    font-size: 14px; letter-spacing: 0.32em; color: rgba(20, 17, 13, 0.55); transform: none;
+    text-shadow: none;
   }
   /* ::BEFORE, NOT ::AFTER, AND THAT IS NOT A PREFERENCE. `.hud-head::after` already belongs to
      the frame-ring machinery six hundred lines below this, and its `[data-b="none"]` rule --
@@ -1559,12 +1597,7 @@
      invisible in every screenshot, because an absence looks like a choice.
      ::before is free, and `order: 1` in a flex column puts it after the title instead of before
      the kicker, which is the one thing ::before would otherwise get wrong. */
-  .hud[data-t="midashi"] .hud-head { display: flex; flex-direction: column; align-items: flex-start; }
-  .hud[data-t="midashi"] .hud-head::before {
-    content: ''; display: block; order: 1; width: 124px; height: 3px; margin-top: 12px;
-    background: linear-gradient(90deg, var(--sec-hi, var(--sec)), rgba(0, 0, 0, 0));
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
-  }
+  .hud[data-t="midashi"] .hud-head::before { display: none; }
   .hud[data-t="midashi"] .hud-sub {
     color: var(--washi-dim); text-shadow: var(--halo); margin-bottom: 0;
   }
@@ -17969,13 +18002,21 @@ function hudBuild(rows) {
   hudEl.style.setProperty('--sec', acc[0]);
   hudEl.style.setProperty('--sec-lo', acc[1]);
   hudEl.style.setProperty('--sec-hi', acc[2]);
-  const head = HUD.level === 3
+  /* THE MARK IS THE SECTION'S OWN, and at level three the deck's -- the same character the menu
+     stamps on that item and the same one `sealOf` puts on a row, so one glyph means one thing
+     wherever it appears. Declared before `head` because `head` uses it. */
+  const headMark = HUD.level === 3
+    ? ((String(tile[0]).match(/[\u3040-\u30ff\u4e00-\u9faf]/) || [it.kanji])[0])
+    : it.kanji;
+  const headBody = HUD.level === 3
     ? `<div class="hud-kick">${it.en} \u2014 ${tile[1]}</div>`
       + `<div class="hud-title"><b>${tile[0]}</b><i>${tile[1]}</i></div>`
       + `<div class="hud-sub">\u30ec\u30d9\u30eb\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044 \u00b7 CHOOSE A LEVEL</div>`
     : `<div class="hud-kick">SECTION ${String(ITEMS.indexOf(it) + 1).padStart(2, '0')} / 06</div>`
       + `<div class="hud-title"><b>${it.jp}</b><i>${it.en}</i></div>`
       + `<div class="hud-sub">${it.descJp} \u00b7 ${it.desc}</div>`;
+  const head = `<span class="hud-mark">${headMark}</span>`
+    + `<span class="hud-headtext">${headBody}</span>`;
   /* the bar is emitted at zero width and filled a frame later, so its transition has something to
      run from -- an element born at 46% has never changed and will never animate */
   /* the seal is the row's own first Japanese character, the way the menu's is the section's --
