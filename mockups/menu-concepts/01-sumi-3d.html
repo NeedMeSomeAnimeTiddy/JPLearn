@@ -1515,7 +1515,8 @@
   .hud[data-t="midashi"] .course-shape,
   .hud[data-t="midashi"] .ledger,
   .hud[data-t="midashi"] .ascent,
-  .hud[data-t="midashi"] .deck { zoom: var(--u); }
+  .hud[data-t="midashi"] .deck,
+  .hud[data-t="midashi"] .feed { zoom: var(--u); }
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
@@ -2078,7 +2079,8 @@
      chips, and its own plates carry everything it has to say */
   .hud[data-screen="ledger"] .hud-detail,
   .hud[data-screen="ascent"] .hud-detail,
-  .hud[data-screen="deck"] .hud-detail { display: none; }
+  .hud[data-screen="deck"] .hud-detail,
+  .hud[data-screen="feed"] .hud-detail { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2413,6 +2415,135 @@
   .dk-pager { display: flex; align-items: baseline; justify-content: space-between;
     padding: 0 20px 14px; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
     letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5); }
+
+  /* ================================================================================
+     THE FEED IS A QUEUE, NOT A ROAD.
+
+     Vocabulary's level three stopped being a block list and became today's words. It was
+     drawn on the road -- twelve tablets in peers mode -- and two things were wrong with
+     that, one small and one structural.
+
+     THE SMALL ONE: the screen had no control for the number it is generated from. Every
+     word on it was there because the budget was twelve, and there was nowhere to change
+     it. The shipped app has a chip row, none / 5 / 10 / 20 / 40, and this had nothing.
+
+     THE STRUCTURAL ONE: a road is places you walk, in an order, and they are still there
+     tomorrow. A feed is a queue that is REPLACED tomorrow, and emptying it is the point.
+     Drawing the second as the first tells the learner they are choosing when they are
+     not -- there is no choosing in a feed, there is only how much and whether you did it.
+
+     So: the next word as the hero, today's list as a proportional rail that empties, and
+     the budget as a real control with the two denominators standing next to it. The rail
+     is deliberately the deck screen's rail -- same object, same reading -- because these
+     two screens sit one keypress apart and a learner should not have to learn twice.
+     ================================================================================ */
+  .feed {
+    position: relative; margin-top: 6px;
+    margin-left: -52px; width: calc(100vw / var(--u)); height: 440px;
+  }
+  .fd-wrap { position: absolute; inset: 0; }
+  .fd-f { position: absolute; border: 0; padding: 0; margin: 0; font: inherit; text-align: left;
+    cursor: pointer; color: var(--ink); }
+  .fd-f::after { content: ''; position: absolute; left: -7px; top: -7px; right: -7px;
+    bottom: -7px; box-shadow: inset 0 0 0 3px var(--hi); opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease; }
+  .fd-f.on::after { opacity: 1; }
+  .fd-cap { display: flex; align-items: baseline; justify-content: space-between;
+    white-space: nowrap; padding: 6px 15px 7px; background: var(--ink); color: var(--gold-hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em; }
+  .fd-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
+
+  /* ---- the word you would do now ---- */
+  .fd-hero { left: 56px; top: 30px; width: 620px; height: 246px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .fd-body { flex: 1; display: flex; flex-direction: column; padding: 14px 24px 0; }
+  .fd-word { font-family: var(--jp); font-weight: 700; line-height: 1.04; color: var(--ink); }
+  .fd-read { margin-top: 7px; font-family: var(--lat-ui); font-weight: 700; font-size: 15px;
+    letter-spacing: 0.22em; color: #b23320; }
+  .fd-gloss { margin-top: 5px; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 22px; line-height: 1.1; color: rgba(20, 17, 13, 0.78); }
+  /* WHY THIS WORD IS HERE. The ordering picks the word using the MOST of what you already
+     know, so naming those characters is the difference between a list and a reason. */
+  .fd-uses { margin-top: auto; display: flex; align-items: center; gap: 9px; padding-bottom: 10px; }
+  .fd-uses span { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
+  .fd-uses i { width: 27px; height: 27px; display: grid; place-items: center;
+    font-family: var(--jp); font-style: normal; font-size: 17px;
+    background: var(--gold); color: var(--ink); }
+  .fd-uses i.no { background: rgba(20, 17, 13, 0.12); color: rgba(20, 17, 13, 0.55);
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.28); }
+  .fd-theme { display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 24px 11px; background: rgba(20, 17, 13, 0.06);
+    box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16); font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.6);
+    white-space: nowrap; }
+  .fd-slab { position: absolute; right: -14px; bottom: -30px; z-index: 3; padding: 9px 15px 10px;
+    background: var(--hi); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); white-space: nowrap; }
+  .fd-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 10px; line-height: 12px; letter-spacing: 0.14em; color: #ffd9a1; }
+  .fd-slab b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
+    line-height: 17px; letter-spacing: 0.1em; color: var(--washi); margin-top: 2px; }
+
+  /* ---- how much today, and what that is a fraction of ---- */
+  .fd-today { position: absolute; left: 694px; top: 30px; width: 490px; height: 246px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .fd-count { display: flex; align-items: baseline; gap: 12px; padding: 12px 20px 0; }
+  .fd-count b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 62px;
+    line-height: 0.86; color: var(--ink); }
+  .fd-count span { display: flex; flex-direction: column; gap: 2px; }
+  .fd-count em { font-style: normal; font-family: var(--lat); font-weight: 900; font-size: 19px;
+    color: #b23320; }
+  .fd-count i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55); white-space: nowrap; }
+  .fd-steps { display: flex; gap: 6px; padding: 14px 20px 0; }
+  /* THE CONTROL. Five values, each its own focusable -- no mode, no second axis: the arrows
+     already walk the screen and Enter already picks, so the chips need no new grammar. */
+  .fd-step { position: relative; flex: 1; padding: 9px 0 10px; text-align: center; border: 0;
+    cursor: pointer; background: rgba(20, 17, 13, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.22);
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
+    color: rgba(20, 17, 13, 0.6); }
+  .fd-step.set { background: var(--gold); box-shadow: none; color: var(--ink); }
+  .fd-step::after { content: ''; position: absolute; left: -4px; top: -4px; right: -4px;
+    bottom: -4px; box-shadow: inset 0 0 0 3px var(--hi); opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease; }
+  .fd-step.on::after { opacity: 1; }
+  .fd-steplab { padding: 7px 20px 0; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); }
+  /* THE DENOMINATORS. "Twelve words today" is a card trick without them, and the second one
+     is the number the whole ordering turns on -- clearing a kanji block is what moves it. */
+  .fd-denom { margin-top: auto; display: flex; align-items: stretch;
+    box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.2); }
+  .fd-denom span { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 10px 20px 12px; }
+  .fd-denom span + span { box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2); }
+  .fd-denom b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
+    color: var(--ink); }
+  .fd-denom i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); white-space: nowrap; }
+
+  /* ---- today's list, which empties ---- */
+  .fd-rail { position: absolute; left: 56px; top: 296px; width: 1128px; height: 104px;
+    display: flex; flex-direction: column;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .fd-segrow { flex: 1; display: flex; align-items: stretch; gap: 4px; padding: 12px 16px 8px; }
+  .fd-segrow i { flex: 1; display: block; max-width: 120px; position: relative;
+    background: rgba(20, 17, 13, 0.13); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+  .fd-segrow i.done { background: var(--gold); box-shadow: none; }
+  .fd-segrow i.here { background: #b23320; box-shadow: 0 0 0 2px rgba(20, 17, 13, 0.55); }
+  /* a budget of zero has no segments at all, and an empty rail must say which it is */
+  .fd-none { flex: 1; display: grid; place-items: center; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 11px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); }
+  .fd-railcap { display: flex; align-items: baseline; justify-content: space-between;
+    padding: 0 16px 9px; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
 
   .course-shape {
     position: relative; margin-top: 6px;
@@ -4891,21 +5022,70 @@ const L3_DAILY = {
    ================================================================================ */
 const STUDY_FEED = {
   vocab_n5: {
-    of: 744, readable: 291, knownKanji: 67, budget: 12,
-    /* [word, reading, meaning, the theme it is still labelled with] */
+    of: 744, readable: 291, knownKanji: 67,
+    /* THE DEFAULT IS TEN, WHICH IS THE SHIPPED APP'S. `DEFAULT_NEW_PER_DAY` in
+       `domain/vocab_order` is 10 and the renderer's chips are [0, 5, 10, 20, 40]; this file
+       carried 12 with no way to change it, which is the whole of open problem four. */
+    budget: 10, steps: [0, 5, 10, 20, 40],
+    /* the sixty-seven characters of kanji N5's first three blocks -- the real ones, so the
+       hero's "kanji you already know" is a check rather than a claim */
+    known: '日月四金九七水土時木火'
+      + '分一年二三五六八十百千万'
+      + '半大長後外小山北川西白雨'
+      + '田花内安赤中高新前上東下'
+      + '左右天青南古人子気女母父'
+      + '目口耳手足力男友',
+    /* FORTY, BECAUSE THE LARGEST BUDGET IS FORTY. The real output of `next_words` against the
+       real N5 deck for a learner with those 67 characters, so every budget below forty is a
+       prefix of this list -- which is exactly how the ordering works.
+       THE CHARACTER OF THE LIST CHANGES AROUND TWENTY-TWO, and that is not a transcription
+       error. Up to there the words are the ones using the MOST of what you know, which is why
+       so many are dates -- 日 and the numerals are the block just cleared. After that the
+       ordering runs out of those and falls back to the deck's own order, which is gojuon: ao,
+       aoi, aka, akai. Setting the budget to forty is visibly reaching further than the
+       ordering can currently justify, and the screen should let you see that.
+       [word, reading, gloss, theme] */
     words: [
-      ['\u4e8c\u5341\u65e5', 'hatsuka', 'twenty days', 'Days of the Month'],
-      ['\u4e00\u65e5', 'ichinichi', 'one day (duration)', 'Days of the Month'],
-      ['\u4e94\u65e5', 'itsuka', 'five days', 'Days of the Month'],
-      ['\u7537\u306e\u5b50', 'otokonoko', 'boy', 'Relatives'],
-      ['\u5927\u4eba', 'otona', 'adult', 'Relatives'],
-      ['\u5973\u306e\u5b50', 'onnanoko', 'girl', 'Relatives'],
-      ['\u4e5d\u65e5', 'kokonoka', 'nine days', 'Days of the Month'],
-      ['\u4e0a\u624b', 'jouzu', 'be good at', 'Classroom & Reading'],
-      ['\u4e00\u65e5', 'tsuitachi', 'one day', 'Days of the Month'],
-      ['\u5929\u6c17', 'tenki', 'weather', 'Common Nouns'],
-      ['\u5341\u65e5', 'tooka', 'ten days', 'Days of the Month'],
-      ['\u4e03\u65e5', 'nanoka', 'seven days', 'Days of the Month'],
+    ['\u4e8c\u5341\u65e5', 'hatsuka', 'twenty days', 'Days of the Month'],
+    ['\u4e00\u65e5', 'ichinichi', 'one day (duration)', 'Days of the Month'],
+    ['\u4e94\u65e5', 'itsuka', 'five days', 'Days of the Month'],
+    ['\u7537\u306e\u5b50', 'otokonoko', 'boy', 'Relatives'],
+    ['\u5927\u4eba', 'otona', 'adult', 'Relatives'],
+    ['\u5973\u306e\u5b50', 'onnanoko', 'girl', 'Relatives'],
+    ['\u4e5d\u65e5', 'kokonoka', 'nine days', 'Days of the Month'],
+    ['\u4e0a\u624b', 'jouzu', 'be good at', 'Classroom & Reading'],
+    ['\u4e00\u65e5', 'tsuitachi', 'one day', 'Days of the Month'],
+    ['\u5929\u6c17', 'tenki', 'weather', 'Common Nouns'],
+    ['\u5341\u65e5', 'tooka', 'ten days', 'Days of the Month'],
+    ['\u4e03\u65e5', 'nanoka', 'seven days', 'Days of the Month'],
+    ['\u534a\u5206', 'hambun', 'half', 'Counting & Digits'],
+    ['\u4e00\u6708', 'hitotsuki', 'one month', 'Days of the Month'],
+    ['\u4e00\u4eba', 'hitori', 'one person', 'Days of the Month'],
+    ['\u4e8c\u4eba', 'futari', 'two people', 'Days of the Month'],
+    ['\u4e8c\u65e5', 'futsuka', 'two days', 'Days of the Month'],
+    ['\u4e0b\u624b', 'heta', 'unskillful', 'Classroom & Reading'],
+    ['\u4e09\u65e5', 'mikka', 'three days', 'Days of the Month'],
+    ['\u516d\u65e5', 'muika', 'six days', 'Days of the Month'],
+    ['\u516b\u65e5', 'youka', 'eight days', 'Days of the Month'],
+    ['\u56db\u65e5', 'yokka', 'four days', 'Days of the Month'],
+    ['\u9752', 'ao', 'blue', 'Colours'],
+    ['\u9752\u3044', 'aoi', 'blue', 'Colours'],
+    ['\u8d64', 'aka', 'red', 'Colours'],
+    ['\u8d64\u3044', 'akai', 'red', 'Colours'],
+    ['\u4e0a\u3052\u308b', 'ageru', 'to raise', 'Handling Things'],
+    ['\u65b0\u3057\u3044', 'atarashii', 'new', 'Adjectives'],
+    ['\u5f8c', 'ato', 'afterwards (later)', 'Times of Day'],
+    ['\u96e8', 'ame', 'rain', 'Common Nouns'],
+    ['\u4e00', 'ichi', 'one', 'Counting & Digits'],
+    ['\u4e94\u3064', 'itsutsu', 'five things', 'Numbers'],
+    ['\u4e0a', 'ue', 'above', 'This, That & Where'],
+    ['\u5f8c\u308d', 'ushiro', 'back', 'This, That & Where'],
+    ['\u5927\u304d\u3044', 'ookii', 'big', 'Adjectives'],
+    ['\u5927\u304d\u306a', 'ookina', 'big', 'Size & Shape'],
+    ['\u304a\u6bcd\u3055\u3093', 'okaasan', 'mother (formal)', 'Family'],
+    ['\u304a\u91d1', 'okane', 'money', 'Around Town'],
+    ['\u304a\u7236\u3055\u3093', 'otousan', 'father (formal)', 'Family'],
+    ['\u7537', 'otoko', 'man', 'Relatives']
     ],
   },
 };
@@ -18608,6 +18788,7 @@ function hudRows() {
   if (hudBespoke() === 'ledger') return ledgerRows();
   if (hudBespoke() === 'ascent') return ascentRows();
   if (hudBespoke() === 'deck') return deckRows();
+  if (hudBespoke() === 'feed') return feedRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -19253,10 +19434,135 @@ function deckLayout() {
   });
 }
 
+/* ================================================================================================
+   THE FEED SCREEN -- vocabulary's level three.
+
+   See the long note above `.feed` in the stylesheet. Two problems, and the second is the one that
+   made this a screen rather than a chip row bolted onto the road: a feed is a queue that empties
+   and is replaced tomorrow, and the road says "choose one of these places", which is not a choice
+   this screen offers.
+
+   THE SIX FOCUSABLE THINGS are the hero and the five budget steps. The steps are ordinary
+   focusables rather than a control with its own axis, so the arrows and Enter mean here exactly
+   what they mean everywhere else in this menu -- move, then pick.
+   ================================================================================================ */
+let FD_BUDGET = -1, FD_DONE = 3;
+
+function fdFeed() { return STUDY_FEED[HUD.tile] || null; }
+function fdBudget() {
+  const F = fdFeed();
+  if (!F) return 0;
+  /* -1 means "never touched", so the deck's own default stands until the learner sets one */
+  return FD_BUDGET < 0 ? F.budget : FD_BUDGET;
+}
+function fdToday() {
+  const F = fdFeed();
+  return F ? F.words.slice(0, fdBudget()) : [];
+}
+/* the next word is the first one not done -- a queue has a front, not a selection */
+function fdAt() { return Math.min(fdToday().length - 1, FD_DONE); }
+
+/* THE ROWS ARE WHAT THE CURSOR ADDRESSES, NOT TODAY'S WORDS -- and that distinction is not
+   pedantic, it is the bug that ate the NONE setting. `hudDraw` opens with
+   `if (!all.length) return;`, so when these were the word list, choosing a budget of zero
+   produced zero rows, the draw bailed before rebuilding, and the screen went on showing the
+   forty words you had just turned off. The cursor here has always addressed six things -- the
+   hero and the five steps -- and a budget of none is six things and no words. */
+function feedRows() {
+  const F = fdFeed();
+  const steps = F ? F.steps : [];
+  return [{ no: '00', en: 'NEXT WORD', jp: '次の語', big: 'NEXT WORD', small: '次の語',
+    meta: 'TODAY', pct: 0, figs: [], next: ['', '', ''] }]
+    .concat(steps.map((v, i) => ({ no: String(i + 1).padStart(2, '0'),
+      en: v === 0 ? 'NO NEW WORDS' : v + ' A DAY', jp: '今日', big: String(v), small: '今日',
+      meta: 'BUDGET', pct: 0, figs: [], next: ['', '', ''] })));
+}
+
+function feedMarkup() {
+  const F = fdFeed();
+  if (!F) return '';
+  const today = fdToday(), n = today.length, budget = fdBudget();
+  const done = Math.min(FD_DONE, n), at = fdAt();
+  const cur = today[at];
+  const kanjiOf = (t) => Array.from(t).filter((ch) => /[一-龯]/.test(ch));
+
+  let hero;
+  if (!cur) {
+    hero = `<span class="fd-body"><span class="fd-word" style="font-size:44px">`
+      + (budget === 0 ? '休み' : 'しまい')
+      + `</span><span class="fd-gloss">`
+      + (budget === 0 ? 'No new words today — reviews only.'
+        : 'Today’s words are done. More tomorrow.')
+      + `</span></span>`
+      + `<span class="fd-theme"><span>${budget === 0 ? 'THE BUDGET IS SET TO NONE'
+        : 'THE FEED REFILLS AT MIDNIGHT'}</span><span>${done} DONE</span></span>`;
+  } else {
+    const [w, yomi, gloss, theme] = cur;
+    const ks = kanjiOf(w);
+    /* the word is set from its own length -- お父さん is four characters and 上 is one */
+    const size = Math.max(40, Math.min(76, Math.floor(430 / Math.max(1, w.length))));
+    hero = `<span class="fd-body">`
+      + `<span class="fd-word" style="font-size:${size}px">${w}</span>`
+      + `<span class="fd-read">${yomi.toUpperCase()}</span>`
+      + `<span class="fd-gloss">${gloss}</span>`
+      + `<span class="fd-uses"><span>${ks.length ? 'KANJI YOU ALREADY KNOW' : 'NO KANJI IN IT'}</span>`
+      + ks.map((ch) => `<i class="${F.known.indexOf(ch) >= 0 ? '' : 'no'}">${ch}</i>`).join('')
+      + `</span></span>`
+      /* THE COUNTER MOVED INTO THE CAP. The action slab hangs off the card's bottom-right
+         corner, which is exactly where a right-aligned second item in this row lands -- "WORD 4
+         OF 10" was drawn underneath it and never seen. */
+      + `<span class="fd-theme"><span>${theme.toUpperCase()}</span></span>`;
+  }
+
+  const segs = n
+    ? today.map((_, i) =>
+      `<i class="${i < done ? 'done' : i === at ? 'here' : ''}"></i>`).join('')
+    : `<span class="fd-none">NO NEW WORDS TODAY</span>`;
+
+  return `<div class="fd-wrap">`
+    + `<button class="fd-f fd-hero" data-i="0">`
+      + `<span class="fd-cap"><b>${cur ? '次の語 NEXT WORD · ' + (at + 1) + ' OF ' + n
+        : '今日 TODAY'}</b><i>TODAY’S FEED · REPLACED TOMORROW</i></span>`
+      + hero
+      + `<span class="fd-slab"><em>${n ? (n - done) + ' LEFT TODAY' : 'NOTHING QUEUED'}</em>`
+      + `<b>${n ? 'START TODAY’S WORDS' : 'GO TO REVIEWS'} ▸</b></span>`
+      + `</button>`
+    + `<div class="fd-today">`
+      + `<span class="fd-cap"><b>今日 TODAY</b><i>NEW WORDS A DAY</i></span>`
+      + `<span class="fd-count"><b>${n}</b><span>`
+      + `<em>${done} DONE · ${Math.max(0, n - done)} TO GO</em>`
+      + `<i>${budget === 0 ? 'NO NEW WORDS SET' : 'BUDGET IS ' + budget + ' A DAY'}</i>`
+      + `</span></span>`
+      + `<span class="fd-steps">`
+      + F.steps.map((v, k) => `<button class="fd-step${v === budget ? ' set' : ''}" `
+        + `data-i="${k + 1}" data-v="${v}">${v === 0 ? 'NONE' : v}</button>`).join('')
+      + `</span>`
+      + `<span class="fd-steplab">HOW MANY NEW WORDS A DAY · REVIEWS ARE NOT CAPPED</span>`
+      + `<span class="fd-denom">`
+      + `<span><b>${F.readable} / ${F.of}</b><i>READABLE WITH WHAT YOU KNOW</i></span>`
+      + `<span><b>${F.knownKanji}</b><i>KANJI KNOWN · THIS IS THE ORDER</i></span>`
+      + `</span></div>`
+    + `<div class="fd-rail"><span class="fd-segrow">${segs}</span>`
+      + `<span class="fd-railcap"><span>${n ? 'FIRST' : ''}</span>`
+      + `<span>${n ? n + ' WORDS TODAY · ' + done + ' DONE' : 'REVIEWS ONLY'}`
+      + ` · ${F.readable} OF ${F.of} READABLE</span>`
+      + `<span>${n ? 'LAST' : ''}</span></span></div>`
+    + `</div>`;
+}
+
+function feedLayout() {
+  hudEl.querySelectorAll('.fd-f, .fd-step').forEach((b) => {
+    b.classList.toggle('on', +b.dataset.i === HUD.at);
+  });
+}
+
 function hudBespoke() {
-  /* A DECK'S BLOCKS ARE LEVEL THREE, not level two -- the only bespoke screen that is. */
+  /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
-    return HUD.sec === 'STUDY' && STUDY_BLOCKS[HUD.tile] ? 'deck' : null;
+    if (HUD.sec !== 'STUDY') return null;
+    if (STUDY_BLOCKS[HUD.tile]) return 'deck';
+    if (STUDY_FEED[HUD.tile]) return 'feed';
+    return null;
   }
   if (HUD.level !== 2) return null;
   if (HUD.sec === 'RECORDS') return 'ledger';
@@ -19280,7 +19586,8 @@ function hudDraw(force) {
     /* THE DECK SCREEN HAS SEVENTY-SIX ROWS AND TWO FOCUSABLE THINGS. Its rows are the blocks,
        because the rail and the grid are drawn from them, but the cursor only ever addresses the
        hero and the cleared pile -- so it is clamped to those rather than to the row count. */
-    const span = bespoke === 'deck' ? 2 : all.length;
+    /* the feed's cursor addresses the hero plus five budget steps, never its word list */
+    const span = bespoke === 'deck' ? 2 : bespoke === 'feed' ? 6 : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -19295,7 +19602,8 @@ function hudDraw(force) {
   const key = [HUD.sec, HUD.level, HUD.tile, HUD.t, HUD.b, HUD.air,
     rows.length, HUD.lo, all.length, courseShaped() ? HUD.c : '',
     bespoke || '', bespoke ? String(LG_WEAK) : '',
-    bespoke === 'deck' ? String(DK_PICK) : ''].join('|');
+    bespoke === 'deck' ? String(DK_PICK) : '',
+    bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -19398,7 +19706,9 @@ function hudBuild(rows) {
       ? `<div class="ascent">${ascentMarkup()}</div>`
       : bespoke === 'deck'
         ? `<div class="deck">${deckMarkup()}</div>`
-        : shaped
+        : bespoke === 'feed'
+          ? `<div class="feed">${feedMarkup()}</div>`
+          : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
@@ -19440,6 +19750,16 @@ function hudBuild(rows) {
       const to = +b.dataset.i;
       LG_OPEN = HUD.cur === to ? !LG_OPEN : true;
       HUD.cur = to;
+      hudDraw();
+    });
+  });
+  hudEl.querySelectorAll('.fd-f, .fd-step').forEach((b) => {
+    b.addEventListener('click', () => {
+      HUD.cur = +b.dataset.i;
+      if (b.dataset.v !== undefined) {
+        FD_BUDGET = +b.dataset.v;
+        FD_DONE = Math.min(FD_DONE, FD_BUDGET);
+      }
       hudDraw();
     });
   });
@@ -19527,6 +19847,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'ledger') { ledgerLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'ascent') { ascentLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'deck') { deckLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'feed') { feedLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -19820,6 +20141,31 @@ addEventListener('keydown', (e) => {
         lvChip.querySelector('.xp-track i').style.width =
           Math.round(D.xpIn / D.xpOf * 100) + '%';
       }
+      e.preventDefault(); return;
+    }
+  }
+  /* ---- THE FEED'S OWN KEYS ----
+     Six focusables and no modes: the hero, then the five budget steps. Enter on a step sets the
+     budget, which is the whole of open problem four. The generic branch below would wrap the
+     cursor around the WORD count -- forty at the largest budget -- so the arrows are handled
+     here and never reach it. */
+  if (hudBespoke() === 'feed') {
+    const F = fdFeed();
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      HUD.cur = (HUD.cur + 1) % 6; hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      HUD.cur = (HUD.cur + 5) % 6; hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') {
+      if (HUD.cur > 0 && F) {
+        FD_BUDGET = F.steps[HUD.cur - 1];
+        /* WHAT IS ALREADY DONE STAYS DONE. Cutting the budget below the number finished cannot
+           un-finish them, so the count is clamped rather than reset -- otherwise dropping to
+           five after doing eight would claim you had done none of today. */
+        FD_DONE = Math.min(FD_DONE, FD_BUDGET);
+        hudDraw();
+      } else { doFlash(0.18); }
       e.preventDefault(); return;
     }
   }
