@@ -24,6 +24,7 @@ from domain.blocks import (
     _display_name,
     blocks_for_slug,
     compute_unlocked_count,
+    themes_for_slug,
     unlock_threshold_for_slug,
 )
 from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS
@@ -106,19 +107,25 @@ class TestCategoryResolution:
 
 class TestGeneratedBlocks:
     @pytest.mark.parametrize("slug", _GENERATED)
-    def test_blocks_partition_the_whole_deck(self, slug: str) -> None:
-        """Every card is in exactly one block, and no block invents an id."""
-        deck_ids = [card.id for card in ALL_DECKS[slug]().cards]
-        block_ids = [cid for block in blocks_for_slug(slug) for cid in block.card_ids]
+    def test_groups_partition_the_whole_deck(self, slug: str) -> None:
+        """Every card is in exactly one group, and no group invents an id.
 
-        assert sorted(block_ids) == sorted(deck_ids)
-        assert len(block_ids) == len(set(block_ids)), "a card id appears in two blocks"
+        Asked of ``themes_for_slug`` rather than ``blocks_for_slug``, because the
+        vocabulary levels have no blocks at all now — but the property this is really
+        checking, that the grouping covers the deck exactly once, still has to hold or
+        a word loses its label.
+        """
+        deck_ids = [card.id for card in ALL_DECKS[slug]().cards]
+        group_ids = [cid for group in themes_for_slug(slug) for cid in group.card_ids]
+
+        assert sorted(group_ids) == sorted(deck_ids)
+        assert len(group_ids) == len(set(group_ids)), "a card id appears in two groups"
 
     @pytest.mark.parametrize("slug", _GENERATED)
-    def test_block_indices_are_contiguous_from_zero(self, slug: str) -> None:
+    def test_group_indices_are_contiguous_from_zero(self, slug: str) -> None:
         """``build_block_progress`` gates on ``index < unlocked_count``."""
-        blocks = blocks_for_slug(slug)
-        assert [block.index for block in blocks] == list(range(len(blocks)))
+        groups = themes_for_slug(slug)
+        assert [group.index for group in groups] == list(range(len(groups)))
 
     @pytest.mark.parametrize("slug", _GENERATED)
     def test_blocks_are_non_empty_and_named(self, slug: str) -> None:
@@ -169,20 +176,20 @@ class TestGeneratedBlocks:
                         )
 
     @pytest.mark.parametrize("slug", ["vocab_n5", "vocab_n3", "vocab_n1"])
-    def test_vocabulary_blocks_keep_deck_order(self, slug: str) -> None:
+    def test_vocabulary_themes_keep_deck_order(self, slug: str) -> None:
         """Components describe kanji only, so vocabulary must be left alone."""
-        generated = [b for b in blocks_for_slug(slug) if b.name.split()[-1].isdigit()]
+        generated = [b for b in themes_for_slug(slug) if b.name.split()[-1].isdigit()]
         remainder = [cid for block in generated for cid in block.card_ids]
         assert remainder == sorted(remainder), f"'{slug}' vocabulary was reordered"
 
     def test_authored_categories_come_first_and_keep_their_names(self) -> None:
-        names = [block.name for block in blocks_for_slug("vocab_n5")]
+        names = [block.name for block in themes_for_slug("vocab_n5")]
         assert names[:4] == ["Greetings", "Numbers", "Time & Days", "Family"]
 
     def test_level_prefix_is_stripped_from_category_names(self) -> None:
         """``"Kanji: N5 · Numbers & Time"`` reads as ``"Numbers & Time"``."""
         assert blocks_for_slug("kanji_n5")[0].name == "Numbers & Time"
-        assert blocks_for_slug("vocab_n4")[0].name == "School & Work"
+        assert themes_for_slug("vocab_n4")[0].name == "School & Work"
 
     @pytest.mark.parametrize(
         ("deck_name", "expected"),
@@ -205,10 +212,30 @@ class TestGeneratedBlocks:
         for slug in _GENERATED:
             assert unlock_threshold_for_slug(slug) == CATEGORY_UNLOCK_THRESHOLD
 
-    def test_previously_blockless_decks_now_have_blocks(self) -> None:
-        """The measured starting point: both returned ``{"blocks": []}``."""
-        assert blocks_for_slug("vocab_n5")
+    def test_kanji_levels_have_blocks(self) -> None:
+        """Kanji keeps its chain: a character follows the components it is built from."""
         assert blocks_for_slug("kanji_n5")
+
+    @pytest.mark.parametrize(
+        "slug", ["vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1"]
+    )
+    def test_vocabulary_levels_are_not_chunked(self, slug: str) -> None:
+        """418 blocks went when vocabulary stopped being a chain.
+
+        The groups themselves are still there and still named -- what went is the claim
+        that they are an order you unlock one at a time.
+        """
+        assert blocks_for_slug(slug) == []
+        assert themes_for_slug(slug), "the themes must survive for labelling and filtering"
+
+    def test_dropping_vocabulary_blocks_is_the_whole_reduction(self) -> None:
+        """Measured before the change: 604 across every deck, 418 of them vocabulary."""
+        every = (
+            "hiragana", "katakana", "grammar_patterns", "sentence_examples",
+            "conjugation_training", "kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2",
+            "kanji_n1", "vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1",
+        )
+        assert sum(len(blocks_for_slug(s)) for s in every) == 186
 
     def test_category_decks_themselves_have_no_blocks(self) -> None:
         """A category is a block now, so it does not carry blocks of its own."""

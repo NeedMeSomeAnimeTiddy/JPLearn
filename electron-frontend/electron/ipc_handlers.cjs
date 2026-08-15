@@ -146,6 +146,44 @@ function registerIpcHandlers(options) {
     }
   })
 
+  // The vocabulary levels have no blocks -- `blocks_for_slug` returns [] for them --
+  // so they ask a different question: not "which chunk may I open" but "what am I being
+  // given today". The count is optional and previews a budget without storing it.
+  options.ipcMain.handle('study:get-vocab-feed', async (event, slug, count) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedSlug = validateDeckSlug(slug)
+    const args = ['vocab-feed', validatedSlug]
+    if (count !== undefined && count !== null) args.push(String(Math.trunc(Number(count)) || 0))
+    try {
+      return await runPythonBridgeWithArgsRead(args)
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch vocabulary feed: ${detail}`)
+    }
+  })
+
+  options.ipcMain.handle('study:set-vocab-feed-budget', async (event, count, slug) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    // The bridge clamps and stores; this only has to refuse something that is not a
+    // number at all, so a NaN cannot be written into the settings table as "NaN".
+    const budget = Math.trunc(Number(count))
+    if (!Number.isFinite(budget)) throw new Error('Vocabulary budget must be a number')
+    const args = ['vocab-feed-set', String(budget)]
+    if (slug !== undefined && slug !== null) args.push(validateDeckSlug(slug))
+    try {
+      const payload = await options.runPythonBridgeWithArgs(args)
+      // A WRITE THAT CHANGES WHAT A READ RETURNS HAS TO DROP THE READ'S CACHE.
+      // `vocab-feed` goes through `runPythonBridgeWithArgsRead`, which is cached; without
+      // this, setting the budget answers with the new feed and then every subsequent fetch
+      // serves the old one until something else happens to clear it.
+      clearBridgeReadCaches()
+      return payload
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to set vocabulary budget: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('study:get-block-progress', async (event, slug) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedSlug = validateDeckSlug(slug)

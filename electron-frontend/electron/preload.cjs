@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getStudySummary: () => ipcRenderer.invoke('study:get-summary'),
   getDailyActivity: (days) => ipcRenderer.invoke('study:get-daily-activity', days ?? 365),
   getBlockProgress: (slug) => ipcRenderer.invoke('study:get-block-progress', slug),
+  getVocabFeed: (slug, count) => ipcRenderer.invoke('study:get-vocab-feed', slug, count),
+  setVocabFeedBudget: (count, slug) => ipcRenderer.invoke('study:set-vocab-feed-budget', count, slug),
   getCardScores: () => ipcRenderer.invoke('study:get-card-scores'),
   importCardScores: (legacyScores) => ipcRenderer.invoke('study:import-card-scores', legacyScores),
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),

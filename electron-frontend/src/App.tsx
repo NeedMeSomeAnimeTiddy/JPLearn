@@ -99,6 +99,7 @@ import {
 } from './features/study-session'
 import './App.css'
 import { useBlockSelection, describeSelection } from './features/block-selection'
+import { useVocabFeed } from './features/vocab-feed'
 import { useProgression, ProgressionMap, LOCKED_NODE_REASON } from './features/progression'
 import type { ProgressionNodeView } from './features/progression'
 import { computeMinigameLockReasons } from './lib/minigameAvailability'
@@ -548,6 +549,9 @@ function App() {
   // derived from stored prefs rather than held here, so blocks arriving from the
   // bridge cannot race it — see features/block-selection.
   const blockSelection = useBlockSelection(activeDeckSlug, blockProgress, deckCards)
+  // The vocabulary levels have no blocks to select, so they have a feed instead. The
+  // hook answers nothing for every other deck, which is why both can be live at once.
+  const vocabFeed = useVocabFeed(activeDeckSlug)
   const activeBlockCards = blockSelection.cards
 
   const models = useModels()
@@ -2276,6 +2280,8 @@ function App() {
       {/* ScriptHub uses a full view so setup content has enough space. */}
       {view === 'script_hub' ? (
         <ScriptHubView
+          vocabFeed={vocabFeed}
+          activeDeckSlug={activeDeckSlug}
           navDirection={navDirection}
           activeScript={activeScript}
           activeGame={activeGame}

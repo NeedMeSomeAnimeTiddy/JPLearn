@@ -27,6 +27,7 @@ import type {
   SessionGoalPayload,
   SessionSummaryPayload,
   TutorReactionPayload,
+  VocabFeedPayload,
   XPProgressPayload,
 } from './generated/types'
 
@@ -529,6 +530,11 @@ interface DesktopApi {
     days: Array<{ date: string; count: number; accuracy: number }>
   }>
   getBlockProgress: (slug: DeckSlug) => Promise<BlockProgressPayload>
+  // The vocabulary levels are not chunked, so they are fed rather than unlocked.
+  // Optional, like every other capability added after a release: a renderer running
+  // against an older bridge has to fall back rather than throw.
+  getVocabFeed?: (slug: DeckSlug, count?: number) => Promise<VocabFeedPayload>
+  setVocabFeedBudget?: (count: number, slug?: DeckSlug) => Promise<VocabFeedPayload>
   // Per-card mastery counters, keyed by deck slug (issue #66). Optional so a
   // renderer running against an older bridge falls back rather than throwing.
   getCardScores?: () => Promise<CardMasteryScoresPayload>
