@@ -97,13 +97,17 @@
        invalid -- and an invalid background is not ignored, it is NONE. Every plate I touched
        went fully transparent at every setting including 1, which is why the "before" frame
        looked exactly as broken as the "after" one. */
-    --paper: 0.78;
+    /* 0.55 AND 30px TOGETHER, not separately: every point of alpha given away has to be bought
+       back with blur, or the world stops being a wash behind the words and starts being a
+       picture through them. Checked at the certification hall and on RECORDS, which carries
+       more type per plate than any other screen here. */
+    --paper: 0.55;
     /* AND HOW HARD THE PAPER DIFFUSES WHAT IS BEHIND IT. Straight alpha lets the world through
        as ITSELF -- and this world is flat-shaded, so a hillside's edge crosses a plate as a hard
        line straight through the type. Blur turns that same hillside into colour and light with
        no edges, which is the part worth showing and the part that was breaking it. Applied only
        when `body.frosted` is on, because `backdrop-filter` costs GPU whether it blurs or not. */
-    --frost: 14px;
+    --frost: 30px;
     --washi: #f2ead8;
     --washi-dim: #cfc6ae;
     --ink: #14110d;
