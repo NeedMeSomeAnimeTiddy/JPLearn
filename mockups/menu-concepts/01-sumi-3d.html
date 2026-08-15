@@ -17882,6 +17882,45 @@ function ftL3Rows(sec, jp) {
       meta: theme.toUpperCase() + ' \u00b7 ' + yomi.toUpperCase(), unit: 'words',
     }));
   }
+  /* ================================================================================
+     DAILY'S LEVEL THREE, WHICH HAS BEEN DEAD SINCE IT WAS WRITTEN.
+
+     `L3_DAILY` was defined and then read by nothing -- `L3DATA` has no DAILY key either, so
+     `ftL3Rows` fell through to the generic branch, returned an empty array, and `hudPick`
+     correctly refused. The effect was that pressing Enter on any of the four games flashed
+     and stayed put: the whole section was a dead end and the carousel was decoration.
+
+     WHAT A GAME'S LEVEL THREE IS. You do not browse a crossword, so the rows are not parts
+     of the puzzle -- they are WHERE ITS WORDS CAME FROM, which is how the app really builds
+     one: `DailyGameWord` carries `deck_slug` and `deck_name`, and `select_daily_word_pool`
+     draws from the decks you are studying. So each row is a deck, how many of today's items
+     came out of it, and how far through that deck you are.
+
+     ONLY THE DECKS THE GAME ACTUALLY USES. Two of the six are zero for every game -- grammar
+     and listening feed none of these four puzzles -- and a row reading "0 items" on every
+     game in the section is a row that never says anything. */
+  if (sec === 'DAILY' && L3_DAILY.perGame[jp]) {
+    const G = L3_DAILY.perGame[jp];
+    const used = L3_DAILY.decks.map((d, k) => ({ d, k })).filter(({ k }) => G[k][0] > 0);
+    return used.map(({ d, k }, i) => {
+      const [items, pct] = G[k];
+      return {
+        key: String(i + 1).padStart(2, '0'),
+        /* `block`/`of` for the same reason the feed sets them: without it the stone's number
+           slot is handed the deck's English name instead of its index. */
+        block: i + 1, of: used.length,
+        en: d[1], jp: d[0], n: items, pct,
+        /* NO PERCENT IN THE META, DELIBERATELY. A peer's foot already prints `r.pct` on its
+           own, and `csToken`'s first rule returns any percentage it can find -- so a meta
+           carrying one put 61% in the token slot directly above the 61% in the foot, the same
+           figure twice on a 94px stone. Reordering the string cannot fix that; the percent has
+           to leave it. What the token says instead is how much of TODAY'S puzzle came out of
+           this deck, which nothing else on the stone shows. */
+        meta: items + ' ' + L3_DAILY.unit.toUpperCase(),
+        unit: L3_DAILY.unit,
+      };
+    });
+  }
   if (STUDY_BLOCKS[jp]) {
     const B = STUDY_BLOCKS[jp];
     const done = Math.round((B.length * PATH.herePct) / 100);
@@ -18449,7 +18488,7 @@ const CS_PEER_KIND = {
 };
 /* a feed's stones are WORDS. Everything else at level three is a theme. */
 const csPeerKind = () => (HUD.level === 3
-  ? (STUDY_FEED[HUD.tile] ? 'WORD' : 'THEME')
+  ? (STUDY_FEED[HUD.tile] ? 'WORD' : HUD.sec === 'DAILY' ? 'DECK' : 'THEME')
   : (CS_PEER_KIND[HUD.sec] || 'AREA'));
 
 function csToken(meta) {
