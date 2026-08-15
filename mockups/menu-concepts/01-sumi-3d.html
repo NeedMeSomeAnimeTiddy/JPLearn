@@ -18534,6 +18534,39 @@ function cardLine(r, status, peers) {
   return [go, '#ffd9a1', 'var(--hi)', '700', '0.16em'];
 }
 
+/* ================================================================================================
+   THE ROAD SLID, BUT ITS WORDS HARD-CUT.
+
+   Everything that has a POSITION on this screen already animates -- the rail translates over
+   0.52s, the tablets ease their `left`, the marker runs 0.62s, the minimap's bars grow. What none
+   of them did was animate CONTENT: the hero's number, name and gloss are written straight into
+   the DOM on every sync, so the card slid gracefully across the screen while the three biggest
+   pieces of type on it changed instantly halfway through. That mismatch is what reads as static
+   -- not too little motion, but motion in the furniture and none in the words.
+
+   So the text ARRIVES. It enters from the side you came from, which ties the animation to the
+   navigation rather than decorating it: walk forward and the new name comes in from the right.
+   A small stagger down the three lines lets the eye land on the number first, which is the one
+   that says where you are.
+   ================================================================================================ */
+let csPrevSel = -1;
+function csArrive(wrap, dir) {
+  if (reduced) return;
+  const parts = ['.cs-hnum', '.cs-hjp', '.cs-hen']
+    .map((q) => wrap.querySelector(q)).filter(Boolean);
+  if (!parts.length) return;
+  gsap.killTweensOf(parts);
+  gsap.fromTo(parts, { opacity: 0, x: dir * 20 },
+    { opacity: 1, x: 0, duration: 0.34, ease: 'power2.out', stagger: 0.045, overwrite: true });
+  /* the seal is the gesture this interface already uses for "this one", so it comes down again
+     rather than fading in with everything else */
+  const seal = wrap.querySelector('.cs-hseal');
+  if (seal && getComputedStyle(seal).opacity !== '0') {
+    gsap.fromTo(seal, { scale: 1.5, rotate: 13 },
+      { scale: 1, rotate: 0, duration: 0.4, ease: 'back.out(2.6)', overwrite: true });
+  }
+}
+
 function courseLayout(rows) {
   const wrap = hudEl.querySelector('.course-wrap');
   if (!wrap) return;
@@ -18711,6 +18744,9 @@ function courseLayout(rows) {
   hjp.style.color = faceUp ? 'var(--ink)' : 'rgba(230,222,200,0.72)';
   h('.cs-hen').textContent = blocks ? r.meta : peers ? enOf(r) : r.en;
   h('.cs-hen').style.color = faceUp ? 'var(--hi-deep)' : dim;
+  /* AFTER the writes, never before -- the tween has to start from the new words, not the old */
+  if (csPrevSel >= 0 && sel !== csPrevSel) csArrive(wrap, sel > csPrevSel ? 1 : -1);
+  csPrevSel = sel;
   h('.cs-gatelabel').textContent = peers ? 'WHAT IT HOLDS'
     : blocks
       ? (status === 'current' ? 'BLOCK'
@@ -19326,8 +19362,17 @@ function ascentLayout() {
   const panel = hudEl.querySelector('.as-panel');
   if (!panel) return;
   if (panel.dataset.at !== String(HUD.at)) {
+    const had = panel.dataset.at !== undefined;
     panel.dataset.at = String(HUD.at);
     panel.innerHTML = asPanel(HUD.at);
+    /* THE WHOLE PANEL IS REPLACED when the level changes, which is the hardest cut on this
+       screen -- five bars and four modes appearing at once with no transition. It is rebuilt
+       markup so there is nothing to tween FROM; it arrives instead, and only after the first
+       time, so entering the section does not double up with the panel's own fade-in. */
+    if (had && !reduced) {
+      gsap.fromTo(panel.children, { opacity: 0, y: 9 },
+        { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out', stagger: 0.05, overwrite: true });
+    }
     panel.querySelectorAll('.as-mode').forEach((b) => {
       b.addEventListener('click', () => {
         if (!asOpen(HUD.at)) { doFlash(0.2); punchShake(0.24); return; }
@@ -19840,6 +19885,8 @@ function hudBuild(rows) {
   /* DELETED, NOT EMPTIED. `dataset.course = ''` leaves the attribute present, and `[data-course]`
      matches an attribute that exists whatever its value — so writing an empty string here would
      have hidden the figure chips in all six sections via the rule at the end of the course block. */
+  /* a new screen starts with no history, so the first paint settles rather than flying in */
+  csPrevSel = -1;
   if (shaped) hudEl.dataset.course = COURSE_SHAPES[HUD.c][0];
   else delete hudEl.dataset.course;
   /* DELETED, NOT EMPTIED, for the same reason `data-course` is -- `[data-screen]` would match an
