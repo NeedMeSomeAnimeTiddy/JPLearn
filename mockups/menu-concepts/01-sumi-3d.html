@@ -2734,7 +2734,11 @@
   .fd-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
 
   /* ---- the word you would do now ---- */
-  .fd-hero { left: 56px; top: 30px; width: 620px; height: 246px;
+  /* ---- THE FRAME CONTRACT, ON THE FEED. Same arithmetic as the chain: a 246-tall card
+     paints 14.7px wider each side than it is authored and the 100-tall rail 6.2, so the
+     stage's 160/1120 become 175/1105 for the cards and 168/1112 for the rail. The pair runs
+     532 + 18 + 380 = 930 and is balanced about x640. ---- */
+  .fd-hero { left: 175px; top: 36px; width: 532px; height: 246px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
       rgba(235,230,217,var(--paper)) 100%);
@@ -2769,7 +2773,7 @@
     line-height: 17px; letter-spacing: 0.1em; color: var(--washi); margin-top: 2px; }
 
   /* ---- how much today, and what that is a fraction of ---- */
-  .fd-today { position: absolute; left: 694px; top: 30px; width: 490px; height: 246px;
+  .fd-today { position: absolute; left: 725px; top: 36px; width: 380px; height: 246px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
       rgba(203,193,164,var(--paper)) 100%);
@@ -2806,11 +2810,18 @@
   .fd-denom span + span { box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2); }
   .fd-denom b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
     color: var(--ink); }
+  /* WRAPPING, NOT NOWRAP. The card went 490 to 380, so each of these two columns has 150px
+     for a caption that wants 195. Both captions are load-bearing -- one says what the fraction
+     is of, the other says the number IS the ordering -- so the line breaks instead of the
+     words going. */
+  /* `balance` rather than a hand-placed break: left to itself the wrap put "KNOW" and
+     "ORDER" alone on a second line, which reads as a mistake rather than as a caption. */
   .fd-denom i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-    letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); white-space: nowrap; }
+    letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); line-height: 1.35;
+    text-wrap: balance; }
 
   /* ---- today's list, which empties ---- */
-  .fd-rail { position: absolute; left: 56px; top: 296px; width: 1128px; height: 104px;
+  .fd-rail { position: absolute; left: 168px; top: 302px; width: 944px; height: 100px; 
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
       rgba(235,230,217,var(--paper)) 100%);
@@ -19968,7 +19979,8 @@ function feedMarkup() {
     const [w, yomi, gloss, theme] = cur;
     const ks = kanjiOf(w);
     /* the word is set from its own length -- お父さん is four characters and 上 is one */
-    const size = Math.max(40, Math.min(76, Math.floor(430 / Math.max(1, w.length))));
+    /* 365, not 430: the constant is the card's own text width, and the card is 532 now */
+    const size = Math.max(40, Math.min(76, Math.floor(365 / Math.max(1, w.length))));
     hero = `<span class="fd-body">`
       + `<span class="fd-word" style="font-size:${size}px">${w}</span>`
       + `<span class="fd-read">${yomi.toUpperCase()}</span>`
