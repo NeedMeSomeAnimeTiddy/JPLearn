@@ -1455,6 +1455,7 @@
        block of numbers holding its foot down. */
     padding: calc(88px * var(--u)) 0 calc(150px * var(--u)) calc(52px * var(--u));
     display: flex; flex-direction: column; justify-content: flex-end;
+    /* --- see `[data-course]` below: the road is the one stack too tall for this box --- */
     /* MEASURED, NOT CHOSEN. The box between the brand mark and the hint bar is 516 tall. Head 76
        + four rows + readout 105 has to fit inside it, which leaves the rest for the rows -- and
        at the menu's own 0.5 ratio the word follows from the row. Nothing here is a taste
@@ -1464,6 +1465,15 @@
        is 536 rather than 516, and everything grew about 12% inside it. */
     --row-h: 88px; --word: 44px; --mw: 640px;
   }
+  /* HANGING FROM THE TOP, BECAUSE THE ROAD DOES NOT FIT. `flex-end` is right for a short stack --
+     four rows and a head sit at the bottom of the box with the top padding as slack, which is why
+     READING's kicker lands at y 131 with the brand ending at 55. The course carries a 440-tall
+     road instead, and head + road + both paddings is 765 in a 720 frame. An overflowing flex-end
+     column overflows past its own START edge, so the head climbed to y 37 -- through the 88px
+     padding it was given and into the brand mark. Anchored at the top it keeps that padding and
+     the overflow goes down into the 150 of bottom reserve instead, which is what the reserve is
+     for. */
+  .hud[data-t="midashi"][data-course] .hud-panel { justify-content: flex-start; }
   /* the same wash the menu stands on. `#typeShade` is `body.at-menu` only and these rooms are lit
      like daylight -- cream on pale sand has almost no separation without it. */
   .hud[data-t="midashi"] .hud-panel::before {
