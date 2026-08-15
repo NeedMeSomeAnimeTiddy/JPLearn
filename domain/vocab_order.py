@@ -66,29 +66,41 @@ def order_by_known_kanji(
         known: the kanji characters the learner has already met.
 
     Returns:
-        Every id in ``entries``, sorted by how many of the word's kanji are still
-        unknown, then by how many kanji it uses at all, then by the deck's own order.
+        Every id in ``entries``, readable words first and, among those, the ones that
+        use the most of what the learner has just learned.
 
-    The three keys, in order and why:
+    The four keys, in order and why:
 
     1. **Unknown kanji, fewest first.** The whole point. A word made only of characters
        you have met is readable today; one with two you have never seen is two lessons
        away.
-    2. **Total kanji, fewest first.** Between two equally-readable words, the shorter
-       one is the smaller step — and this is what keeps all-kana words at the very
-       front rather than scattered through the words that happen to score zero because
-       the learner is far along.
-    3. **The deck's own position.** A stable tiebreak, so the order is deterministic
-       and two runs with the same knowledge give the same list. `domain/` may not be
-       random, and a feed that reshuffles itself between sessions is not a feed.
+    2. **Known kanji used, most first.** MEASURED, NOT CHOSEN. Ranking readable words by
+       fewest kanji instead put every all-kana word ahead of every other, and since the
+       tiebreak below is the deck's gojūon order, N5 opened on ああ・あそこ・あちら・
+       あっち・あなた — two hundred kana words in alphabetical order, which is the exact
+       failure this ordering exists to replace. Preferring words that EXERCISE known
+       characters opens the same deck on 二十日・一日・五日・男の子・大人・女の子, all
+       built from the kanji block the learner just cleared, and the first kana word
+       still arrives at position 110 of 744 rather than being exiled.
+    3. **Total kanji, fewest first.** Between two words that use the same number of
+       known characters, the shorter one is the smaller step.
+    4. **The deck's own position.** A stable tiebreak, so the order is deterministic and
+       two runs with the same knowledge give the same list. `domain/` may not be random,
+       and a feed that reshuffles itself between sessions is not a feed.
+
+    What none of this has is a sense of which words are USEFUL — this app carries no
+    frequency data, so an ordering can only reflect what the learner knows, never what
+    the language does most often. That is a real limit and not a bug to be tuned around.
     """
     known_set = frozenset(known)
     ranked = []
     for position, (card_id, text) in enumerate(entries):
         used = kanji_in(text)
-        ranked.append((len(used - known_set), len(used), position, card_id))
+        ranked.append(
+            (len(used - known_set), -len(used & known_set), len(used), position, card_id)
+        )
     ranked.sort()
-    return [card_id for _, _, _, card_id in ranked]
+    return [card_id for *_, card_id in ranked]
 
 
 def next_words(

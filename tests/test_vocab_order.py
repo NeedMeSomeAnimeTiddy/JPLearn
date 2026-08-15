@@ -35,10 +35,15 @@ class TestOrderByKnownKanji:
         entries = [(1, "図書館"), (2, "山川")]
         assert order_by_known_kanji(entries, {"山"}) == [2, 1]
 
-    def test_all_kana_sorts_ahead_of_a_known_compound(self) -> None:
-        """Between two readable words the shorter step wins."""
+    def test_a_word_that_exercises_known_kanji_beats_one_with_none(self) -> None:
+        """The feed reinforces the kanji curriculum rather than dodging it.
+
+        This is the key that was wrong first time round: ranking readable words by
+        FEWEST kanji put every kana word in front, and the gojuon tiebreak then opened
+        N5 on two hundred alphabetical kana.
+        """
         entries = [(1, "友達"), (2, "ともだち")]
-        assert order_by_known_kanji(entries, {"友", "達"}) == [2, 1]
+        assert order_by_known_kanji(entries, {"友", "達"}) == [1, 2]
 
     def test_deck_order_is_the_tiebreak_and_it_is_stable(self) -> None:
         entries = [(7, "水"), (3, "火"), (9, "山")]
@@ -86,13 +91,29 @@ class TestAgainstTheRealDecks:
         entries = [(c.id, c.character) for c in cards]
         assert sorted(order_by_known_kanji(entries, set())) == sorted(c.id for c in cards)
 
-    def test_n5_opens_with_something_a_beginner_can_read(self) -> None:
-        """The corpus order opens ああ・会う・青・青い — gojūon, not a curriculum."""
+    def test_the_feed_opens_on_something_readable_today(self) -> None:
+        """Whatever the learner knows, the first word must need nothing they do not."""
         cards = ALL_DECKS["vocab_n5"]().cards
         entries = [(c.id, c.character) for c in cards]
         by_id = {c.id: c.character for c in cards}
-        first = by_id[order_by_known_kanji(entries, set())[0]]
-        assert kanji_in(first) == frozenset(), f"opened on {first}, which needs kanji"
+        for known in (set(), {"日", "一", "二", "十"}):
+            first = by_id[order_by_known_kanji(entries, known)[0]]
+            assert not (kanji_in(first) - known), f"opened on {first}, which is unreadable"
+
+    def test_the_feed_does_not_open_on_a_run_of_kana(self) -> None:
+        """The measured failure of the first attempt, kept as a test.
+
+        With three kanji blocks behind the learner it opened ああ・あそこ・あちら・
+        あっち・あなた — the deck's own alphabetical order wearing a new name.
+        """
+        kb = blocks_for_slug("kanji_n5")
+        kanji_by_id = {c.id: c.character for c in ALL_DECKS["kanji_n5"]().cards}
+        known = {kanji_by_id[cid] for b in kb[:3] for cid in b.card_ids}
+        cards = ALL_DECKS["vocab_n5"]().cards
+        by_id = {c.id: c.character for c in cards}
+        order = order_by_known_kanji([(c.id, c.character) for c in cards], known)
+        opening = [by_id[cid] for cid in order[:10]]
+        assert all(kanji_in(w) for w in opening), f"opened on kana: {opening}"
 
     def test_the_themes_still_cover_every_card(self) -> None:
         """Dropping the blocks must not have dropped the labels with them."""
