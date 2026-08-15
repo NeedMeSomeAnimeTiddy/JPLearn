@@ -19,7 +19,7 @@ from pathlib import Path
 
 from data.card_notes_repository import build_offline_note_key, canonical_jmdict_source_id
 from data.text_normalization import contains_japanese_script
-from domain.blocks import blocks_for_slug
+from domain.blocks import themes_for_slug
 from domain.decks import ALL_DECKS
 from domain.kanji_components import KANJI_COMPONENTS
 from domain.retrieval import cosine_similarity, embed_text
@@ -351,10 +351,14 @@ def _deck_metadata_for_kanji(character: str) -> tuple[list[str], list[str], str 
         if not matching_cards:
             continue
         # The theme is what the hub labels this card, so it is what belongs in a
-        # detail panel. Read off the block rather than a category deck: kanji
-        # categories became block definitions and no longer exist as decks.
+        # detail panel. Read off the theme rather than a category deck: kanji
+        # categories became group definitions and no longer exist as decks.
+        # `themes_for_slug`, NOT `blocks_for_slug`. The two parted when vocabulary
+        # levels stopped being chunked — vocabulary has no blocks at all now, so
+        # asking for blocks here would silently drop the theme label off every one
+        # of the 8,000-odd words while leaving kanji's intact.
         wanted = {card.id for card in matching_cards}
-        for block in blocks_for_slug(slug):
+        for block in themes_for_slug(slug):
             if wanted.isdisjoint(block.card_ids):
                 continue
             label = f"{deck.name} · {block.name}"

@@ -43,10 +43,35 @@ GENERATED_BLOCK_SIZE = 20
 # The "N5" in "Kanji: N5 · Numbers & Time" — a level marker, not part of the name.
 _LEVEL_LABEL = re.compile(r"[Nn][1-5]")
 
-# Decks whose blocks are generated from the parent deck rather than hand-listed.
+# Decks whose groups are generated from the parent deck rather than hand-listed.
 _GENERATED_BLOCK_SLUGS: tuple[str, ...] = (
     "vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1",
     "kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2", "kanji_n1",
+)
+
+# ---------------------------------------------------------------------------
+# Why vocabulary is not chunked
+# ---------------------------------------------------------------------------
+# Blocks are a chain: the next one opens when this one is 70 % answered. That is a
+# sound promise for a deck with an internal order, and kanji has one — a character
+# genuinely follows the components it is built from, which is why
+# ``_component_ordered`` exists and why kanji N1's 76 groups read as real topics
+# the whole way down.
+#
+# Vocabulary has no such spine, and applying the same rule to it produced arithmetic
+# rather than teaching: 2,699 N1 words at ~20 a group is 137 groups, of which perhaps
+# forty are real topics ("Law & Justice", "Money & Finance") and the rest are
+# containers invented to hold the remainder — "Chance & Extent", "Two Jobs & Loads",
+# and a literal "Odds & Ends" at 137. Five separate "Loanwords:" groups; "Trade &
+# Accounts" at 10 and "Trade & Fit" at 128.
+#
+# So the levels stop being chunked. There are 418 fewer blocks in the app for it, and
+# the groups themselves survive under ``themes_for_slug`` for labelling and filtering
+# — what goes is the claim that they are an order you must walk. What replaces the
+# order is ``domain.vocab_order``: the next word is the one whose kanji you already
+# know.
+_VOCAB_LEVEL_SLUGS: frozenset[str] = frozenset(
+    {"vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1"}
 )
 
 
@@ -245,13 +270,31 @@ def _generated_blocks(slug: str) -> tuple[Block, ...]:
     return tuple(blocks)
 
 
-def blocks_for_slug(slug: str) -> list[Block]:
-    """Return the ordered block sequence for a deck slug.
+def themes_for_slug(slug: str) -> list[Block]:
+    """Return every named group of cards in a deck, whether or not it gates study.
 
-    Returns an empty list for decks that do not use block progression — the
-    thematic category decks themselves, which are now views over a parent rather
-    than block-bearing decks of their own.
+    This is what ``blocks_for_slug`` used to be for every deck. The two split when
+    vocabulary levels stopped being chunked (see ``_VOCAB_LEVEL_SLUGS``): the
+    *groups* are still real and still worth naming — a dictionary panel says which
+    theme a word belongs to, and a study filter offers them — but they are no
+    longer a sequence you unlock one at a time.
+
+    Use this to LABEL or FILTER. Use ``blocks_for_slug`` to gate.
     """
+    if slug in _VOCAB_LEVEL_SLUGS:
+        return list(_generated_blocks(slug))
+    return blocks_for_slug(slug)
+
+
+def blocks_for_slug(slug: str) -> list[Block]:
+    """Return the ordered block sequence a deck is studied in, one unlocked at a time.
+
+    Returns an empty list for decks that do not use block progression: the thematic
+    category decks, which are views over a parent rather than block-bearing decks of
+    their own, and the vocabulary levels, which are not chunked at all.
+    """
+    if slug in _VOCAB_LEVEL_SLUGS:
+        return []
     if slug == "hiragana":
         return _HIRAGANA_BLOCKS
     if slug == "katakana":

@@ -15,7 +15,7 @@ from collections import Counter
 import pytest
 
 from domain.block_mapping import category_slugs_for_parent, resolve_category_card_ids
-from domain.blocks import blocks_for_slug
+from domain.blocks import themes_for_slug
 from domain.decks import ALL_DECKS
 from domain.kanji_themes import KANJI_THEMES
 from domain.vocab_themes import VOCAB_THEMES
@@ -65,13 +65,13 @@ class TestThemeData:
 class TestThemedBlocks:
     @pytest.mark.parametrize("slug", THEMED_SLUGS)
     def test_no_block_is_left_numbered(self, slug: str) -> None:
-        numbered = [b.name for b in blocks_for_slug(slug) if _GENERIC_NAME.fullmatch(b.name)]
+        numbered = [b.name for b in themes_for_slug(slug) if _GENERIC_NAME.fullmatch(b.name)]
         assert not numbered, f"'{slug}' still has numbered blocks: {numbered}"
 
     @pytest.mark.parametrize("slug", THEMED_SLUGS)
-    def test_blocks_still_partition_the_deck(self, slug: str) -> None:
+    def test_themes_still_partition_the_deck(self, slug: str) -> None:
         deck_ids = sorted(card.id for card in ALL_DECKS[slug]().cards)
-        block_ids = sorted(cid for block in blocks_for_slug(slug) for cid in block.card_ids)
+        block_ids = sorted(cid for block in themes_for_slug(slug) for cid in block.card_ids)
         assert block_ids == deck_ids
 
 
@@ -80,7 +80,7 @@ class TestHeadingsAreUnambiguous:
 
     @pytest.mark.parametrize("slug", sorted({*KANJI_THEMES, *VOCAB_THEMES}))
     def test_no_two_blocks_in_a_deck_share_a_name(self, slug: str) -> None:
-        names = [block.name for block in blocks_for_slug(slug)]
+        names = [block.name for block in themes_for_slug(slug)]
         duplicated = sorted({name for name, n in Counter(names).items() if n > 1})
         assert not duplicated, (
             f"'{slug}' has two blocks named {duplicated} — the authored category decks "
