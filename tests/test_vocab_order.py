@@ -8,7 +8,36 @@ import pytest
 
 from domain.blocks import blocks_for_slug, themes_for_slug
 from domain.decks import ALL_DECKS
-from domain.vocab_order import kanji_in, next_words, order_by_known_kanji, unknown_count
+from domain.vocab_order import (
+    DEFAULT_NEW_PER_DAY,
+    MAX_NEW_PER_DAY,
+    clamp_budget,
+    kanji_in,
+    next_words,
+    order_by_known_kanji,
+    unknown_count,
+)
+
+
+class TestClampBudget:
+    """A stored setting is user input that has sat in a database across upgrades."""
+
+    @pytest.mark.parametrize("raw", [None, "", "   ", "ten", "7.5", [], {}])
+    def test_anything_unreadable_falls_back_rather_than_raising(self, raw: object) -> None:
+        assert clamp_budget(raw) == DEFAULT_NEW_PER_DAY
+
+    @pytest.mark.parametrize(("raw", "expected"), [("0", 0), ("1", 1), (" 25 ", 25), (25, 25)])
+    def test_a_readable_number_is_taken_as_written(self, raw: object, expected: int) -> None:
+        assert clamp_budget(raw) == expected
+
+    def test_zero_is_a_real_setting_not_a_disabled_one(self) -> None:
+        """"No new words today, just my reviews" is deliberate."""
+        assert clamp_budget("0") == 0
+        assert next_words([(1, "水")], {"水"}, seen=(), budget=clamp_budget("0")) == []
+
+    def test_a_negative_becomes_the_floor_and_a_typo_becomes_the_ceiling(self) -> None:
+        assert clamp_budget("-5") == 0
+        assert clamp_budget("99999") == MAX_NEW_PER_DAY
 
 
 class TestKanjiIn:

@@ -39,6 +39,43 @@ from collections.abc import Iterable, Sequence
 _KANJI_MIN = 0x4E00
 _KANJI_MAX = 0x9FFF
 
+# ---------------------------------------------------------------------------
+# How many new words a day
+# ---------------------------------------------------------------------------
+# The meter that replaced the block gate. A block said "these twenty, then the next
+# twenty"; this says "this many today", which is the same pacing decision made once by
+# the learner instead of ~137 times by the deck.
+#
+# TEN, because that is what the reference apps converge on for a learner who also has
+# reviews to clear: Anki's own guidance is 15–20 new cards a day for people doing nothing
+# else, jpdb declines to cap it at all, and this app is asking for vocabulary ON TOP OF a
+# kanji curriculum and a daily game. Ten new words plus their reviews is a session; twenty
+# plus everything else is how a backlog starts.
+DEFAULT_NEW_PER_DAY = 10
+
+# The floor is zero and it is a real setting, not a disabled one: "no new words today,
+# just my reviews" is a thing a learner does deliberately when the backlog is up.
+MIN_NEW_PER_DAY = 0
+# The ceiling is not a judgement about what is possible, it is a guard on a text field
+# that reaches this through a settings table — 200 new words is already past anything the
+# SRS can schedule sanely, and past it the number is a typo rather than an intention.
+MAX_NEW_PER_DAY = 200
+
+
+def clamp_budget(value: object) -> int:
+    """Return a usable daily budget from whatever the settings table held.
+
+    Anything unreadable — absent, empty, a word, a float, a negative — comes back as the
+    default rather than raising. A stored setting is user input that has been sitting in
+    a database across upgrades, and a feed that refuses to run because the number is
+    malformed fails worse than one that quietly uses ten.
+    """
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return DEFAULT_NEW_PER_DAY
+    return max(MIN_NEW_PER_DAY, min(MAX_NEW_PER_DAY, number))
+
 
 def kanji_in(text: str) -> frozenset[str]:
     """Return the distinct kanji in ``text``.
