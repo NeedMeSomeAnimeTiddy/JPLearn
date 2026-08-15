@@ -1534,7 +1534,8 @@
   .hud[data-t="midashi"] .ascent,
   .hud[data-t="midashi"] .deck,
   .hud[data-t="midashi"] .feed,
-  .hud[data-t="midashi"] .path { zoom: var(--u); }
+  .hud[data-t="midashi"] .path,
+  .hud[data-t="midashi"] .library { zoom: var(--u); }
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
@@ -2101,7 +2102,8 @@
   .hud[data-screen="ascent"] .hud-detail,
   .hud[data-screen="deck"] .hud-detail,
   .hud[data-screen="feed"] .hud-detail,
-  .hud[data-screen="path"] .hud-detail { display: none; }
+  .hud[data-screen="path"] .hud-detail,
+  .hud[data-screen="library"] .hud-detail { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2309,6 +2311,156 @@
     backdrop-filter: blur(var(--frost)) saturate(1.15);
     -webkit-backdrop-filter: blur(var(--frost)) saturate(1.15);
   }
+
+  /* ================================================================================
+     READING IS A LIBRARY -- Design's "Reading Library v3", implemented.
+
+     The only screen in this menu that is neither a chain nor a set of peers. All thirty
+     texts are open, none unlocks another, there is no correct order, and the choice being
+     made is "what do I feel like reading" -- so it is a LIST you travel, with the one you
+     are on grown to carry its detail and the rest collapsed to a line.
+
+     WHAT THE DESIGN GOT, AND IT IS KEPT: the selected row expands from 38 to 100px and only
+     then admits its reading, its length and what it will teach you; the four difficulty
+     bands announce themselves with rules that STICK to the top edge while you are inside
+     them; and the whole library sits in one strip along the foot, so thirty never feels
+     like a scroll into the dark.
+
+     WHAT CHANGED, AND IT IS ONLY DATA: the design carried eight titles because the brief
+     gave it eight. All thirty are real now.
+     ================================================================================ */
+  .lb-row .lb-detail, .lb-row .lb-slab { display: none; }
+  .lb-row.on .lb-detail { display: flex; }
+  .lb-row.on .lb-slab { display: flex; }
+  .lb-row.on .lb-words, .lb-row.on .lb-hint { display: none; }
+  .lb-row .lb-state em { display: none; }
+  .lb-row.on .lb-state em { display: block; }
+  .lb-mark { width: 58px; }          .lb-row.on .lb-mark { width: 68px; }
+  .lb-mark b { font-size: 15px; }    .lb-row.on .lb-mark b { font-size: 22px; }
+  .lb-jp { font-size: 18px; }        .lb-row.on .lb-jp { font-size: 26px; }
+  .lb-en { font-size: 11px; }        .lb-row.on .lb-en { font-size: 13px; }
+  .lb-body { padding: 0 18px; }      .lb-row.on .lb-body { padding: 0 22px; }
+  .lb-state { width: 200px; padding: 0 16px; gap: 5px; }
+  .lb-row.on .lb-state { width: 216px; padding: 0 20px; gap: 7px; }
+  .lb-state b { font-size: 12px; }   .lb-row.on .lb-state b { font-size: 16px; }
+  .lb-track { height: 8px; }         .lb-row.on .lb-track { height: 10px; }
+  /* one curve for every travelling property, so a row grows, moves and re-weights together */
+  .lb-row, .lb-mark, .lb-jp, .lb-en, .lb-body, .lb-state, .lb-track, .lb-mark b, .lb-state b,
+  .lb-head, .lb-bars i {
+    transition: top 0.46s cubic-bezier(0.18, 0.92, 0.24, 1),
+      height 0.46s cubic-bezier(0.18, 0.92, 0.24, 1),
+      width 0.46s cubic-bezier(0.18, 0.92, 0.24, 1),
+      transform 0.46s cubic-bezier(0.18, 0.92, 0.24, 1),
+      padding 0.46s cubic-bezier(0.18, 0.92, 0.24, 1),
+      font-size 0.46s cubic-bezier(0.18, 0.92, 0.24, 1),
+      opacity 0.3s ease, background 0.3s ease, box-shadow 0.26s ease;
+  }
+  .lb-rail { transition: transform 0.46s cubic-bezier(0.18, 0.92, 0.24, 1); }
+  .lb-track i { transition: width 0.7s cubic-bezier(0.18, 0.92, 0.24, 1); }
+
+  .library { position: relative; margin-top: 6px; margin-left: -52px;
+    width: calc(100vw / var(--u)); height: 470px; }
+  /* the mask is what stops a row ending abruptly at the viewport edge -- it fades rather
+     than being cut, which is what makes the rail read as continuing past the frame */
+  .lb-view { position: absolute; left: 134px; top: 6px; width: 1012px; height: 424px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0, rgba(0,0,0,1) 40px,
+      rgba(0,0,0,1) calc(100% - 26px), rgba(0,0,0,0) 100%);
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0, rgba(0,0,0,1) 40px,
+      rgba(0,0,0,1) calc(100% - 26px), rgba(0,0,0,0) 100%); }
+  .lb-rail { position: absolute; left: 6px; top: 0; width: 1000px; will-change: transform; }
+
+  .lb-row { position: absolute; left: 0; width: 1000px; display: flex; align-items: stretch;
+    cursor: pointer; border: 0; padding: 0; font: inherit; text-align: left;
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    background: linear-gradient(178deg, #f7f6f3 0%, #e6e4dd 100%); }
+  .lb-row.on { background: #fff;
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
+  /* THE LEAN IS A CLIP, NOT A SKEW. Skewing the row would skew its type with it; clipping
+     the leading edge gives the same diagonal while the words stay upright. */
+  .lb-mark { flex: none; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 1px; background: rgba(20, 17, 13, 0.07); }
+  .lb-row.on .lb-mark { background: rgba(20, 17, 13, 0.1); }
+  .lb-mark.done { background: var(--gold); }
+  .lb-mark b { font-family: var(--lat); font-style: italic; font-weight: 900; line-height: 1;
+    letter-spacing: 0; color: var(--ink); }
+  .lb-mark em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 7.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); }
+
+  .lb-body { flex: 1; min-width: 0; display: flex; flex-direction: column;
+    justify-content: center; }
+  .lb-titles { display: flex; align-items: baseline; gap: 15px; min-width: 0; }
+  .lb-jp { font-family: var(--jp); font-weight: 700; letter-spacing: 0.05em; line-height: 1;
+    white-space: nowrap; color: var(--ink); }
+  .lb-en { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    letter-spacing: 0.13em; white-space: nowrap; color: rgba(20, 17, 13, 0.6); }
+  .lb-row.on .lb-en { color: #b23320; }
+  .lb-words { margin-left: auto; font-style: normal; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 10px; letter-spacing: 0.14em; white-space: nowrap;
+    color: rgba(20, 17, 13, 0.5); }
+  /* the detail line only exists on the open row -- it is the reason the row grew */
+  .lb-detail { display: flex; align-items: center; gap: 11px; min-width: 0; overflow: hidden;
+    margin-top: 11px; padding-top: 11px; white-space: nowrap;
+    box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16); }
+  .lb-detail i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 10.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.58); }
+  .lb-detail i.read { font-family: var(--jp); font-weight: 400; font-size: 12.5px;
+    letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.62); }
+  .lb-detail i.new { color: #b23320; }
+  .lb-detail i.src { font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.42); }
+  .lb-detail s { flex: none; width: 3px; height: 3px; background: rgba(20, 17, 13, 0.28); }
+
+  .lb-state { flex: none; display: flex; flex-direction: column; justify-content: center;
+    box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.14); }
+  .lb-state em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); white-space: nowrap; }
+  .lb-state b { font-family: var(--lat); font-style: italic; font-weight: 900;
+    letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
+  .lb-track { position: relative; display: block; background: rgba(20, 17, 13, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.22); }
+  .lb-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
+  .lb-slab { flex: none; width: 210px; align-self: stretch; margin: -1px -1px -1px 0;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    background: var(--hi); font-style: normal; white-space: nowrap; }
+  .lb-slab b { font-family: var(--lat-ui); font-weight: 700; font-size: 12.5px;
+    letter-spacing: 0.14em; color: #ffd9a1; }
+  .lb-slab b.key { font-size: 9.5px; letter-spacing: 0.18em; color: rgba(255, 217, 161, 0.75); }
+  .lb-hint { flex: none; width: 200px; align-self: center; padding-right: 16px;
+    text-align: right; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.18em; white-space: nowrap;
+    color: rgba(20, 17, 13, 0.32); }
+
+  /* ---- the band markers, which stick ---- */
+  .lb-heads { position: absolute; left: 134px; top: 0; width: 1012px; height: 436px;
+    overflow: hidden; pointer-events: none; z-index: 30; }
+  .lb-head { position: absolute; left: 0; width: 1000px; height: 26px; display: flex;
+    align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
+  .lb-rule { position: absolute; left: 0; right: 0; top: 50%; margin-top: -1px; height: 2px; }
+  .lb-plate { position: relative; display: flex; align-items: center; gap: 12px; height: 26px;
+    padding: 0 18px; background: rgba(244, 242, 236, 0.9);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.44); }
+  .lb-head.here .lb-plate { background: #fff; }
+  .lb-plate b.k { flex: none; font-family: var(--jp); font-weight: 700; font-size: 15px;
+    line-height: 1; letter-spacing: 0.08em; color: rgba(20, 17, 13, 0.45); }
+  .lb-head.here .lb-plate b.k { color: #b23320; }
+  .lb-plate b.n { flex: none; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 14px; letter-spacing: 0.05em; line-height: 1; white-space: nowrap;
+    color: rgba(20, 17, 13, 0.55); }
+  .lb-head.here .lb-plate b.n { color: var(--ink); }
+  .lb-plate i { flex: none; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.2em; white-space: nowrap; color: rgba(20, 17, 13, 0.42); }
+
+  /* ---- the whole library in one strip ---- */
+  .lb-mini { position: absolute; left: 190px; top: 440px; width: 900px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .lb-bars { display: flex; align-items: flex-end; gap: 3px; }
+  .lb-bars i { display: block; }
+  .lb-tally { display: flex; align-items: baseline; justify-content: center; gap: 9px;
+    white-space: nowrap; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+    letter-spacing: 0.16em; color: var(--gold-hi);
+    paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
+  .lb-tally s { text-decoration: none; color: rgba(242, 234, 216, 0.32); }
+  .lb-tally u { text-decoration: none; color: rgba(242, 234, 216, 0.72); }
 
   .deck, .path {
     position: relative; margin-top: 6px;
@@ -18974,6 +19126,7 @@ function hudRows() {
   if (hudBespoke() === 'deck') return deckRows();
   if (hudBespoke() === 'feed') return feedRows();
   if (hudBespoke() === 'path') return paRows();
+  if (hudBespoke() === 'library') return libraryRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -20018,6 +20171,222 @@ function pathScreenLayout() {
   });
 }
 
+/* ================================================================================================
+   READING'S LEVEL TWO -- Design's "Reading Library v3".
+
+   ALL THIRTY TEXTS ARE REAL, which is the one thing changed from the design. It carried eight
+   titles because the brief I wrote gave it eight; these are every passage in
+   `data/external_sources/passages/aozora/passages.json` -- title, title reading, word count and
+   readability score -- sorted by that score, which is the only ordering the data supports.
+
+   THE ENGLISH TITLES ARE MINE, and they are the only invented thing on this screen. The app
+   stores no English for a passage. They are translations of the Japanese, not data, and if the
+   app ever gains real ones these should be replaced rather than trusted.
+
+   FOUR BANDS OF EQUAL SIZE, NOT EQUAL WIDTH. The design cut its synthetic scores at 0.049 /
+   0.098 / 0.147, which is right for a flat spread. The real scores are not flat -- fourteen of
+   the thirty sit above 0.147 and only two land between 0.098 and 0.147 -- so fixed thresholds
+   produced a band of two and a band of fourteen. Cutting into four contiguous runs of 8/8/7/7
+   keeps the ordering honest and gives four bands a learner can actually use.
+   ================================================================================================ */
+const LIB = [
+  ['山のコドモ', 'やまのコドモ', 'Mountain Child', 555, 0.000],
+  ['お月さまと ぞう', 'おつきさまと ぞう', 'The Moon and the Elephant', 359, 0.000],
+  ['三人と 二つの りんご', 'さんにんと ふたつの りんご', 'Three People, Two Apples', 393, 0.000],
+  ['マルは しあわせ', 'マルは しあわせ', 'Maru is Happy', 445, 0.000],
+  ['お星さま', 'おほしさま', 'Stars', 73, 0.002],
+  ['はつゆめ', 'はつゆめ', 'First Dream', 1230, 0.023],
+  ['秋が きました', 'あきが きました', 'Autumn Has Come', 471, 0.024],
+  ['みけの ごうがいやさん', 'みけの ごうがいやさん', 'Mike the Paper Seller', 369, 0.032],
+  ['おっぱい', 'おっぱい', 'Mother’s Milk', 310, 0.033],
+  ['つめたい メロン', 'つめたい メロン', 'The Cold Melon', 312, 0.045],
+  ['こがらしの ふく ばん', 'こがらしの ふく ばん', 'The Night the Cold Wind Blew', 400, 0.065],
+  ['子もりうた', 'こもりうた', 'Lullaby', 88, 0.073],
+  ['しゃしんやさん', 'しゃしんやさん', 'The Photographer', 437, 0.088],
+  ['つづれさせ', 'つづれさせ', 'The Cricket’s Cry', 258, 0.093],
+  ['しろくまの 子', 'しろくまの こ', 'Polar Bear Cub', 305, 0.110],
+  ['村のかじやさん', 'むらのかじやさん', 'The Village Blacksmith', 520, 0.123],
+  ['夏の晩方あった話', 'なつのばんがたあったはなし', 'A Summer Evening Tale', 825, 0.147],
+  ['あかい雲', 'あかいくも', 'Red Cloud', 102, 0.167],
+  ['片目のごあいさつ', 'かためのごあいさつ', 'The One-Eyed Greeting', 958, 0.168],
+  ['ねことおしるこ', 'ねことおしるこ', 'The Cat and the Sweet Soup', 1122, 0.168],
+  ['チューリップの芽', 'チューリップのめ', 'The Tulip Bud', 399, 0.176],
+  ['きれいなきれいな町', 'きれいなきれいなまち', 'The Beautiful Town', 1695, 0.187],
+  ['子うぐいすと母うぐいす', 'こうぐいすとははうぐいす', 'Young Warbler, Mother Warbler', 1095, 0.187],
+  ['仲よしがけんかした話', 'なかよしがけんかしたはなし', 'When Friends Quarrelled', 1081, 0.189],
+  ['金色のボタン', 'きんいろのボタン', 'The Golden Button', 2202, 0.191],
+  ['子供どうし', 'こどもどうし', 'Among Children', 1396, 0.192],
+  ['お母さん', 'おかあさん', 'Mother', 1086, 0.195],
+  ['かたい大きな手', 'かたいおおきなて', 'Big Hard Hands', 2539, 0.195],
+  ['ボールの行方', 'ボールのゆくえ', 'Where the Ball Went', 2359, 0.195],
+  ['ひばりのおじさん', 'ひばりのおじさん', 'Uncle Skylark', 767, 0.196],
+];
+/* how far through each one the learner is, by index into LIB */
+const LIB_READ = { 0: 100, 2: 100, 4: 100, 7: 38, 12: 64, 18: 12 };
+const LIB_BANDS = [8, 8, 7, 7];
+const LIB_KANJI = ['一', '二', '三', '四'];
+const LIB_GNAME = ['EASIEST', 'EASIER', 'HARDER', 'HARDEST'];
+/* forty words a minute is a beginner reading aloud, which is what these are for */
+const LIB_PACE = 40;
+const LB_SEL_H = 100, LB_ROW_H = 38, LB_GAP = 6, LB_HEAD = 26, LB_HEAD_GAP = 19;
+const LB_VH = 424, LB_FOCUS = 200;
+let LB_SEL = 7;
+
+/* which band each index belongs to, derived once from the run lengths */
+const LIB_GROUP = (() => {
+  const g = []; let b = 0, left = LIB_BANDS[0];
+  for (let i = 0; i < LIB.length; i++) {
+    if (left === 0) { b++; left = LIB_BANDS[b]; }
+    g.push(b); left--;
+  }
+  return g;
+})();
+
+function libMins(words) { return Math.max(1, Math.round(words / LIB_PACE)); }
+function libDone(i) { return (LIB_READ[i] || 0) >= 100; }
+
+/* THE LAYOUT IS RECOMPUTED FROM THE SELECTION, because the selected row is 100px and every
+   other one is 38 -- so every row below the selection moves when it changes. */
+function libLayout(sel) {
+  const tops = [], heads = [];
+  let y = 0, g = -1;
+  for (let i = 0; i < LIB.length; i++) {
+    if (LIB_GROUP[i] !== g) {
+      g = LIB_GROUP[i];
+      if (i) y += LB_HEAD_GAP;
+      heads[g] = y;
+      y += LB_HEAD + LB_HEAD_GAP;
+    }
+    tops[i] = y;
+    y += (i === sel ? LB_SEL_H : LB_ROW_H) + LB_GAP;
+  }
+  return { tops, heads, total: y };
+}
+
+function libraryMarkup() {
+  const rows = LIB.map(([jp, reading, en, words], i) => {
+    const p = LIB_READ[i] || 0;
+    return `<button class="lb-row" data-i="${i}">`
+      + `<span class="lb-mark"><b>${libMins(words)}</b><em>MIN</em></span>`
+      + `<span class="lb-body"><span class="lb-titles">`
+        + `<b class="lb-jp">${jp}</b><i class="lb-en">${en}</i>`
+        + `<i class="lb-words">${words.toLocaleString()} words</i></span>`
+        /* THE DETAIL LINE IS IN EVERY ROW AND SHOWN ON ONE. Rebuilding it when the selection
+           moves would give the row nothing to animate from -- the same reason `hudDraw` splits
+           build from sync everywhere else in this file. */
+        + `<span class="lb-detail">`
+          + `<i class="read">${reading}</i><s></s>`
+          + `<i>${words.toLocaleString()} WORDS</i><s></s>`
+          + `<i class="new">≈30 NEW WORDS</i><s></s>`
+          + `<i class="src">青空文庫 AOZORA BUNKO</i></span></span>`
+      + `<span class="lb-state"><em>HOW FAR YOU GOT</em>`
+        + `<b></b><span class="lb-track"><i style="width:${p}%"></i></span></span>`
+      + `<i class="lb-slab"><b>${p >= 100 ? 'READ IT AGAIN ▸'
+        : p > 0 ? 'RESUME AT ' + p + '% ▸' : 'BEGIN READING ▸'}</b>`
+        + `<b class="key">ENTER</b></i>`
+      + `<i class="lb-hint">${p >= 100 ? '済 READ' : p > 0 ? 'IN PROGRESS' : ''}</i>`
+      + `</button>`;
+  }).join('');
+
+  const heads = LIB_GNAME.map((nm, g) => `<div class="lb-head" data-g="${g}">`
+    + `<i class="lb-rule"></i><span class="lb-plate">`
+    + `<b class="k">${LIB_KANJI[g]}</b><b class="n">${nm}</b>`
+    + `<i>${LIB_BANDS[g]} TEXTS</i></span></div>`).join('');
+
+  const bars = LIB.map((_, i) => `<i data-i="${i}"></i>`).join('');
+
+  return `<div class="lb-view"><div class="lb-rail">${rows}</div></div>`
+    + `<div class="lb-heads">${heads}</div>`
+    + `<div class="lb-mini"><span class="lb-bars">${bars}</span>`
+    + `<span class="lb-tally"><span></span><s>·</s><u></u></span></div>`;
+}
+
+function libraryLayout() {
+  const sel = LB_SEL = Math.max(0, Math.min(LB_SEL, LIB.length - 1));
+  const L = libLayout(sel);
+  /* the rail carries the selected row to a fixed line, then stops travelling at either end so
+     the list does not float away from its own edges */
+  let shift = LB_FOCUS - L.tops[sel] - LB_SEL_H / 2;
+  shift = Math.min(shift, 24);
+  shift = Math.max(shift, Math.min(24, LB_VH - L.total - 30));
+  const rail = hudEl.querySelector('.lb-rail');
+  if (!rail) return;
+  rail.style.transform = `translateY(${Math.round(shift)}px)`;
+  rail.style.height = L.total + 'px';
+
+  hudEl.querySelectorAll('.lb-row').forEach((el, i) => {
+    const isSel = i === sel, d = Math.abs(i - sel);
+    const h = isSel ? LB_SEL_H : LB_ROW_H;
+    el.classList.toggle('on', isSel);
+    el.style.top = L.tops[i] + 'px';
+    el.style.height = h + 'px';
+    el.style.opacity = d === 0 ? 1 : d <= 2 ? 0.98 : d <= 4 ? 0.9 : d <= 6 ? 0.74 : 0.5;
+    el.style.zIndex = isSel ? 12 : 4;
+    el.style.transform = `scale(${Math.max(0.9, 1 - Math.min(d, 6) * 0.016)})`;
+    /* the leading edge leans with the row's own height, so a tall row leans further */
+    const lean = Math.round(h * 0.1405);
+    const mk = el.querySelector('.lb-mark');
+    mk.classList.toggle('done', libDone(i));
+    mk.style.clipPath = `polygon(0 0,100% 0,calc(100% - ${lean}px) 100%,0 100%)`;
+    mk.style.paddingRight = Math.round(lean / 2) + 'px';
+    const slab = el.querySelector('.lb-slab');
+    slab.style.clipPath = `polygon(${lean}px 0,100% 0,100% 100%,0 100%)`;
+    slab.style.paddingLeft = (16 + lean) + 'px';
+    const p = LIB_READ[i] || 0;
+    const st = el.querySelector('.lb-state b');
+    st.textContent = p >= 100 ? 'FINISHED' : p > 0 ? p + '% READ' : 'NOT STARTED';
+    st.style.color = p >= 100 ? '#8f6a26' : p > 0 ? 'var(--ink)' : 'rgba(20,17,13,0.42)';
+  });
+
+  /* ---- the band markers, which ride the rail and then stick ---- */
+  hudEl.querySelectorAll('.lb-head').forEach((el, g) => {
+    const here = LIB_GROUP[sel] === g;
+    const natural = shift + L.heads[g];
+    const nextNat = g < 3 ? shift + L.heads[g + 1] : 1e6;
+    /* STICKING IS WHAT MAKES THIRTY ROWS NAVIGABLE. Inside a band its name stays pinned to the
+       top edge instead of scrolling away, so you always know which one you are in -- but it is
+       pushed off by the NEXT band's marker rather than overlapping it. */
+    const stuck = here && natural < -18;
+    const top = Math.round(stuck ? Math.min(-18, nextNat - LB_HEAD - 8) : natural);
+    const gone = top < -LB_HEAD - 4 || natural > LB_VH + 30;
+    const fIn = Math.max(0, Math.min(1, (top - 2) / 24));
+    const fOut = Math.max(0, Math.min(1, (LB_VH - 30 - (top + LB_HEAD)) / 26 + 1));
+    el.classList.toggle('here', here);
+    el.style.top = (top + 18) + 'px';
+    el.style.opacity = gone ? 0 : stuck ? 1 : Math.min(fIn, fOut).toFixed(3);
+    const rule = el.querySelector('.lb-rule');
+    const c = here ? 'var(--gold)' : 'rgba(242,234,216,0.4)';
+    rule.style.height = here ? '3px' : '2px';
+    rule.style.background = `linear-gradient(90deg,rgba(0,0,0,0) 0,${c} 15%,${c} 85%,rgba(0,0,0,0) 100%)`;
+  });
+
+  /* ---- the whole library in one strip ---- */
+  hudEl.querySelectorAll('.lb-bars i').forEach((el, i) => {
+    const d = Math.abs(i - sel), p = LIB_READ[i] || 0;
+    el.style.width = (d === 0 ? 13 : d === 1 ? 10 : d === 2 ? 8 : d <= 4 ? 7 : 6) + 'px';
+    el.style.height = (d === 0 ? 20 : d === 1 ? 15 : d === 2 ? 12 : d <= 4 ? 10 : 8) + 'px';
+    el.style.background = p >= 100 ? 'var(--gold)' : p > 0 ? '#8f7440' : 'rgba(242,234,216,0.26)';
+    el.style.boxShadow = i === sel ? '0 0 0 2px var(--hi)' : 'none';
+    el.style.marginLeft = i > 0 && LIB_GROUP[i] !== LIB_GROUP[i - 1] ? '11px' : '';
+  });
+  let read = 0, going = 0;
+  LIB.forEach((_, i) => { const p = LIB_READ[i] || 0; if (p >= 100) read++; else if (p > 0) going++; });
+  const tally = hudEl.querySelector('.lb-tally');
+  if (tally) {
+    tally.querySelector('span').textContent = read
+      ? `${read} READ · ≈${read * 30} WORDS MET` : '30 TEXTS · NONE OPENED';
+    tally.querySelector('u').textContent = (going ? `${going} PART READ · ` : '')
+      + `${LIB.length - read - going} UNOPENED`;
+  }
+}
+
+function libraryRows() {
+  return LIB.map(([jp, reading, en, words], i) => ({
+    no: String(i + 1).padStart(2, '0'), en, jp, big: en, small: jp,
+    meta: `${words} WORDS`, pct: LIB_READ[i] || 0, figs: [], next: ['', '', ''],
+  }));
+}
+
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
@@ -20030,6 +20399,8 @@ function hudBespoke() {
   /* THE COURSE STOPS BEING A ROAD. Sixteen milestones, one of them current -- the same chain the
      deck screen draws, and for the same reason. */
   if (HUD.sec === 'STUDY') return 'path';
+  /* READING is the only flat, ungated set in the menu -- see the note above `.library` */
+  if (HUD.sec === 'READING') return 'library';
   if (HUD.sec === 'RECORDS') return 'ledger';
   if (HUD.sec === 'JLPT') return 'ascent';
   return null;
@@ -20053,7 +20424,7 @@ function hudDraw(force) {
        hero and the cleared pile -- so it is clamped to those rather than to the row count. */
     /* the feed's cursor addresses the hero plus five budget steps, never its word list */
     const span = bespoke === 'deck' || bespoke === 'path' ? 2
-      : bespoke === 'feed' ? 6 : all.length;
+      : bespoke === 'feed' ? 6 : bespoke === 'library' ? LIB.length : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -20070,6 +20441,7 @@ function hudDraw(force) {
     bespoke || '', bespoke ? String(LG_WEAK) : '',
     bespoke === 'deck' ? String(DK_PICK) : '',
     bespoke === 'path' ? PA_PICK + '/' + paHere() : '',
+    bespoke === 'library' ? 'lib' : '',
     bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
@@ -20179,7 +20551,9 @@ function hudBuild(rows) {
           ? `<div class="feed">${feedMarkup()}</div>`
           : bespoke === 'path'
             ? `<div class="path">${pathScreenMarkup()}</div>`
-            : shaped
+            : bespoke === 'library'
+              ? `<div class="library">${libraryMarkup()}</div>`
+              : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
   hudEl.innerHTML = `<div class="hud-panel"><div class="hud-head">${head}</div>`
@@ -20239,6 +20613,17 @@ function hudBuild(rows) {
      hero back where it belongs, and a locked one refuses out loud rather than doing nothing --
      silence is indistinguishable from a broken click. */
   /* the rail and the road each take a pointerdown and nothing else -- see the note by `DRAG` */
+  if (bespoke === 'library') {
+    hudEl.querySelectorAll('.lb-row').forEach((b) => {
+      b.addEventListener('click', () => { LB_SEL = +b.dataset.i; hudDraw(); });
+    });
+    hudEl.querySelectorAll('.lb-head').forEach((b) => {
+      b.addEventListener('click', () => { LB_SEL = LIB_GROUP.indexOf(+b.dataset.g); hudDraw(); });
+    });
+    hudEl.querySelectorAll('.lb-bars i').forEach((b) => {
+      b.addEventListener('click', () => { LB_SEL = +b.dataset.i; hudDraw(); });
+    });
+  }
   if (bespoke === 'path') {
     hudEl.querySelectorAll('.dk-f').forEach((b) => {
       b.addEventListener('click', () => {
@@ -20388,6 +20773,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'deck') { deckLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'feed') { feedLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'path') { pathScreenLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'library') { libraryLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -20708,6 +21094,21 @@ addEventListener('keydown', (e) => {
       } else { doFlash(0.18); }
       e.preventDefault(); return;
     }
+  }
+  /* ---- THE LIBRARY'S KEYS ----
+     Up and down move one text; LEFT and RIGHT jump a whole band, which is what makes thirty
+     rows crossable without holding a key down -- four presses reaches any of them. */
+  if (hudBespoke() === 'library') {
+    const g = LIB_GROUP[LB_SEL];
+    if (e.key === 'ArrowDown') { LB_SEL = Math.min(LIB.length - 1, LB_SEL + 1); hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowUp') { LB_SEL = Math.max(0, LB_SEL - 1); hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const ng = g + (e.key === 'ArrowLeft' ? -1 : 1);
+      if (ng >= 0 && ng <= 3) { LB_SEL = LIB_GROUP.indexOf(ng); hudDraw(); }
+      else { doFlash(0.14); }
+      e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') { doFlash(0.18); e.preventDefault(); return; }
   }
   /* ---- STUDY'S COURSE, SAME KEYS AS THE DECK SCREEN ----
      Deliberately identical: two focusables, Enter acts on the open step, left opens what is
