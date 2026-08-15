@@ -33,46 +33,94 @@ now carries **every section at both levels** — three modes of one layout:
 The menu itself (level one) is a vertical column of the same rows, one open at a time. All of it
 is in `components/built.html`.
 
-## The three open problems
+## The four open problems
 
-These are the screens the road does **not** fit. Each is a separate brief.
+These are the screens the road does **not** fit. Each is a separate brief. Every figure below was
+read out of the running app on 2026-08-15, not remembered.
 
 ### 1. A deck's blocks at real scale
 
-The road paints the selected block plus four either side and draws one bar per block in the strip
-beneath. That holds for the 6 blocks of kanji N5 and the 44 of vocabulary N5. The real decks are:
+The road paints the selected block plus four either side, and draws one bar per block in the strip
+beneath. That holds for the 6 blocks of kanji N5. The real decks are:
 
-| deck | blocks | | deck | blocks |
-| --- | --- | --- | --- | --- |
-| hiragana / katakana | 12 | | vocab N5 | 44 |
-| kanji N5 | 6 | | vocab N4 | 35 |
-| kanji N4 | 17 | | vocab N3 | **109** |
-| kanji N3 | 23 | | vocab N2 | 93 |
-| kanji N2 | 22 | | vocab N1 | **137** |
-| kanji N1 | **76** | | grammar / sentences | 6 / 8 |
+| deck | blocks | cards | cards per block |
+| --- | --- | --- | --- |
+| kanji N5 | 6 | 99 | 8–29 |
+| grammar | 6 | 64 | 5–18 |
+| hiragana / katakana | 12 each | 104 each | 5–33 |
+| kanji N4 | 17 | 177 | 6–19 |
+| kanji N2 | 22 | 384 | 8–24 |
+| kanji N3 | 23 | 366 | 7–24 |
+| kanji N1 | **76** | 1,192 | 7–30 |
 
-At 137 you see 9 of them, the strip is ~2,000px of indicator in a 1,280px frame, and reaching the
-last one is 130 keypresses. **One drawing has to hold 4 and 137.** Every block has an authored name
-("Numbers & Time", "Days of the Month"), a card count of 3–36, a mastery fraction, and a locked
-state: block N+1 opens when block N reaches 70% of its cards answered at least once (80% for the
-two kana decks).
+**The vocabulary levels are no longer in this table**, and that is the change since this brief was
+first written. They used to be the worst of it — N1 was 137 blocks, N3 was 109 — and in August 2026
+they stopped having blocks at all (problem 4). The app went from 604 blocks to 186. That removed the
+extreme, not the problem: **one drawing still has to hold 6 and 76.**
+
+At 76 you see nine tablets. The strip beneath draws one bar per block at widths 26 / 21 / 17 / 13 /
+10px by distance from the selection, 5px gaps — about **1,190px of indicator in a 1,280px frame**,
+before the caption chip that sits beside it. Reaching the last block is roughly 70 keypresses.
+
+Every block has an authored name ("Numbers & Time", "Law & Order"), a card count, a mastery fraction
+and a locked state: block N+1 opens when block N reaches **70%** of its cards answered at least once
+— **80%** for the two kana decks, which are the exception, not the rule.
 
 ### 2. RECORDS
 
 Its four items — STREAK, ACCURACY, TIME, RANK — are **figures you read, not places you go**, and
-there is nothing inside a streak to open. It is the one screen in the app that is a dashboard and
-it currently borrows a route. The whole of its data: streak 12 days current / 21 best / 2 freezes
-left / last completed 8-9; accuracy 86%; study time 42 hours; rank 7th grade; level 7 with
-640 / 900 XP this level, 260 to next, 12,480 total. There is no per-day series, so there is nothing
-to plot as a line.
+there is nothing inside a streak to open. It is the one screen in the app that is a dashboard and it
+currently borrows a route.
+
+**It has far more data than this brief used to claim.** The earlier version said there was no
+per-day series and nothing to plot. That was wrong. `daily-activity` returns up to **365 days** of
+`{date, count, accuracy}` — two channels, not one — and the live database has **319 active days** in
+the last year, 7–59 reviews a day, 75–100% accuracy a day. The app already draws it as a
+contribution calendar (`features/heatmap`, 365-day lookback, five intensity steps at 12 reviews a
+step).
+
+The rest of what it can read: `achievement-milestones` gives **15,406 total reviews**, a best-streak
+figure, three review milestones (100 / 500 / 1,000), five streak milestones (3 / 7 / 14 / 30 / 100)
+and a set of node-mastery badges, each with an earned flag. `xp-progress` gives level, total XP, XP
+into this level and XP to the next.
 
 ### 3. JLPT
 
-Five levels N5→N1, each with a **readiness percentage**, and a level unlocks only when the one
-before it reaches **30%**. Four papers under each — 文字語彙 VOCAB, 文法 GRAMMAR, 読解 READING,
-聴解 LISTENING — at 5 mock exams each. The current screen shows the four papers and no readiness at
-all, so the app knows two things the screen does not show: how ready you are, and what is gating
-the next level.
+**The four papers this screen currently shows do not exist in the app.** 文字語彙 / 文法 / 読解 /
+聴解 at "5 mock exams each" was invented for the mockup. What the app actually has, in
+`views/JLPTPrepView.tsx` and `domain/jlpt_readiness.py`:
+
+- **Five levels N5→N1**, each with a readiness percentage — mastered vocabulary plus mastered kanji
+  over the level's total.
+- Under each, that figure **broken into two bars**, kanji and vocabulary, each with its own
+  mastered / total count.
+- **Two different thresholds, and the screen must not conflate them**: **30%** on the previous level
+  is what *unlocks* the next one; **80%** is what marks a level **Ready**.
+- **Four modes, not four papers**: Diagnostic (20 questions spanning every level, to find your
+  target), Mock Exam (timed 30 minutes, one level, returns a projected score), Adaptive Review
+  (SRS-due cards for that level), Weak Areas (leeches and lowest-accuracy cards first).
+- A mock exam is scored against the level's **real pass mark** — N5 80, N4 90, N3 95, N2 90, N1 100
+  — plus a vocabulary/grammar section maximum and section pass mark.
+
+So the app knows three things the screen does not show: how ready you are, what is gating the next
+level, and that these four buttons are ways to sit the same exam rather than four exams.
+
+### 4. The vocabulary feed has no control
+
+The newest screen, and the only one here that is already built. Vocabulary's level three is no
+longer a block list — it is **today's words**: twelve tablets on the road in peers mode, nothing
+sunk, nothing locked. Ordering is `domain/vocab_order` — the next word is the one whose kanji you
+already know, and among those the one using the **most** of what you know, so every kanji block
+cleared pulls vocabulary toward the front.
+
+It shows the words and two denominators (291 of 744 readable, 67 kanji known). **It does not show
+the daily budget**, which is the single number the entire screen is generated from. The shipped app
+has a chip row — none / 5 / 10 / 20 / 40 — and the mockup hardcodes twelve with nowhere to change
+it.
+
+There is a deeper mismatch under that. A road is a set of places you walk, in an order, and they are
+still there tomorrow. A feed is a queue that is **replaced** tomorrow, and finishing it is the point.
+Both are currently the same drawing.
 
 ## Hard constraints
 
