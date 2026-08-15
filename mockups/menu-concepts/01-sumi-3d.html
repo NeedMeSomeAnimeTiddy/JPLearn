@@ -1974,17 +1974,12 @@
     flex: none; padding: 6px 10px 7px; text-align: center; white-space: nowrap;
     font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em;
   }
-  .cs-hhead {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    padding: 13px 18px 4px;
-  }
+  /* ONE CHILD NOW, so no `space-between` pretending there is something to push apart. The
+     coloured chapter mark that used to sit at the right of this row is gone -- see below. */
+  .cs-hhead { display: flex; align-items: center; padding: 13px 18px 4px; }
   .cs-hnum {
     font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 24px;
     letter-spacing: 0;
-  }
-  .cs-hchap {
-    width: 22px; height: 22px; font-family: var(--jp-go); font-weight: 700; font-size: 12px;
-    line-height: 22px; text-align: center; box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.3);
   }
   .cs-hjp {
     margin-top: auto; padding: 0 12px; font-family: var(--jp); font-weight: 400;
@@ -17464,10 +17459,6 @@ const CS_CHAPTERS = [
   { jp: '検定', en: 'CERTIFICATION', from: 11, to: 15 },
 ];
 const CS_CHNUM = ['一', '二', '三', '四'];
-const CS_CHTONE = [
-  { bg: '#4f9d6b', ink: '#0d1a12' }, { bg: '#cfa45c', ink: '#14110d' },
-  { bg: '#c2344a', ink: '#f2ead8' }, { bg: '#5b86c4', ink: '#f2ead8' },
-];
 const csChapter = (i) => CS_CHAPTERS.findIndex((c) => i >= c.from && i <= c.to);
 const CS_BACK = 'repeating-linear-gradient(135deg, rgba(242,234,216,0.06) 0 7px,'
   + ' rgba(0,0,0,0) 7px 14px), linear-gradient(rgba(17,19,28,0.9), rgba(11,13,20,0.94))';
@@ -17520,7 +17511,7 @@ function courseMarkup(rows) {
     + `</button>`).join('');
   const hero = `<button class="cs-hero">`
     + `<span class="cs-htab"></span>`
-    + `<span class="cs-hhead"><span class="cs-hnum"></span><span class="cs-hchap"></span></span>`
+    + `<span class="cs-hhead"><span class="cs-hnum"></span></span>`
     + `<span class="cs-hjp"></span><span class="cs-hen"></span>`
     + `<span class="cs-hfoot">`
     + `<span class="cs-gaterow"><span class="cs-gatelabel"></span><span class="cs-gateval"></span></span>`
@@ -17678,7 +17669,6 @@ function courseLayout(rows) {
   const dead = !blocks && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
   const faceUp = status !== 'locked';
   const ch = Math.max(0, csChapter(sel));
-  const tone = CS_CHTONE[ch];
   const hero = wrap.querySelector('.cs-hero');
   hero.style.cssText = `left: ${Math.round(centers[sel] - CS_WSEL / 2)}px; top: 0;`
     + ` background: ${faceUp ? 'var(--washi)' : CS_BACK};`
@@ -17701,12 +17691,13 @@ function courseLayout(rows) {
         : 'background: rgba(242,234,216,0.13); color: var(--gold-hi);');
   h('.cs-hnum').textContent = r.no;
   h('.cs-hnum').style.color = faceUp ? 'var(--ink)' : dim;
-  const hc = h('.cs-hchap');
-  /* the chapters belong to the COURSE. Inside one deck every block is in the same chapter, so the
-     mark would be a constant dressed as a state. */
-  hc.style.display = blocks ? 'none' : 'block';
-  hc.textContent = CS_CHNUM[ch];
-  if (!blocks) hc.style.cssText = `background: ${tone.bg}; color: ${tone.ink};`;
+  /* THE CHAPTER MARK IS GONE FROM THE CARD. It was the third statement of the same fact on one
+     screen -- the header line names the chapter, the card wore its numeral in the chapter's own
+     colour, and the post on the road now marks the one boundary the app's data actually has. Of
+     those three the card's was the weakest: a coloured square reading 三 tells you nothing you
+     can act on, it repeats what the line above already says in words, and it was the only one of
+     the three claiming a four-chapter structure that `domain/progression_curriculum.py` does not
+     have. `CS_CHTONE` went with it -- it existed to colour this one square. */
   /* THE BIG SLOT TAKES THE BLOCK'S WEIGHT. It is sized for one or two characters of mincho and a
      block's name is neither -- but its card count is exactly one figure, it is the number that
      differs block to block, and it is the thing you want before pressing START. The name goes
