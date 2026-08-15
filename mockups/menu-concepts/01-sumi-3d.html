@@ -17467,14 +17467,21 @@ function pathRows() {
    The camera tween is `walkGo`'s, value for value — a sine over 1.15s, `overwrite: true` so
    holding an arrow key does not stack tweens. It was tuned to read as walking at this scale and
    this is the same act. */
+/* THE CAMERA WALKS ONLY WHERE THERE IS SOMETHING TO WALK. `pathPose` is the course's own -- a
+   standing point per step along STUDY's road -- and there is no such thing for four peers in a
+   room you have already arrived in. Everywhere else this moves the cursor and redraws, and the
+   camera holds the arrival it was given. */
 function pathGo(i, dur = 1.15) {
-  HUD.cur = Math.max(0, Math.min(i, STUDY_PATH.length - 1));
-  const p = pathPose(HUD.cur);
-  gsap.to(cam, {
-    px: p.eye[0], py: p.eye[1], pz: p.eye[2],
-    tx: p.tgt[0], ty: p.tgt[1], tz: p.tgt[2],
-    fov: 46, roll: 0, duration: reduced ? 0 : dur, ease: 'sine.inOut', overwrite: true,
-  });
+  const nRows = hudRows().length || 1;
+  HUD.cur = Math.max(0, Math.min(i, nRows - 1));
+  if (HUD.sec === 'STUDY' && HUD.level === 2) {
+    const p = pathPose(HUD.cur);
+    gsap.to(cam, {
+      px: p.eye[0], py: p.eye[1], pz: p.eye[2],
+      tx: p.tgt[0], ty: p.tgt[1], tz: p.tgt[2],
+      fov: 46, roll: 0, duration: reduced ? 0 : dur, ease: 'sine.inOut', overwrite: true,
+    });
+  }
   pathHud();
   hudDraw();
 }
@@ -17557,7 +17564,18 @@ const CS_FACE = 'linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%)';
    exactly like the label on a book spine: it takes a name of any length and leaves every other
    thing about the stone identical. The alternative was truncating, and a road of "Descriptio..."
    is not a road. */
-const csIsBlocks = () => HUD.level === 3;
+const csIsBlocks = () => HUD.level === 3 && HUD.sec === 'STUDY' && !!STUDY_BLOCKS[HUD.tile];
+/* A PEER LIST IS ONE WITH NO `state` ON IT. Read off the rows rather than off the section, because
+   that is the fact the drawing actually depends on -- the day STUDY gains an unordered area or
+   READING gains a graded one, this follows without an edit. */
+const csIsPeers = (rows) => !rows.some((r) => r.state);
+/* what one of them IS, per section. The course's tablets wear the place they hand off to; a peer
+   wears its own kind, which is a different word in each of the six rooms. */
+const CS_PEER_KIND = {
+  STUDY: 'AREA', DAILY: 'GAME', READING: 'TEXT', DRILLS: 'DRILL',
+  JLPT: 'PAPER', RECORDS: 'RECORD',
+};
+const csPeerKind = () => (HUD.level === 3 ? 'THEME' : (CS_PEER_KIND[HUD.sec] || 'AREA'));
 
 function csToken(meta) {
   const m = String(meta || '').toUpperCase();
@@ -17566,7 +17584,11 @@ function csToken(meta) {
   x = m.match(/(\d+)\s+WORDS/); if (x) return x[1] + ' WORDS';
   if (/ONCE/.test(m)) return 'ONCE';
   if (/EVERY SCENE/.test(m)) return 'ALL SCENES';
-  return m.split(' ').slice(0, 2).join(' ');
+  /* a peer's meta is two facts joined by a dot -- "TODAY \u00b7 8 OF 10", "N5 \u00b7 12 TEXTS" --
+     and the one a ninety-four pixel stone wants is the one carrying the figure */
+  const seg = m.split('\u00b7').map((t) => t.trim()).filter(Boolean);
+  const pick = seg.find((t) => /\d/.test(t)) || seg[seg.length - 1] || m;
+  return pick.split(' ').slice(0, 3).join(' ');
 }
 /* the exams carry their level as a figure of its own, so the tablet reads N5 under the number
    rather than squeezing "JLPT N5" into a vertical column */
@@ -17619,7 +17641,11 @@ function courseMarkup(rows) {
 }
 
 /* what the slab says, and it still cannot promise something the step cannot do */
-function cardLine(r, status) {
+function cardLine(r, status, peers) {
+  /* a peer cannot be locked and cannot hand off, so it says the only thing it does */
+  if (peers) {
+    return ['OPEN THIS ' + csPeerKind() + ' \u25b8', '#ffd9a1', 'var(--hi)', '700', '0.16em'];
+  }
   /* a block has no `kind` -- it is always the same kind of thing -- so it answers first, or the
      hand-off branch below prints "GO TO undefined" */
   if (csIsBlocks()) {
@@ -17644,6 +17670,13 @@ function courseLayout(rows) {
   if (!wrap) return;
   const n = rows.length;
   const blocks = csIsBlocks();
+  const peers = csIsPeers(rows);
+  /* AT LEVEL THREE THE TWO SCRIPTS ARE SWAPPED. `hudRows` builds a level-three row with `en`
+     holding the Japanese name and `jp` the Latin one -- documented there as historical -- so the
+     spine and the hero's big slot have to read the other field or a peer theme puts N5 down the
+     stone and 入門 in the label. */
+  const jpOf = (r) => (HUD.level === 3 ? r.en : r.jp);
+  const enOf = (r) => (HUD.level === 3 ? r.jp : r.en);
   const sel = Math.max(0, Math.min(HUD.at | 0, n - 1));
   const cur = rows.findIndex((r) => r.state === 'here');
   const dim = 'rgba(222,214,189,0.55)';
@@ -17685,18 +17718,23 @@ function courseLayout(rows) {
   /* --- the tablets --- */
   wrap.querySelectorAll('.cs-tab').forEach((el, i) => {
     const r = rows[i];
-    const status = r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
+    const status = peers ? 'current'
+      : r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
     const isSel = i === sel;
-    const dead = !blocks && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
+    const dead = !blocks && !peers && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
     const faceUp = status !== 'locked';
     const d = Math.abs(i - sel);
     const op = isSel ? 0 : [1, 1, 0.92, 0.72, 0.45][d] ?? 0;
     /* a block's number is its place in the deck and its token is its card count -- the same pair
        the course carries: where in the sequence, and how much of a thing it is */
-    const bits = blocks ? { lv: '', en: r.en, vjp: r.en, tok: r.meta } : csBits(r);
+    const bits = blocks ? { lv: '', en: r.en, vjp: r.en, tok: r.meta }
+      : peers ? { lv: '', en: enOf(r), vjp: jpOf(r), tok: csToken(r.meta) }
+        : csBits(r);
     /* DIRECTION, DRAWN. What is finished sinks and takes a small shadow; what is ahead stands
        proud of the road and casts a long one. Behind and ahead stop being mirror images. */
-    const dep = status === 'done'
+    /* NOTHING SINKS ON A PEER ROAD. Depth is how this drawing says "behind you", and behind you
+       is a fact a peer list does not have -- four games are four games whichever you played last. */
+    const dep = (!peers && status === 'done')
       ? { y: 9, sh: '3px 4px 0 rgba(0,0,0,0.32)' }
       : { y: -6, sh: '6px 9px 0 rgba(0,0,0,0.5)' };
     const key = faceUp ? 'var(--ink)' : 'rgba(242,234,216,0.66)';
@@ -17711,9 +17749,9 @@ function courseLayout(rows) {
       + ` transition-delay: ${Math.min(d, 3) * 14}ms;`;
     const q = (c) => el.querySelector(c);
     const dst = q('.cs-dest');
-    dst.textContent = blocks ? 'BLOCK'
+    dst.textContent = peers ? csPeerKind() : blocks ? 'BLOCK'
       : (r.kind === 'goto' && r.to ? '\u2192 ' + r.to : (dead ? 'NOT BUILT' : 'DECK'));
-    dst.style.cssText = !blocks && r.kind === 'goto' && r.to
+    dst.style.cssText = !blocks && !peers && r.kind === 'goto' && r.to
       ? `background: ${(SECTION_ACCENT[r.to] || SECTION_ACCENT.STUDY)[0]}; color: var(--washi);`
       : dead
         ? (faceUp
@@ -17733,21 +17771,27 @@ function courseLayout(rows) {
       ? `color: ${faceUp ? 'var(--hi-deep)' : '#f2ead8'};` : 'display: none;';
     const vj = q('.cs-vjp');
     vj.textContent = bits.vjp;
-    vj.dataset.lat = blocks ? '1' : '0';
+    vj.dataset.lat = blocks || (peers && HUD.level === 3 && !/[\u3040-\u30ff\u4e00-\u9faf]/
+      .test(String(bits.vjp))) ? '1' : '0';
     vj.style.color = faceUp ? 'var(--ink)' : 'rgba(232,224,203,0.78)';
     q('.cs-gate').textContent = bits.tok;
     q('.cs-gate').style.color = faceUp ? 'rgba(20,17,13,0.62)' : 'rgba(242,234,216,0.62)';
     const g = q('.cs-glyph');
-    g.dataset.seal = status === 'done' ? '1' : '0';
-    g.textContent = status === 'done' ? '\u6e08'
-      : status === 'current' ? 'YOU ARE HERE' : (dead ? 'NOT YET' : 'LOCKED');
-    if (status !== 'done') g.style.color = status === 'current' ? 'var(--hi-deep)' : 'rgba(242,234,216,0.52)';
+    /* a peer's foot carries its own figure. There is no cleared, here or locked to report, and the
+       one number that differs stone to stone is how far into it you are. */
+    g.dataset.seal = !peers && status === 'done' ? '1' : '0';
+    g.textContent = peers ? (Math.max(0, r.pct) + '%')
+      : status === 'done' ? '\u6e08'
+        : status === 'current' ? 'YOU ARE HERE' : (dead ? 'NOT YET' : 'LOCKED');
+    if (peers) g.style.color = 'rgba(20,17,13,0.62)';
+    else if (status !== 'done') g.style.color = status === 'current' ? 'var(--hi-deep)' : 'rgba(242,234,216,0.52)';
   });
 
   /* --- the hero, standing in the selected tablet's slot --- */
   const r = rows[sel];
-  const status = r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
-  const dead = !blocks && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
+  const status = peers ? 'current'
+    : r.state === 'done' ? 'done' : (r.state === 'here' ? 'current' : 'locked');
+  const dead = !blocks && !peers && (r.kind === 'none' || (r.kind === 'goto' && !r.to));
   const faceUp = status !== 'locked';
   const ch = Math.max(0, csChapter(sel));
   const hero = wrap.querySelector('.cs-hero');
@@ -17758,9 +17802,9 @@ function courseLayout(rows) {
     + (!faceUp && dead ? ' border: 1px dashed rgba(242,234,216,0.4);' : '');
   const h = (c) => hero.querySelector(c);
   const htab = h('.cs-htab');
-  htab.textContent = blocks ? 'BLOCK'
+  htab.textContent = peers ? csPeerKind() : blocks ? 'BLOCK'
     : (r.kind === 'goto' && r.to ? '\u2192 ' + r.to : (dead ? 'NOT BUILT' : 'DECK'));
-  htab.style.cssText = !blocks && r.kind === 'goto' && r.to
+  htab.style.cssText = !blocks && !peers && r.kind === 'goto' && r.to
     ? `background: ${(SECTION_ACCENT[r.to] || SECTION_ACCENT.STUDY)[0]}; color: var(--washi);`
     : dead
       ? (faceUp
@@ -17785,23 +17829,33 @@ function courseLayout(rows) {
      where the English name goes at level two, so the card still reads identity-then-detail down
      the page rather than swapping the two over. */
   const hjp = h('.cs-hjp');
-  hjp.dataset.lat = blocks ? '1' : '0';
-  hjp.textContent = blocks ? r.en : r.jp;
+  const heroBig = blocks ? r.en : peers ? jpOf(r) : r.jp;
+  const bigIsJp = /[\u3040-\u30ff\u4e00-\u9faf]/.test(String(heroBig));
+  hjp.dataset.lat = blocks || !bigIsJp ? '1' : '0';
+  hjp.textContent = heroBig;
+  /* CJK glyphs are one em wide and the card gives 250 of them, so the size is the width divided by
+     the count -- capped at the 66 the one- and two-character names are drawn at, floored at 28
+     where mincho stops being mincho. Latin keeps its own rule; it is a figure, not a name. */
+  hjp.style.fontSize = bigIsJp && !blocks
+    ? Math.max(28, Math.min(66, Math.floor(250 / (String(heroBig).length * 1.06)))) + 'px'
+    : '';
   hjp.style.color = faceUp ? 'var(--ink)' : 'rgba(230,222,200,0.72)';
-  h('.cs-hen').textContent = blocks ? r.meta : r.en;
+  h('.cs-hen').textContent = blocks ? r.meta : peers ? enOf(r) : r.en;
   h('.cs-hen').style.color = faceUp ? 'var(--hi-deep)' : dim;
-  h('.cs-gatelabel').textContent = blocks
-    ? (status === 'current' ? 'BLOCK'
-      : status === 'done' ? 'CLEARED' : 'LOCKED UNTIL THE ONE BEFORE')
-    : (status === 'current' ? 'GATE TO CLEAR'
-      : status === 'done' ? 'CLEARED' : (dead ? 'NOT BUILT YET' : 'LOCKED UNTIL'));
+  h('.cs-gatelabel').textContent = peers ? 'WHAT IT HOLDS'
+    : blocks
+      ? (status === 'current' ? 'BLOCK'
+        : status === 'done' ? 'CLEARED' : 'LOCKED UNTIL THE ONE BEFORE')
+      : (status === 'current' ? 'GATE TO CLEAR'
+        : status === 'done' ? 'CLEARED' : (dead ? 'NOT BUILT YET' : 'LOCKED UNTIL'));
   h('.cs-gatelabel').style.color = faceUp ? 'rgba(20,17,13,0.45)' : 'rgba(242,234,216,0.45)';
-  h('.cs-gateval').textContent = blocks ? (r.no + ' / ' + String(n).padStart(2, '0'))
-    : (dead ? '\u2014' : r.meta);
+  h('.cs-gateval').textContent = peers ? r.meta
+    : blocks ? (r.no + ' / ' + String(n).padStart(2, '0'))
+      : (dead ? '\u2014' : r.meta);
   h('.cs-gateval').style.color = faceUp ? 'rgba(20,17,13,0.8)' : 'rgba(242,234,216,0.78)';
-  const showGauge = status === 'current';
+  const showGauge = peers || status === 'current';
   h('.cs-gaugerow').style.display = showGauge ? 'flex' : 'none';
-  h('.cs-hseal').style.display = status === 'done' ? 'block' : 'none';
+  h('.cs-hseal').style.display = !peers && status === 'done' ? 'block' : 'none';
   const filled = Math.round(12 * Math.max(0, r.pct) / 100);
   h('.cs-segs').querySelectorAll('i').forEach((sg, k) => {
     sg.style.cssText = `background: ${k < filled ? 'var(--gold)'
@@ -17810,7 +17864,7 @@ function courseLayout(rows) {
   });
   h('.cs-pct').textContent = Math.max(0, r.pct) + '%';
   h('.cs-pct').style.color = faceUp ? 'var(--hi-deep)' : 'var(--gold-hi)';
-  const [line, lc, lbg, lw, ls] = cardLine(r, status);
+  const [line, lc, lbg, lw, ls] = cardLine(r, status, peers);
   h('.cs-slab').style.background = lbg;
   const li = h('.cs-slab i');
   li.textContent = line;
@@ -17818,6 +17872,8 @@ function courseLayout(rows) {
 
   /* --- the marker: where you are BETWEEN this step and the next --- */
   const mk = wrap.querySelector('.cs-mark');
+  if (peers) mk.style.display = 'none';
+  else mk.style.display = '';
   const cu = cur < 0 ? 0 : cur;
   const nxt = centers[Math.min(cu + 1, n - 1)];
   const gold = centers[cu] + (nxt - centers[cu]) * Math.max(0, rows[cu].pct) / 100;
@@ -17834,10 +17890,14 @@ function courseLayout(rows) {
 
   /* --- the chapter line, the edge tags and the whole-of-it strip --- */
   const cd = CS_CHAPTERS[ch];
-  wrap.querySelector('.cs-chaplead').textContent = blocks ? 'THE BLOCKS \u5e33' : 'THE PATH \u9053';
-  wrap.querySelector('.cs-chapnow').textContent = blocks
-    ? (n + ' BLOCKS \u00b7 ' + rows.filter((x) => x.state === 'done').length + ' CLEARED')
-    : (CS_CHNUM[ch] + ' ' + cd.jp + ' ' + cd.en);
+  wrap.querySelector('.cs-chaplead').textContent = peers
+    ? (HUD.level === 3 ? 'THE THEMES \u984c' : 'THE AREAS \u90e8')
+    : blocks ? 'THE BLOCKS \u5e33' : 'THE PATH \u9053';
+  wrap.querySelector('.cs-chapnow').textContent = peers
+    ? (String(n).padStart(2, '0') + ' \u00b7 ' + (HUD.sec || ''))
+    : blocks
+      ? (n + ' BLOCKS \u00b7 ' + rows.filter((x) => x.state === 'done').length + ' CLEARED')
+      : (CS_CHNUM[ch] + ' ' + cd.jp + ' ' + cd.en);
   const behind = sel, ahead = n - 1 - sel;
   const lo = wrap.querySelector('.cs-side.lo'), hi = wrap.querySelector('.cs-side.hi');
   lo.style.opacity = behind ? 1 : 0.14;
@@ -17853,9 +17913,14 @@ function courseLayout(rows) {
       + (i === sel ? ' box-shadow: 0 0 0 3px var(--hi);' : '');
   });
   const cleared = rows.filter((x) => x.state === 'done').length;
-  wrap.querySelector('.cs-cleared').textContent = cleared
-    + (blocks ? ' BLOCKS CLEARED' : ' STEPS CLEARED');
-  wrap.querySelector('.cs-togo').textContent = (n - cleared - 1) + ' TO GO';
+  /* CLEARED AND TO GO ARE SEQUENCE WORDS. A peer list has neither, so its strip says the two
+     things that ARE true of it: how many there are, and which one you are standing on. */
+  wrap.querySelector('.cs-cleared').textContent = peers
+    ? (String(n).padStart(2, '0') + ' ' + csPeerKind() + 'S')
+    : (cleared + (blocks ? ' BLOCKS CLEARED' : ' STEPS CLEARED'));
+  wrap.querySelector('.cs-togo').textContent = peers
+    ? ('ON ' + String(sel + 1).padStart(2, '0'))
+    : ((n - cleared - 1) + ' TO GO');
 }
 
 /* ================================================================================================
@@ -17977,10 +18042,17 @@ function hudWindow(rows) {
    ONLY WHERE THE ROWS ARE ACTUALLY A SEQUENCE. The other five sections' level threes are lists of
    peers -- minigames, passages, exam modes -- with no order and no `state`, and they keep the row
    list. `STUDY_BLOCKS[HUD.tile]` is the test, because it is the thing that produces the order. */
-function courseShaped() {
-  if (HUD.sec !== 'STUDY') return false;
-  return HUD.level === 2 || (HUD.level === 3 && !!STUDY_BLOCKS[HUD.tile]);
-}
+/* ONE SHAPE FOR EVERY SCREEN PAST THE MENU. This was STUDY's alone because the road was built
+   for a gated sequence and the other five sections' rows are peers -- no order, no `state`, no
+   gate. That is an argument about what the road may SAY, not about what it is: a strip of stones
+   with the one you are on standing forward is the menu's own posture turned on its side, and it
+   is honest for four peers as long as it does not draw a chain that is not there.
+
+   So `courseLayout` has three modes. `path` gates and seals and counts what is cleared; `blocks`
+   does the same one level in; `peers` draws the same stones with none of the sequence furniture --
+   nothing sunk, nothing locked, no marker between steps, no cleared count. What survives is what
+   is true of a peer list: which of them there are, which one you are on, and what it holds. */
+function courseShaped() { return HUD.level === 2 || HUD.level === 3; }
 
 function hudDraw(force) {
   const all = hudRows();
@@ -18294,6 +18366,8 @@ function hudPick() {
     r.tile = r.deck;
   }
   if (HUD.level === 3 || !r || !r.tile) { doFlash(0.2); punchShake(0.24); return; }
+  /* and nothing to drill into is the same answer as nowhere to go */
+  if (!ftL3Rows(HUD.sec, r.tile).length) { doFlash(0.2); punchShake(0.24); return; }
   /* the tier you chose acknowledges the key before anything else happens */
   const hit = hudEl.querySelector('.hud-row.on');
   if (hit && !reduced) {
