@@ -1876,15 +1876,34 @@
   }
   .course-wrap { position: relative; width: 100%; height: 440px; }
 
-  /* ---- the chapter line, above the road ---- */
+  /* ---- the chapter line, above the road ----
+     THE LAST BARE THING IN THIS CORNER. It was cream type with a heavy dark stroke around it,
+     which is the treatment for type standing on an open valley -- correct while the heading beside
+     it was the same, wrong the moment the heading took a slab. Two objects an inch apart cannot
+     answer legibility two different ways.
+
+     A CHIP RATHER THAN A SECOND SLAB, because it is a caption and the thing above it is the
+     title. It gets the `.stat-chip` treatment exactly: washi, ink, one hard offset shadow, small
+     and tracked -- the same object the four along the top of the screen already are.
+
+     AND IT LEANS THE OTHER WAY. `.upnext-item` and `.desc-line` roll opposite each other for the
+     reason the top row's chips do: two boxes stacked at the same angle read as one mis-cut sheet,
+     and at opposite angles as two things set down separately. The slab above rolls -1.2, so this
+     rolls +1. The stroke goes with the wash -- it is ink on paper now. */
   .cs-chapline {
-    position: absolute; left: 52px; top: 0; height: 16px;
-    display: flex; align-items: center; gap: 11px; white-space: nowrap;
-    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.2em;
-    color: rgba(242, 234, 216, 0.78);
-    paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
+    position: absolute; left: 52px; top: 0;
+    display: flex; align-items: center; gap: 9px; white-space: nowrap;
+    padding: 5px 13px 6px;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transform: skewX(-8deg) rotate(1deg); transform-origin: 0 50%;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+    color: var(--ink);
   }
-  .cs-chapline s { text-decoration: none; color: rgba(242, 234, 216, 0.28); }
+  .cs-chapline s { text-decoration: none; color: rgba(20, 17, 13, 0.26); }
+  /* the road's name is the label and where you are in it is the value, so they are not the same
+     weight of ink -- the same split the state line on the menu's open card makes */
+  .cs-chaplead { color: rgba(20, 17, 13, 0.5); }
 
   /* ---- the strip: a window on a much wider rail ----
      The mask is what stops the tablets ending in a hard vertical cut at each edge -- the road runs
