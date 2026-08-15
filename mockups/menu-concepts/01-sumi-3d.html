@@ -2354,8 +2354,8 @@
   .lb-jp { font-size: 18px; }        .lb-row.on .lb-jp { font-size: 26px; }
   .lb-en { font-size: 11px; }        .lb-row.on .lb-en { font-size: 13px; }
   .lb-body { padding: 0 18px; }      .lb-row.on .lb-body { padding: 0 22px; }
-  .lb-state { width: 200px; padding: 0 16px; gap: 5px; }
-  .lb-row.on .lb-state { width: 216px; padding: 0 20px; gap: 7px; }
+  .lb-state { width: 178px; padding: 0 14px; gap: 5px; }
+  .lb-row.on .lb-state { width: 190px; padding: 0 16px; gap: 7px; }
   .lb-state b { font-size: 12px; }   .lb-row.on .lb-state b { font-size: 16px; }
   .lb-track { height: 8px; }         .lb-row.on .lb-track { height: 10px; }
   /* one curve for every travelling property, so a row grows, moves and re-weights together */
@@ -2372,19 +2372,35 @@
   .lb-rail { transition: transform 0.46s cubic-bezier(0.18, 0.92, 0.24, 1); }
   .lb-track i { transition: width 0.7s cubic-bezier(0.18, 0.92, 0.24, 1); }
 
+  /* ================================================================================
+     THE FRAME CONTRACT, ON THE LIBRARY.
+
+     RULE 1 · THE STAGE. x 160-1120, y 192-576 -- 960x384, 40% of the frame. The drawing
+     lives inside it, balanced about x 640. This block is positioned in the panel's own
+     space, which begins at frame y166, so the stage's top is 26 here and its foot is 410.
+     RULE 2 · THE MOAT. 160px of bare valley each side is what is left over once the stage
+     is inset, and nothing is allowed to reach into it -- not a rail, not a tally, not the
+     action slab, which used to hang off the row's right end into open country.
+     RULE 3 · COVERAGE. Rows are 900 wide inside a 960 stage: six of them, one grown, is
+     about 28% of the frame in opaque paint, under the 33% ceiling with the heading slab
+     and the chips counted in.
+     THE OVERFLOW RULE is the one that changes what is on the screen rather than where it
+     sits: thirty rows fold to a window of SIX around the selection, and what leaves the
+     window becomes a count on the edge it left over.
+     ================================================================================ */
   .library { position: relative; margin-top: 6px; margin-left: -52px;
     width: calc(100vw / var(--u)); height: 470px; }
   /* the mask is what stops a row ending abruptly at the viewport edge -- it fades rather
      than being cut, which is what makes the rail read as continuing past the frame */
-  .lb-view { position: absolute; left: 134px; top: 6px; width: 1012px; height: 424px;
+  .lb-view { position: absolute; left: 160px; top: 26px; width: 960px; height: 384px;
     overflow: hidden;
     -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0, rgba(0,0,0,1) 40px,
       rgba(0,0,0,1) calc(100% - 26px), rgba(0,0,0,0) 100%);
     mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0, rgba(0,0,0,1) 40px,
       rgba(0,0,0,1) calc(100% - 26px), rgba(0,0,0,0) 100%); }
-  .lb-rail { position: absolute; left: 6px; top: 0; width: 1000px; will-change: transform; }
+  .lb-rail { position: absolute; left: 30px; top: 0; width: 900px; will-change: transform; }
 
-  .lb-row { position: absolute; left: 0; width: 1000px; display: flex; align-items: stretch;
+  .lb-row { position: absolute; left: 0; width: 900px; display: flex; align-items: stretch;
     cursor: pointer; border: 0; padding: 0; font: inherit; text-align: left;
     box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
     background: linear-gradient(178deg, #f7f6f3 0%, #e6e4dd 100%); }
@@ -2425,6 +2441,7 @@
   .lb-detail s { flex: none; width: 3px; height: 3px; background: rgba(20, 17, 13, 0.28); }
 
   .lb-state { flex: none; display: flex; flex-direction: column; justify-content: center;
+    overflow: hidden;
     box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.14); }
   .lb-state em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
     font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); white-space: nowrap; }
@@ -2433,21 +2450,21 @@
   .lb-track { position: relative; display: block; background: rgba(20, 17, 13, 0.12);
     box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.22); }
   .lb-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
-  .lb-slab { flex: none; width: 210px; align-self: stretch; margin: -1px -1px -1px 0;
+  .lb-slab { flex: none; width: 186px; align-self: stretch; margin: -1px 0 -1px 0;
     display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
     background: var(--hi); font-style: normal; white-space: nowrap; }
   .lb-slab b { font-family: var(--lat-ui); font-weight: 700; font-size: 12.5px;
     letter-spacing: 0.14em; color: #ffd9a1; }
   .lb-slab b.key { font-size: 9.5px; letter-spacing: 0.18em; color: rgba(255, 217, 161, 0.75); }
-  .lb-hint { flex: none; width: 200px; align-self: center; padding-right: 16px;
+  .lb-hint { flex: none; width: 186px; align-self: center; padding-right: 16px;
     text-align: right; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
     font-size: 9.5px; letter-spacing: 0.18em; white-space: nowrap;
     color: rgba(20, 17, 13, 0.32); }
 
   /* ---- the band markers, which stick ---- */
-  .lb-heads { position: absolute; left: 134px; top: 0; width: 1012px; height: 436px;
+  .lb-heads { position: absolute; left: 160px; top: 26px; width: 960px; height: 384px;
     overflow: hidden; pointer-events: none; z-index: 30; }
-  .lb-head { position: absolute; left: 0; width: 1000px; height: 26px; display: flex;
+  .lb-head { position: absolute; left: 30px; width: 900px; height: 26px; display: flex;
     align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; }
   .lb-rule { position: absolute; left: 0; right: 0; top: 50%; margin-top: -1px; height: 2px; }
   .lb-plate { position: relative; display: flex; align-items: center; gap: 12px; height: 26px;
@@ -2465,8 +2482,24 @@
     font-size: 9px; letter-spacing: 0.2em; white-space: nowrap; color: rgba(20, 17, 13, 0.42); }
 
   /* ---- the whole library in one strip ---- */
-  .lb-mini { position: absolute; left: 190px; top: 440px; width: 900px;
-    display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .lb-mini { position: absolute; left: 190px; top: 412px; width: 900px;
+    display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  /* WHAT LEFT THE WINDOW, COUNTED ON THE EDGE IT LEFT OVER. Six of thirty are on screen;
+     these say where the other twenty-four went, which is the whole reason a window is
+     allowed to be this small. */
+  .lb-count { position: absolute; right: 190px; display: flex; align-items: baseline; gap: 7px;
+    padding: 3px 10px 4px; background: rgba(10, 9, 6, 0.82);
+    box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.24);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+    color: rgba(242, 234, 216, 0.6); white-space: nowrap; z-index: 34;
+    transition: opacity 0.24s ease; }
+  .lb-count b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
+    color: var(--gold-hi); }
+  /* ON THE CONTAINER, NOT IN THE HEAD BOX. They were inside `.lb-heads`, which is 384 tall
+     with `overflow: hidden`, so the BELOW chip at top 388 was clipped out of existence --
+     present in the DOM, painting nothing. */
+  .lb-count.up { top: 26px; }
+  .lb-count.down { top: 386px; }
   .lb-bars { display: flex; align-items: flex-end; gap: 3px; }
   .lb-bars i { display: block; }
   .lb-tally { display: flex; align-items: baseline; justify-content: center; gap: 9px;
@@ -20243,8 +20276,15 @@ const LIB_GNAME = ['EASIEST', 'EASIER', 'HARDER', 'HARDEST'];
 /* forty words a minute is a beginner reading aloud, which is what these are for */
 const LIB_PACE = 40;
 const LB_SEL_H = 100, LB_ROW_H = 38, LB_GAP = 6, LB_HEAD = 26, LB_HEAD_GAP = 19;
-const LB_VH = 424, LB_FOCUS = 200;
+/* THE OVERFLOW RULE. Six rows on the stage, whatever the list is thirty long. The window
+   centres the selection where it can and clamps at both ends, so the first and last texts
+   are reachable without the list pretending to continue past them. */
+const LB_VH = 384, LB_WIN = 6, LB_LEAD = 2;
 let LB_SEL = 7;
+function libWindow(sel) {
+  const lo = Math.max(0, Math.min(sel - LB_LEAD, LIB.length - LB_WIN));
+  return { lo, hi: Math.min(LIB.length, lo + LB_WIN) };
+}
 
 /* which band each index belongs to, derived once from the run lengths */
 const LIB_GROUP = (() => {
@@ -20259,22 +20299,19 @@ const LIB_GROUP = (() => {
 function libMins(words) { return Math.max(1, Math.round(words / LIB_PACE)); }
 function libDone(i) { return (LIB_READ[i] || 0) >= 100; }
 
-/* THE LAYOUT IS RECOMPUTED FROM THE SELECTION, because the selected row is 100px and every
-   other one is 38 -- so every row below the selection moves when it changes. */
+/* THE LAYOUT IS THE WINDOW, not the list. Only the six rows on the stage get a position;
+   the rest are taken out of the flow entirely. The band marker no longer rides the rail and
+   stick to the top -- with six rows there is one band worth naming, so it is simply pinned
+   there, which is the same idea with the machinery removed. */
 function libLayout(sel) {
-  const tops = [], heads = [];
-  let y = 0, g = -1;
-  for (let i = 0; i < LIB.length; i++) {
-    if (LIB_GROUP[i] !== g) {
-      g = LIB_GROUP[i];
-      if (i) y += LB_HEAD_GAP;
-      heads[g] = y;
-      y += LB_HEAD + LB_HEAD_GAP;
-    }
+  const { lo, hi } = libWindow(sel);
+  const tops = [];
+  let y = LB_HEAD + 12;
+  for (let i = lo; i < hi; i++) {
     tops[i] = y;
     y += (i === sel ? LB_SEL_H : LB_ROW_H) + LB_GAP;
   }
-  return { tops, heads, total: y };
+  return { tops, lo, hi, total: y };
 }
 
 function libraryMarkup() {
@@ -20291,8 +20328,10 @@ function libraryMarkup() {
         + `<span class="lb-detail">`
           + `<i class="read">${reading}</i><s></s>`
           + `<i>${words.toLocaleString()} WORDS</i><s></s>`
-          + `<i class="new">≈30 NEW WORDS</i><s></s>`
-          + `<i class="src">青空文庫 AOZORA BUNKO</i></span></span>`
+          /* THE SOURCE WENT WHEN THE ROW NARROWED TO 900. Four facts fitted at 1000 and
+             three fit at 900; "青空文庫" was the one a learner choosing what to read needs
+             least, and a clipped line reading "青空文..." is worse than an absent one. */
+          + `<i class="new">≈30 NEW WORDS</i></span></span>`
       + `<span class="lb-state"><em>HOW FAR YOU GOT</em>`
         + `<b></b><span class="lb-track"><i style="width:${p}%"></i></span></span>`
       + `<i class="lb-slab"><b>${p >= 100 ? 'READ IT AGAIN ▸'
@@ -20305,12 +20344,15 @@ function libraryMarkup() {
   const heads = LIB_GNAME.map((nm, g) => `<div class="lb-head" data-g="${g}">`
     + `<i class="lb-rule"></i><span class="lb-plate">`
     + `<b class="k">${LIB_KANJI[g]}</b><b class="n">${nm}</b>`
-    + `<i>${LIB_BANDS[g]} TEXTS</i></span></div>`).join('');
+    + `<i>${LIB_BANDS[g]} TEXTS</i></span></div>`).join('')
+;
 
   const bars = LIB.map((_, i) => `<i data-i="${i}"></i>`).join('');
 
   return `<div class="lb-view"><div class="lb-rail">${rows}</div></div>`
     + `<div class="lb-heads">${heads}</div>`
+    + `<div class="lb-count up"><b></b><span>ABOVE</span></div>`
+    + `<div class="lb-count down"><b></b><span>BELOW</span></div>`
     + `<div class="lb-mini"><span class="lb-bars">${bars}</span>`
     + `<span class="lb-tally"><span></span><s>·</s><u></u></span></div>`;
 }
@@ -20318,17 +20360,22 @@ function libraryMarkup() {
 function libraryLayout() {
   const sel = LB_SEL = Math.max(0, Math.min(LB_SEL, LIB.length - 1));
   const L = libLayout(sel);
-  /* the rail carries the selected row to a fixed line, then stops travelling at either end so
-     the list does not float away from its own edges */
-  let shift = LB_FOCUS - L.tops[sel] - LB_SEL_H / 2;
-  shift = Math.min(shift, 24);
-  shift = Math.max(shift, Math.min(24, LB_VH - L.total - 30));
   const rail = hudEl.querySelector('.lb-rail');
   if (!rail) return;
-  rail.style.transform = `translateY(${Math.round(shift)}px)`;
+  /* THE RAIL NO LONGER TRAVELS. It used to translate thirty rows past a fixed focus line;
+     the window means the six on screen are laid out from the stage's top every time, so the
+     rows move and the rail stands still. */
+  rail.style.transform = '';
   rail.style.height = L.total + 'px';
 
   hudEl.querySelectorAll('.lb-row').forEach((el, i) => {
+    const inWin = i >= L.lo && i < L.hi;
+    el.style.display = inWin ? '' : 'none';
+    /* CLEARED BEFORE THE EARLY RETURN, NOT AFTER IT. A row that leaves the window kept `.on`
+       while hidden, so `.lb-row.on` matched two elements and the one it matched first was the
+       stale one -- which is how a working band jump read as a broken one. */
+    el.classList.toggle('on', i === sel);
+    if (!inWin) return;
     const isSel = i === sel, d = Math.abs(i - sel);
     const h = isSel ? LB_SEL_H : LB_ROW_H;
     el.classList.toggle('on', isSel);
@@ -20356,22 +20403,13 @@ function libraryLayout() {
     st.style.color = p >= 100 ? '#8f6a26' : p > 0 ? 'var(--ink)' : 'rgba(20,17,13,0.42)';
   });
 
-  /* ---- the band markers, which ride the rail and then stick ---- */
+  /* ---- one band marker, pinned to the stage's top edge ---- */
   hudEl.querySelectorAll('.lb-head').forEach((el, g) => {
     const here = LIB_GROUP[sel] === g;
-    const natural = shift + L.heads[g];
-    const nextNat = g < 3 ? shift + L.heads[g + 1] : 1e6;
-    /* STICKING IS WHAT MAKES THIRTY ROWS NAVIGABLE. Inside a band its name stays pinned to the
-       top edge instead of scrolling away, so you always know which one you are in -- but it is
-       pushed off by the NEXT band's marker rather than overlapping it. */
-    const stuck = here && natural < -18;
-    const top = Math.round(stuck ? Math.min(-18, nextNat - LB_HEAD - 8) : natural);
-    const gone = top < -LB_HEAD - 4 || natural > LB_VH + 30;
-    const fIn = Math.max(0, Math.min(1, (top - 2) / 24));
-    const fOut = Math.max(0, Math.min(1, (LB_VH - 30 - (top + LB_HEAD)) / 26 + 1));
     el.classList.toggle('here', here);
-    el.style.top = (top + 18) + 'px';
-    el.style.opacity = gone ? 0 : stuck ? 1 : Math.min(fIn, fOut).toFixed(3);
+    el.style.top = '0px';
+    el.style.opacity = here ? 1 : 0;
+    el.style.pointerEvents = here ? 'auto' : 'none';
     const rule = el.querySelector('.lb-rule');
     const c = here ? 'var(--gold)' : 'rgba(242,234,216,0.4)';
     rule.style.height = here ? '3px' : '2px';
@@ -20387,6 +20425,11 @@ function libraryLayout() {
     el.style.boxShadow = i === sel ? '0 0 0 2px var(--hi)' : 'none';
     el.style.marginLeft = i > 0 && LIB_GROUP[i] !== LIB_GROUP[i - 1] ? '11px' : '';
   });
+  const up = hudEl.querySelector('.lb-count.up'), dn = hudEl.querySelector('.lb-count.down');
+  if (up) { up.querySelector('b').textContent = L.lo; up.style.opacity = L.lo ? 1 : 0; }
+  if (dn) { const n = LIB.length - L.hi;
+    dn.querySelector('b').textContent = n; dn.style.opacity = n ? 1 : 0; }
+
   let read = 0, going = 0;
   LIB.forEach((_, i) => { const p = LIB_READ[i] || 0; if (p >= 100) read++; else if (p > 0) going++; });
   const tally = hudEl.querySelector('.lb-tally');
