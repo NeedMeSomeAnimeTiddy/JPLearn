@@ -2368,6 +2368,13 @@
     color: rgba(242, 234, 216, 0.78); }
 
   /* ---- the whole deck, proportionally ---- */
+  /* GRAB, BECAUSE IT IS DRAGGABLE. The rail scrubs the whole deck and the road pushes along;
+     both say so with the cursor rather than expecting the mouse to discover it. */
+  .dk-rail, .cs-strip { cursor: grab; }
+  body.is-dragging .dk-rail, body.is-dragging .cs-strip,
+  body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
+  /* a scrub that selects text as it goes drags a blue smear across the valley */
+  body.is-dragging { user-select: none; -webkit-user-select: none; }
   .dk-rail { position: absolute; left: 56px; top: 296px; width: 1128px; height: 96px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
@@ -15035,6 +15042,13 @@ let flownTo = 0;
 /* a handle for headless verification: an arrival is a state change, and waiting a fixed number
    of milliseconds for one is guesswork the moment the frame rate moves */
 window.NAV = { get state() { return state; }, get busy() { return busy; },
+  /* how sensitive the mouse is: `NAV.feel()` reports, `NAV.feel(wheel, drag)` sets. Lower is
+     more sensitive. Wheel is deltaY per step (100 = one mouse notch), drag is px per step. */
+  feel: (w, d) => {
+    if (w) WHEEL_STEP = w;
+    if (d) DRAG_STEP = d;
+    return { wheelPerStep: WHEEL_STEP, dragPxPerStep: DRAG_STEP };
+  },
   /* which item the keyboard is on. Without this a harness can only COUNT its own ArrowDowns and
      hope none were swallowed — which is how a flight regression run came back reporting READING's
      numbers against DRILLS' camera. */
@@ -19589,6 +19603,96 @@ function feedLayout() {
   });
 }
 
+/* ================================================================================================
+   MOUSE TRAVERSAL -- DRAG AND WHEEL.
+
+   TWO OBJECTS, TWO METAPHORS, AND SWAPPING THEM WOULD BE WRONG. The deck rail is a MAP: it shows
+   the whole deck at once at a fixed scale, so dragging across it is ABSOLUTE -- the block under
+   the pointer is the block you get, the way a scrubber works. The road is a REEL: it shows nine
+   of however many and re-centres on whatever is selected, so dragging it is RELATIVE -- you push
+   the reel and it travels under a fixed centre. An absolute drag on the road would fight its own
+   re-centring, and a relative drag on the rail would throw away the one thing the rail has, which
+   is that every block already has a place on it.
+
+   THE GESTURE LIVES ON `window`, NOT ON THE ELEMENT. `hudBuild` replaces the whole panel on every
+   shape change and a drag that moves the selection causes exactly that -- so `pointermove` bound
+   to the rail would be listening to a node that stopped existing halfway through the gesture. The
+   element gets `pointerdown` and nothing else. The cached band positions survive the rebuild
+   because they are numbers, and because changing the selection re-paints the segments without
+   moving them.
+   ================================================================================================ */
+let DRAG = null, dragEnded = 0, wheelAcc = 0;
+/* ---- HOW HARD YOU HAVE TO PUSH ----
+   ONE NOTCH IS ONE STEP. A desktop mouse wheel sends deltaY 100 per detent in Chrome, so the
+   threshold IS 100 -- the first version used 40, which turned every notch into two or three
+   blocks and made a 76-block deck impossible to land on. A trackpad sends many small deltas
+   instead and they accumulate to the same place, which is the whole point of accumulating
+   rather than counting events.
+   THE DRAG IS DELIBERATELY HEAVIER THAN THE WHEEL. 96px is most of a tablet's width, so
+   pushing the road along is a decision rather than a twitch. Tune both live with
+   `NAV.feel(wheel, drag)` rather than editing this line. */
+let DRAG_STEP = 96;
+let WHEEL_STEP = 100;
+
+/* THE DRAG IS CLAMPED WHERE THE CLICK IS REFUSED. Scrubbing past the open block would let the
+   pointer reach blocks the keyboard and the mouse both decline to open. */
+function dragPickDeck(x) {
+  if (!DRAG || !DRAG.bands) return;
+  let i = 0;
+  for (let k = 0; k < DRAG.bands.length; k++) if (x >= DRAG.bands[k]) i = k;
+  const here = dkHere();
+  i = Math.max(0, Math.min(i, here));
+  const want = i === here ? -1 : i;
+  if (want === DK_PICK) return;
+  DK_PICK = want; DK_OPEN = false; HUD.cur = 0;
+  hudDraw();
+}
+
+addEventListener('pointermove', (e) => {
+  if (!DRAG) return;
+  DRAG.moved += Math.abs(e.clientX - DRAG.lastX);
+  if (DRAG.kind === 'deck') { dragPickDeck(e.clientX); DRAG.lastX = e.clientX; return; }
+  const step = Math.trunc((e.clientX - DRAG.lastX) / DRAG_STEP);
+  if (!step) return;
+  DRAG.lastX += step * DRAG_STEP;
+  /* dragging RIGHT pulls earlier steps toward you, which is how a physical reel behaves */
+  pathGo(HUD.cur - step, 0.26);
+});
+
+addEventListener('pointerup', () => {
+  if (!DRAG) return;
+  document.body.classList.remove('is-dragging');
+  /* A DRAG THAT TRAVELLED IS NOT A CLICK. The browser fires one anyway at the end of the
+     gesture, and without this the segment under the pointer would be picked a second time --
+     harmless on the rail, but on the road it would enter the step you happened to stop on. */
+  if (DRAG.moved > 4) dragEnded = performance.now();
+  DRAG = null;
+});
+
+function hudWheel(e) {
+  const bespoke = hudBespoke();
+  const onDeck = bespoke === 'deck';
+  const onRoad = !bespoke && courseShaped();
+  if (!onDeck && !onRoad) return;
+  e.preventDefault();
+  wheelAcc += e.deltaY;
+  const step = Math.trunc(wheelAcc / WHEEL_STEP);
+  if (!step) return;
+  wheelAcc -= step * WHEEL_STEP;
+  if (onDeck) {
+    const here = dkHere();
+    const from = DK_PICK < 0 ? here : DK_PICK;
+    const to = Math.max(0, Math.min(from + step, here));
+    const want = to === here ? -1 : to;
+    if (want === DK_PICK) return;
+    DK_PICK = want; DK_OPEN = false; HUD.cur = 0;
+    hudDraw();
+  } else {
+    pathGo(HUD.cur + step, 0.26);
+  }
+}
+hudEl.addEventListener('wheel', hudWheel, { passive: false });
+
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
@@ -19800,8 +19904,26 @@ function hudBuild(rows) {
      screen already says: a cleared block becomes the hero to revisit, the open block puts the
      hero back where it belongs, and a locked one refuses out loud rather than doing nothing --
      silence is indistinguishable from a broken click. */
+  /* the rail and the road each take a pointerdown and nothing else -- see the note by `DRAG` */
+  const dkRail = hudEl.querySelector('.dk-rail');
+  if (dkRail) dkRail.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const segs = [...dkRail.querySelectorAll('.dk-segrow i')];
+    if (!segs.length) return;
+    DRAG = { kind: 'deck', lastX: e.clientX, moved: 0,
+      bands: segs.map((el) => el.getBoundingClientRect().left) };
+    document.body.classList.add('is-dragging');
+    dragPickDeck(e.clientX);
+  });
+  const csStrip = hudEl.querySelector('.cs-strip');
+  if (csStrip) csStrip.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    DRAG = { kind: 'road', lastX: e.clientX, moved: 0 };
+    document.body.classList.add('is-dragging');
+  });
   hudEl.querySelectorAll('.dk-segrow i').forEach((el) => {
     el.addEventListener('click', () => {
+      if (performance.now() - dragEnded < 140) return;
       const i = +el.dataset.b, here = dkHere();
       if (i > here) { doFlash(0.2); punchShake(0.24); return; }
       DK_PICK = i === here ? -1 : i;
@@ -19820,18 +19942,27 @@ function hudBuild(rows) {
     b.addEventListener('click', () => { HUD.cur = +b.dataset.i; AS_IN = false; hudDraw(); });
   });
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
-    b.addEventListener('click', () => pathGo(+b.dataset.i, 0.5));
+    b.addEventListener('click', () => {
+      if (performance.now() - dragEnded < 140) return;
+      pathGo(+b.dataset.i, 0.5);
+    });
   });
   /* and the strip beneath them does the same thing -- it is the only part of the road that
      shows the WHOLE list at once, so it is the fastest way to cross a long one */
   hudEl.querySelectorAll('.cs-minibars i').forEach((el, i) => {
-    el.addEventListener('click', () => pathGo(i, 0.5));
+    el.addEventListener('click', () => {
+      if (performance.now() - dragEnded < 140) return;
+      pathGo(i, 0.5);
+    });
   });
   /* AND THE HERO IS FINALLY A BUTTON. It has been a `<button>` with `cursor: pointer` and no
      handler since the road was built -- the one card carrying "START THIS STEP" was the only
      thing on the screen a mouse could not press. */
   const heroBtn = hudEl.querySelector('.cs-hero');
-  if (heroBtn) heroBtn.addEventListener('click', () => hudPick());
+  if (heroBtn) heroBtn.addEventListener('click', () => {
+    if (performance.now() - dragEnded < 140) return;
+    hudPick();
+  });
   hudEl.querySelectorAll('.hud-row').forEach((b) => {
     /* `data-i` is the row's place in the WINDOW, so it is lifted back into the full list before
        it becomes the cursor — otherwise hovering row 0 of a window that starts at 6 jumps the
@@ -20437,9 +20568,18 @@ walkHud.querySelectorAll('.wh-step').forEach((b) => {
     if (walkSec) walkGo(walkAt + (+b.dataset.d));
   });
 });
+/* ONE STEP PER EVENT WAS THE BUG. This counted wheel EVENTS rather than distance, so a mouse
+   notch moved one step and a trackpad flick -- which is thirty small events, not one -- moved
+   thirty. It shares the HUD's accumulator and its threshold, so the walk and the road answer a
+   wheel at the same rate rather than each having their own idea of how hard you pushed. */
+let walkWheelAcc = 0;
 addEventListener('wheel', (e) => {
-  if (!walkSec || busy) return;
-  walkGo(walkAt + (e.deltaY > 0 ? 1 : -1));
+  if (!walkSec || busy) { walkWheelAcc = 0; return; }
+  walkWheelAcc += e.deltaY;
+  const step = Math.trunc(walkWheelAcc / WHEEL_STEP);
+  if (!step) return;
+  walkWheelAcc -= step * WHEEL_STEP;
+  walkGo(walkAt + step);
 }, { passive: true });
 
 /* the sub plane is detached until the first CSS3D render — query through subEl, not document */
