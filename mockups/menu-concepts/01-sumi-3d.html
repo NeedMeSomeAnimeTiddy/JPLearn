@@ -1487,9 +1487,18 @@
      deliberately NOT zoomed -- a viewport unit inside a zoomed box resolves against the viewport
      and is then scaled again, so 34vw would become 68. They already scale with the window by
      being written in vw in the first place. */
+  /* THE ROAD IS THE FOURTH CONTENT BLOCK AND WAS NEVER ADDED TO THIS LIST. It was built after
+     the other three and compensated by hand instead -- `52px * var(--u)` here, `60px * var(--u)`
+     there -- which scaled where it was ANCHORED and never what it was made of. Measured at
+     1280 / 1920 / 2560: a tablet stayed 101px wide at all three, so it went from 7.9% of the
+     frame to 4.0%, the hero from 26.3% to 13.2%, and the whole road from 89.7% of the width to
+     44.8% -- a small drawing in the middle of a wide screen with the frame furniture spread out
+     around it. Every hand compensation below comes out with this line going in, or they multiply
+     twice. */
   .hud[data-t="midashi"] .hud-head,
   .hud[data-t="midashi"] .hud-list,
-  .hud[data-t="midashi"] .hud-detail { zoom: var(--u); }
+  .hud[data-t="midashi"] .hud-detail,
+  .hud[data-t="midashi"] .course-shape { zoom: var(--u); }
   .hud[data-t="midashi"] .hud-cut { display: none; }
   .hud[data-t="midashi"] .hud-rule { display: none; }
 
@@ -1817,13 +1826,16 @@
   .course-shape {
     position: relative; margin-top: 6px;
     min-height: 440px; display: flex; align-items: flex-start;
-    margin-left: calc(-52px * var(--u)); width: 100vw;
+    /* the panel's own left padding, cancelled -- and both of these are read in the block's own
+       zoomed space now, so the raw 52 lands on the panel's `52px * var(--u)` and the divided
+       viewport width comes back to exactly one screen */
+    margin-left: -52px; width: calc(100vw / var(--u));
   }
   .course-wrap { position: relative; width: 100%; height: 440px; }
 
   /* ---- the chapter line, above the road ---- */
   .cs-chapline {
-    position: absolute; left: calc(52px * var(--u)); top: 0; height: 16px;
+    position: absolute; left: 52px; top: 0; height: 16px;
     display: flex; align-items: center; gap: 11px; white-space: nowrap;
     font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.2em;
     color: rgba(242, 234, 216, 0.78);
@@ -1837,8 +1849,8 @@
   .cs-strip {
     position: absolute; left: 0; right: 0; top: 20px; height: 388px; overflow: hidden;
     /* the gutter the counted tags stand in, and where the road starts existing again */
-    --gutter: calc(116px * var(--u));
-    --solid: calc(300px * var(--u));
+    --gutter: 116px;
+    --solid: 300px;
     -webkit-mask-image: linear-gradient(90deg,
       rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter), rgba(0,0,0,1) var(--solid),
       rgba(0,0,0,1) calc(100% - var(--solid)), rgba(0,0,0,0) calc(100% - var(--gutter)),
@@ -2045,14 +2057,16 @@
   /* INSET WITH THE REST OF THE CHROME, and scaled the way it is. P13's 30px is a 1280-frame
      number and it left these two hard against the edge of a 1440 one -- tighter to the glass than
      the brand, the hint stack and the back tab, all of which sit 40px in and RIDE `--u`, so on a
-     bigger window everything else moved inward and the bookends did not.
+     bigger window everything else moved inward and the bookends did not. (That whole argument is
+     settled differently now: the block these live in rides `--u` like the rest of the panel, so
+     these are plain design pixels and scale with everything around them.)
      AND 88 WAS INSIDE THE ROAD. "Inside the mask fade" is not the same as behind nothing: at 88
      the mask still passed a third to a half of its ink, and a tablet four steps out is painted at
      45%, so a fifth of a full tablet was showing THROUGH a solid tag rather than beside it. The
      strip has a dead zone now -- see `--gutter` -- and these sit in it: 60 puts the whole 48-wide
      tag inside 116 with eight pixels to spare. */
-  .cs-side.lo { left: calc(60px * var(--u)); }
-  .cs-side.hi { right: calc(60px * var(--u)); }
+  .cs-side.lo { left: 60px; }
+  .cs-side.hi { right: 60px; }
   .cs-side i {
     position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg);
   }
