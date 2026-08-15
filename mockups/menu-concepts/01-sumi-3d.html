@@ -2534,8 +2534,24 @@
     font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em; }
   .dk-cap i { font-style: normal; color: rgba(232, 196, 124, 0.6); }
 
+  /* ================================================================================
+     THE FRAME CONTRACT, ON THE CHAIN -- which is the deck screen and the course path at
+     once, because both are drawn by `chainMarkup`.
+
+     THE SKEW IS WHY THESE ARE NOT ROUND NUMBERS. Every plate here is skewed -8deg and
+     rolled -1.2, and a bounding box on a skewed plane measures the PROJECTION: a 236-tall
+     card paints 14.1px wider than it is authored on each side, and the 96-tall rail 5.7.
+     So the stage's 160 and 1120 become an authored 174 and 1106 for the cards and 166 and
+     1114 for the rail. Reading `left: 56` as "56px from the frame" is what put this screen
+     at x42 -- fourteen pixels into a moat that is supposed to be bare valley.
+
+     WHAT MOVED: the three cards went from 226/560/306 to 190/470/239 and the rail from
+     1128 to 948, so the group runs 174-1106 and is balanced about x640. WHAT DID NOT: the
+     type sizes. A card 17% narrower with the same 9px captions is a copy problem, not a
+     scaling one, and it was fixed as copy -- see the gate line in `chainMarkup`.
+     ================================================================================ */
   /* ---- what is behind you ---- */
-  .dk-behind { left: 56px; top: 30px; width: 226px; height: 236px;
+  .dk-behind { left: 174px; top: 36px; width: 190px; height: 236px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
       rgba(203,193,164,var(--paper)) 100%);
@@ -2553,7 +2569,7 @@
     color: rgba(20, 17, 13, 0.62); white-space: nowrap; }
 
   /* ---- the one you can actually study ---- */
-  .dk-here { left: 300px; top: 30px; width: 560px; height: 236px;
+  .dk-here { left: 380px; top: 36px; width: 470px; height: 236px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
       rgba(235,230,217,var(--paper)) 100%);
@@ -2580,7 +2596,7 @@
      rendered, so the card read "WANTS80 CHARACTERS". */
   .dk-gate { display: block;
     /* right padding clears the action slab, which overhangs this row's right end */
-    padding: 9px 190px 11px 24px; background: rgba(20, 17, 13, 0.06);
+    padding: 9px 180px 11px 22px; background: rgba(20, 17, 13, 0.06);
     box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16);
     font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
     color: rgba(20, 17, 13, 0.6); white-space: nowrap; }
@@ -2594,7 +2610,7 @@
     line-height: 17px; letter-spacing: 0.1em; color: var(--washi); margin-top: 2px; }
 
   /* ---- what is ahead, and cannot be pressed ---- */
-  .dk-ahead { position: absolute; left: 878px; top: 30px; width: 306px; height: 236px;
+  .dk-ahead { position: absolute; left: 866px; top: 36px; width: 239px; height: 236px;
     display: flex; flex-direction: column;
     background: rgba(10, 9, 6, calc(0.86 * var(--paper)));
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
@@ -2622,7 +2638,7 @@
   body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
   /* a scrub that selects text as it goes drags a blue smear across the valley */
   body.is-dragging { user-select: none; -webkit-user-select: none; }
-  .dk-rail { position: absolute; left: 56px; top: 296px; width: 1128px; height: 96px;
+  .dk-rail { position: absolute; left: 168px; top: 302px; width: 944px; height: 96px;
     display: flex; flex-direction: column;
     background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
       rgba(235,230,217,var(--paper)) 100%);
@@ -2653,17 +2669,20 @@
   .dk-frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
     zoom: var(--u); pointer-events: none; }
   .dk-frame > * { pointer-events: auto; }
-  .dk-sheet { position: absolute; left: 150px; top: 96px; width: 980px;
+  /* THE SHEET IS IN FRAME SPACE, NOT THE BLOCK'S -- `.dk-frame` is a 1280x720 box pinned to
+     the viewport, so these numbers are the contract's own. It is a modal over its own scrim,
+     but the stage does not grow for modals either. */
+  .dk-sheet { position: absolute; left: 184px; top: 202px; width: 912px;
     display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
     background: var(--washi);
     box-shadow: 12px 14px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
   .dk-sheet > .dk-cap { background: #e0913a; color: var(--ink); font-size: 10px;
     letter-spacing: 0.2em; padding: 7px 18px 8px; }
   .dk-sheet > .dk-cap i { color: rgba(20, 17, 13, 0.6); }
-  .dk-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 16px 18px; }
+  .dk-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 18px; }
   .dk-cell { position: relative; border: 0; cursor: pointer; text-align: left; padding: 8px 10px 9px;
     background: rgba(20, 17, 13, 0.07); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
-    display: flex; flex-direction: column; gap: 4px; min-height: 62px; }
+    display: flex; flex-direction: column; gap: 4px; min-height: 58px; }
   .dk-cell b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
     color: rgba(20, 17, 13, 0.45); }
   .dk-cell em { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
@@ -19769,11 +19788,15 @@ function chainMarkup(c) {
     return `<i class="${cls}" data-b="${i}" title="${String(i + 1).padStart(2, '0')} `
       + `${it.title} — ${state}"></i>`;
   }).join('');
+  /* THE CARD IS 470 WIDE NOW, so the divisor is 470 -- it is the card's own width, and left
+     at 560 the name is set for a card that no longer exists and runs off the right edge. */
   const size = Math.max(26, Math.min(c.maxName || 46,
-    Math.floor(560 / (String(c.hero.name).length * (c.nameWide ? 1.06 : 0.62)))));
+    Math.floor(470 / (String(c.hero.name).length * (c.nameWide ? 1.06 : 0.62)))));
   return `<div class="dk-wrap">`
     + `<button class="dk-f dk-behind" data-i="1">`
-      + `<span class="dk-cap"><b>BEHIND YOU</b><i>ALL REVISITABLE</i></span>`
+      /* "ALL REVISITABLE" left with the 226-wide card: at 190 the two halves of this caption
+         are wider than the card, and the foot of it already says ENTER · OPEN THEM. */
+      + `<span class="dk-cap"><b>BEHIND YOU</b><i></i></span>`
       + `<span class="dk-bignum"><b>${c.cleared}</b><i>${c.behindLabel}</i></span>`
       + `<span class="dk-act">ENTER · OPEN THEM</span></button>`
     + `<button class="dk-f dk-here" data-i="0">`
@@ -19821,10 +19844,12 @@ function deckMarkup() {
       /* WHAT THE GATE IS FOR IS THE NEXT BLOCK -- 70% of this one is not a score, it is a key */
       /* ONE STATEMENT, NOT TWO. The second span sat under the action slab and was never
          visible; the card count it carried is already in the line above. */
+      /* BOTH OF THESE WERE CUT TO THE CARD. The gate line is the widest single thing on the
+         hero and it is `nowrap`, so at 470 the long forms ran under the action slab and out
+         the far side. What went is what was said twice: the card count is in the line above. */
       gate: revisit
-        ? `ALREADY CLEARED · STUDYING IT AGAIN CHANGES NOTHING AHEAD`
-        : `OPENS BLOCK ${here + 2 > n ? n : here + 2} AT <em>${dkGate()}%</em> `
-          + `· ${cards} CARDS ANSWERED ONCE`,
+        ? `ALREADY CLEARED · NOTHING AHEAD MOVES`
+        : `OPENS BLOCK ${here + 2 > n ? n : here + 2} AT <em>${dkGate()}%</em>`,
       slabEm: revisit ? `BLOCK ${at + 1}` : 'THE ONLY WAY ON',
       slabB: revisit ? 'REVISIT THIS BLOCK' : 'START THIS BLOCK',
     },
@@ -20158,7 +20183,7 @@ function pathScreenMarkup() {
       subRight: revisit ? 'DONE' : 'IN PROGRESS',
       pct: revisit ? 100 : (r.pct || 0),
       gate: revisit
-        ? `ALREADY DONE · GOING BACK CHANGES NOTHING AHEAD`
+        ? `ALREADY DONE · NOTHING AHEAD MOVES`
         : (want ? `WANTS <em>${want}</em>` : 'NOTHING TO CLEAR'),
       slabEm: revisit ? `STEP ${at + 1}` : 'THE ONLY WAY ON',
       slabB,
