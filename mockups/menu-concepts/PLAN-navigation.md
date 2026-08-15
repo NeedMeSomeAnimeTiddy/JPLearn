@@ -119,14 +119,29 @@ Radix covers the two behaviours needed) · a chart library (the ledger's drawing
 better for it) · a virtualisation library — **the frame contract's overflow rule means nothing
 scrolls**, so windows are computed rather than virtualised · i18n (single locale).
 
-**Flagged, not recommended:** `@react-three/fiber` + `drei`, needed only if the valley itself ships
-into the product. Bundle size, GPU and the whole `world.glb` pipeline make that a separate decision.
+**The valley ships** (decided 2026-08-16). The 3D world comes into the product, so `three` is a
+real dependency — but **`@react-three/fiber` and `drei` probably are not**, and that is worth
+stating plainly because it is the difference between a week of work and a month.
+
+> The mockup is already split the way a React port wants: the valley is a `<canvas>` driven by
+> imperative three.js, and the entire interface is screen-space HTML on top of it. React only ever
+> needs to own the HUD. Rewriting ~25,000 lines of working world code into a declarative scene
+> graph buys a reactivity model that a fixed, authored world does not need. Mount the world module
+> as-is in one component, give it an imperative handle for `flyTo(section)`, and let React own the
+> 2D layer — which is what it already owns today.
+
+**What the world actually costs.** Runtime payload is `world.glb` 44.6 MB + `people.glb` 0.1 MB +
+`boatlamp.glb` 0.02 MB + ~1.1 MB of three.js and addons. In a browser that would be disqualifying;
+**in Electron it is nothing** — it loads from local disk in an app whose runtime is already ~150 MB,
+with WebGL guaranteed by the bundled Chromium and no network fetch at all. The real costs are
+elsewhere and both are measurable: **cold start** (the mockup needs ~4s before the menu is usable,
+which is a long time to look at nothing) and the **frame budget** while the menu is up. Neither is
+a reason not to ship it; both need a number before the port is called done.
 
 ## What is not decided
 
-- Whether the valley ships into the product at all, or the app takes the interface language
-  without the 3D world.
 - Whether READING's level four is a frame-contract screen or a full-page reader. It is the app's
   `PassageReader`, and the stage/moat rules probably should not govern a page of prose.
 - Where onboarding sits. `complete-onboarding` and `features/onboarding` exist; the tree has no
-  slot for a first run.
+  slot for a first run — and with the valley shipping, a first run is also the first time anyone
+  waits four seconds for a menu.
