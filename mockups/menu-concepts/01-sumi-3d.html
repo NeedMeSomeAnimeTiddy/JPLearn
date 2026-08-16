@@ -354,6 +354,68 @@
   body.menu-inline #descLine, body.menu-inline #upnext { display: none; }
   body:not(.menu-inline) .standing { display: none; }
 
+  /* ================================================================================
+     THE HERO — the app's opinion, and the reason a casual player never has to choose.
+
+     Nine sessions out of ten the answer is "do the thing that is due". This card is that
+     answer, standing in one place, selected when the menu opens, and running on Enter
+     before the learner has read a single section name. The five rows are for the tenth
+     session — the one where you want something specific.
+
+     IT IS WHERE THE SUGGESTION BOX WAS, and it replaces it. That box was per-section and
+     only appeared on the open row: three layers of "what next" (row slab, suggestion box,
+     hero) is two too many, and the weakest of the three was the one that moved. The column
+     keeps its own action slab; the hero keeps the app's.
+
+     WHY IT SITS BESIDE THE COLUMN AND NOT ABOVE IT. The stack already fills the stage's
+     384 — four closed rows and one open come to 366 painted — so a card above would have to
+     be paid for by shrinking the rows. To the right there is empty stage the box was already
+     using, and the left-column-mountain-right composition survives untouched.
+     ================================================================================ */
+  /* 204, because the SELECTED state lifts 5px: at 199 the one state that matters was the one
+     five pixels into the crown band. */
+  .st-hero { position: absolute; left: 566px; top: 204px; width: 340px;
+    display: flex; flex-direction: column; border: 0; padding: 0; font: inherit;
+    text-align: left; cursor: pointer; z-index: 20;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
+    transition: transform 0.24s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.24s ease; }
+  body:not(.menu-inline) .st-hero { display: none; }
+  .st-hero.on { box-shadow: 10px 13px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transform: skewX(-8deg) rotate(-1.2deg) translate(6px, -5px); }
+  .st-hero.is-press { transform: skewX(-8deg) rotate(-1.2deg) translate(2px, 3px);
+    transition-duration: 0.12s; }
+
+  .sh-cap { flex: none; display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; padding: 7px 15px 8px; background: var(--ink); white-space: nowrap; }
+  .sh-cap b { font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.2em; color: var(--gold-hi); }
+  .sh-cap i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 10.5px;
+    letter-spacing: 0.1em; color: rgba(232, 196, 124, 0.6); }
+
+  .sh-body { padding: 12px 16px 0; }
+  .sh-fig { display: flex; align-items: baseline; gap: 11px; }
+  .sh-fig b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 44px;
+    line-height: 0.9; color: var(--ink); }
+  .sh-fig span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .sh-fig em { font-style: normal; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 16px; line-height: 1.05; color: #b23320; }
+  .sh-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
+  /* the one line that says WHY this and not something else -- without it the card is an
+     instruction, and an instruction a learner cannot audit is one they stop trusting */
+  .sh-why { margin-top: 9px; font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px;
+    line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.66); }
+  .sh-meta { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; padding: 10px 16px 9px; white-space: nowrap;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
+    color: rgba(20, 17, 13, 0.5); }
+  .sh-meta s { text-decoration: none; color: rgba(20, 17, 13, 0.34); }
+  .sh-slab { flex: none; height: 32px; display: grid; place-items: center; background: var(--hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
+    color: #ffd9a1; white-space: nowrap; }
+
   /* ---- the row: position, size and the lean everything else inherits ---- */
   /* 166 RATHER THAN 104, WHICH IS THE MOAT. The row is skewed about its left-middle, so a
      40-tall one paints 2.8px left of where it is authored and the open one 8.9 -- at 104 the
@@ -16886,13 +16948,16 @@ function setActive(i) {
   if (busy || state !== 'menu') return;
   /* a folded row is built so the indices stay parallel to the world's cameras, but it is not a
      place you can stand at level one */
-  if (!atL1(i)) return;
+  if (i !== HERO_ROW && !atL1(i)) return;
   active = i;
   itemEls.forEach((el, j) => {
     el.classList.toggle('is-active', j === i);
     el.classList.toggle('is-dimmed', j !== i);
   });
-  swapWm(ITEMS[i].kanji);
+  /* the watermark follows the section; on the hero it follows the section the card names */
+  swapWm(i === HERO_ROW
+    ? (ITEMS[Math.max(0, ITEMS.findIndex((it) => it.en === heroPick().sec))] || ITEMS[0]).kanji
+    : ITEMS[i].kanji);
   standSync();
   /* THE SAME TREATMENT AS UP NEXT, now that it is the same kind of object. When this was bare
      type on a rule, box and label were the same element and `swapText` took its unpainted path:
@@ -16901,9 +16966,12 @@ function setActive(i) {
      directly above it, and a slab that snaps to a new width while its text cross-fades is the
      one thing in this corner that still moves in a way nothing else does. */
   swapText(descLine, descIn, () => {
-    descIn.innerHTML = `<b>${ITEMS[i].desc}</b><i>${ITEMS[i].descJp}</i>`;
+    const h = i === HERO_ROW ? heroPick() : null;
+    descIn.innerHTML = h
+      ? `<b>${h.why}</b><i>${h.capJp}</i>`
+      : `<b>${ITEMS[i].desc}</b><i>${ITEMS[i].descJp}</i>`;
   });
-  if (!reduced) {
+  if (!reduced && i !== HERO_ROW) {
     /* overwrite: fast hovering used to stack rival tweens on the same object,
        and the "shrink back" one would win — the pop simply never happened */
     gsap.to(itemObjs[i].position, { z: itemBaseZ[i] + 110, duration: 0.4, ease: 'back.out(2.2)', overwrite: true });
@@ -17032,14 +17100,116 @@ const L1_SEQ = ITEMS.map((it, i) => i).filter(atL1).sort((a, b) => ITEMS[a].ord 
 const l1No = (i) => L1_SEQ.indexOf(i) + 1;
 const l1Count = () => L1_SEQ.length;
 /* walk to the next row that is actually there, in reading order */
+/* THE HERO IS POSITION ZERO IN THE WALK, above the first row. `HERO_ROW` is -1 rather than an
+   index because it is not an `ITEMS` entry -- it is the app's answer, not a section. */
 function l1Step(from, d) {
-  const at = L1_SEQ.indexOf(from);
-  if (at < 0) return L1_SEQ[0];
-  return L1_SEQ[(at + d + L1_SEQ.length) % L1_SEQ.length];
+  const seq = [HERO_ROW].concat(L1_SEQ);
+  const at = seq.indexOf(from);
+  if (at < 0) return seq[0];
+  return seq[(at + d + seq.length) % seq.length];
 }
 
 const standEl = document.getElementById('standing');
+let heroEl = null;
 const standRows = [];
+
+/* ================================================================================================
+   THE HERO -- what the app would have you do, in one card.
+
+   `HERO_AT` is the selection when it is the hero rather than a row: -1 is the card, 0..5 index
+   `ITEMS`. It is where the menu opens, which is the whole point -- a casual player presses Enter
+   once and is studying, without having read a section name.
+
+   THE PRIORITY IS THE APP'S, NOT A GUESS. In the shipped app this comes off `recommendations`,
+   `study-queue` and `daily-goal`; here it is the same three facts in the same order, because the
+   order is the interesting part:
+     1. CARDS ARE DUE. The scheduler asked for them, and reviews decay if they wait.
+     2. THE PATH HAS A NEXT BLOCK. Nothing due means the thing to do is learn something.
+     3. THE PUZZLES ARE UNPLAYED. Nothing due and nothing new left today -- have a game.
+   ================================================================================================ */
+const HERO_ROW = -1;
+function heroPick() {
+  const due = 12;                       /* `study-queue` -- what the scheduler says is ready */
+  const step = PATH.done, cur = STUDY_PATH[step] || {};
+  const blocks = cur.deck ? STUDY_BLOCKS[cur.deck] : null;
+  const bn = blocks
+    ? Math.min(blocks.length, Math.round((blocks.length * PATH.herePct) / 100) + 1) : 1;
+  const puzzles = ITEMS[1].badge || 0;  /* `daily-goal` -- today's unplayed games */
+
+  if (due > 0) {
+    return { cap: 'DO THIS NOW', capJp: '今日の一手', sec: 'DRILLS', lane: 0,
+      fig: String(due), figEm: 'CARDS DUE', figLab: 'THE SCHEDULER PICKED THEM',
+      why: 'These are the cards whose interval ran out today. Everything else can wait; '
+        + 'these are the ones that slip.',
+      meta: 'ABOUT 6 MINUTES', metaR: 'PRACTICE · REVIEW', act: 'START REVIEWING' };
+  }
+  if (blocks) {
+    return { cap: 'DO THIS NOW', capJp: '今日の一手', sec: 'STUDY',
+      fig: String(bn), figEm: blocks[bn - 1][0], figLab: 'THE NEXT BLOCK',
+      why: 'Nothing is due, so the thing to do is learn something new — this is where the '
+        + 'path has you.',
+      meta: `${blocks[bn - 1][1]} CARDS`, metaR: 'THE PATH · ' + (cur.en || ''),
+      act: 'START THIS BLOCK' };
+  }
+  return { cap: 'DO THIS NOW', capJp: '今日の一手', sec: 'DAILY',
+    fig: String(puzzles), figEm: 'PUZZLES LEFT', figLab: 'TODAY',
+    why: 'Nothing due and nothing new waiting — the day is yours. Have a game.',
+    meta: 'NEW EACH DAY', metaR: 'PRACTICE · DAILY GAMES', act: "PLAY TODAY'S" };
+}
+
+function heroBuild() {
+  const b = document.createElement('button');
+  b.className = 'st-hero';
+  b.type = 'button';
+  b.innerHTML = '<span class="sh-cap"><b></b><i></i></span>'
+    + '<span class="sh-body"><span class="sh-fig"><b></b>'
+    + '<span><em></em><i></i></span></span>'
+    + '<span class="sh-why"></span></span>'
+    + '<span class="sh-meta"><s></s><span></span></span>'
+    + '<span class="sh-slab"></span>';
+  b.addEventListener('mouseenter', () => setActive(HERO_ROW));
+  b.addEventListener('focus', () => setActive(HERO_ROW));
+  b.addEventListener('click', () => {
+    if (active === HERO_ROW) { heroPress(); select(HERO_ROW); } else setActive(HERO_ROW);
+  });
+  standEl.appendChild(b);
+  return b;
+}
+
+function heroPress() {
+  if (!heroEl) return;
+  heroEl.classList.add('is-press');
+  setTimeout(() => heroEl.classList.remove('is-press'), 150);
+}
+
+function heroSync() {
+  if (!heroEl) return;
+  const h = heroPick();
+  const q = (s) => heroEl.querySelector(s);
+  q('.sh-cap b').textContent = h.cap;
+  q('.sh-cap i').textContent = h.capJp;
+  q('.sh-fig b').textContent = h.fig;
+  q('.sh-fig em').textContent = h.figEm;
+  q('.sh-fig i').textContent = h.figLab;
+  q('.sh-why').textContent = h.why;
+  q('.sh-meta s').textContent = h.meta;
+  q('.sh-meta span').textContent = h.metaR;
+  q('.sh-slab').textContent = active === HERO_ROW ? `${h.act} · ENTER ▸` : h.act;
+  heroEl.classList.toggle('on', active === HERO_ROW);
+}
+
+/* the hero runs the thing rather than opening a section -- except for the two that ARE a place,
+   where it hands off to the section it named so the learner ends up where the card said */
+function heroGo() {
+  const h = heroPick();
+  heroPress();
+  if (h.sec === 'STUDY') { const i = ITEMS.findIndex((it) => it.en === 'STUDY'); active = i; select(i); return; }
+  if (h.sec === 'DAILY') { enterSection('DAILY'); return; }
+  /* reviews are a session, which is the app rather than the menu -- the same place every other
+     terminal on this menu stops */
+  const i = ITEMS.findIndex((it) => it.en === 'DRILLS');
+  active = i; select(i);
+}
 
 function standBuild() {
   const D = standData();
@@ -17076,16 +17246,12 @@ function standBuild() {
       + '<span class="st-fig on">' + segs + '</span></span>'
       + '<span class="st-slab">' + (secLocked(i) ? 'LOCKED 施錠' : d.slab) + '</span>'
       + '</span></button>'
-      + '<div class="st-clip"><button class="st-box" type="button" tabindex="-1">'
-      + '<span class="st-box-col">'
-      + '<span class="st-box-txt"><span class="st-box-en">' + d.sug + '</span>'
-      + '<span class="st-box-jp">' + d.sugJp + '</span></span>'
-      + '<span class="st-box-btn">' + d.sugBtn + '</span></span>'
-      + '<span class="st-strip"><span>SUGGESTED</span></span>'
-      + '</button></div></div>';
+      /* THE SUGGESTION BOX WENT TO THE HERO. It was per-section and only appeared on the open
+         row; three layers of "what next" -- row slab, box, hero -- is two too many, and the box
+         was the one that moved. See the note by `.st-hero`. */
+      + '</div>';
 
     const card = row.querySelector('.st-card');
-    const box = row.querySelector('.st-box');
     /* HOVER OPENS, A CLICK ON THE OPEN ONE GOES. Same two-step the type planes had -- pointing is
        not choosing -- so a mouse never enters a section it only crossed. */
     card.addEventListener('mouseenter', () => setActive(i));
@@ -17093,10 +17259,13 @@ function standBuild() {
     card.addEventListener('click', () => { if (active === i) { standPress(i, 'is-press'); select(i); } else setActive(i); });
     /* the suggestion is a shortcut INTO the section, so it lands in the same place; there is no
        deeper route to hand it in this mockup, and pretending otherwise would be a dead button */
-    box.addEventListener('click', (e) => { e.stopPropagation(); standPress(i, 'is-boxpress'); select(i); });
     standEl.appendChild(row);
-    standRows.push({ row, card, box, kind: d.kind, pct: d.pct });
+    standRows.push({ row, card, kind: d.kind, pct: d.pct });
   });
+  heroEl = heroBuild();
+  /* THE MENU OPENS ON THE HERO. Nine sessions in ten the answer is the card, and a casual
+     player should be able to press Enter without having read a section name. */
+  active = HERO_ROW;
   standSync();
 }
 
@@ -17128,6 +17297,7 @@ function standPress(i, cls) {
 function standSync() {
   let y = ST_TOP;
   /* laid out down `L1_SEQ`, not down the array */
+  heroSync();
   L1_SEQ.forEach((i) => {
     const r = standRows[i];
     const open = i === active;
@@ -17145,6 +17315,7 @@ function standSync() {
 }
 
 function standFocus(i) {
+  if (i === HERO_ROW) { if (heroEl) heroEl.focus({ preventScroll: true }); return; }
   const r = standRows[i];
   if (r) r.card.focus({ preventScroll: true });
 }
@@ -22814,6 +22985,7 @@ function enterSection(en) {
 }
 
 function select(i) {
+  if (i === HERO_ROW) { heroGo(); return; }
   /* refuse rather than fly: a locked section has nothing to show yet, and the row already says
      what opens it */
   if (secLocked(i)) { standPress(i, 'is-press'); return; }
