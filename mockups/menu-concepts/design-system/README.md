@@ -58,9 +58,6 @@ Every figure below was read out of the running app on 2026-08-15, not remembered
 longer briefs — the screens exist — but they are what the screens are made of, and a redesign that
 contradicts one of them is wrong.
 
-These are the screens the road does **not** fit. Each is a separate brief. Every figure below was
-read out of the running app on 2026-08-15, not remembered.
-
 ### 1. A deck's blocks at real scale
 
 The road paints the selected block plus four either side, and draws one bar per block in the strip

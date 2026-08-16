@@ -2135,6 +2135,10 @@
   .hud[data-screen="feed"] .hud-detail,
   .hud[data-screen="path"] .hud-detail,
   .hud[data-screen="library"] .hud-detail { display: none; }
+  .hud[data-screen="modes"] .hud-detail { display: none; }
+  /* the road's up-next card is hidden under `[data-course]`; this screen is not a course
+     and was inheriting it into the bottom-right corner, over the key hints */
+  .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2546,6 +2550,200 @@
     paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
   .lb-tally s { text-decoration: none; color: rgba(242, 234, 216, 0.32); }
   .lb-tally u { text-decoration: none; color: rgba(242, 234, 216, 0.72); }
+
+  /* ================================================================================
+     DRILLS IS SEVENTEEN MODES ON AN AXIS OF SIX DECKS.
+
+     Design's answer, re-laid onto the stage. It kept the road rather than replacing it, and that
+     is a better call than the brief's: the road's problem at STUDY was that fifteen of its
+     sixteen stones could not be chosen. Here every stone that is PAINTED can be run, so the road
+     is describing a real decision. What it was missing is the second axis.
+
+     THE DECK AXIS IS A FOLD. A mode the current deck does not offer leaves the road entirely --
+     width zero, and the road closes over the gap on the same easing everything else moves on.
+     That is why the counts appear in three places and none of them is decoration: each group
+     block says "n MODES · m HERE", each deck chip says "n / 17", and the foot strip keeps a mark
+     for all seventeen. Without those, a mode vanishing reads as a bug rather than as a fact about
+     hiragana.
+
+     WHY BESPOKE AND NOT `courseLayout`. DAILY still uses the shared road and is the right shape
+     for it -- four games, no groups, no second axis. Threading a fold and a deck row through the
+     function they share would put DRILLS' problem inside DAILY's screen.
+
+     THE GEOMETRY IS THE CONTRACT'S, which is the one thing the imported design did not have:
+     it was drawn on the road's pre-contract numbers and ran off both edges of the frame. Deck row
+     at the stage's top (frame y192), strip 234 to 576, foot strip in the band below. The strip is
+     inset to 160-1120 and its mask fades the road into open valley at those edges rather than at
+     the glass -- the same 70/190 gutter the course's road has used since it moved onto the stage.
+     ================================================================================ */
+  .modes { position: relative; margin-top: 6px; margin-left: -52px;
+    width: calc(100vw / var(--u)); height: 470px; }
+
+  /* ---- the deck axis ---- */
+  /* 31, NOT 28. The selected chip lifts 3px, so at 28 the one chip that matters was the one
+     poking into the crown band. */
+  .dr-decks { position: absolute; left: 160px; top: 31px; width: 960px;
+    display: flex; justify-content: center; gap: 9px; }
+  .dr-deck { flex: none; height: 32px; display: flex; align-items: center; gap: 7px;
+    padding: 0 13px; border: 0; cursor: pointer; font: inherit; white-space: nowrap;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transition: background 0.25s ease, box-shadow 0.25s ease,
+      transform 0.25s cubic-bezier(0.2, 0.92, 0.24, 1); }
+  .dr-deck b { font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px;
+    letter-spacing: 0.12em; color: var(--ink); }
+  .dr-deck i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 12.5px;
+    line-height: 1; color: rgba(20, 17, 13, 0.45); }
+  .dr-deck s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5); }
+  .dr-deck.on { background: var(--ink); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45);
+    transform: translateY(-3px); }
+  .dr-deck.on b { color: var(--gold-hi); }
+  .dr-deck.on i { color: rgba(232, 196, 124, 0.7); }
+  .dr-deck.on s { color: rgba(242, 234, 216, 0.6); }
+  /* the cursor is in the deck row rather than on the road */
+  .dr-deck.on.zone { box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 2px var(--hi); }
+
+  /* ---- the road, inset to the stage ---- */
+  .dr-strip { position: absolute; left: 160px; top: 70px; width: 960px; height: 342px;
+    overflow: hidden; --gutter: 70px; --solid: 190px;
+    -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter),
+      rgba(0,0,0,1) var(--solid), rgba(0,0,0,1) calc(100% - var(--solid)),
+      rgba(0,0,0,0) calc(100% - var(--gutter)), rgba(0,0,0,0) 100%);
+    mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter),
+      rgba(0,0,0,1) var(--solid), rgba(0,0,0,1) calc(100% - var(--solid)),
+      rgba(0,0,0,0) calc(100% - var(--gutter)), rgba(0,0,0,0) 100%); }
+  .dr-rail { position: absolute; left: 0; top: 0; width: 5200px; height: 342px;
+    transition: transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); will-change: transform; }
+
+  /* ---- a group, riding above the modes it holds ---- */
+  .dr-chap { position: absolute; top: 0; height: 28px; z-index: 6;
+    transition: left 0.54s cubic-bezier(0.2, 0.95, 0.22, 1),
+      width 0.54s cubic-bezier(0.2, 0.95, 0.22, 1), opacity 0.3s ease; }
+  .dr-chapin { box-sizing: border-box; width: 100%; height: 28px; display: flex;
+    align-items: center; gap: 9px; padding: 0 11px; white-space: nowrap;
+    transform: skewX(-8deg); transform-origin: 0 50%;
+    background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    transition: background 0.3s ease, box-shadow 0.3s ease; }
+  .dr-chap.here .dr-chapin { background: var(--ink); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45); }
+  .dr-chapin u { flex: none; width: 19px; height: 19px; text-decoration: none;
+    background: var(--gold); color: var(--ink); font-family: var(--jp); font-weight: 700;
+    font-size: 11.5px; line-height: 19px; text-align: center; }
+  .dr-chapin b { font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px;
+    letter-spacing: 0.2em; color: var(--ink); }
+  .dr-chap.here .dr-chapin b { color: var(--gold-hi); }
+  .dr-chapin i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 13px;
+    letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.45); }
+  .dr-chap.here .dr-chapin i { color: rgba(232, 196, 124, 0.7); }
+  .dr-chapin s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.5); }
+  .dr-chap.here .dr-chapin s { color: rgba(242, 234, 216, 0.6); }
+
+  /* ---- a mode you are not on ---- */
+  .dr-tab { position: absolute; width: 94px; height: 236px; border: 0; padding: 11px 6px 9px;
+    font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center;
+    gap: 6px; background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transform: skewX(-8deg) rotate(-1.2deg);
+    transition: opacity 0.3s ease, transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1),
+      left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); }
+  .dr-tab b { flex: none; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 21px; line-height: 1; color: var(--ink); }
+  .dr-tab em { flex: none; display: block; width: 28px; height: 1px;
+    background: rgba(20, 17, 13, 0.4); }
+  .dr-tab i { flex: none; font-style: normal; font-family: var(--jp); font-size: 32px;
+    line-height: 1.1; color: var(--ink); }
+  /* THE NAME TURNS ON ITS SIDE, which is the answer the deck screen's stones already give: a mode
+     called "CONJUGATION DRILL" is seventeen characters and the stone is ninety-four wide. */
+  /* HORIZONTAL AND WRAPPING, not standing. Turned on its side "CONJUGATION DRILL" is 170px of
+     type in the 128 the stone has left after its number and glyph, and it was being clipped to
+     "CONJUGATION DRI". Wrapped across 82px it takes two lines and loses nothing. */
+  .dr-tab span { flex: none; align-self: stretch; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; line-height: 11.5px; letter-spacing: 0.05em; text-align: center;
+    color: var(--ink); }
+  .dr-tab s { flex: none; margin-top: auto; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.1em; white-space: nowrap;
+    color: rgba(20, 17, 13, 0.55); }
+  .dr-tab:hover { filter: brightness(1.05); }
+
+  /* ---- the mode you would run ---- */
+  .dr-hero { position: absolute; width: 240px; height: 300px; border: 0; padding: 0;
+    font: inherit; cursor: pointer; text-align: left; z-index: 14;
+    display: flex; flex-direction: column;
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transform: skewX(-8deg) rotate(-1.2deg);
+    transition: left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); }
+  .dr-htab { flex: none; padding: 6px 10px 7px; text-align: center; white-space: nowrap;
+    background: var(--ink); color: var(--gold-hi); font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.18em; }
+  .dr-hnum { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    padding: 11px 15px 0; }
+  .dr-hnum b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
+    line-height: 1; color: var(--ink); }
+  .dr-hnum s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.15em; white-space: nowrap; color: rgba(20, 17, 13, 0.5); }
+  .dr-hglyph { margin-top: 1px; text-align: center; font-family: var(--jp); font-weight: 400;
+    font-size: 42px; line-height: 1.1; color: var(--ink); }
+  .dr-hen { padding: 1px 12px 0; text-align: center; font-family: var(--lat);
+    font-style: italic; font-weight: 900; line-height: 1.1; letter-spacing: 0.01em;
+    color: #b23320; }
+  .dr-hd { padding: 6px 16px 0; text-align: center; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 10.5px; letter-spacing: 0.04em; line-height: 1.5; color: rgba(20, 17, 13, 0.66); }
+  /* WHICH SIX, NOT HOW MANY. The count is in the line beside it; these say WHICH decks offer this
+     mode, with the one you are standing on ringed -- that is the fact the fold is made of. */
+  .dr-cells { margin-top: auto; padding: 0 15px 11px; display: flex; align-items: center;
+    justify-content: space-between; gap: 10px; }
+  .dr-cells span { display: flex; gap: 4px; }
+  .dr-cells i { display: block; width: 12px; height: 12px;
+    background: rgba(20, 17, 13, 0.14); transition: background 0.25s ease; }
+  .dr-cells i.has { background: rgba(20, 17, 13, 0.78); }
+  .dr-cells i.at { box-shadow: 0 0 0 2px var(--hi); }
+  .dr-cells s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8.5px; letter-spacing: 0.12em; white-space: nowrap; color: rgba(20, 17, 13, 0.55); }
+  .dr-slab { flex: none; height: 26px; display: grid; place-items: center; background: var(--hi);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+    color: #ffd9a1; white-space: nowrap; }
+
+  /* ---- what is off each end ---- */
+  /* centred on the stones (frame 298-534), not hung off the bottom of the strip */
+  .dr-side { position: absolute; top: 218px; width: 48px; height: 140px; z-index: 38;
+    transition: opacity 0.32s ease; }
+  .dr-side.lo { left: 178px; }
+  .dr-side.hi { right: 178px; }
+  .dr-side i { position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg); }
+  .dr-side i:nth-child(1) { top: 14px; height: 112px; box-shadow: 2px 3px 0 rgba(0,0,0,0.4); }
+  .dr-side i:nth-child(2) { top: 7px; height: 126px; box-shadow: 2px 3px 0 rgba(0,0,0,0.4); }
+  .dr-side i:nth-child(3) { height: 140px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 7px; }
+  .dr-side.lo i:nth-child(1) { left: 22px; background: #a9a087; }
+  .dr-side.lo i:nth-child(2) { left: 11px; background: #c8bfa5; }
+  .dr-side.lo i:nth-child(3) { left: 0; background: #e6ddc4;
+    box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.18); }
+  .dr-side.hi i:nth-child(1) { right: 22px; background: #a9a087; }
+  .dr-side.hi i:nth-child(2) { right: 11px; background: #c8bfa5; }
+  .dr-side.hi i:nth-child(3) { right: 0; background: #e6ddc4;
+    box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.18); }
+  .dr-side b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px;
+    line-height: 1; color: var(--ink); }
+  .dr-side u { writing-mode: vertical-rl; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.62); }
+
+  /* ---- all seventeen, in the foot band ---- */
+  .dr-mini { position: absolute; left: 160px; top: 420px; width: 960px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .dr-bars { display: flex; align-items: flex-end; gap: 3px; }
+  .dr-bars i { display: block; background: var(--gold);
+    transition: width 0.34s cubic-bezier(0.2, 0.92, 0.24, 1),
+      height 0.34s cubic-bezier(0.2, 0.92, 0.24, 1), background 0.25s ease; }
+  /* A FOLDED MODE KEEPS ITS MARK. This strip is the only place all seventeen are always visible,
+     which is what stops the fold reading as deletion. */
+  .dr-bars i.off { background: rgba(242, 234, 216, 0.22); }
+  .dr-line { white-space: nowrap; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+    letter-spacing: 0.16em; color: var(--gold-hi);
+    paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
 
   .deck, .path {
     position: relative; margin-top: 6px;
@@ -19267,6 +19465,7 @@ function hudRows() {
   if (hudBespoke() === 'feed') return feedRows();
   if (hudBespoke() === 'path') return paRows();
   if (hudBespoke() === 'library') return libraryRows();
+  if (hudBespoke() === 'modes') return modeRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -20558,6 +20757,237 @@ function libraryRows() {
   }));
 }
 
+/* ================================================================================================
+   DRILLS -- SEVENTEEN MODES ON AN AXIS OF SIX DECKS.
+
+   See the long note by `.modes` in the stylesheet for why this is bespoke and why the fold is the
+   whole idea. Everything below is the app's own data, read out of
+   `electron-frontend/src/constants.tsx` on 2026-08-16: MINIGAMES for the names and descriptions,
+   MINIGAME_SKILL_GROUP for the five groups, and SCRIPT_MINIGAMES for who offers what.
+
+   THE ORDER IS THE GROUPS', NOT THE APP'S. `MINIGAMES` lists modes in the order they were built
+   and their groups interleave; a road wants its chapters contiguous, so the seventeen are
+   re-ordered here into group runs. Nothing else about them changes.
+   ================================================================================================ */
+const DR_DECKS = [
+  { k: 'hira', glyph: 'あ', en: 'HIRAGANA' },
+  { k: 'kata', glyph: 'ア', en: 'KATAKANA' },
+  { k: 'kanji', glyph: '漢', en: 'KANJI N5' },
+  { k: 'vocab', glyph: '語', en: 'VOCAB N5' },
+  { k: 'gram', glyph: '文', en: 'GRAMMAR' },
+  { k: 'sent', glyph: '例', en: 'SENTENCES' },
+];
+const DR_ALL = DR_DECKS.map((d) => d.k);
+/* the app's own five skill groups, with its own one-line helper for each */
+const DR_GROUPS = [
+  { en: 'RECOGNITION', jp: '認識', glyph: '認', num: '一', from: 0, to: 3 },
+  { en: 'RECALL', jp: '想起', glyph: '想', num: '二', from: 4, to: 8 },
+  { en: 'LISTENING', jp: '聴解', glyph: '聴', num: '三', from: 9, to: 10 },
+  { en: 'CHALLENGE', jp: '挑戦', glyph: '挑', num: '四', from: 11, to: 15 },
+  { en: 'MIXED', jp: '混合', glyph: '混', num: '五', from: 16, to: 16 },
+];
+/* `on: null` means every deck offers it -- seven of the seventeen. FOUR EXIST ON EXACTLY ONE
+   DECK, which is the fact that makes this two screens' worth of information rather than a list. */
+const DR_MODES = [
+  { en: 'ROMAJI SPRINT', d: 'Type the romaji reading as fast as you can', on: ['hira', 'kata', 'kanji'] },
+  { en: 'MEANING MATCH', d: 'Pick the meaning from four', on: null },
+  { en: 'CHARACTER MATCH', d: 'Pick the character for the meaning', on: null },
+  { en: 'COMPOUND BUILDER', d: 'Build compounds from individual kanji meanings', on: ['vocab'] },
+  { en: 'STROKE ORDER', d: 'Type the kanji from meaning, reinforcing the writing sequence', on: ['kanji'] },
+  { en: 'HANDWRITING', d: 'Draw one character in its correct stroke order', on: ['hira', 'kata', 'kanji'] },
+  { en: 'TYPED RECALL', d: 'Type the meaning directly, with near-miss tolerance', on: ['kanji', 'vocab', 'gram', 'sent'] },
+  { en: 'SPEECH RECALL', d: 'Say the meaning aloud — transcribed and graded offline', on: null },
+  { en: 'CONJUGATION DRILL', d: 'Produce the form the round asks for', on: ['vocab'] },
+  { en: 'RECOGNITION', d: 'Hear a word and choose its meaning, character hidden until feedback', on: null },
+  { en: 'DICTATION', d: 'Hear a word and type it in Japanese, with no visual hints', on: ['hira', 'kata', 'vocab'] },
+  { en: 'SENTENCE ASSEMBLY', d: 'Arrange shuffled chunks into natural Japanese order', on: ['hira', 'kata', 'gram', 'sent'] },
+  { en: 'PARTICLE CLOZE', d: 'Fill the missing particle from context and word order', on: ['hira', 'kata', 'kanji', 'vocab', 'gram'] },
+  { en: 'VIBE CHECK', d: 'Read social tone and pick the register that fits', on: ['gram'] },
+  { en: 'IMPOSTER', d: 'Find the token carrying a deliberate grammar error', on: null },
+  { en: 'CONTEXT CLOZE', d: 'Fill the missing word from the sentence around it', on: null },
+  { en: 'INTERLEAVE MIX', d: 'Cycle reading, meaning and character rounds in one run', on: null },
+];
+let DR_SEL = 1, DR_DECK = 0, DR_ZONE = 'strip';
+const DR_W = 94, DR_WSEL = 240, DR_GAP = 18, DR_X0 = 400;
+
+const drOn = (m) => m.on || DR_ALL;
+const drHas = (i, k) => drOn(DR_MODES[i]).indexOf(k) >= 0;
+const drGroup = (i) => DR_GROUPS.findIndex((g) => i >= g.from && i <= g.to);
+const drDeck = () => DR_DECKS[DR_DECK];
+/* how many of the seventeen this deck offers -- the figure on its chip */
+const drDeckCount = (k) => DR_MODES.reduce((n, m, i) => n + (drHas(i, k) ? 1 : 0), 0);
+/* SELECTION CAN NEVER REST ON A FOLDED MODE. Changing deck snaps to the nearest one that is
+   still offered, outward from where you were, so the road never focuses a gap. */
+function drNearest(sel, k) {
+  if (drHas(sel, k)) return sel;
+  for (let r = 1; r < DR_MODES.length; r++) {
+    if (sel - r >= 0 && drHas(sel - r, k)) return sel - r;
+    if (sel + r < DR_MODES.length && drHas(sel + r, k)) return sel + r;
+  }
+  return sel;
+}
+const drScale = (d) => Math.max(0.78, 1 - Math.min(d, 5) * 0.055);
+
+/* THE FOLD IS IN THE WIDTHS. An unavailable mode is given width zero and the cursor walks the
+   offered list rather than all seventeen, so the road closes over it without a special case
+   anywhere else in the drawing. */
+function drLayout(sel, k) {
+  const av = DR_MODES.map((m, i) => drHas(i, k));
+  const list = [];
+  av.forEach((a, i) => { if (a) list.push(i); });
+  const at = list.indexOf(sel);
+  const lefts = [], widths = [], centres = [];
+  let x = DR_X0, first = true;
+  for (let i = 0; i < DR_MODES.length; i++) {
+    if (!av[i]) { lefts.push(x); widths.push(0); centres.push(x); continue; }
+    if (!first) x += DR_GAP;
+    first = false;
+    const d = Math.abs(list.indexOf(i) - at);
+    const w = i === sel ? DR_WSEL : Math.round(DR_W * drScale(d));
+    lefts.push(x); widths.push(w); centres.push(x + w / 2);
+    x += w;
+  }
+  return { av, list, at, lefts, widths, centres };
+}
+
+function modesMarkup() {
+  const decks = DR_DECKS.map((d, i) => `<button class="dr-deck" data-d="${i}">`
+    + `<b>${d.en}</b><i>${d.glyph}</i><s>${drDeckCount(d.k)} / ${DR_MODES.length}</s></button>`).join('');
+  const chaps = DR_GROUPS.map((g, gi) => `<div class="dr-chap" data-g="${gi}">`
+    + `<div class="dr-chapin"><u>${g.num}</u><b>${g.en}</b><i>${g.jp}</i><s></s></div></div>`).join('');
+  const tabs = DR_MODES.map((m, i) => `<button class="dr-tab" data-m="${i}">`
+    + `<b>${String(i + 1).padStart(2, '0')}</b><em></em>`
+    + `<i>${DR_GROUPS[drGroup(i)].glyph}</i>`
+    + `<span>${m.en}</span><s></s></button>`).join('');
+  const cells = DR_DECKS.map((d) => `<i data-k="${d.k}"></i>`).join('');
+  const bars = DR_MODES.map((_, i) => `<i data-m="${i}"></i>`).join('');
+  return `<div class="dr-decks">${decks}</div>`
+    + `<div class="dr-strip"><div class="dr-rail">${chaps}${tabs}`
+      + `<button class="dr-hero">`
+        + `<span class="dr-htab"></span>`
+        + `<span class="dr-hnum"><b></b><s></s></span>`
+        + `<span class="dr-hglyph"></span>`
+        + `<span class="dr-hen"></span>`
+        + `<span class="dr-hd"></span>`
+        + `<span class="dr-cells"><span>${cells}</span><s></s></span>`
+        + `<span class="dr-slab"></span></button>`
+    + `</div></div>`
+    + `<div class="dr-side lo"><i></i><i></i><i><b></b><u>MORE</u></i></div>`
+    + `<div class="dr-side hi"><i></i><i></i><i><b></b><u>MORE</u></i></div>`
+    + `<div class="dr-mini"><span class="dr-bars">${bars}</span><span class="dr-line"></span></div>`;
+}
+
+function modesLayout() {
+  const k = drDeck().k;
+  DR_SEL = drNearest(Math.max(0, Math.min(DR_SEL, DR_MODES.length - 1)), k);
+  const L = drLayout(DR_SEL, k);
+  const strip = hudEl.querySelector('.dr-strip');
+  const rail = hudEl.querySelector('.dr-rail');
+  if (!rail || !strip) return;
+  /* THE MIDDLE OF THE STRIP, MEASURED. The same trap the course's road fell into when it was
+     inset -- `.modes` is frame-wide and the strip is 960 of it, so half the wrapper is 160px
+     right of half the road. */
+  const focus = strip.clientWidth / 2;
+  const shift = Math.round(focus - L.centres[DR_SEL]);
+  rail.style.transform = `translateX(${shift}px)`;
+
+  hudEl.querySelectorAll('.dr-deck').forEach((el, i) => {
+    el.classList.toggle('on', i === DR_DECK);
+    el.classList.toggle('zone', i === DR_DECK && DR_ZONE === 'deck');
+  });
+
+  const mode = DR_MODES[DR_SEL], gi = drGroup(DR_SEL);
+  hudEl.querySelectorAll('.dr-tab').forEach((el, i) => {
+    const on = L.av[i], isSel = i === DR_SEL;
+    const d = on ? Math.abs(L.list.indexOf(i) - L.at) : 0;
+    /* a folded stone collapses into its own seam rather than fading in place */
+    el.style.left = Math.round((on ? L.centres[i] : L.lefts[i]) - DR_W / 2) + 'px';
+    /* the stones bottom-align with the hero: 336 - 236 */
+    el.style.top = '100px';
+    el.style.opacity = !on || isSel ? 0 : d === 1 ? 1 : d === 2 ? 0.92 : d === 3 ? 0.72 : d === 4 ? 0.45 : 0;
+    el.style.pointerEvents = on && !isSel ? 'auto' : 'none';
+    el.style.transform = `skewX(-8deg) rotate(-1.2deg) scale(${on ? drScale(d) : 0.2})`;
+    const n = drOn(DR_MODES[i]).length;
+    el.querySelector('s').textContent = n === 6 ? 'ALL 6' : n + (n === 1 ? ' DECK' : ' DECKS');
+  });
+
+  hudEl.querySelectorAll('.dr-chap').forEach((el, g) => {
+    const G = DR_GROUPS[g];
+    let lo = -1, hi = -1, have = 0;
+    for (let i = G.from; i <= G.to; i++) if (L.av[i]) { if (lo < 0) lo = i; hi = i; have++; }
+    /* a group with nothing left on this deck has no span to sit over */
+    if (lo < 0) { el.style.opacity = 0; el.style.width = '0px'; return; }
+    const a = L.centres[lo] - (lo === DR_SEL ? DR_WSEL : DR_W) / 2;
+    const b = L.centres[hi] + (hi === DR_SEL ? DR_WSEL : DR_W) / 2;
+    el.style.opacity = 1;
+    el.style.left = Math.round(a + 14) + 'px';
+    el.style.width = Math.round(b - a) + 'px';
+    el.classList.toggle('here', g === gi);
+    /* THE CAPTION IS CUT TO THE SPAN, AND THE SPAN IS WHATEVER THE FOLD LEFT. MIXED is one
+       mode, so its block is 94px wide and "1 MODE · 1 HERE" is 102 of them. Measured rather than
+       estimated: write the long form, ask the row whether it overflowed, and step down. */
+    const total = G.to - G.from + 1;
+    const cap = el.querySelector('s'), inner = el.querySelector('.dr-chapin');
+    const long = `${total} MODE${total === 1 ? '' : 'S'} · ${have} HERE`;
+    cap.textContent = long;
+    if (inner.scrollWidth > inner.clientWidth) cap.textContent = `${have}/${total}`;
+    if (inner.scrollWidth > inner.clientWidth) cap.textContent = '';
+    if (inner.scrollWidth > inner.clientWidth) el.querySelector('i').style.display = 'none';
+    else el.querySelector('i').style.display = '';
+  });
+
+  const hero = hudEl.querySelector('.dr-hero');
+  hero.style.left = Math.round(L.centres[DR_SEL] - DR_WSEL / 2) + 'px';
+  /* BELOW THE GROUP ROW, NOT THROUGH IT. At strip-top 0 the hero's own tab painted over the
+     chapter block that is supposed to be riding above it. */
+  hero.style.top = '36px';
+  hero.querySelector('.dr-htab').textContent = `${DR_GROUPS[gi].en} · ${DR_GROUPS[gi].jp}`;
+  hero.querySelector('.dr-hnum b').textContent = String(DR_SEL + 1).padStart(2, '0');
+  const nOn = drOn(mode).length;
+  hero.querySelector('.dr-hnum s').textContent = nOn === 6 ? 'ON ALL 6 DECKS'
+    : `ON ${nOn} DECK${nOn === 1 ? '' : 'S'}`;
+  hero.querySelector('.dr-hglyph').textContent = DR_GROUPS[gi].glyph;
+  const nm = hero.querySelector('.dr-hen');
+  nm.textContent = mode.en;
+  /* set from its own length, the same rule the deck screen's hero uses */
+  nm.style.fontSize = Math.max(14, Math.min(20, Math.floor(216 / (mode.en.length * 0.62)))) + 'px';
+  hero.querySelector('.dr-hd').textContent = mode.d;
+  hero.querySelectorAll('.dr-cells i').forEach((el, i) => {
+    el.classList.toggle('has', drHas(DR_SEL, DR_DECKS[i].k));
+    el.classList.toggle('at', i === DR_DECK);
+  });
+  hero.querySelector('.dr-cells s').textContent = 'OFFERED HERE';
+  hero.querySelector('.dr-slab').textContent = `RUN ON ${drDeck().en} · ENTER ▸`;
+
+  /* ---- what is off each end, counted ---- */
+  const lo = Math.max(0, L.at - 4), hi = Math.max(0, L.list.length - 1 - L.at - 4);
+  const lEl = hudEl.querySelector('.dr-side.lo'), rEl = hudEl.querySelector('.dr-side.hi');
+  lEl.style.opacity = lo ? 1 : 0; lEl.querySelector('b').textContent = lo;
+  rEl.style.opacity = hi ? 1 : 0; rEl.querySelector('b').textContent = hi;
+
+  hudEl.querySelectorAll('.dr-bars i').forEach((el, i) => {
+    const on = L.av[i];
+    const d = on ? Math.abs(L.list.indexOf(i) - L.at) : 9;
+    el.classList.toggle('off', !on);
+    el.style.width = (!on ? 5 : d === 0 ? 14 : d === 1 ? 11 : d === 2 ? 9 : d <= 4 ? 8 : 6) + 'px';
+    el.style.height = (!on ? 6 : d === 0 ? 19 : d === 1 ? 14 : d === 2 ? 11 : d <= 4 ? 9 : 7) + 'px';
+    el.style.boxShadow = i === DR_SEL ? '0 0 0 2px var(--hi)' : 'none';
+    el.style.marginLeft = i > 0 && drGroup(i) !== drGroup(i - 1) ? '10px' : '';
+  });
+  hudEl.querySelector('.dr-line').textContent =
+    `MODE ${L.at + 1} / ${L.list.length} OFFERED ON ${drDeck().en}`
+    + (L.list.length < DR_MODES.length ? ` · ${DR_MODES.length - L.list.length} FOLDED AWAY` : '');
+}
+
+/* the cursor addresses one thing; the modes and the deck row are walked with the arrows */
+function modeRows() {
+  return DR_MODES.map((m, i) => ({
+    no: String(i + 1).padStart(2, '0'), en: m.en, jp: DR_GROUPS[drGroup(i)].jp,
+    big: m.en, small: DR_GROUPS[drGroup(i)].jp, meta: m.d.toUpperCase(),
+    pct: 0, figs: [], next: ['', '', ''],
+  }));
+}
+
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
@@ -20573,6 +21003,9 @@ function hudBespoke() {
   /* READING is the only flat, ungated set in the menu -- see the note above `.library` */
   if (HUD.sec === 'READING') return 'library';
   if (HUD.sec === 'RECORDS') return 'ledger';
+  /* DRILLS IS NOT A ROAD OF FOUR. Seventeen modes in five groups on six decks -- see the
+     note by `.modes`. DAILY keeps the shared road, which is the right shape for four games. */
+  if (HUD.sec === 'DRILLS') return 'modes';
   if (HUD.sec === 'JLPT') return 'ascent';
   return null;
 }
@@ -20594,8 +21027,11 @@ function hudDraw(force) {
        because the rail and the grid are drawn from them, but the cursor only ever addresses the
        hero and the cleared pile -- so it is clamped to those rather than to the row count. */
     /* the feed's cursor addresses the hero plus five budget steps, never its word list */
+    /* the modes screen walks two axes with the arrows and holds its own selection, so the
+       shared cursor is pinned rather than being asked to address seventeen things */
     const span = bespoke === 'deck' || bespoke === 'path' ? 2
-      : bespoke === 'feed' ? 6 : bespoke === 'library' ? LIB.length : all.length;
+      : bespoke === 'feed' ? 6 : bespoke === 'library' ? LIB.length
+        : bespoke === 'modes' ? 1 : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -20613,7 +21049,8 @@ function hudDraw(force) {
     bespoke === 'deck' ? String(DK_PICK) : '',
     bespoke === 'path' ? PA_PICK + '/' + paHere() : '',
     bespoke === 'library' ? 'lib' : '',
-    bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : ''].join('|');
+    bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : '',
+    bespoke === 'modes' ? DR_SEL + '/' + DR_DECK + '/' + DR_ZONE : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -20724,6 +21161,8 @@ function hudBuild(rows) {
             ? `<div class="path">${pathScreenMarkup()}</div>`
             : bespoke === 'library'
               ? `<div class="library">${libraryMarkup()}</div>`
+              : bespoke === 'modes'
+                ? `<div class="modes">${modesMarkup()}</div>`
               : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -20945,6 +21384,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'feed') { feedLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'path') { pathScreenLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'library') { libraryLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'modes') { modesLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -21280,6 +21720,38 @@ addEventListener('keydown', (e) => {
       e.preventDefault(); return;
     }
     if (e.key === 'Enter') { doFlash(0.18); e.preventDefault(); return; }
+  }
+  /* ---- DRILLS' TWO AXES, ON THE FOUR ARROWS AND NOTHING ELSE ----
+     Left and right walk the modes this deck OFFERS -- never the folded ones, so the cursor
+     cannot land in a gap. Up moves into the deck row, where left and right change the deck and
+     the road refolds under you; down or Escape comes back to the road. Enter runs the mode on
+     the deck you are standing on. No third key, which is the rule for every screen here. */
+  if (hudBespoke() === 'modes') {
+    const k = drDeck().k;
+    const L = drLayout(DR_SEL, k);
+    if (e.key === 'ArrowUp') { DR_ZONE = 'deck'; hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowDown') { DR_ZONE = 'strip'; hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      const d = e.key === 'ArrowRight' ? 1 : -1;
+      if (DR_ZONE === 'deck') {
+        const to = DR_DECK + d;
+        if (to >= 0 && to < DR_DECKS.length) {
+          DR_DECK = to;
+          /* the road refolds, so the selection has to be somewhere still standing */
+          DR_SEL = drNearest(DR_SEL, DR_DECKS[to].k);
+          hudDraw();
+        }
+      } else {
+        const to = L.at + d;
+        if (to >= 0 && to < L.list.length) { DR_SEL = L.list[to]; hudDraw(); }
+      }
+      e.preventDefault(); return;
+    }
+    if (e.key === 'Escape' || e.key === 'Backspace') {
+      /* Escape unwinds the deck row first and the section second */
+      if (DR_ZONE === 'deck') { DR_ZONE = 'strip'; hudDraw(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+    }
+    if (e.key === 'Enter' && DR_ZONE === 'deck') { DR_ZONE = 'strip'; hudDraw(); e.preventDefault(); return; }
   }
   /* ---- STUDY'S COURSE, SAME KEYS AS THE DECK SCREEN ----
      Deliberately identical: two focusables, Enter acts on the open step, left opens what is
