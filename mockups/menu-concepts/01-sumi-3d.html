@@ -374,6 +374,20 @@
     z-index: 14;
   }
   .st-row.is-open { transform: skewX(-8deg) rotate(-1.2deg) translateX(20px); z-index: 18; }
+  /* BUILT, NOT SHOWN. It exists so `ITEMS` stays index-parallel to the world's cameras. */
+  .st-row.is-folded { display: none; }
+  /* LOCKED IS VISIBLE AND DIMMED, NOT HIDDEN — the agreed answer: you can see the whole game from
+     day one, and each locked row says what opens it. The card keeps its paper so the row still
+     reads as a row; what goes is the colour, the figure and the action. */
+  .st-row.is-locked .st-card { background: linear-gradient(178deg, #ded8c8 0%, #c9c3b1 100%); }
+  .st-row.is-locked .st-mark { filter: saturate(0.15); }
+  .st-row.is-locked .st-en { color: rgba(20, 17, 13, 0.5); }
+  .st-row.is-locked .st-jp { color: rgba(20, 17, 13, 0.34); }
+  .st-row.is-locked .st-tok { color: rgba(20, 17, 13, 0.42); }
+  .st-row.is-locked .st-fig { display: none !important; }
+  .st-row.is-locked .st-slab { background: rgba(20, 17, 13, 0.42); }
+  .st-row.is-locked .st-clip { display: none; }
+  .st-row.is-locked .st-state i { color: #8a5a2a; }
   .st-in { position: absolute; inset: 0; }
 
   /* ---- the card ---- */
@@ -1611,13 +1625,16 @@
     flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 16px;
     margin-bottom: 0;
   }
+  /* ENGLISH LED, JAPANESE AS TEXTURE. The word you navigate by is one you can read at a glance;
+     the kanji chip, the reading and the vertical type all stay exactly as they were. L1's rows
+     were already this way round -- this slab was the only thing inverted. */
   .hud[data-t="midashi"] .hud-title b {
-    font-family: var(--jp); font-weight: 700; font-size: 34px; letter-spacing: 0.13em;
-    color: var(--ink); line-height: 1; text-shadow: none;
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
+    letter-spacing: 0.01em; color: var(--ink); line-height: 1; text-shadow: none;
   }
   .hud[data-t="midashi"] .hud-title i {
-    font-family: var(--lat-ui); font-weight: 700; font-style: normal;
-    font-size: 14px; letter-spacing: 0.32em; color: rgba(20, 17, 13, 0.55); transform: none;
+    font-family: var(--jp); font-weight: 700; font-style: normal;
+    font-size: 19px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.55); transform: none;
     text-shadow: none;
   }
   /* ::BEFORE, NOT ::AFTER, AND THAT IS NOT A PREFERENCE. `.hud-head::after` already belongs to
@@ -2136,9 +2153,11 @@
   .hud[data-screen="path"] .hud-detail,
   .hud[data-screen="library"] .hud-detail { display: none; }
   .hud[data-screen="modes"] .hud-detail { display: none; }
+  .hud[data-screen="lanes"] .hud-detail { display: none; }
   /* the road's up-next card is hidden under `[data-course]`; this screen is not a course
      and was inheriting it into the bottom-right corner, over the key hints */
-  .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs { display: none; }
+  .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs,
+  .hud[data-screen="lanes"] .hud-next, .hud[data-screen="lanes"] .hud-figs { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2576,6 +2595,65 @@
      inset to 160-1120 and its mask fades the road into open valley at those edges rather than at
      the glass -- the same 70/190 gutter the course's road has used since it moved onto the stage.
      ================================================================================ */
+  /* ================================================================================
+     PRACTICE'S THREE LANES. Three peers on the stage: review, drills, the daily puzzles.
+     960 wide, three cards of 304 with 24 between them, so the row is balanced about x640
+     and each card is wide enough for a sentence at 11px without wrapping to three lines.
+     ================================================================================ */
+  /* 180/920, NOT 160/960. A 330-tall card skewed -8deg paints 19.7px wider each side than it is
+     authored, so a row laid at the stage's own edges hangs 20px into the moat at both ends. */
+  .lanes { position: absolute; left: 180px; top: 40px; width: 920px; height: 330px;
+    display: flex; gap: 24px; }
+  .pr-lane { flex: 1; min-width: 0; border: 0; padding: 0; font: inherit; text-align: left;
+    cursor: pointer; display: flex; flex-direction: column;
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
+    box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transform: skewX(-8deg) rotate(-1.2deg);
+    transition: transform 0.26s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.26s ease,
+      background 0.26s ease; }
+  .pr-lane:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+  .pr-lane.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
+    box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px); }
+  .pr-lane.on:nth-child(2) { transform: skewX(-8deg) rotate(1deg) translateY(-6px); }
+
+  .pr-cap { flex: none; display: flex; align-items: baseline; gap: 10px; padding: 8px 15px 9px;
+    background: var(--ink); white-space: nowrap; }
+  .pr-cap b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+    letter-spacing: 0.2em; color: var(--gold-hi); }
+  .pr-cap i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 11px;
+    letter-spacing: 0.1em; color: rgba(232, 196, 124, 0.6); }
+  .pr-glyph { padding: 12px 15px 0; font-family: var(--jp); font-weight: 400; font-size: 46px;
+    line-height: 1; color: rgba(20, 17, 13, 0.22); }
+  .pr-fig { display: flex; align-items: baseline; gap: 9px; padding: 4px 15px 0; }
+  .pr-fig b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 40px;
+    line-height: 1; color: var(--ink); }
+  .pr-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55); }
+  .pr-d { padding: 9px 15px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 11px;
+    line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.68); }
+  .pr-foot { margin-top: auto; padding: 0 15px 10px; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8.5px; letter-spacing: 0.14em; line-height: 1.4;
+    color: rgba(20, 17, 13, 0.45); }
+  /* THE SLAB IS ALWAYS THERE, and only the selected one says ENTER -- a strip that appears on
+     selection makes the card change height, and three cards of different heights read as three
+     kinds of thing rather than three lanes. */
+  .pr-slab { flex: none; height: 28px; display: grid; place-items: center;
+    background: rgba(20, 17, 13, 0.13); font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6);
+    white-space: nowrap; transition: background 0.24s ease, color 0.24s ease; }
+  .pr-lane.on .pr-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
+  /* REVIEWS ARE THE OBLIGATION, so they carry the one vermilion on the screen and the other two
+     do not -- the same law the action slab obeys everywhere else in this menu. */
+  .pr-lane.duty.on .pr-slab { background: var(--hi); color: #ffd9a1; }
+
+  .pr-note { position: absolute; left: 180px; top: 400px; width: 920px; text-align: center;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+    color: var(--gold-hi); paint-order: stroke fill;
+    -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
+
   .modes { position: relative; margin-top: 6px; margin-left: -52px;
     width: calc(100vw / var(--u)); height: 470px; }
 
@@ -5508,7 +5586,23 @@ addEventListener('resize', uiScale);
    `NAV.glass(0.8)` is plain transparency -- but the design as drawn is solid paper. */
 
 const ITEMS = [
-  { jp: '学習', en: 'STUDY',   kanji: '学', desc: 'Kana, kanji and vocabulary by section', descJp: 'かな・漢字・語彙のセクション学習' },
+  /* ---- THE FIVE SECTIONS ----------------------------------------------------------------
+     `en` is the KEY and never changes: it is what `HUD.sec` carries, what `SECTION_ACCENT`,
+     `SUBTILES`, `L2_PLANES` and `WORLD_L3` are keyed by, and what three hundred and seventy-nine
+     places in this file compare against. `label` is what is DRAWN. Separating the two is what
+     makes a rename a five-line change instead of a file-wide search.
+
+     AND THE ARRAY STAYS SIX LONG. `DESTS`, `ENVS` and the flight editor are index-parallel to
+     this list — a destination is `DESTS[i]` for the same `i` — so removing an entry would
+     silently repoint every camera after it at the wrong place in a world that is authored, not
+     generated. DAILY is marked `under` instead: it is no longer a row at level one, it is a lane
+     inside PRACTICE, and its camera, its road and its level three are untouched.
+
+     LOCKS ARE AUTHORED DEMO STATE, not derived from `PATH.done`. The sentence names the real
+     curriculum node that opens it, so the mechanic reads true, but the mockup does not hide two
+     finished screens behind a gate nobody can pass here. Press L for the first-run state. */
+  { jp: '道', en: 'STUDY', label: 'THE PATH', kanji: '道', ord: 1,
+    desc: 'The one route from zero — everything new starts here', descJp: '入門から N1 までの一本道' },
   /* 日課 rather than 復習. This slot was REVIEW until 2026-08-09, and REVIEW was invented: the app
      has no such screen, because reviewing is simply what a study session DOES. Its four tiles were
      queues you run, not places you go, and the due count belongs on the menu's own up-next strip —
@@ -5517,11 +5611,23 @@ const ITEMS = [
      The shrine takes it without changing a thing. The ema wall already hangs four tablets that are
      YOURS, larger and forward of a crowd of blanks behind them — four games in front, the days
      already done behind — and a shrine is somewhere you go daily, which is what 日課 means. */
-  { jp: '日課', en: 'DAILY',  kanji: '日', desc: "Today's four puzzles — two still open", descJp: '毎日の四つのパズル', badge: 2 },
-  { jp: '読解', en: 'READING', kanji: '読', desc: 'Graded reading passages, N5 to N2', descJp: 'レベル別の読みもの' },
-  { jp: '特訓', en: 'DRILLS',  kanji: '特', desc: 'Daily minigames to sharpen recall', descJp: '毎日のミニゲームで腕試し' },
-  { jp: '検定', en: 'JLPT',    kanji: '検', desc: 'Mock exams and JLPT preparation', descJp: 'JLPT 模擬試験と対策' },
-  { jp: '記録', en: 'RECORDS', kanji: '記', desc: 'Progress, statistics and streaks', descJp: '進捗・統計・連続記録' },
+  /* a lane inside PRACTICE now, not a section. `under` keeps it out of level one and out of the
+     arrow walk; everything else about it still works exactly as it did. */
+  { jp: '日課', en: 'DAILY', label: 'DAILY GAMES', kanji: '日', under: 'DRILLS',
+    desc: "Today's four puzzles — two still open", descJp: '毎日の四つのパズル', badge: 2 },
+  { jp: '実践', en: 'READING', label: 'THE WORLD', kanji: '実', ord: 3,
+    desc: 'Real Japanese — thirty texts, and conversation', descJp: '読みものと会話',
+    opens: 'reach READING on the path' },
+  { jp: '練習', en: 'DRILLS', label: 'PRACTICE', kanji: '練', ord: 2,
+    desc: 'Reviews, seventeen drills and the daily puzzles', descJp: '復習・訓練・日課' },
+  { jp: '検定', en: 'JLPT', label: 'THE EXAM', kanji: '検', ord: 4,
+    desc: 'How ready you are, and four ways to find out', descJp: 'JLPT 模擬試験と対策',
+    /* NOT LOCKED BY DEFAULT. An authored lock here made the ascent -- a finished screen -- flatly
+       unreachable, which is a worse thing for a mockup to be than un-gated. The gate is real and
+       it is named; press L to stand in it. */
+    opens: 'reach JLPT N5 on the path' },
+  { jp: '記録', en: 'RECORDS', label: 'YOU', kanji: '記', ord: 5,
+    desc: 'Your streak, your year, your level', descJp: '進捗・統計・連続記録' },
 ];
 const SUBTILES = {
   /* かな rather than ひらがな and カタカナ as two: the garden has four faces and grammar had no home
@@ -16778,6 +16884,9 @@ function swapWm(ch) {
 const wmPulse = { v: 1 };
 function setActive(i) {
   if (busy || state !== 'menu') return;
+  /* a folded row is built so the indices stay parallel to the world's cameras, but it is not a
+     place you can stand at level one */
+  if (!atL1(i)) return;
   active = i;
   itemEls.forEach((el, j) => {
     el.classList.toggle('is-active', j === i);
@@ -16833,7 +16942,10 @@ const ST_ROW_H = 40, ST_GAP = 9;
 const ST_H = { gauge: 118, due: 126, fig: 122 };
 /* CENTRED IN THE STAGE, NOT IN THE FRAME. Same derivation as before -- the tallest arrangement
    is centred and the shorter ones hang from the same line -- against 192-576 rather than 0-720. */
-const ST_STACK = 5 * (ST_ROW_H + ST_GAP) + Math.max(...Object.values(ST_H));
+/* FOUR CLOSED ROWS AND ONE OPEN, since DAILY folded into PRACTICE — the stack that has to fit
+   the stage lost a row, so the column re-centres on it rather than keeping a gap where the
+   sixth used to be. */
+const ST_STACK = 4 * (ST_ROW_H + ST_GAP) + Math.max(...Object.values(ST_H));
 const ST_TOP = 192 + Math.round((384 - ST_STACK) / 2);
 
 function standData() {
@@ -16863,19 +16975,24 @@ function standData() {
       slab: 'PLAY TODAY\u2019S PUZZLES \u25b8',
       sug: 'Crossword', sugJp: '\u30af\u30ed\u30b9\u30ef\u30fc\u30c9', sugBtn: 'PLAY \u25b8',
     },
+    /* THE WORLD is reading AND conversation now, so its figure is texts rather than grades --
+       the grades are a fact about the library, one level in. */
     READING: {
-      tok: '4 GRADES',
-      lab: 'GRADED', val: 'N5 TO N2',
-      kind: 'fig', fig: '41', figLab: 'TEXTS IN THE LIBRARY',
+      tok: '30 TEXTS',
+      lab: 'REAL JAPANESE', val: 'READ AND TALK',
+      kind: 'fig', fig: '30', figLab: 'TEXTS TO READ',
       slab: 'OPEN THE LIBRARY \u25b8',
       sug: 'Short texts, N5', sugJp: '\u77ed\u6587', sugBtn: 'READ \u25b8',
     },
     DRILLS: {
-      tok: '4 KINDS',
-      lab: 'BEST SO FAR', val: 'SPEED \u00b7 42',
-      kind: 'fig', fig: '8', figLab: 'DRILLS READY TO RUN',
-      slab: 'PICK A DRILL \u25b8',
-      sug: 'Listening', sugJp: '\u805e\u304d\u53d6\u308a', sugBtn: 'DRILL \u25b8',
+      /* PRACTICE absorbed the daily puzzles: its figure is what is actually waiting, with the
+         drills and the games as the other two lanes. */
+      tok: '3 LANES',
+      lab: 'WAITING FOR YOU', val: '12 DUE \u00b7 2 PUZZLES',
+      kind: 'due', due: 12, figLab: 'CARDS DUE TODAY',
+      slab: 'PRACTISE \u25b8',
+      /* the suggestion is what the app would pick first, and reviews outrank a drill */
+      sug: 'Your reviews', sugJp: '\u5fa9\u7fd2', sugBtn: 'REVIEW \u25b8',
     },
     JLPT: {
       tok: '20 MOCKS',
@@ -16894,6 +17011,33 @@ function standData() {
   };
 }
 
+/* WHICH ROWS LEVEL ONE ACTUALLY HAS. `under` folds an item into another section; `LOCKED_TOO`
+   is the first-run view, on L, which locks everything the curriculum has not opened yet. */
+let FIRST_RUN = false;
+const atL1 = (i) => !ITEMS[i].under;
+const secLocked = (i) => !!(ITEMS[i].locked || (FIRST_RUN && ITEMS[i].opens));
+const secLabel = (it) => it.label || it.en;
+/* "reach JLPT N5 on the path" -> "JLPT N5 OPENS IT". The unlock sentence lives in `.st-detail`,
+   which only an OPEN row shows, and a locked row can never be opened -- so without this the one
+   line written to explain the gate was unreachable. */
+const lockTok = (it) => {
+  const m = /reach (.+?) on the path/i.exec(it.opens || '');
+  return m ? (m[1].toUpperCase() + ' FIRST') : 'LOCKED';
+};
+/* THE ORDER ON SCREEN IS NOT THE ORDER IN THE ARRAY, and it cannot be. `ITEMS` is index-parallel
+   to `DESTS`, `ENVS` and the flight editor's saved overlay, so swapping two entries would repoint
+   two cameras and invalidate every saved flight. `ord` is the reading order — Path, Practice,
+   World, Exam, You — and everything the learner touches walks THIS list. */
+const L1_SEQ = ITEMS.map((it, i) => i).filter(atL1).sort((a, b) => ITEMS[a].ord - ITEMS[b].ord);
+const l1No = (i) => L1_SEQ.indexOf(i) + 1;
+const l1Count = () => L1_SEQ.length;
+/* walk to the next row that is actually there, in reading order */
+function l1Step(from, d) {
+  const at = L1_SEQ.indexOf(from);
+  if (at < 0) return L1_SEQ[0];
+  return L1_SEQ[(at + d + L1_SEQ.length) % L1_SEQ.length];
+}
+
 const standEl = document.getElementById('standing');
 const standRows = [];
 
@@ -16906,8 +17050,8 @@ function standBuild() {
        hole in it rather than as an accent and an action. */
     const acc = SECTION_ACCENT[it.en][it.en === 'DAILY' ? 1 : 0];
     const row = document.createElement('div');
-    row.className = 'st-row';
-    row.style.setProperty('--i', i);
+    row.className = 'st-row' + (atL1(i) ? '' : ' is-folded') + (secLocked(i) ? ' is-locked' : '');
+    row.style.setProperty('--i', atL1(i) ? l1No(i) - 1 : 0);
     row.style.setProperty('--acc', acc);
 
     const segs = d.kind === 'gauge'
@@ -16921,15 +17065,16 @@ function standBuild() {
     row.innerHTML = '<div class="st-in">'
       + '<button class="st-card" type="button">'
       + '<span class="st-mark"><span class="st-glyph">' + it.kanji + '</span>'
-      + '<b class="st-no">' + String(i + 1).padStart(2, '0') + '</b></span>'
+      + '<b class="st-no">' + String(l1No(i)).padStart(2, '0') + '</b></span>'
       + '<span class="st-body">'
-      + '<span class="st-head"><span class="st-en">' + it.en + '</span>'
+      + '<span class="st-head"><span class="st-en">' + secLabel(it) + '</span>'
       + '<span class="st-jp">' + it.jp + '</span>'
-      + '<span class="st-tok">' + d.tok + '</span></span>'
+      + '<span class="st-tok">' + (secLocked(i) ? lockTok(it) : d.tok) + '</span></span>'
       + '<span class="st-detail">'
-      + '<span class="st-state"><b>' + d.lab + '</b><i>' + d.val + '</i></span>'
+      + '<span class="st-state"><b>' + (secLocked(i) ? 'OPENS WHEN YOU' : d.lab) + '</b>'
+      + '<i>' + (secLocked(i) ? (it.opens || '').toUpperCase() : d.val) + '</i></span>'
       + '<span class="st-fig on">' + segs + '</span></span>'
-      + '<span class="st-slab">' + d.slab + '</span>'
+      + '<span class="st-slab">' + (secLocked(i) ? 'LOCKED 施錠' : d.slab) + '</span>'
       + '</span></button>'
       + '<div class="st-clip"><button class="st-box" type="button" tabindex="-1">'
       + '<span class="st-box-col">'
@@ -16955,6 +17100,20 @@ function standBuild() {
   standSync();
 }
 
+/* WHAT A LOCK CHANGES IS WORDS, not structure -- so toggling the first-run view rewrites three
+   strings per row rather than rebuilding the column and losing its open state. */
+function standRebuildText() {
+  const D = standData();
+  standRows.forEach((r, i) => {
+    const it = ITEMS[i], d = D[it.en], lk = secLocked(i);
+    const q = (sel) => r.row.querySelector(sel);
+    q('.st-tok').textContent = lk ? lockTok(it) : d.tok;
+    q('.st-state b').textContent = lk ? 'OPENS WHEN YOU' : d.lab;
+    q('.st-state i').textContent = lk ? (it.opens || '').toUpperCase() : d.val;
+    q('.st-slab').textContent = lk ? 'LOCKED 施錠' : d.slab;
+  });
+}
+
 function standPress(i, cls) {
   const r = standRows[i];
   if (!r) return;
@@ -16968,13 +17127,15 @@ function standPress(i, cls) {
    this. It runs on every selection change and costs six writes. */
 function standSync() {
   let y = ST_TOP;
-  standRows.forEach((r, i) => {
+  /* laid out down `L1_SEQ`, not down the array */
+  L1_SEQ.forEach((i) => {
+    const r = standRows[i];
     const open = i === active;
     const h = open ? ST_H[r.kind] : ST_ROW_H;
     r.row.classList.toggle('is-open', open);
     r.row.style.setProperty('--top', y + 'px');
     r.row.style.setProperty('--h', h + 'px');
-    r.row.style.setProperty('--lag', Math.min(Math.abs(i - active), 4) * 26 + 'ms');
+    r.row.style.setProperty('--lag', Math.min(Math.abs(l1No(i) - l1No(active)), 4) * 26 + 'ms');
     if (r.kind === 'gauge') {
       const on = Math.round((12 * r.pct) / 100);
       r.row.querySelectorAll('.st-segs i').forEach((seg, k) => seg.classList.toggle('on', open && k < on));
@@ -19466,6 +19627,7 @@ function hudRows() {
   if (hudBespoke() === 'path') return paRows();
   if (hudBespoke() === 'library') return libraryRows();
   if (hudBespoke() === 'modes') return modeRows();
+  if (hudBespoke() === 'lanes') return laneRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -20988,9 +21150,84 @@ function modeRows() {
   }));
 }
 
+/* ================================================================================================
+   PRACTICE'S THREE LANES -- the screen the restructure needed.
+
+   PRACTICE is the one section that is a merge rather than a rename: it absorbed the daily puzzles
+   from DAILY and the seventeen modes from DRILLS, and it owns the review queue that never had a
+   home anywhere. Three things you can do with material the path has already taught you, and
+   nothing new is introduced here.
+
+   THEY ARE PEERS, NOT A CHAIN. Nothing is gated, nothing is ordered, all three are available now
+   -- so this is three cards side by side, and the only thing that distinguishes them is which one
+   the app would pick for you. Review carries the vermilion because reviews are the obligation;
+   the other two are things you choose.
+
+   WHY A LANE AND NOT A SECTION. Each of these was a top-level row at some point in this file's
+   history and none of them earned it: they are all "use what you know", and a casual learner
+   opening a menu should not have to tell three kinds of practice apart before doing any.
+   ================================================================================================ */
+const PR_LANES = [
+  { k: 'review', en: 'REVIEW', jp: '復習', glyph: '復',
+    d: 'The cards the scheduler says are due today',
+    fig: '12', figLab: 'CARDS DUE', foot: 'ABOUT 6 MINUTES', act: 'START REVIEWING' },
+  { k: 'drills', en: 'DRILLS', jp: '訓練', glyph: '訓',
+    d: 'Seventeen ways to practise, on any of six decks',
+    fig: '17', figLab: 'MODES', foot: '5 SKILL GROUPS', act: 'PICK A DRILL' },
+  { k: 'games', en: 'DAILY GAMES', jp: '日課', glyph: '日',
+    d: 'Four puzzles built out of your own decks, new each day',
+    fig: '2', figLab: 'STILL OPEN', foot: 'CROSSWORD · WORD SEARCH · PAIRS · BLITZ',
+    act: "PLAY TODAY'S" },
+];
+let PR_AT = 0;
+
+function lanesMarkup() {
+  const cards = PR_LANES.map((L, i) => `<button class="pr-lane" data-i="${i}">`
+    + `<span class="pr-cap"><b>${L.en}</b><i>${L.jp}</i></span>`
+    + `<span class="pr-glyph">${L.glyph}</span>`
+    + `<span class="pr-fig"><b>${L.fig}</b><i>${L.figLab}</i></span>`
+    + `<span class="pr-d">${L.d}</span>`
+    + `<span class="pr-foot">${L.foot}</span>`
+    + `<span class="pr-slab"></span></button>`).join('');
+  return `<div class="lanes">${cards}</div>`
+    + `<div class="pr-note">練習 · NOTHING NEW IS TAUGHT HERE — THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU</div>`;
+}
+
+function lanesLayout() {
+  PR_AT = Math.max(0, Math.min(PR_AT, PR_LANES.length - 1));
+  hudEl.querySelectorAll('.pr-lane').forEach((el, i) => {
+    const on = i === PR_AT;
+    el.classList.toggle('on', on);
+    /* the reviews lane is the only one carrying the action colour: it is the obligation, the
+       other two are things you choose to do */
+    el.classList.toggle('duty', PR_LANES[i].k === 'review');
+    el.querySelector('.pr-slab').textContent = on
+      ? `${PR_LANES[i].act} · ENTER ▸` : PR_LANES[i].act;
+  });
+}
+
+function laneRows() {
+  return PR_LANES.map((L, i) => ({
+    no: String(i + 1).padStart(2, '0'), en: L.en, jp: L.jp, big: L.en, small: L.jp,
+    meta: L.figLab, pct: 0, figs: [], next: ['', '', ''],
+  }));
+}
+
+/* entering a lane is the only place in this file that changes SECTION rather than level: the
+   puzzles are DAILY's road and DAILY's camera, and they still are -- they are just reached from
+   here now instead of from a row of their own at level one. */
+function lanePick() {
+  const L = PR_LANES[PR_AT];
+  if (L.k === 'drills') { HUD.level = 3; hudDraw(); return; }
+  if (L.k === 'games') { enterSection('DAILY'); return; }
+  /* review runs a session, which is the app rather than the menu -- the same place every other
+     terminal on this menu stops */
+}
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
+    /* the drills lane, one level inside PRACTICE */
+    if (HUD.sec === 'DRILLS') return 'modes';
     if (HUD.sec !== 'STUDY') return null;
     if (STUDY_BLOCKS[HUD.tile]) return 'deck';
     if (STUDY_FEED[HUD.tile]) return 'feed';
@@ -21003,9 +21240,9 @@ function hudBespoke() {
   /* READING is the only flat, ungated set in the menu -- see the note above `.library` */
   if (HUD.sec === 'READING') return 'library';
   if (HUD.sec === 'RECORDS') return 'ledger';
-  /* DRILLS IS NOT A ROAD OF FOUR. Seventeen modes in five groups on six decks -- see the
-     note by `.modes`. DAILY keeps the shared road, which is the right shape for four games. */
-  if (HUD.sec === 'DRILLS') return 'modes';
+  /* PRACTICE'S LEVEL TWO IS ITS THREE LANES. The seventeen modes moved one level in when the
+     section absorbed the reviews and the daily puzzles -- see the note by `.lanes`. */
+  if (HUD.sec === 'DRILLS') return 'lanes';
   if (HUD.sec === 'JLPT') return 'ascent';
   return null;
 }
@@ -21031,7 +21268,7 @@ function hudDraw(force) {
        shared cursor is pinned rather than being asked to address seventeen things */
     const span = bespoke === 'deck' || bespoke === 'path' ? 2
       : bespoke === 'feed' ? 6 : bespoke === 'library' ? LIB.length
-        : bespoke === 'modes' ? 1 : all.length;
+        : bespoke === 'modes' ? 1 : bespoke === 'lanes' ? PR_LANES.length : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -21050,7 +21287,8 @@ function hudDraw(force) {
     bespoke === 'path' ? PA_PICK + '/' + paHere() : '',
     bespoke === 'library' ? 'lib' : '',
     bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : '',
-    bespoke === 'modes' ? DR_SEL + '/' + DR_DECK + '/' + DR_ZONE : ''].join('|');
+    bespoke === 'modes' ? DR_SEL + '/' + DR_DECK + '/' + DR_ZONE : '',
+    bespoke === 'lanes' ? String(PR_AT) : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -21089,8 +21327,14 @@ function hudBuild(rows) {
     ? `<div class="hud-kick">${it.en} \u2014 ${tile[1]}</div>`
       + `<div class="hud-title"><b>${tile[0]}</b><i>${tile[1]}</i></div>`
       + `<div class="hud-sub">\u30ec\u30d9\u30eb\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044 \u00b7 CHOOSE A LEVEL</div>`
-    : `<div class="hud-kick">SECTION ${String(ITEMS.indexOf(it) + 1).padStart(2, '0')} / 06</div>`
-      + `<div class="hud-title"><b>${it.jp}</b><i>${it.en}</i></div>`
+    /* A FOLDED SECTION HAS NO ORDINAL, because it is not a row at level one -- DAILY is reached
+       from inside PRACTICE, so its kicker names the way in rather than a number it does not have.
+       And the count is `l1Count()`, not a hard six: the menu is five rows now. */
+    : `<div class="hud-kick">${it.under
+        ? secLabel(ITEMS[ITEMS.findIndex((q) => q.en === it.under)]) + ' — ' + secLabel(it)
+        : 'SECTION ' + String(l1No(ITEMS.indexOf(it))).padStart(2, '0') + ' / '
+          + String(l1Count()).padStart(2, '0')}</div>`
+      + `<div class="hud-title"><b>${secLabel(it)}</b><i>${it.jp}</i></div>`
       + `<div class="hud-sub">${it.descJp} \u00b7 ${it.desc}</div>`;
   const head = `<span class="hud-mark">${headMark}</span>`
     + `<span class="hud-headtext">${headBody}</span>`;
@@ -21163,6 +21407,8 @@ function hudBuild(rows) {
               ? `<div class="library">${libraryMarkup()}</div>`
               : bespoke === 'modes'
                 ? `<div class="modes">${modesMarkup()}</div>`
+                : bespoke === 'lanes'
+                  ? `<div class="modes">${lanesMarkup()}</div>`
               : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -21385,6 +21631,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'path') { pathScreenLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'library') { libraryLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'modes') { modesLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'lanes') { lanesLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -21720,6 +21967,16 @@ addEventListener('keydown', (e) => {
       e.preventDefault(); return;
     }
     if (e.key === 'Enter') { doFlash(0.18); e.preventDefault(); return; }
+  }
+  /* ---- PRACTICE'S THREE LANES: left and right, and Enter ---- */
+  if (hudBespoke() === 'lanes') {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      PR_AT = Math.min(PR_LANES.length - 1, PR_AT + 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      PR_AT = Math.max(0, PR_AT - 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') { lanePick(); e.preventDefault(); return; }
   }
   /* ---- DRILLS' TWO AXES, ON THE FOUR ARROWS AND NOTHING ELSE ----
      Left and right walk the modes this deck OFFERS -- never the folded ones, so the cursor
@@ -22541,7 +22798,25 @@ function backOrbit() {
          d && d.bend ? d.mid : null, AIM_LEAN_BACK, d && d.pace, HOME.roll || 0);
 }
 
+/* ENTERING A SECTION THAT IS NOT A ROW. DAILY folded into PRACTICE, so nothing at level one
+   selects it any more -- but its camera, its road and its level three are all still there and
+   still correct. This is the one way in: stand the menu back up, then take the normal path in,
+   bypassing only the guard that stops a FOLDED row being the L1 selection. */
+function enterSection(en) {
+  const i = ITEMS.findIndex((it) => it.en === en);
+  if (i < 0) return;
+  goBack();
+  const go = () => {
+    if (state === 'menu' && !busy) { active = i; select(i); }
+    else setTimeout(go, 140);
+  };
+  setTimeout(go, 480);
+}
+
 function select(i) {
+  /* refuse rather than fly: a locked section has nothing to show yet, and the row already says
+     what opens it */
+  if (secLocked(i)) { standPress(i, 'is-press'); return; }
   if (busy || state !== 'menu') return;
   busy = true;
   flownTo = i;
@@ -22921,10 +23196,27 @@ addEventListener('keydown', (e) => {
       if (document.body.classList.contains('menu-inline')) standFocus(i);
       else itemEls[i].focus({ preventScroll: true });
     };
-    if (e.key === 'ArrowDown') go((active + 1) % ITEMS.length);
-    else if (e.key === 'ArrowUp') go((active + ITEMS.length - 1) % ITEMS.length);
+    if (e.key === 'ArrowDown') go(l1Step(active, 1));
+    else if (e.key === 'ArrowUp') go(l1Step(active, -1));
     else if (e.key === 'Enter') select(active);
-    else if (e.key >= '1' && e.key <= '6') go(+e.key - 1);
+    /* FIRST RUN, ON L. The same idea as the ledger's bad-week key: a design that only looks good
+       on a full account has not been tested, and neither has one that only looks good on an empty
+       one. This locks everything the curriculum has not opened yet. */
+    else if (e.key === 'l' || e.key === 'L') {
+      FIRST_RUN = !FIRST_RUN;
+      standRows.forEach((r, j) => r.row.classList.toggle('is-locked', secLocked(j)));
+      standRebuildText();
+      /* stepping ONCE can land on another locked row -- in the first-run view two of the five
+         are shut, and they are adjacent */
+      let guard = 0;
+      while (secLocked(active) && guard++ < L1_SEQ.length) go(l1Step(active, 1));
+    }
+    /* the number keys address the VISIBLE ordinal, which is what the row prints */
+    else if (e.key >= '1' && e.key <= '9') {
+      const want = +e.key;
+      const i = ITEMS.findIndex((_, j) => atL1(j) && l1No(j) === want);
+      if (i >= 0) go(i);
+    }
   } else if (state === 'sub' && walkSec) {
     /* moving IS the scrollbar down here */
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') walkGo(walkAt + 1);
