@@ -10,7 +10,7 @@ this is stale.**
 | Card | What it settles |
 | --- | --- |
 | `foundations/frame-contract.html` | **Start here.** Where a screen is allowed to stand: the stage, the moat, the two bands, the overflow rule, and the skew arithmetic that puts a screen in the moat while its CSS looks correct. Everything built obeys it. |
-| `components/screens.html` | The eleven screens that exist, each as a real 1280×720 plate at one hour, with which of the four shapes it is and which two still have open problems. |
+| `components/screens.html` | The twelve screens that exist, each as a real 1280×720 plate at one hour, with which of the four shapes it is and which two still have open problems. |
 | `components/built.html` | The five objects those screens are made of — menu row, road tablet, hero card, heading slab, caption chip — at real size, on the real backdrop, with the numbers they are built from. |
 | `foundations/backdrops.html` | The ground each of the six sections actually stands on — six real plates with the interface switched off. The camera stands somewhere different in each section, so design against the one you are designing for. **JLPT and RECORDS are the two extremes.** |
 | `foundations/backdrop.html` | The older single-plate version of the above, kept for the measured menu footprints on it. |
@@ -23,7 +23,7 @@ this is stale.**
 
 ## What is settled, and no longer open
 
-**Every screen is built.** Eleven of them, across three levels, all shown in
+**Every screen is built.** Twelve of them, across three levels, all shown in
 `components/screens.html`. The four problems this file used to open with — a deck's blocks at real
 scale, RECORDS, JLPT, the vocabulary feed's missing budget — are all drawings now. The reference
 data behind each is kept below, because it is still what those screens are made of.
@@ -34,16 +34,16 @@ nothing scrolls. See `foundations/frame-contract.html` — it supersedes the old
 width", which is what let screens paint to both edges and bury the valley the menu exists to show.
 
 **The road is no longer the shape of everything.** It used to carry every section at both levels.
-It now carries two — DAILY and DRILLS — and it is the right shape for one of them.
+It now carries one — DAILY — which is the one it is the right shape for.
 
 ## The two open problems
 
 Both are **shape** problems rather than layout ones, and both have their own brief.
 
-### A. DRILLS is drawn as four tablets and is seventeen modes in five groups
+### ~~A. DRILLS is drawn as four tablets~~ — BUILT 2026-08-16
 
-The road is right for a small unordered set you pick between. DRILLS is not that. It is the same
-category error STUDY had before its rebuild: a drawing describing a decision nobody is offered.
+Seventeen modes in five groups on an axis of six decks, with the fold: a mode the current deck
+does not offer leaves the road and the road closes over it. See `components/screens.html`.
 
 ### B. JLPT has no level three, so its level two is doing two jobs
 

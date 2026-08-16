@@ -1,7 +1,7 @@
 <!-- @dsCard group="Components" -->
 <!doctype html>
 <meta charset="utf-8">
-<title>The eleven screens that exist</title>
+<title>The twelve screens that exist</title>
 <style>
   :root {
     --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
@@ -47,7 +47,7 @@
   td { color: rgba(242,234,216,0.76); }
 </style>
 
-<h1>The eleven screens that exist</h1>
+<h1>The twelve screens that exist</h1>
 <p class="lede">
   <code>built.html</code> documents five OBJECTS — the menu row, the road tablet, the hero card, the
   heading slab, the caption chip. It is still correct about those. This card is which SCREENS they
@@ -55,11 +55,11 @@
 </p>
 <p class="lede">
   <b>Every plate below is the real mockup at 1280&times;720 with the clock frozen at 17:30.</b> One
-  hour for all eleven, so what differs between them is shape rather than lighting — for the ground
+  hour for all twelve, so what differs between them is shape rather than lighting — for the ground
   each section actually stands on across the day, see <code>foundations/backdrops.html</code>.
 </p>
 <p class="lede">
-  <b>All eleven sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
+  <b>All twelve sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
   drawing inside x&nbsp;160&ndash;1120 / y&nbsp;192&ndash;576, bare valley 160px either side,
   whole-set summaries in the foot band. Read that card before designing a new one — in particular
   the part about skew being paint rather than layout, which is what puts a screen in the moat while
@@ -67,14 +67,14 @@
 </p>
 
 <div class="note">
-  <b>Eleven screens, three levels.</b>
+  <b>Twelve screens, three levels.</b>
   <table>
     <tr><th>LEVEL 1</th><td>the standing menu — a vertical column of six section rows, one open at
       a time</td></tr>
     <tr><th>LEVEL 2</th><td>six, one per section: STUDY path &middot; DAILY road &middot; READING
-      library &middot; DRILLS road &middot; JLPT ascent &middot; RECORDS ledger</td></tr>
-    <tr><th>LEVEL 3</th><td>four: STUDY deck &middot; STUDY feed &middot; DAILY road &middot;
-      DRILLS road</td></tr>
+      library &middot; DRILLS modes &middot; JLPT ascent &middot; RECORDS ledger</td></tr>
+    <tr><th>LEVEL 3</th><td>four: STUDY deck &middot; STUDY feed &middot; STUDY cleared pile &middot;
+      DAILY road</td></tr>
   </table>
 </div>
 
@@ -84,7 +84,7 @@
   <b>Chain</b> — ordered and gated, exactly one item open. <b>Peers</b> — a small unordered set, all
   available. <b>List</b> — a large flat set, all available, no order. <b>Dashboard</b> — figures you
   read, not places you go. Choosing the wrong one is the mistake this menu has made twice, and
-  <span class="warn">it is still made in one place</span> — see DRILLS at the foot of this card.
+  both are now corrected.
 </p>
 
 <figure>
@@ -192,23 +192,34 @@
   </figcaption>
 </figure>
 
+<figure>
+  <img src="../assets/screen-modes.png" alt="DRILLS, the modes">
+  <figcaption>
+    <div class="name"><b>THE FOLD</b><i>DRILLS &middot; LEVEL 2 &middot; 17 MODES &times; 6 DECKS</i><u>peers</u></div>
+    <p>The road, kept, plus the axis it was missing. Seventeen modes in five groups with a deck row
+      above them &mdash; <b>a mode the current deck does not offer leaves the road entirely</b> and
+      the road closes over it. Classes are <code>.dr-*</code>.</p>
+    <p>Three counts are what stop a fold reading as deletion: each group block says
+      &ldquo;n&nbsp;MODES &middot; m&nbsp;HERE&rdquo;, each deck chip &ldquo;n&nbsp;/&nbsp;17&rdquo;,
+      and the foot strip keeps a mark for all seventeen. Grammar folds six away and says so.</p>
+    <p>Four of the seventeen exist on exactly one deck &mdash; Stroke Order is kanji only, Vibe
+      Check is grammar only, Compound Builder and Conjugation Drill are vocabulary only. That is
+      what this screen is made of, and the reason a flat list of seventeen would be a lie.</p>
+  </figcaption>
+</figure>
+
 <h2>AND THE ROAD, WHICH STILL EXISTS</h2>
 <figure>
-  <div class="pair">
-    <img src="../assets/screen-road-daily.png" alt="DAILY, the road">
-    <img src="../assets/screen-road-drills.png" alt="DRILLS, the road">
-  </div>
+  <img src="../assets/screen-road-daily.png" alt="DAILY, the road">
   <figcaption>
-    <div class="name"><b>THE ROAD</b><i>DAILY AND DRILLS &middot; LEVELS 2 AND 3</i><u>peers</u>
-      <u class="open">WRONG SHAPE AT DRILLS</u></div>
+    <div class="name"><b>THE ROAD</b><i>DAILY &middot; LEVELS 2 AND 3</i><u>peers</u></div>
     <p>The carousel from <code>built.html</code> B&amp;C, inset to the stage. It was full-bleed on
       purpose — a road that stops at the frame edge is not a road — and it survives the move because
       of its mask: the road does not stop at x160, it <b>fades</b> there, into open valley rather
       than into the glass.</p>
-    <p><b>It is the right shape at DAILY</b>, which is four games you pick between: a small
-      unordered set, nothing locked, nothing sequenced.</p>
-    <p class="warn"><b>It is the wrong shape at DRILLS</b>, which is seventeen practice modes in
-      five skill groups drawn as four tablets. That is the same category error STUDY had — a drawing
-      describing a decision nobody is offered. See the brief.</p>
+    <p><b>It carries one section now.</b> DAILY is four games you pick between — a small unordered
+      set, nothing locked, nothing sequenced — which is exactly what this shape is for. DRILLS used
+      it until August 2026 and has its own screen above; READING&rsquo;s level three no longer uses
+      it either.</p>
   </figcaption>
 </figure>
