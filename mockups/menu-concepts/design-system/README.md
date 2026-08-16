@@ -34,7 +34,13 @@ nothing scrolls. See `foundations/frame-contract.html` — it supersedes the old
 width", which is what let screens paint to both edges and bury the valley the menu exists to show.
 
 **The road is no longer the shape of everything.** It used to carry every section at both levels.
-It now carries one — DAILY — which is the one it is the right shape for.
+It now carries the daily puzzles and nothing else, which is the one thing it is the right shape for.
+
+**Six sections became five**, and DAILY became a lane inside Practice: The Path 道 · Practice 練習 ·
+The World 実践 · The Exam 検定 · You 記録. A hero card carries the app's own recommendation and is
+the selection the menu opens on. Locked sections stay visible and name their gate; press **L** for
+the first-run view. See `PLAN-navigation.md` in the mockup folder for the whole tree and the four
+decisions behind it.
 
 ## The two open problems
 

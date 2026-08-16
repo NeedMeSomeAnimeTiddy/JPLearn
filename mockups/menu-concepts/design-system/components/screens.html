@@ -69,12 +69,12 @@
 <div class="note">
   <b>Twelve screens, three levels.</b>
   <table>
-    <tr><th>LEVEL 1</th><td>the standing menu — a vertical column of six section rows, one open at
-      a time</td></tr>
-    <tr><th>LEVEL 2</th><td>six, one per section: STUDY path &middot; DAILY road &middot; READING
-      library &middot; DRILLS modes &middot; JLPT ascent &middot; RECORDS ledger</td></tr>
-    <tr><th>LEVEL 3</th><td>four: STUDY deck &middot; STUDY feed &middot; STUDY cleared pile &middot;
-      DAILY road</td></tr>
+    <tr><th>LEVEL 1</th><td>the standing menu — the hero, and five section rows beneath it</td></tr>
+    <tr><th>LEVEL 2</th><td>six: The Path's path &middot; Practice's lanes &middot; The World's
+      library &middot; The Exam's ascent &middot; You's ledger &middot; and the daily road, which is
+      reached from inside Practice rather than from a row of its own</td></tr>
+    <tr><th>LEVEL 3</th><td>five: the deck &middot; the feed &middot; the cleared pile &middot;
+      the drill modes &middot; the daily road</td></tr>
   </table>
 </div>
 
@@ -90,10 +90,16 @@
 <figure>
   <img src="../assets/screen-menu.png" alt="Level one, the standing menu">
   <figcaption>
-    <div class="name"><b>THE MENU</b><i>LEVEL 1 &middot; 6 SECTIONS</i><u>chain</u></div>
-    <p>Six rows, one open at a time, the open one carrying its own state and its own next action so
-      there is no second panel to look at. Classes are <code>.st-*</code>. Documented as an object
-      in <code>built.html</code> section A.</p>
+    <div class="name"><b>THE MENU</b><i>LEVEL 1 &middot; THE HERO AND FIVE SECTIONS</i><u>chain</u></div>
+    <p><b>The hero is the selection the menu opens on</b>, which is the whole point: nine sessions in
+      ten the answer is "do what is due", and a casual player should reach it in one keypress without
+      having read a section name. Its priority is the app's own — cards due, then the path's next
+      block, then the unplayed puzzles — because reviews decay if they wait and nothing else on this
+      menu does. Classes are <code>.st-*</code> and <code>.sh-*</code>.</p>
+    <p>It replaced the per-section suggestion box rather than joining it. Three layers of "what
+      next" — row slab, box, hero — is two too many, and the box was the weakest and the only one
+      that moved. It also freed the space: the column already fills the stage, so a card above would
+      have been paid for by shrinking the rows.</p>
     <p><b>The one screen that does not obey the contract's balance.</b> It keeps the moat and the
       bands but stays a left column with the mountain to its right — that composition is why the
       rest of the interface looks the way it does.</p>
@@ -193,9 +199,22 @@
 </figure>
 
 <figure>
+  <img src="../assets/screen-lanes.png" alt="Practice, the three lanes">
+  <figcaption>
+    <div class="name"><b>THE LANES</b><i>PRACTICE &middot; LEVEL 2 &middot; 3 LANES</i><u>peers</u></div>
+    <p>Practice is the one section that is a merge rather than a rename: it absorbed the daily
+      puzzles, the seventeen drills, and the review queue that never had a home anywhere. Three
+      things you can do with material the path has already taught you, and nothing new is introduced
+      here. Classes are <code>.pr-*</code>.</p>
+    <p><b>Only reviews carry vermilion</b>, because only reviews are an obligation — the other two
+      are things you choose. That is the same colour law the action slab obeys everywhere else.</p>
+  </figcaption>
+</figure>
+
+<figure>
   <img src="../assets/screen-modes.png" alt="DRILLS, the modes">
   <figcaption>
-    <div class="name"><b>THE FOLD</b><i>DRILLS &middot; LEVEL 2 &middot; 17 MODES &times; 6 DECKS</i><u>peers</u></div>
+    <div class="name"><b>THE FOLD</b><i>PRACTICE &middot; LEVEL 3 &middot; 17 MODES &times; 6 DECKS</i><u>peers</u></div>
     <p>The road, kept, plus the axis it was missing. Seventeen modes in five groups with a deck row
       above them &mdash; <b>a mode the current deck does not offer leaves the road entirely</b> and
       the road closes over it. Classes are <code>.dr-*</code>.</p>
@@ -212,7 +231,7 @@
 <figure>
   <img src="../assets/screen-road-daily.png" alt="DAILY, the road">
   <figcaption>
-    <div class="name"><b>THE ROAD</b><i>DAILY &middot; LEVELS 2 AND 3</i><u>peers</u></div>
+    <div class="name"><b>THE ROAD</b><i>THE DAILY PUZZLES, INSIDE PRACTICE</i><u>peers</u></div>
     <p>The carousel from <code>built.html</code> B&amp;C, inset to the stage. It was full-bleed on
       purpose — a road that stops at the frame edge is not a road — and it survives the move because
       of its mask: the road does not stop at x160, it <b>fades</b> there, into open valley rather
