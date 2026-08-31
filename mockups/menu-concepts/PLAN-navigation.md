@@ -51,7 +51,12 @@ Plus **Look it up** 引く — an overlay on one key from any level, not a secti
   is GRAMMAR rather than READING, and there is a six-step window in which The World is open and
   half of it is not. That window is a real state most early accounts will sit in, so the Read lane
   draws it (press `L` on the screen) rather than the mockup pretending the section arrives whole.
-- **JLPT → The Exam.** Same shape, gains the level three it never had.
+- **JLPT → The Exam.** Same shape, gains the level three it never had. **Built 2026-08-31**,
+  and the ascent gave up the detail panel that was doing a level three's job from inside level
+  two. The new screen carries the fact nothing in the app stated: the vocabulary-and-grammar
+  section is a separate gate, so a total above the pass mark with that section below 19 (or 38
+  at N4/N5) is still a fail. It also draws what the app *cannot* project — there is no
+  listening content, so `overall_passes` is always False and the total is hatched, not zeroed.
 - **RECORDS → You.** Gains achievements, history and settings.
 - **New: Look it up.** `dictionary-search`, `kanji-detail`, `lookup-sentence`, `assistant-chat`
   and `assistant-chat-ocr` all exist on the bridge and appear nowhere in the menu.
@@ -67,7 +72,7 @@ streak, XP, level. *Built; the hero and the progressive reveal are new.*
 | The Path | the journey, 16 milestones **[built]** | a deck's blocks **[built]** · today's words **[built]** · an unlock moment **[new]** | the study session *(in the app)* |
 | Practice | three lanes **[new]** | review **[new]** · drill picker **[briefed]** · daily games **[built]** | the game runs *(in the app)* |
 | The World | two lanes **[built]** | the library **[built]** · pick a scene **[built]** | the reader · the conversation *(in the app)* |
-| The Exam | the ascent **[built]** | a level **[briefed]** | the exam runs *(in the app)* |
+| The Exam | the ascent **[built]** | a level **[built]** | the exam runs *(in the app)* |
 | You | the ledger **[built]** | achievements · history · settings **[to design]** | — |
 
 Everything marked *(in the app)* exists as a React feature today and is not a menu screen —

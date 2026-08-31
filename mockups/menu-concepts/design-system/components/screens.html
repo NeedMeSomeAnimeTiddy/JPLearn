@@ -1,7 +1,7 @@
-<!-- @dsCard group="Components" name="The screens" subtitle="Fourteen screens across three levels, each a real 1280×720 plate" width="1360" height="12300" -->
+<!-- @dsCard group="Components" name="The screens" subtitle="Sixteen screens across three levels, each a real 1280×720 plate" width="1360" height="12300" -->
 <!doctype html>
 <meta charset="utf-8">
-<title>The fourteen screens that exist</title>
+<title>The sixteen screens that exist</title>
 <style>
   :root {
     --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
@@ -47,7 +47,7 @@
   td { color: rgba(242,234,216,0.76); }
 </style>
 
-<h1>The fourteen screens that exist</h1>
+<h1>The sixteen screens that exist</h1>
 <p class="lede">
   <code>built.html</code> documents five OBJECTS — the menu row, the road tablet, the hero card, the
   heading slab, the caption chip. It is still correct about those. This card is which SCREENS they
@@ -55,11 +55,11 @@
 </p>
 <p class="lede">
   <b>Every plate below is the real mockup at 1280&times;720 with the clock frozen at 17:30.</b> One
-  hour for all fourteen, so what differs between them is shape rather than lighting — for the ground
+  hour for all sixteen, so what differs between them is shape rather than lighting — for the ground
   each section actually stands on across the day, see <code>foundations/backdrops.html</code>.
 </p>
 <p class="lede">
-  <b>All fourteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
+  <b>All sixteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
   drawing inside x&nbsp;160&ndash;1120 / y&nbsp;192&ndash;576, bare valley 160px either side,
   whole-set summaries in the foot band. Read that card before designing a new one — in particular
   the part about skew being paint rather than layout, which is what puts a screen in the moat while
@@ -67,14 +67,15 @@
 </p>
 
 <div class="note">
-  <b>Fourteen screens, three levels.</b>
+  <b>Sixteen screens, three levels.</b>
   <table>
     <tr><th>LEVEL 1</th><td>the standing menu — the hero, and five section rows beneath it</td></tr>
     <tr><th>LEVEL 2</th><td>six: The Path's path &middot; Practice's lanes &middot; The World's
       lanes &middot; The Exam's ascent &middot; You's ledger &middot; and the daily road, which is
       reached from inside Practice rather than from a row of its own</td></tr>
-    <tr><th>LEVEL 3</th><td>seven: the deck &middot; the feed &middot; the cleared pile &middot;
-      the drill modes &middot; the daily road &middot; the library &middot; the scene picker</td></tr>
+    <tr><th>LEVEL 3</th><td>nine: the deck &middot; the feed &middot; the cleared pile &middot;
+      the drill modes &middot; the daily road &middot; the library &middot; the scene picker &middot;
+      and one JLPT level, open or shut</td></tr>
   </table>
   <p style="margin:9px 0 0"><b>Two sections have lanes now, and they are the same component.</b>
   Practice's three and The World's two are one card doing one job — "which of these do you want to
@@ -88,7 +89,8 @@
   <b>Chain</b> — ordered and gated, exactly one item open. <b>Peers</b> — a small unordered set, all
   available. <b>List</b> — a large flat set, all available, no order. <b>Dashboard</b> — figures you
   read, not places you go. Choosing the wrong one is the mistake this menu has made twice, and
-  both are now corrected.
+  both are now corrected. One screen carries two shapes &mdash; The Exam's level three is a
+  dashboard with a set of peers at its foot &mdash; and that is the exception, not the pattern.
 </p>
 
 <figure>
@@ -232,16 +234,67 @@
 <figure>
   <img src="../assets/screen-ascent.png" alt="JLPT, the ascent">
   <figcaption>
-    <div class="name"><b>THE LADDER</b><i>JLPT &middot; LEVEL 2 &middot; 5 LEVELS</i><u>chain</u>
-      <u class="open">HAS AN OPEN PROBLEM</u></div>
+    <div class="name"><b>THE LADDER</b><i>THE EXAM &middot; LEVEL 2 &middot; 5 LEVELS</i><u>chain</u></div>
     <p>Five columns whose HEIGHT is readiness, a 0&ndash;100 measure at the left, and both thresholds
       drawn straight across all five as deliberately different marks — 30% dashed (opens the next
       level), 80% solid (ready to sit). Classes are <code>.as-*</code>.</p>
-    <p class="warn">This screen paid the most for the contract. Measure, columns and detail panel
-      were three columns of demand coming to 1230px painted, and they had to become 960: the panel
-      went 340&rarr;288, the columns 810&rarr;530, and the plinths lost their mastered counts. It is
-      also the only section with no level three — the panel is doing a level three's job from inside
-      level two. See the brief.</p>
+    <p><b>This screen used to have an open problem and no longer does.</b> Its right-hand detail
+      panel was a level three living inside a level two — the only screen here doing both jobs at
+      once — and the contract charged it for that: measure, columns and panel came to 1230px of
+      demand that had to become 960, so the panel was squeezed 340&rarr;288 and the plinths dropped
+      their mastered counts. The panel is a screen now, and this is the ladder, the measure and the
+      two thresholds. One cursor instead of two.</p>
+    <p><b>The freed width went into the GAPS, not only into the bars</b>, and that was measured
+      rather than assumed. Laid first at 150 wide with 9 between, five 352-tall columns run
+      unbroken from 270 to 1094 and the valley stops existing between the moats — the one thing
+      the contract says the drawing must not spend. At 118 with 50 between, and a lighter track,
+      it is still a chart and there is still a village behind it. The plinths took their three
+      facts back on two lines rather than one.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-level.png" alt="The Exam, one level">
+  <figcaption>
+    <div class="name"><b>THE RUNG</b><i>THE EXAM &middot; LEVEL 3 &middot; 1 LEVEL</i><u>dashboard</u>
+      <u>peers</u></div>
+    <p><b>Two shapes on one screen, deliberately.</b> The reading is a dashboard — figures you look
+      at, with nothing inside a percentage to open. The four modes are peers — a small unordered set,
+      all available. They are drawn as different objects because they are different things, and this
+      is the only screen in the set that carries both. Classes are <code>.lv-*</code>, and the split
+      bars are the ascent's own <code>.as-split</code> moved whole rather than redrawn.</p>
+    <p>It answers three questions in the order someone deciding whether to book an exam asks them.
+      <b>How ready am I, and out of what</b> — kanji and vocabulary against the 80% line.
+      <b>What would happen if I sat it.</b> <b>What do I do about it</b> — the four modes, each
+      saying what it is FOR, because two of them move the readiness figure, one measures it, one
+      finds which level to aim at, and the card counts never said which was which. Adaptive Review
+      carries the vermilion whether or not it is selected: which of the four you owe is a fact about
+      the queue, not about where the cursor is.</p>
+    <p><b>The middle question is the new part, and the app can only half answer it.</b>
+      <code>project_mock_score</code> scales a mock into the vocabulary-and-grammar section and
+      stops — <code>listening_projected</code> is always None and <code>overall_passes</code> always
+      False, because there is no listening content. So the screen draws the section it can project,
+      hatches the one it cannot, and says the total is therefore not something it can predict. An
+      absence is drawn as a hatch and an em dash, never as a zero: "you scored nothing" is a
+      different and untrue claim.</p>
+    <p><b>Beneath that is the sentence this screen exists for</b>, and nothing anywhere else in the
+      app says it: the vocab-and-grammar section is a separate gate, so a total above the pass mark
+      with that section below its own mark is still a fail.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-level-locked.png" alt="The Exam, a locked level">
+  <figcaption>
+    <div class="name"><b>THE RUNG, SHUT</b><i>THE EXAM &middot; LEVEL 3 &middot; LOCKED</i><u>dashboard</u></div>
+    <p><b>A locked level still opens and still reads.</b> This is the one place in the menu where
+      Enter on something shut is not refused, and deliberately: what a locked level needs to tell you
+      is what is gating it and how far off that is, which is a screenful, not a flash. The refusal
+      moved inward to the four modes, where it belongs — you can read N1, you cannot sit it.</p>
+    <p>Everything keeps its size and loses only its brightness, which is the same law the locked lane
+      in The World obeys. The gate is named in the readiness row's own caption
+      (&ldquo;N2 must reach 30% to open this&rdquo;), and the pass marks are still stated — they are
+      true of the exam whether or not you can sit it yet.</p>
   </figcaption>
 </figure>
 
