@@ -148,6 +148,8 @@ export interface FeatureStatusPayload {
   category: string
   is_unlocked: boolean
   badges: string[]
+  just_unlocked: boolean
+  unlocked_at: string | null
 }
 
 export interface XPProgressPayload {

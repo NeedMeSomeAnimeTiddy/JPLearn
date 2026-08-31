@@ -2272,3 +2272,61 @@ def test_run_command_conjugation_drill_data_rejects_a_non_conjugatable_word() ->
 
     assert code == 2
     assert "not a conjugatable dictionary form" in str(payload["error"])
+
+
+def _feature(payload: dict[str, Any], feature_id: str) -> dict[str, Any]:
+    features = cast(list[dict[str, Any]], payload["features"])
+    return next(f for f in features if f["feature_id"] == feature_id)
+
+
+def test_feature_unlock_status_reports_the_transition_it_causes(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """`themes` has no requirement, so the first call is what unlocks it."""
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.build_feature_unlock_status()
+
+    themes = _feature(payload, "themes")
+    assert themes["is_unlocked"] is True
+    assert themes["just_unlocked"] is True
+    assert themes["unlocked_at"] is not None
+
+
+def test_feature_unlock_status_reports_a_gated_feature_as_neither(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Nothing is mastered on a fresh database, so `listening_mode` stays shut."""
+    _use_temp_db(tmp_path, monkeypatch)
+
+    payload = desktop_bridge.build_feature_unlock_status()
+
+    listening = _feature(payload, "listening_mode")
+    assert listening["is_unlocked"] is False
+    assert listening["just_unlocked"] is False
+    assert listening["unlocked_at"] is None
+
+
+def test_feature_unlock_status_only_claims_the_transition_once(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """The regression this field exists for.
+
+    The unlock is persisted by the call that evaluates it, so a second call finds
+    nothing new and must say so — `just_unlocked` is a fact about THIS call, not a
+    fact about the feature. `unlocked_at` is the half that survives, which is why a
+    surface wanting to show an unlock exactly once should compare timestamps rather
+    than race every other caller for the flag.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    first = desktop_bridge.build_feature_unlock_status()
+    second = desktop_bridge.build_feature_unlock_status()
+
+    assert _feature(first, "themes")["just_unlocked"] is True
+    assert _feature(second, "themes")["just_unlocked"] is False
+    assert _feature(second, "themes")["is_unlocked"] is True
+    assert (
+        _feature(second, "themes")["unlocked_at"]
+        == _feature(first, "themes")["unlocked_at"]
+    )

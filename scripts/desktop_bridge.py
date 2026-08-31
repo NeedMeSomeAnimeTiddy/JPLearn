@@ -148,6 +148,7 @@ from data.database import (  # noqa: E402
     count_total_reviews,
     load_badges,
     load_daily_counts,
+    load_feature_unlock_times,
     load_feature_unlocks,
     load_tutor_seen_keys,
     load_user_progression,
@@ -707,11 +708,24 @@ class ProgressionNodeStatusPayload:
 
 @dataclass(frozen=True)
 class FeatureStatusPayload:
+    """One catalog feature, its state, and when that state arrived.
+
+    ``just_unlocked`` is true only for the call that *caused* the transition, and
+    that call is also the one that persists it — so it is true at most once, for
+    whichever surface asks first. It is the right signal for a caller that knows it
+    is the first thing to run after a study session, and the wrong one for anything
+    else. ``unlocked_at`` is the durable half: a surface that wants to show an
+    unlock exactly once should remember the last timestamp it displayed and compare,
+    rather than racing every other caller for ``just_unlocked``.
+    """
+
     feature_id: str
     name: str
     category: str
     is_unlocked: bool
     badges: tuple[str, ...] = ()
+    just_unlocked: bool = False
+    unlocked_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1900,6 +1914,12 @@ def build_feature_unlock_status() -> dict[str, object]:
         for reward in ev.unlock.rewards:
             if reward.reward_type == "badge":
                 save_badge(reward.descriptor, now)
+    # The events were computed and thrown away here for as long as this function has
+    # existed, so no caller could ever tell an unlock from a state. Both halves are
+    # reported now: which features this call transitioned, and when each one first
+    # did. See FeatureStatusPayload for which of the two a caller should trust.
+    just_unlocked = {ev.feature_id for ev in events}
+    unlocked_times = load_feature_unlock_times()
     result = []
     for feat in JPLEARN_FEATURES:
         badge_descriptors = tuple(
@@ -1913,6 +1933,8 @@ def build_feature_unlock_status() -> dict[str, object]:
                     category=feat.category,
                     is_unlocked=feat_state.statuses.get(feat.feature_id) == "unlocked",
                     badges=badge_descriptors,
+                    just_unlocked=feat.feature_id in just_unlocked,
+                    unlocked_at=unlocked_times.get(feat.feature_id),
                 )
             )
         )

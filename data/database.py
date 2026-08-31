@@ -930,6 +930,22 @@ def load_feature_unlocks() -> set[str]:
     return {row["feature_id"] for row in rows}
 
 
+def load_feature_unlock_times() -> dict[str, str]:
+    """Return feature_id -> the ISO timestamp it was first unlocked at.
+
+    ``unlocked_at`` has been written by :func:`save_feature_unlock` since the table
+    existed and read by nothing. A caller that wants to show an unlock *once* needs
+    it: the transition itself is only observable to whichever call first evaluates
+    it, but the timestamp stays, so any surface can remember what it has shown.
+    """
+    init_db()
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT feature_id, unlocked_at FROM user_feature_unlocks"
+        ).fetchall()
+    return {row["feature_id"]: row["unlocked_at"] for row in rows}
+
+
 def save_feature_unlock(feature_id: str, unlocked_at: str) -> None:
     """Record a feature as unlocked (idempotent)."""
     init_db()

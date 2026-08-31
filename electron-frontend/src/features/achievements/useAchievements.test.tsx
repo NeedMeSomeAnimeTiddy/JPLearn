@@ -52,7 +52,7 @@ describe('useAchievements', () => {
     installAchievementsApi({
       getFeatureState: vi.fn(async () => ({
         features: [
-          { feature_id: 'listening_mode', name: 'Listening', category: 'learning_mode', is_unlocked: true, badges: ['listening_mode_unlocked'] },
+          { feature_id: 'listening_mode', name: 'Listening', category: 'learning_mode', is_unlocked: true, badges: ['listening_mode_unlocked'], just_unlocked: false, unlocked_at: '2026-08-31T00:00:00+00:00' },
         ],
       })),
       getAchievementMilestones: vi.fn(async () => ({
@@ -123,7 +123,7 @@ describe('useAchievements', () => {
     installAchievementsApi({
       getFeatureState: vi.fn(async () => ({
         features: [
-          { feature_id: 'listening_mode', name: 'Listening', category: 'learning_mode', is_unlocked: false, badges: ['listening_mode_unlocked'] },
+          { feature_id: 'listening_mode', name: 'Listening', category: 'learning_mode', is_unlocked: false, badges: ['listening_mode_unlocked'], just_unlocked: false, unlocked_at: null },
         ],
       })),
     })
