@@ -2218,13 +2218,16 @@
   .hud[data-screen="lanes"] .hud-detail { display: none; }
   .hud[data-screen="world"] .hud-detail { display: none; }
   .hud[data-screen="scenes"] .hud-detail { display: none; }
+  .hud[data-screen="level"] .hud-detail { display: none; }
   /* the road's up-next card is hidden under `[data-course]`; this screen is not a course
      and was inheriting it into the bottom-right corner, over the key hints */
   .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs,
   .hud[data-screen="lanes"] .hud-next, .hud[data-screen="lanes"] .hud-figs,
   .hud[data-screen="world"] .hud-next, .hud[data-screen="world"] .hud-figs,
   .hud[data-screen="scenes"] .hud-next,
-  .hud[data-screen="scenes"] .hud-figs { display: none; }
+  .hud[data-screen="scenes"] .hud-figs,
+  .hud[data-screen="level"] .hud-next,
+  .hud[data-screen="level"] .hud-figs { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2271,7 +2274,11 @@
      and over near-black track in the same 800px, so a single colour disappears for half its
      length: the gate alternates gold and ink dash for dash, and the ready line is washi with an
      ink keyline. */
-  .as-rule { position: absolute; left: 262px; width: 487px; height: 2px; z-index: 6;
+  /* 265/834, FOLLOWING THE COLUMNS. They ran 267-744 while the detail panel took the
+     right third of the stage; with the panel gone they run 270-1094, and a rule still
+     stopping at 749 would have crossed two of the five. Five pixels of overhang at each
+     end, the same as before. */
+  .as-rule { position: absolute; left: 265px; width: 832px; height: 2px; z-index: 6;
     pointer-events: none; }
   .as-rule.gate { background: repeating-linear-gradient(90deg,
     var(--gold-hi) 0 9px, rgba(20, 17, 13, 0.8) 9px 18px); }
@@ -2293,12 +2300,15 @@
     font-size: 8px; letter-spacing: 0.2em; margin-top: 3px; color: rgba(242, 234, 216, 0.72); }
 
   /* ---- a level ---- */
+  /* 0.72 AND 0.70, NOT 0.88 AND 0.86. An empty track is the part of the column that is not
+     the drawing, and at 118 wide there is half as much again of it as there was at 84 --
+     the same alpha over a bigger area reads as a wall rather than as a chart. */
   .as-col { position: absolute; top: 54px; height: 352px; transform: skewX(-8deg);
     background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.05) 0 7px,
-      rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.88);
+      rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.72);
     box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
     border: 0; padding: 0; cursor: pointer; }
-  .as-col.here { background: rgba(10, 9, 6, 0.86);
+  .as-col.here { background: rgba(10, 9, 6, 0.70);
     box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.4); }
   .as-col.locked { background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.06) 0 7px,
       rgba(0, 0, 0, 0) 7px 14px), linear-gradient(rgba(17, 19, 28, 0.9), rgba(11, 13, 20, 0.94));
@@ -2325,20 +2335,31 @@
     box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); font-family: var(--lat-ui);
     font-weight: 700; font-size: 8px; letter-spacing: 0.1em; color: rgba(242, 234, 216, 0.44); }
 
+  /* TWO LINES, NOT THREE FACTS IN A ROW. Level and state on the first, the count on the
+     second -- which is what lets the column be 118 wide instead of the 150 a single row of
+     all three demanded, and the gaps between the columns are worth more than the row. */
   .as-plinth { position: absolute; top: 410px; height: 40px; transform: skewX(-8deg);
-    display: flex; align-items: center; justify-content: space-between; padding: 0 8px;
+    display: flex; flex-wrap: wrap; align-items: baseline; align-content: center;
+    gap: 0 8px; padding: 0 11px;
     background: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34); }
   .as-plinth.here { background: var(--gold); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
   .as-plinth.locked { background: rgba(12, 10, 8, 0.6);
     box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
-  .as-plinth b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 18px;
+  .as-plinth b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
     color: var(--gold-hi); }
-  .as-plinth.here b { font-size: 21px; color: var(--ink); }
+  .as-plinth.here b { font-size: 17px; color: var(--ink); }
   .as-plinth.locked b { color: rgba(242, 234, 216, 0.5); }
+  /* 9px, NOT 7.5. The state was set small enough to survive an 84px plinth; at 150 there is
+     no reason to whisper it. */
   .as-plinth i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-    font-size: 7.5px; letter-spacing: 0.1em; text-align: right; line-height: 1.35;
+    font-size: 8.5px; letter-spacing: 0.1em; line-height: 1.35;
     color: rgba(242, 234, 216, 0.58); }
   .as-plinth.here i { color: rgba(20, 17, 13, 0.7); }
+  .as-plinth u { flex-basis: 100%; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.08em; line-height: 1.3;
+    color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
+  .as-plinth.here u { color: rgba(20, 17, 13, 0.62); }
+  .as-plinth.locked u { color: rgba(242, 234, 216, 0.3); }
   /* THE READY BADGE IS GOLD BECAUSE GOLD IS EARNED. It is the only thing on this screen that
      says a level is finished rather than in progress. */
   .as-ready { position: absolute; transform: skewX(-8deg); height: 22px; display: grid;
@@ -2353,16 +2374,11 @@
     transform: skewX(-8deg); box-shadow: inset 0 0 0 2px var(--washi);
     transition: left 0.3s cubic-bezier(0.2, 0.92, 0.24, 1), width 0.3s cubic-bezier(0.2, 0.92, 0.24, 1); }
 
-  /* ---- the selected level, in detail ---- */
-  /* 288 wide and the columns' own height, so it stops at the stage's foot with them --
-     it used to run to y618, past the foot band and under the corner hints. */
-  .as-panel { position: absolute; left: 808px; top: 54px; width: 288px; height: 352px;
-    display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
-    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-      rgba(235,230,217,var(--paper)) 100%);
-    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22); }
-  .as-banner { padding: 6px 0 7px; text-align: center; white-space: nowrap;
-    font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.2em; }
+  /* ---- the split bars, which no longer live here ---- */
+  /* THE PANEL THAT HELD THESE IS GONE. It was a level three inside a level two, and it
+     cost this screen 288px of stage for the privilege -- see the note by `.level`. The
+     bars themselves were never the problem, so they moved to the screen that is now
+     level three and the shell around them was deleted. */
   .as-split { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 9px; }
   .as-srow { display: flex; flex-direction: column; gap: 5px; }
   .as-shead { display: flex; align-items: baseline; gap: 9px; }
@@ -2382,24 +2398,147 @@
   .as-track u.gate { background: #b23320; }
   .as-track u.ready { background: var(--ink); }
 
-  .as-modes { margin-top: auto; display: flex; flex-direction: column;
-    box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16); }
-  /* A MODE IS AN ACTION AND CARRIES NO PERCENTAGE. Four ways to sit the same exam is not
-     four things to make progress through, and giving each a bar was exactly the reading the
-     four papers produced. */
-  .as-mode { position: relative; display: flex; align-items: baseline; gap: 10px;
-    padding: 9px 16px; border: 0; background: none; cursor: pointer; text-align: left;
-    box-shadow: inset 0 -1px 0 rgba(207, 164, 92, 0.5); }
-  .as-mode:last-child { box-shadow: none; }
-  .as-mode b { font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
-    letter-spacing: 0.16em; color: var(--ink); white-space: nowrap; }
-  .as-mode i { margin-left: auto; font-style: normal; font-family: var(--lat-ui);
-    font-weight: 700; font-size: 9px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.55);
-    white-space: nowrap; }
-  .as-mode.on { background: var(--hi); }
-  .as-mode.on b { color: var(--washi); }
-  .as-mode.on i { color: #ffd9a1; }
-  .as-panel.dim .as-modes { opacity: 0.42; }
+  /* ================================================================================
+     THE EXAM'S LEVEL THREE -- the screen the ascent's right-hand panel was standing in
+     for, and the reason that panel is gone.
+
+     WHAT WAS WRONG WITH THE PANEL. It was a level three living inside a level two.
+     Every other section in this menu shows the SHAPE at level two and the THING YOU DO
+     at level three; the ascent tried both at once, and the frame contract charged it for
+     that -- measure, columns and panel were three columns of demand adding to 1230px
+     painted that had to become 960, so the panel was squeezed 340 to 288 and the plinths
+     lost their mastered counts. Both are given back now: the columns run 270 to 1094
+     across the whole stage and the plinths carry their counts again.
+
+     A DASHBOARD WITH AN ACTION SET AT ITS FOOT, which is two shapes and deliberately so.
+     The reading is figures you look at; the four modes are peers you pick between. They
+     are drawn as different objects because they are.
+
+     THE SPLIT BARS ARE THE ASCENT'S OWN. `.as-split` / `.as-srow` / `.as-track` moved
+     here whole rather than being redrawn -- it is the same object showing the same thing,
+     and the panel it used to live in is the only part that died.
+     ================================================================================ */
+  /* 168/944 for the band, 176/924 for the pair, 170/940 for the modes -- three different
+     insets because they are three different transforms. The band and the tiles are skewed
+     only (0.1405 x height, halved); the pair is skewed AND rolled, and its right-hand
+     panel takes the counter-roll's bigger bleed. See the frame-contract card. */
+  .level { position: relative; margin-top: 6px; margin-left: -52px;
+    width: calc(100vw / var(--u)); height: 470px; }
+
+  /* ---- the band: which level, what state, how ready ---- */
+  /* 32/48, 90/206, 308/98 -- the three bands were first laid at 56/176/104 and the panels
+     overflowed onto the modes: a caption, three rows and a foot come to 247px of demand in a
+     176px box. The rows were tightened (track 12 to 10, gaps 5 to 4) and the band gave up
+     8px, which bought the panels the 206 they actually need. */
+  .lv-head { position: absolute; left: 168px; top: 32px; width: 944px; height: 48px;
+    display: flex; align-items: center; gap: 14px; padding: 0 20px;
+    transform: skewX(-8deg);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(233,227,212,var(--paper)) 100%);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+  .lv-head > b { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 28px; line-height: 1; color: var(--ink); }
+  .lv-head > i { font-style: normal; font-family: var(--jp); font-weight: 700;
+    font-size: 17px; color: rgba(20, 17, 13, 0.5); }
+  /* the state chip is the plinth's word, in the plinth's colours -- one level, one label,
+     whichever screen you read it on */
+  .lv-state { padding: 4px 11px 5px; background: var(--gold); font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: var(--ink); }
+  .lv-state.here { background: #5b86c4; color: var(--washi); }
+  .lv-state.shut { background: var(--ink); color: rgba(242, 234, 216, 0.6); }
+  .lv-state.ready { background: var(--washi); color: var(--ink); }
+  .lv-figs { margin-left: auto; display: flex; align-items: baseline; gap: 11px; }
+  .lv-figs em { font-style: italic; font-family: var(--lat); font-weight: 900;
+    font-size: 30px; line-height: 1; color: #b23320; }
+  .lv-figs s { text-decoration: none; text-align: right; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 9px; letter-spacing: 0.14em; line-height: 1.5;
+    color: rgba(20, 17, 13, 0.55); }
+  .lv-figs s b { display: block; color: var(--ink); }
+
+  /* ---- the two readings ---- */
+  .lv-pair { position: absolute; left: 176px; top: 90px; width: 924px; height: 206px;
+    display: flex; gap: 20px; }
+  /* `overflow: hidden` IS THE CONTRACT'S OWN RULE APPLIED LOCALLY. The stage never grows,
+     so neither does a plate on it -- content that does not fit must be cut before it is
+     drawn, not allowed to paint over the row below. */
+  .lv-panel { flex: 1; min-width: 0; display: flex; flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(178deg, rgba(240,234,217,var(--paper)) 0%,
+      rgba(215,207,183,var(--paper)) 100%);
+    box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .lv-panel:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+  .lv-cap { flex: none; display: flex; align-items: baseline; gap: 10px;
+    padding: 6px 16px 6px; background: var(--ink); white-space: nowrap; }
+  .lv-cap b { font-family: var(--jp); font-weight: 700; font-size: 12px;
+    color: var(--gold-hi); }
+  .lv-cap i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.17em; color: rgba(232, 196, 124, 0.62); }
+  /* THE DEFINITION MOVED INTO THE CAPTION when the readiness panel lost its foot to the
+     three rows. It is the bar the whole app measures by and it belongs beside the word. */
+  .lv-cap s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8px; letter-spacing: 0.13em;
+    color: rgba(242, 234, 216, 0.42); }
+  /* the ascent's own split, unchanged -- tighter only because two of these sit where one
+     288-wide panel used to */
+  .lv-panel .as-split { padding: 8px 16px 0; gap: 5px; }
+  .lv-panel .as-srow { gap: 4px; }
+  .lv-panel .as-track { height: 10px; }
+  .lv-panel .as-count { color: rgba(20, 17, 13, 0.55); }
+  .lv-foot { margin-top: auto; padding: 8px 16px 10px; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.12em; line-height: 1.55;
+    color: rgba(20, 17, 13, 0.5); }
+  /* THE ONE SENTENCE THIS SCREEN EXISTS TO SAY. A total over the pass mark with the
+     vocab-and-grammar section under its own mark is still a fail, and nothing anywhere in
+     this app said so before. It gets the vermilion because it is the thing that catches
+     people out, not because it is an action. */
+  .lv-foot u { display: block; text-decoration: none; color: #b23320; }
+  /* LISTENING IS NOT A ZERO, IT IS AN ABSENCE. `project_mock_score` returns
+     `listening_projected: None` and `overall_passes: False` always, because the app has no
+     listening content -- so the track is hatched rather than empty. An empty gold track
+     would read as "you scored nothing", which is a different and untrue claim. */
+  .as-track.none { background: repeating-linear-gradient(135deg,
+      rgba(20, 17, 13, 0.13) 0 5px, rgba(20, 17, 13, 0.04) 5px 10px); }
+
+  /* ---- the four modes ---- */
+  .lv-modes { position: absolute; left: 170px; top: 308px; width: 940px; height: 98px;
+    display: flex; gap: 16px; }
+  .lv-mode { flex: 1; min-width: 0; border: 0; padding: 11px 14px 10px; font: inherit;
+    text-align: left; cursor: pointer; display: flex; flex-direction: column;
+    transform: skewX(-8deg);
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transition: background 0.24s ease, box-shadow 0.24s ease; }
+  .lv-mode.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px rgba(20, 17, 13, 0.4); }
+  .lv-mode .g { font-family: var(--jp); font-weight: 700; font-size: 13px; line-height: 1;
+    color: rgba(20, 17, 13, 0.4); }
+  .lv-mode b { margin-top: 5px; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 11px; letter-spacing: 0.11em; line-height: 1.25; color: var(--ink); }
+  .lv-mode i { margin-top: 4px; font-style: normal; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.12em;
+    color: rgba(20, 17, 13, 0.55); }
+  /* WHAT EACH MODE IS FOR, not just what it costs. Two of the four move the readiness
+     figure, one measures it and one finds which level to aim at -- and a learner deciding
+     what to press needs that difference more than it needs a card count. */
+  .lv-mode u { margin-top: auto; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8px; letter-spacing: 0.15em;
+    color: rgba(20, 17, 13, 0.4); }
+  .lv-mode.moves u { color: rgba(20, 17, 13, 0.62); }
+  /* REVIEWS ARE THE OBLIGATION HERE TOO. Adaptive Review is the SRS queue for this level,
+     so it carries the one vermilion on the screen -- the same law PRACTICE's lanes obey. */
+  .lv-mode.duty.on { box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px var(--hi); }
+  /* NOT `.duty.on u`. Which of the four you owe is a fact about the queue, not about where
+     the cursor happens to be -- hidden until selection, it told you only what you had
+     already chosen to look at. */
+  .lv-mode.duty u { color: var(--hi); }
+  .lv-mode.shut.duty u { color: rgba(20, 17, 13, 0.4); }
+  /* a locked level still opens and still reads -- it just cannot be acted on */
+  .lv-mode.shut { background: linear-gradient(178deg, rgba(196,188,166,var(--paper)) 0%,
+      rgba(170,163,142,var(--paper)) 100%); }
+  .lv-mode.shut b, .lv-mode.shut .g { color: rgba(20, 17, 13, 0.45); }
 
   /* ================================================================================
      A DECK'S BLOCKS, AT THE SCALE THE DECK ACTUALLY IS.
@@ -2437,7 +2576,7 @@
      large flat fill. Gated on the body class so the filter is not created at all when off. */
   body.frosted .dk-here, body.frosted .dk-behind, body.frosted .dk-ahead, body.frosted .dk-rail,
   body.frosted .lg-plate, body.frosted .lg-rest, body.frosted .lg-lv,
-  body.frosted .as-panel, body.frosted .as-col,
+  body.frosted .as-col, body.frosted .lv-head, body.frosted .lv-panel,
   body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
     backdrop-filter: blur(var(--frost)) saturate(1.15);
     -webkit-backdrop-filter: blur(var(--frost)) saturate(1.15);
@@ -20001,6 +20140,7 @@ function hudRows() {
   if (hudBespoke() === 'lanes') return laneRows();
   if (hudBespoke() === 'world') return worldRows();
   if (hudBespoke() === 'scenes') return sceneRows();
+  if (hudBespoke() === 'level') return levelRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -20355,33 +20495,66 @@ function ledgerLayout() {
    almost nothing done in it. The design drew it sealed with "GATE MET -- UNSEALS ON THE NEXT
    MOCK", which is a mechanic the app does not have.
    ================================================================================================ */
-/* THE COLUMNS INSIDE THE STAGE. A 360-tall column skewed -8deg paints 25.3px wider each
-   side than it is authored, so the run 267-744 lands at 242-769 -- inside the moat, clear of
-   the measure at its left and the panel at its right. */
-const AS_COLS = [[267, 84], [359, 84], [451, 109], [568, 84], [660, 84]];
+/* THE COLUMNS INSIDE THE STAGE. A 352-tall column skewed -8deg paints 24.7px wider each
+   side than it is authored, so the run 270-1094 lands at 245-1119 -- inside the moat and
+   clear of the measure at its left.
+
+   THEY WERE 84 WIDE AND ENDED AT 744, because the detail panel took the right third of the
+   stage. That panel is level three now, so the whole 826px between the measure and the moat
+   belongs to the ladder -- which is what the ascent is for.
+
+   BUT THE SPACE WENT INTO THE GAPS, NOT ONLY INTO THE BARS. Laid first at 150 wide with 9
+   between, five columns 352 tall came to an unbroken wall from 270 to 1094 and the valley
+   stopped existing between the moats -- which is the one thing the frame contract says the
+   drawing must not spend. At 118 with 50 between, it is still a bar chart and there is still
+   a village behind it. The wide one is the level you are standing on. */
+const AS_COLS = [[270, 118], [438, 118], [606, 150], [806, 118], [974, 118]];
 /* EIGHT PIXELS DOWN AND EIGHT SHORTER. The READY/YOU badge hangs 26 above the column, so
    the drawing's real top is AS_TOP - 26 -- at 46 that put the badge at y184, eight pixels into
    the crown band. Badge, columns and panel now run 192 to 570 and the plinths take the foot. */
 const AS_TOP = 54, AS_H = 352, AS_BOT = 406;
 const AS_GATE = 30, AS_READY = 80;
-/* mastered / total, per level, kanji then vocabulary */
+/* mastered / total, per level, kanji then vocabulary.
+
+   `sec` IS THE SECTION THE APP CAN ACTUALLY SCORE -- [max, pass mark] for vocabulary and
+   grammar, straight out of `JLPT_LEVEL_SPECS`: 120/38 for N5 and N4, which score it together
+   with reading, and 60/19 for N3 upward, which score them apart. `pass` beside it is the
+   whole exam's mark out of 180, and the two are a separate gate each -- which is the thing
+   level three exists to say.
+
+   `mock` IS THE ONLY NEW INVENTION, and it is one the mockup needed to have anything to
+   read: [correct, asked] on the last mock exam, or null where none has been sat. N3's
+   10 of 30 is deliberately poor against its 62% readiness and that is not a contradiction --
+   `build_mock_exam_queue` puts the WEAKEST cards first, so a mock scores well below mastery
+   by design. Projected through `project_mock_score` it lands on 20 of 60 against a pass mark
+   of 19, which is the reading this screen was worth building for. */
 const AS_LEVELS = [
-  { id: 'N5', k: [96, 99], v: [696, 744], pass: 80, due: 12, leech: 2 },
-  { id: 'N4', k: [148, 177], v: [510, 666], pass: 90, due: 64, leech: 9 },
-  { id: 'N3', k: [256, 366], v: [1297, 2139], pass: 95, due: 128, leech: 14 },
-  { id: 'N2', k: [60, 384], v: [115, 1809], pass: 90, due: 31, leech: 4 },
-  { id: 'N1', k: [30, 1192], v: [40, 2699], pass: 100, due: 8, leech: 1 },
+  { id: 'N5', k: [96, 99], v: [696, 744], pass: 80, sec: [120, 38], mock: [27, 30],
+    due: 12, leech: 2 },
+  { id: 'N4', k: [148, 177], v: [510, 666], pass: 90, sec: [120, 38], mock: [19, 30],
+    due: 64, leech: 9 },
+  { id: 'N3', k: [256, 366], v: [1297, 2139], pass: 95, sec: [60, 19], mock: [10, 30],
+    due: 128, leech: 14 },
+  { id: 'N2', k: [60, 384], v: [115, 1809], pass: 90, sec: [60, 19], mock: null,
+    due: 31, leech: 4 },
+  { id: 'N1', k: [30, 1192], v: [40, 2699], pass: 100, sec: [60, 19], mock: null,
+    due: 8, leech: 1 },
 ];
+/* THE THIRD FIELD IS WHAT THE MODE IS FOR, and it is the difference a learner deciding what
+   to press actually needs: two of the four move the readiness figure, one measures it, one
+   finds which level to aim at. The card counts alone never said which was which. */
 const AS_MODES = [
-  ['DIAGNOSTIC', (L) => '20 Q · ALL LEVELS'],
-  ['MOCK EXAM', (L) => '30 MIN · PASS AT ' + L.pass],
-  ['ADAPTIVE REVIEW', (L) => L.due + ' CARDS DUE'],
-  ['WEAK AREAS', (L) => L.leech + ' LEECHES'],
+  ['DIAGNOSTIC', (L) => '20 Q · ALL LEVELS', 'FINDS YOUR LEVEL', '診断'],
+  ['MOCK EXAM', (L) => '30 MIN · PASS AT ' + L.pass, 'MEASURES IT', '模試'],
+  ['ADAPTIVE REVIEW', (L) => L.due + ' CARDS DUE', 'MOVES THE NUMBER', '復習'],
+  ['WEAK AREAS', (L) => L.leech + ' LEECHES', 'MOVES THE NUMBER', '弱点'],
 ];
 /* the level the learner is standing on -- the wide column. It is NOT the cursor: the cursor is
    the white ring and it moves, while this stays where their study actually is. */
 const AS_HERE = 2;
-let AS_IN = false, AS_MODE = 0;
+/* `AS_IN` AND `AS_MODE` ARE GONE. They were the ascent pretending to be two screens: a
+   cursor on the ladder and a second cursor inside the panel, on one level. Enter now leaves
+   for level three and the modes are that screen's, so there is one cursor here again. */
 
 function asPct(L) {
   return Math.round((L.k[0] + L.v[0]) / (L.k[1] + L.v[1]) * 100);
@@ -20425,10 +20598,12 @@ function ascentMarkup() {
     const cls = !open ? 'locked' : here ? 'here' : '';
     const state = !open ? 'LOCKED' : here ? 'CURRENT' : (pct >= AS_READY ? 'READY' : 'OPEN');
     return `<span class="as-plinth ${cls}" style="left:${x}px;width:${w}px">`
-      /* THE COUNTS WENT WITH THE WIDTH. "N5" and "READY" and "792 / 843" is three facts in
-         84px; the first two are what the plinth is for, and the counts are spelled out in the
-         panel for whichever level is selected. */
-      + `<b>${L.id}</b><i>${state}</i></span>`;
+      /* AND THE COUNTS ARE BACK. They were cut when 84px could hold two facts and not three;
+         at 150 the plinth holds all three again, which is the plainest dividend of moving the
+         detail panel out to level three. */
+      + `<b>${L.id}</b><i>${state}</i>`
+      + `<u>${(L.k[0] + L.v[0]).toLocaleString()} / ${(L.k[1] + L.v[1]).toLocaleString()}</u>`
+      + `</span>`;
   }).join('');
 
   const badges = AS_LEVELS.map((L, i) => {
@@ -20454,76 +20629,158 @@ function ascentMarkup() {
     + `<span class="as-rule gate" style="top:${y(AS_GATE)}px"></span>`
     + `<span class="as-chip gate" style="top:${y(AS_GATE)}px"><b>${AS_GATE}%</b><i>GATE</i></span>`
     + `<span class="as-cur"></span>`
-    + `<div class="as-panel"></div>`
     + `</div>`;
 }
 
-/* the selected level's own reading: the split the design never had, then the four modes */
-function asPanel(i) {
-  const L = AS_LEVELS[i], pct = asPct(L), open = asOpen(i), here = i === AS_HERE;
-  const kp = Math.round(L.k[0] / L.k[1] * 100), vp = Math.round(L.v[0] / L.v[1] * 100);
-  const state = !open ? 'LOCKED' : here ? 'CURRENT LEVEL' : (pct >= AS_READY ? 'READY TO SIT' : 'OPEN');
-  const bannerBg = !open ? 'var(--ink)' : here ? '#5b86c4' : 'var(--gold)';
-  const bannerFg = !open ? 'rgba(242,234,216,0.6)' : here ? 'var(--washi)' : 'var(--ink)';
-  const row = (jp, en, done, of, p) => `<span class="as-srow"><span class="as-shead">`
-    + `<span>${jp}</span><em>${en}</em><b>${p}%</b></span>`
-    + `<span class="as-track"><i style="width:${p}%"></i></span>`
-    + `<span class="as-count">${done.toLocaleString()} / ${of.toLocaleString()} MASTERED</span>`
-    + `</span>`;
-  /* WHAT THE GATE MEANS DEPENDS ON WHICH LEVEL YOU ARE LOOKING AT, and saying it in words is
-     the only way the two thresholds cannot be read as one bar with two ticks. */
-  const note = !open
-    ? `${AS_LEVELS[i - 1].id} MUST REACH ${AS_GATE}% TO OPEN THIS`
-    : pct >= AS_READY ? `PAST ${AS_READY}% · READY TO SIT`
-      : i < AS_LEVELS.length - 1
-        ? `${AS_GATE}% OPENED ${AS_LEVELS[i + 1].id} · ${AS_READY}% IS READY`
-        : `${AS_READY}% IS READY TO SIT`;
-  return `<span class="as-banner" style="background:${bannerBg};color:${bannerFg}">`
-      + `${L.id} · ${state}</span>`
-    + `<span class="as-split">`
-      + row('漢字', 'KANJI', L.k[0], L.k[1], kp)
-      + row('語彙', 'VOCAB', L.v[0], L.v[1], vp)
-      + `<span class="as-srow"><span class="as-shead"><span>手応え</span><em>READINESS</em>`
-      + `<b style="color:#b23320">${pct}%</b></span>`
-      + `<span class="as-track"><i style="width:${pct}%"></i>`
-      + `<u class="gate" style="left:${AS_GATE}%"></u>`
-      + `<u class="ready" style="left:${AS_READY}%"></u></span>`
-      + `<span class="as-count">${note}</span></span>`
-    + `</span>`
-    + `<span class="as-modes">`
-    + AS_MODES.map(([name, line], m) => `<button class="as-mode" data-m="${m}">`
-      + `<b>${name}</b><i>${open ? line(L) : 'LOCKED'}</i></button>`).join('')
-    + `</span>`;
-}
-
+/* THE LADDER, THE MEASURE AND THE TWO THRESHOLDS -- and nothing else now. Everything this
+   function used to do below the cursor was the detail panel's, and the detail panel is a
+   screen of its own; `asPanel` went with it. */
 function ascentLayout() {
   const [x, w] = AS_COLS[HUD.at] || AS_COLS[0];
   const cur = hudEl.querySelector('.as-cur');
   if (cur) { cur.style.left = x + 'px'; cur.style.width = w + 'px'; }
   hudEl.querySelectorAll('.as-col').forEach((b, j) => b.classList.toggle('sel', j === HUD.at));
-  const panel = hudEl.querySelector('.as-panel');
-  if (!panel) return;
-  if (panel.dataset.at !== String(HUD.at)) {
-    const had = panel.dataset.at !== undefined;
-    panel.dataset.at = String(HUD.at);
-    panel.innerHTML = asPanel(HUD.at);
-    /* THE WHOLE PANEL IS REPLACED when the level changes, which is the hardest cut on this
-       screen -- five bars and four modes appearing at once with no transition. It is rebuilt
-       markup so there is nothing to tween FROM; it arrives instead, and only after the first
-       time, so entering the section does not double up with the panel's own fade-in. */
-    if (had && !reduced) {
-      gsap.fromTo(panel.children, { opacity: 0, y: 9 },
-        { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out', stagger: 0.05, overwrite: true });
-    }
-    panel.querySelectorAll('.as-mode').forEach((b) => {
-      b.addEventListener('click', () => {
-        if (!asOpen(HUD.at)) { doFlash(0.2); punchShake(0.24); return; }
-        AS_IN = true; AS_MODE = +b.dataset.m; hudDraw();
-      });
-    });
-  }
-  panel.classList.toggle('dim', !AS_IN);
-  panel.querySelectorAll('.as-mode').forEach((b, m) => b.classList.toggle('on', AS_IN && m === AS_MODE));
+}
+
+/* ================================================================================================
+   THE EXAM'S LEVEL THREE -- what one JLPT level asks of you, and the four ways at it.
+
+   THE ASCENT SHOWS THE LADDER; THIS SHOWS A RUNG. The panel that used to do this from inside
+   level two is gone (see the note by `.level`), and with it `AS_IN` and `AS_MODE` -- there is no
+   in-panel mode state any more, because the modes are on a screen of their own.
+
+   THREE QUESTIONS, IN THE ORDER SOMEONE DECIDING WHETHER TO BOOK AN EXAM ASKS THEM:
+     1. how ready am I, and out of what        -- the left panel, the ascent's own split bars
+     2. what would happen if I sat it           -- the right panel, and it is the new part
+     3. what do I do about it                   -- the four modes
+
+   AND THE SECOND ONE HAS AN ANSWER THE APP CAN ONLY HALF GIVE, which is why it is drawn as two
+   bars rather than one. `domain/jlpt_sessions.project_mock_score` scales a mock's accuracy into
+   the vocabulary-and-grammar section and stops: `listening_projected` is always `None` and
+   `overall_passes` is always `False`, because the app has no listening content. So the screen
+   draws the section it CAN project, hatches the one it cannot, and says the total is therefore
+   not something it can predict -- rather than implying a whole-exam verdict it has no right to.
+
+   THE SENTENCE THIS SCREEN EXISTS FOR is at the foot of that panel: the section is a separate
+   gate, and a total above the pass mark with the section below its own mark is still a fail.
+   Nothing anywhere else in the app says so.
+   ================================================================================================ */
+
+/* the level being read, taken from the ascent's cursor on the way in */
+let AS_SEL = 2, LV_AT = 0;
+
+const lvLevel = () => AS_LEVELS[Math.max(0, Math.min(AS_SEL, AS_LEVELS.length - 1))];
+
+/* THE PROJECTION IS THE REAL FORMULA, `round(accuracy * section_max)` out of
+   `project_mock_score` -- not a number chosen to look plausible. */
+function lvProject(L) {
+  if (!L.mock) return null;
+  const acc = L.mock[0] / L.mock[1];
+  return Math.round(acc * L.sec[0]);
+}
+
+function levelMarkup() {
+  const i = Math.max(0, Math.min(AS_SEL, AS_LEVELS.length - 1));
+  const L = AS_LEVELS[i], pct = asPct(L), open = asOpen(i), here = i === AS_HERE;
+  const kp = Math.round(L.k[0] / L.k[1] * 100), vp = Math.round(L.v[0] / L.v[1] * 100);
+  const state = !open ? 'LOCKED' : here ? 'CURRENT LEVEL'
+    : pct >= AS_READY ? 'READY TO SIT' : 'OPEN';
+  const stateCls = !open ? 'shut' : here ? 'here' : pct >= AS_READY ? 'ready' : '';
+  /* the headline reads what is LEFT, not what is done -- "18 points short" is the thing a
+     learner can act on and "62%" on its own is not */
+  const short = Math.max(0, AS_READY - pct);
+
+  /* A NEGATIVE `p` IS THE HATCH, NOT A PERCENTAGE -- and it printed as \"-1%\" for exactly as
+     long as it took to look at the screen. There is no number for a thing the app cannot
+     measure, so the figure is an em dash and the track is hatched. */
+  const row = (jp, en, p, count, ticks) => `<span class="as-srow">`
+    + `<span class="as-shead"><span>${jp}</span><em>${en}</em>`
+      + `<b>${p < 0 ? '\u2014' : p + '%'}</b></span>`
+    + `<span class="as-track${p < 0 ? ' none' : ''}">`
+      + (p >= 0 ? `<i style="width:${Math.min(100, p)}%"></i>` : '') + (ticks || '')
+    + `</span><span class="as-count">${count}</span></span>`;
+
+  /* ---- what the exam actually demands ---- */
+  const proj = lvProject(L);
+  const secPct = proj === null ? 0 : Math.round(proj / L.sec[0] * 100);
+  const markPct = Math.round(L.sec[1] / L.sec[0] * 100);
+  const mark = `<u class="ready" style="left:${markPct}%"></u>`;
+  const secCount = !open ? 'LOCKED — NO MOCK CAN BE SAT YET'
+    : proj === null
+      ? `NO MOCK SAT · PASS MARK ${L.sec[1]} OF ${L.sec[0]}`
+      : `LAST MOCK ${L.mock[0]} / ${L.mock[1]} → ${proj} OF ${L.sec[0]}`
+        + ` · PASS MARK ${L.sec[1]}`;
+
+  return `<div class="lv-head">`
+      + `<b>${L.id}</b><i>検定</i>`
+      + `<span class="lv-state ${stateCls}">${state}</span>`
+      + `<span class="lv-figs"><em>${pct}%</em><s>`
+        + `<b>READY AT ${AS_READY}%</b>`
+        + (open ? (short ? short + ' POINTS SHORT' : 'PAST THE LINE') : 'AND SHUT UNTIL THE GATE')
+      + `</s></span>`
+    + `</div>`
+
+    + `<div class="lv-pair">`
+      + `<div class="lv-panel">`
+        + `<span class="lv-cap"><b>手応え</b><i>HOW READY YOU ARE</i>`
+          + `<s>MASTERED = 3 REVIEWS · 21 DAYS</s></span>`
+        + `<span class="as-split">`
+          + row('漢字', 'KANJI', kp,
+            `${L.k[0].toLocaleString()} / ${L.k[1].toLocaleString()} MASTERED`)
+          + row('語彙', 'VOCAB', vp,
+            `${L.v[0].toLocaleString()} / ${L.v[1].toLocaleString()} MASTERED`)
+          + row('手応え', 'READINESS', pct,
+            !open ? `${AS_LEVELS[i - 1].id} MUST REACH ${AS_GATE}% TO OPEN THIS`
+              : i < AS_LEVELS.length - 1
+                ? `${AS_GATE}% OPENED ${AS_LEVELS[i + 1].id} · ${AS_READY}% IS READY`
+                : `${AS_READY}% IS READY TO SIT`,
+            `<u class="gate" style="left:${AS_GATE}%"></u>`
+            + `<u class="ready" style="left:${AS_READY}%"></u>`)
+        + `</span>`
+      + `</div>`
+
+      + `<div class="lv-panel">`
+        + `<span class="lv-cap"><b>試験</b><i>WHAT PASSING ACTUALLY TAKES</i></span>`
+        + `<span class="as-split">`
+          + row('語彙・文法', 'VOCAB + GRAMMAR', secPct, secCount, mark)
+          /* -1 is the hatch, not a score. See the note by `.as-track.none`. */
+          + row('聴解', 'LISTENING', -1,
+            `0 OF 60 · THIS APP HAS NO LISTENING CONTENT, SO IT CANNOT PROJECT ONE`)
+        + `</span>`
+        + `<span class="lv-foot">TOTAL PASS MARK ${L.pass} OF 180`
+          + `<u>BUT THE SECTION IS ITS OWN GATE — ${L.pass} OVERALL WITH`
+          + ` ${L.sec[1] - 1} HERE IS STILL A FAIL</u></span>`
+      + `</div>`
+    + `</div>`
+
+    + `<div class="lv-modes">`
+      + AS_MODES.map(([name, line, role, glyph], m) => `<button class="lv-mode`
+        + `${role === 'MOVES THE NUMBER' ? ' moves' : ''}`
+        + `${name === 'ADAPTIVE REVIEW' ? ' duty' : ''}${open ? '' : ' shut'}"`
+        + ` data-m="${m}">`
+        + `<span class="g">${glyph}</span><b>${name}</b>`
+        + `<i>${open ? line(L) : 'LOCKED'}</i><u>${role}</u></button>`).join('')
+    + `</div>`;
+}
+
+function levelLayout() {
+  LV_AT = Math.max(0, Math.min(LV_AT, AS_MODES.length - 1));
+  hudEl.querySelectorAll('.lv-mode').forEach((el, m) => el.classList.toggle('on', m === LV_AT));
+}
+
+function levelRows() {
+  const L = lvLevel();
+  return AS_MODES.map(([name, line], m) => ({
+    no: String(m + 1).padStart(2, '0'), en: name, jp: '検定', big: name,
+    small: '検定', meta: line(L), pct: 0, figs: [], next: ['', '', ''],
+  }));
+}
+
+function levelPick() {
+  /* a locked level opens and reads -- it just cannot be sat. The exam itself is the app,
+     which is where every other terminal on this menu stops. */
+  if (!asOpen(AS_SEL)) { doFlash(0.2); punchShake(0.24); return; }
+  doFlash(0.16);
 }
 
 /* ================================================================================================
@@ -21692,6 +21949,7 @@ let SC_AT = 0;
 const L3_SUB = {
   library: '読みものを選んでください · CHOOSE SOMETHING TO READ',
   scenes: '場面を選んでください · CHOOSE A CONVERSATION',
+  level: 'この級が求めるもの · WHAT THIS LEVEL ASKS OF YOU',
 };
 
 function worldMarkup() {
@@ -21800,6 +22058,8 @@ function hudBespoke() {
        which lane you came through -- the only place in this file where level three is chosen by
        the lane rather than by the tile. */
     if (HUD.sec === 'READING') return WORLD_LANES[W_AT].k === 'read' ? 'library' : 'scenes';
+    /* THE EXAM'S LEVEL THREE, which it never had -- see the note by `levelMarkup`. */
+    if (HUD.sec === 'JLPT') return 'level';
     if (HUD.sec !== 'STUDY') return null;
     if (STUDY_BLOCKS[HUD.tile]) return 'deck';
     if (STUDY_FEED[HUD.tile]) return 'feed';
@@ -21846,7 +22106,8 @@ function hudDraw(force) {
           : bespoke === 'world' ? WORLD_LANES.length
             /* the two scenes PLUS the free-talk strip, which is a third thing you can stand on
                and is not in `SCENES` because it is not one */
-            : bespoke === 'scenes' ? SCENES.length + 1 : all.length;
+            : bespoke === 'scenes' ? SCENES.length + 1
+              : bespoke === 'level' ? AS_MODES.length : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -21868,7 +22129,8 @@ function hudDraw(force) {
     bespoke === 'modes' ? DR_SEL + '/' + DR_DECK + '/' + DR_ZONE : '',
     bespoke === 'lanes' ? String(PR_AT) : '',
     bespoke === 'world' ? W_AT + '/' + String(W_SHUT) : '',
-    bespoke === 'scenes' ? String(SC_AT) : ''].join('|');
+    bespoke === 'scenes' ? String(SC_AT) : '',
+    bespoke === 'level' ? AS_SEL + '/' + LV_AT : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -21890,6 +22152,9 @@ function hudBuild(rows) {
          subtiles at all and `HUD.tile` is whatever the last section left behind. */
       || (HUD.sec === 'READING' && (() => { const L = WORLD_LANES[W_AT];
         return L ? [L.jp, L.en] : null; })())
+      /* and THE EXAM's level three is a rung, addressed by `AS_SEL` for the same reason */
+      || (HUD.sec === 'JLPT' && (() => { const L = lvLevel();
+        return L ? [L.id + ' 検定', 'JLPT ' + L.id] : null; })())
       || (SUBTILES[HUD.sec] || []).find((t) => t[0] === HUD.tile)
       || DECK_NAMES[HUD.tile] || [HUD.tile, ''])
     : null;
@@ -22004,6 +22269,8 @@ function hudBuild(rows) {
                     ? `<div class="modes">${worldMarkup()}</div>`
                     : bespoke === 'scenes'
                       ? `<div class="modes">${scenesMarkup()}</div>`
+                      : bespoke === 'level'
+                        ? `<div class="level">${levelMarkup()}</div>`
               : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -22131,8 +22398,14 @@ function hudBuild(rows) {
       HUD.cur = to; hudDraw();
     });
   });
+  /* A CLICK SELECTS A COLUMN AND NOTHING MORE. It used to also clear `AS_IN`, which is what
+     a screen with two cursors needs; there is one cursor here now, so there is nothing to
+     clear -- entering a level is Enter, or a click on the level screen's own modes. */
   hudEl.querySelectorAll('.as-col').forEach((b) => {
-    b.addEventListener('click', () => { HUD.cur = +b.dataset.i; AS_IN = false; hudDraw(); });
+    b.addEventListener('click', () => { HUD.cur = +b.dataset.i; hudDraw(); });
+  });
+  hudEl.querySelectorAll('.lv-mode').forEach((b) => {
+    b.addEventListener('click', () => { LV_AT = +b.dataset.m; levelPick(); hudDraw(); });
   });
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
     b.addEventListener('click', () => {
@@ -22229,6 +22502,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'lanes') { lanesLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'world') { worldLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'scenes') { scenesLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'level') { levelLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -22735,28 +23009,27 @@ addEventListener('keydown', (e) => {
      A LOCKED LEVEL REFUSES. N1 is two gates away and pressing Enter on it must say so rather
      than open four modes that cannot be started -- the flash and shake are what this interface
      already uses for "not that". */
+  /* ---- THE ASCENT: walk the ladder, and Enter opens a rung ----
+     A LOCKED LEVEL STILL OPENS. It is the one place on this menu where Enter on something
+     shut is not refused, and deliberately: what a locked level needs to tell you is what is
+     gating it and how far off that is, which is a screenful, not a flash. The refusal moved
+     inward to the four modes, where it belongs -- you can read N1, you cannot sit it. */
   if (hudBespoke() === 'ascent') {
-    const back = e.key === 'Escape' || e.key === 'Backspace';
-    if (back && AS_IN) {
-      AS_IN = false; hudDraw(); e.preventDefault(); e.stopImmediatePropagation(); return;
-    }
-    if (AS_IN && (e.key === 'ArrowDown' || e.key === 'ArrowRight')) {
-      AS_MODE = (AS_MODE + 1) % AS_MODES.length; hudDraw(); e.preventDefault(); return;
-    }
-    if (AS_IN && (e.key === 'ArrowUp' || e.key === 'ArrowLeft')) {
-      AS_MODE = (AS_MODE + AS_MODES.length - 1) % AS_MODES.length;
-      hudDraw(); e.preventDefault(); return;
-    }
     if (e.key === 'Enter') {
-      if (!asOpen(HUD.cur)) { doFlash(0.2); punchShake(0.24); e.preventDefault(); return; }
-      if (!AS_IN) { AS_IN = true; AS_MODE = 0; hudDraw(); }
-      else { doFlash(0.14); }
+      AS_SEL = HUD.cur; LV_AT = 0; HUD.level = 3; hudDraw();
       e.preventDefault(); return;
     }
-    /* moving between levels leaves the modes, or the ring is on one level and the lit mode
-       belongs to another */
-    if (!AS_IN && (e.key === 'ArrowUp' || e.key === 'ArrowLeft'
-      || e.key === 'ArrowDown' || e.key === 'ArrowRight')) AS_IN = false;
+  }
+  /* ---- ONE RUNG: the four modes, on the four arrows ---- */
+  if (hudBespoke() === 'level') {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      LV_AT = (LV_AT + 1) % AS_MODES.length; hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      LV_AT = (LV_AT + AS_MODES.length - 1) % AS_MODES.length;
+      hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') { levelPick(); e.preventDefault(); return; }
   }
   /* THE COURSE DOES NOT WRAP. Four peers wrap because there is no first or last one; sixteen
      ordered steps have both, and arriving at the arbour and being thrown back to the main gate
