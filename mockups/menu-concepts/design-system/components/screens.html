@@ -1,7 +1,7 @@
-<!-- @dsCard group="Components" name="The screens" subtitle="Sixteen screens across three levels, each a real 1280×720 plate" width="1360" height="12300" -->
+<!-- @dsCard group="Components" name="The screens" subtitle="Eighteen screens across three levels, each a real 1280×720 plate" width="1360" height="14700" -->
 <!doctype html>
 <meta charset="utf-8">
-<title>The sixteen screens that exist</title>
+<title>The eighteen screens that exist</title>
 <style>
   :root {
     --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
@@ -47,7 +47,7 @@
   td { color: rgba(242,234,216,0.76); }
 </style>
 
-<h1>The sixteen screens that exist</h1>
+<h1>The eighteen screens that exist</h1>
 <p class="lede">
   <code>built.html</code> documents five OBJECTS — the menu row, the road tablet, the hero card, the
   heading slab, the caption chip. It is still correct about those. This card is which SCREENS they
@@ -55,11 +55,11 @@
 </p>
 <p class="lede">
   <b>Every plate below is the real mockup at 1280&times;720 with the clock frozen at 17:30.</b> One
-  hour for all sixteen, so what differs between them is shape rather than lighting — for the ground
+  hour for all eighteen, so what differs between them is shape rather than lighting — for the ground
   each section actually stands on across the day, see <code>foundations/backdrops.html</code>.
 </p>
 <p class="lede">
-  <b>All sixteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
+  <b>All eighteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
   drawing inside x&nbsp;160&ndash;1120 / y&nbsp;192&ndash;576, bare valley 160px either side,
   whole-set summaries in the foot band. Read that card before designing a new one — in particular
   the part about skew being paint rather than layout, which is what puts a screen in the moat while
@@ -67,15 +67,16 @@
 </p>
 
 <div class="note">
-  <b>Sixteen screens, three levels.</b>
+  <b>Eighteen screens, three levels.</b>
   <table>
     <tr><th>LEVEL 1</th><td>the standing menu — the hero, and five section rows beneath it</td></tr>
     <tr><th>LEVEL 2</th><td>six: The Path's path &middot; Practice's lanes &middot; The World's
       lanes &middot; The Exam's ascent &middot; You's ledger &middot; and the daily road, which is
       reached from inside Practice rather than from a row of its own</td></tr>
-    <tr><th>LEVEL 3</th><td>nine: the deck &middot; the feed &middot; the cleared pile &middot;
+    <tr><th>LEVEL 3</th><td>ten: the deck &middot; the feed &middot; the cleared pile &middot;
       the drill modes &middot; the daily road &middot; the library &middot; the scene picker &middot;
-      and one JLPT level, open or shut</td></tr>
+      one JLPT level, open or shut &middot; and the unlock moment, which is the one screen here
+      that is an EVENT rather than a place &mdash; nothing navigates to it</td></tr>
   </table>
   <p style="margin:9px 0 0"><b>Two sections have lanes now, and they are the same component.</b>
   Practice's three and The World's two are one card doing one job — "which of these do you want to
@@ -324,6 +325,53 @@
     <p>Four of the seventeen exist on exactly one deck &mdash; Stroke Order is kanji only, Vibe
       Check is grammar only, Compound Builder and Conjugation Drill are vocabulary only. That is
       what this screen is made of, and the reason a flat list of seventeen would be a lie.</p>
+  </figcaption>
+</figure>
+
+<h2>AND THE ONE THAT IS NOT A PLACE</h2>
+<figure>
+  <img src="../assets/screen-unlock.png" alt="The unlock moment, three at once">
+  <figcaption>
+    <div class="name"><b>THE MOMENT</b><i>THE PATH &middot; LEVEL 3 &middot; 1&ndash;3 OPENED</i><u>peers</u></div>
+    <p><b>The screen the restructure was built for.</b>
+      <code>domain/feature_catalog.py</code> gates nine capabilities behind curriculum milestones and
+      nothing has ever drawn the instant one fires. Five moments, every trigger transcribed rather
+      than invented. Classes are <code>.un-*</code>.</p>
+    <p><b>Three things fire at once on GRAMMAR</b>, and that fell out of the data.
+      <code>conversation_mode</code> lands on <code>grammar_n5</code>; <code>kanji_mode</code> wants
+      vocabulary too and vocabulary is the step before, so it completes in the same instant; and
+      <code>tutor_chat</code> depends on <code>conversation_mode</code>, so it chains in the same
+      breath. Finishing step five is the biggest event in the game and nothing in the app has ever
+      said so.</p>
+    <p><b>It is peers, not a fifth shape.</b> One to three things, unordered, all available. What
+      makes it a moment is that it is the only thing on the stage and that you did not navigate to
+      it — every other screen here is somewhere you went.</p>
+    <p><b>The stamp is gold and the slab vermilion, not the other way round.</b> A hanko is
+      vermilion in life, and drawing it that way would put the loudest colour in the interface on a
+      thing you cannot press, two inches from the thing you can. The colour law outranks the
+      reference.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-unlock-one.png" alt="The unlock moment, one thing">
+  <figcaption>
+    <div class="name"><b>THE MOMENT, SMALLER</b><i>THE PATH &middot; LEVEL 3 &middot; 1 OPENED</i><u>peers</u></div>
+    <p><b>The weight of a moment is the NUMBER of cards, not their size.</b> They were first flexed
+      to share the band, so one unlock got a card three times the height of one in a set of three —
+      and the single most important moment in the game rendered as a line of type floating in a
+      blank sheet, which reads as a load failure rather than as emphasis. Cards are 86px and the
+      band centres them.</p>
+    <p>This one also carries the trigger distinction the catalog is careful about: eight features
+      want a node <b>mastered</b>, and <code>jlpt_dashboard</code> wants <code>vocabulary_n5</code>
+      merely <b>unlocked</b> — so The Exam appears when you REACH vocabulary, not when you finish
+      it, and the stamp says so.</p>
+    <p class="warn">The bridge cannot yet announce this. <code>build_feature_unlock_status()</code>
+      computes the transition events and throws them away — the payload carries
+      <code>is_unlocked</code> and no "just unlocked" — and it persists inside the read, so whoever
+      calls first consumes the moment. <code>useAchievements</code> already calls it, meaning
+      opening the badge wall burns the unlock this screen wanted to celebrate. One field on
+      <code>FeatureStatusPayload</code> fixes it.</p>
   </figcaption>
 </figure>
 

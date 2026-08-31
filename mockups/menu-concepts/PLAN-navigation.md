@@ -9,9 +9,31 @@ says so, and where a decision was taken it says who took it and why.
 **1. The app already has a progression game and no UI for it.**
 `domain/feature_catalog.py` gates nine features behind curriculum milestones — `listening_mode`,
 `conversation_mode`, `kanji_mode`, `reading_mode`, `jlpt_dashboard`, `tutor_chat`,
-`advanced_analytics`, `themes`, `achievements`. The bridge exposes `feature-unlocks` and
-`electron/ipc_handlers.cjs` forwards it. **No React file calls it.** The app was built to grow
-and currently arrives fully grown.
+`advanced_analytics`, `themes`, `achievements`. The app was built to grow and currently arrives
+fully grown.
+
+> **Corrected 2026-08-31.** This said "**No React file calls it**", and that is wrong. The wire is
+> complete end to end — `desktop_bridge._cmd_feature_unlocks` → `features:get-state` →
+> `preload.getFeatureState` → typed in `electron.d.ts` — and
+> `features/achievements/useAchievements.ts:28` calls it. What is true is narrower and more useful:
+> that one caller reads `feat.badges` where `feat.is_unlocked`, to fill the badge wall. **Nothing
+> reads feature state to gate a surface, and the nine `access_descriptor`s are consumed by
+> nothing.** The finding survives; the sentence did not.
+
+**1b. And the unlock moment cannot be built on the payload as it stands.**
+`build_feature_unlock_status()` calls `evaluate_features`, which returns the `FeatureEvent`s for
+features that *just* transitioned — then persists them and **throws the events away**.
+`FeatureStatusPayload` carries `feature_id, name, category, is_unlocked, badges` and no
+"just unlocked" flag, so the transition exists for exactly one function call.
+
+Worse, persistence happens inside the read, so **whoever calls first consumes the moment** — and
+`useAchievements` already calls it, meaning opening the badge wall silently burns the unlock the
+menu wanted to celebrate.
+
+**The fix is one field**: `FeatureStatusPayload` gains `just_unlocked: bool`, set from `events`.
+It is a `@dataclass` in `desktop_bridge.py`, so `scripts/generate_ts_types.py` regenerates the
+renderer type — no hand-written duplicate. Until that lands, the mockup's moment is a drawing
+of something the bridge cannot yet announce.
 
 **2. The curriculum is a menu of the other menus.**
 `STUDY_PATH` / `domain/progression_curriculum.py` is 16 nodes, and ten of them are `kind: 'goto'`
@@ -69,7 +91,7 @@ streak, XP, level. *Built; the hero and the progressive reveal are new.*
 
 | section | L2 — the shape | L3 — the thing | L4 — doing it |
 | --- | --- | --- | --- |
-| The Path | the journey, 16 milestones **[built]** | a deck's blocks **[built]** · today's words **[built]** · an unlock moment **[new]** | the study session *(in the app)* |
+| The Path | the journey, 16 milestones **[built]** | a deck's blocks **[built]** · today's words **[built]** · an unlock moment **[built]** | the study session *(in the app)* |
 | Practice | three lanes **[new]** | review **[new]** · drill picker **[briefed]** · daily games **[built]** | the game runs *(in the app)* |
 | The World | two lanes **[built]** | the library **[built]** · pick a scene **[built]** | the reader · the conversation *(in the app)* |
 | The Exam | the ascent **[built]** | a level **[built]** | the exam runs *(in the app)* |
