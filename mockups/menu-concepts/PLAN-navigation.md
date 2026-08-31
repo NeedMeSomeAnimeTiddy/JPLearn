@@ -60,7 +60,7 @@ Six become five, and a first-run player sees one unlocked.
 | 4 | **The Exam** 検定 | JLPT readiness and mocks | `jlpt_n5` node |
 | 5 | **You** 記録 | streak, year, level, achievements, settings | always |
 
-Plus **Look it up** 引く — an overlay on one key from any level, not a section.
+Plus **Look it up** 引く — an overlay on `/` from any level, not a section. **Built 2026-08-31.** One field; the route is inferred from what you type and the five run along the foot so the inference is never a guess. Two of them — the tutor and the OCR workbench — need a model running and are drawn as doors the mockup does not walk through. **Settings is the second overlay and is still to design.**
 
 ### What moved, from today's six
 

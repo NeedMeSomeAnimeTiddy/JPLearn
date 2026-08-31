@@ -1,7 +1,7 @@
-<!-- @dsCard group="Components" name="The screens" subtitle="Fifteen screens across three levels, each a real 1280×720 plate" width="1360" height="15650" -->
+<!-- @dsCard group="Components" name="The screens" subtitle="Fifteen screens across three levels, plus the overlay that belongs to none of them" width="1360" height="17400" -->
 <!doctype html>
 <meta charset="utf-8">
-<title>The fifteen screens that exist</title>
+<title>The fifteen screens, and the overlay</title>
 <style>
   :root {
     --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
@@ -47,7 +47,7 @@
   td { color: rgba(242,234,216,0.76); }
 </style>
 
-<h1>The fifteen screens that exist</h1>
+<h1>The fifteen screens, and the overlay</h1>
 <p class="lede">
   <code>built.html</code> documents five OBJECTS — the menu row, the road tablet, the hero card, the
   heading slab, the caption chip. It is still correct about those. This card is which SCREENS they
@@ -59,7 +59,7 @@
   each section actually stands on across the day, see <code>foundations/backdrops.html</code>.
 </p>
 <p class="lede">
-  <b>All fifteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
+  <b>All fifteen sit on the frame contract</b> — the overlay does not, and says why (<code>foundations/frame-contract.html</code>): the
   drawing inside x&nbsp;160&ndash;1120 / y&nbsp;192&ndash;576, bare valley 160px either side,
   whole-set summaries in the foot band. Read that card before designing a new one — in particular
   the part about skew being paint rather than layout, which is what puts a screen in the moat while
@@ -81,6 +81,9 @@
     <tr><th>LEVEL 3</th><td><b>8</b> — deck &middot; feed &middot; library &middot; scene picker
       &middot; drill modes &middot; one JLPT level &middot; the unlock moment &middot; the badge
       wall</td></tr>
+    <tr><th>NO LEVEL</th><td><b>1</b> — <b>Look it up</b>, an overlay on <code>/</code> from
+      anywhere. It is not counted among the fifteen because it does not stand on the stage and
+      does not belong to a section.</td></tr>
   </table>
   <p style="margin:9px 0 0"><b>Two sections have lanes now, and they are the same component.</b>
   Practice's three and The World's two are one card doing one job — "which of these do you want to
@@ -355,6 +358,47 @@
       already the ledger: 52 weeks with accuracy per bar, and every figure opens onto its own reading.
       Settings is <code>AppSettingsModal</code>, and a tabbed modal reachable from anywhere is the
       right shape for settings — it belongs with "Look it up" as an overlay, not as a rung.</p>
+  </figcaption>
+</figure>
+
+<h2>THE ONE THAT IS NOT A SCREEN</h2>
+<figure>
+  <img src="../assets/screen-lookup.png" alt="Look it up, a kanji">
+  <figcaption>
+    <div class="name"><b>LOOK IT UP</b><i>AN OVERLAY &middot; ON <code>/</code> &middot; FROM ANY LEVEL</i><u>overlay</u></div>
+    <p><b>It obeys the FRAME, not the contract.</b> The contract governs where a screen may stand;
+      an overlay is not standing anywhere, it is on top. The scrim and the design-pixel canvas are
+      the ledger's own (<code>.lg-open</code> / <code>.lg-frame</code>) — a modal that opened
+      differently from the other modal would be a second thing to learn. Classes are
+      <code>.lk-*</code>.</p>
+    <p><b>One field, and what you type picks the answer.</b> Five bridge commands have existed the
+      whole time and none appears in the menu — <code>dictionary-search</code>,
+      <code>kanji-detail</code>, <code>lookup-sentence</code>, <code>assistant-chat</code>,
+      <code>assistant-chat-ocr</code>. Five doors is four too many for something you reach
+      mid-sentence, so the route is inferred, and the five run along the foot so the inference is
+      never a guess you have to make.</p>
+    <p>Its key is registered in capture, so no screen's own block can swallow it, and closing leaves
+      the level underneath untouched.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-lookup-absent.png" alt="Look it up, the dictionary not installed">
+  <figcaption>
+    <div class="name"><b>LOOK IT UP, EMPTY-HANDED</b><i>AN OVERLAY &middot; THE STATE THIS MACHINE IS IN</i><u>overlay</u></div>
+    <p><b>Every answer in these two plates was run, not written.</b> 語 really does decompose to
+      言 口 五, and its level is really tagged N5 from the deck rather than from the dictionary. And
+      this is the real error: <code>build_dictionary_search_payload</code> raises "Offline dictionary
+      index is not installed", because the dictionary is an optional download and it is not
+      installed here.</p>
+    <p><b>An empty answer says what would fill it.</b> One grey line in a 168px block reads as a
+      screen that failed rather than as a state the app is really in, so it names the fields
+      <code>DictionaryCardSummary</code> and <code>KanjiDetailPayload</code> would carry. Same rule
+      as the hatched listening bar on The Exam: an absence is drawn as an absence, never as a
+      zero.</p>
+    <p><b>Two of the five routes are drawn dark and stay dark.</b> The tutor and the OCR workbench
+      need a model running; the mockup names them as doors and does not walk through them. A
+      fabricated tutor reply would be drawing a machine that is not plugged in.</p>
   </figcaption>
 </figure>
 
