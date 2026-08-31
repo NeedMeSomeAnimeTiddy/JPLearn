@@ -2219,6 +2219,7 @@
   .hud[data-screen="world"] .hud-detail { display: none; }
   .hud[data-screen="scenes"] .hud-detail { display: none; }
   .hud[data-screen="level"] .hud-detail { display: none; }
+  .hud[data-screen="unlock"] .hud-detail { display: none; }
   /* the road's up-next card is hidden under `[data-course]`; this screen is not a course
      and was inheriting it into the bottom-right corner, over the key hints */
   .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs,
@@ -2227,7 +2228,9 @@
   .hud[data-screen="scenes"] .hud-next,
   .hud[data-screen="scenes"] .hud-figs,
   .hud[data-screen="level"] .hud-next,
-  .hud[data-screen="level"] .hud-figs { display: none; }
+  .hud[data-screen="level"] .hud-figs,
+  .hud[data-screen="unlock"] .hud-next,
+  .hud[data-screen="unlock"] .hud-figs { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2539,6 +2542,98 @@
   .lv-mode.shut { background: linear-gradient(178deg, rgba(196,188,166,var(--paper)) 0%,
       rgba(170,163,142,var(--paper)) 100%); }
   .lv-mode.shut b, .lv-mode.shut .g { color: rgba(20, 17, 13, 0.45); }
+
+  /* ================================================================================
+     THE UNLOCK MOMENT -- the screen the whole restructure was built for, and the only
+     one here that is an EVENT rather than a place.
+
+     `domain/feature_catalog.py` gates nine capabilities behind curriculum milestones and
+     the bridge has exposed `feature-unlocks` the whole time. No React file has ever
+     called it. The app was built to grow and currently arrives fully grown; this is what
+     growing is supposed to look like.
+
+     IT IS PEERS, NOT A FIFTH SHAPE. One to three things opened at once, unordered, all
+     available -- which is the peers rule exactly, and a moment that invented its own
+     shape would be a moment nobody could read. What makes it a moment is that it is the
+     only thing on the stage and that you did not navigate to it.
+
+     THE CARDS ARE 86 AND THE BAND CENTRES THEM. They were flexed to share the 282 instead,
+     so that one unlock got a card three times the height of a card in a set of three -- and
+     the single most important moment in the game rendered as one line of type floating in
+     the middle of a blank sheet, which reads as a load failure rather than as emphasis. The
+     weight of a moment is the NUMBER of cards; a card is a card.
+
+     THE STAMP IS GOLD AND THE SLAB IS VERMILION, not the other way round. A hanko is
+     vermilion in life, and drawing it that way here would put the loudest colour in the
+     interface on a thing you cannot press, two inches from the thing you can. The colour
+     law outranks the reference.
+     ================================================================================ */
+  .unlock { position: relative; margin-top: 6px; margin-left: -52px;
+    width: calc(100vw / var(--u)); height: 470px; }
+
+  /* ---- what you just finished ---- */
+  .un-stamp { position: absolute; left: 180px; top: 44px; width: 250px; height: 300px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; transform: skewX(-8deg) rotate(-1.2deg);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(231,224,206,var(--paper)) 100%);
+    box-shadow: 8px 11px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2); }
+  .un-stamp .k { font-family: var(--jp); font-weight: 700; font-size: 132px; line-height: 0.9;
+    color: var(--ink); }
+  /* THE RULE IS THE STAMP'S EDGE, and it is the one gold thing on this screen -- the
+     section accent belongs to the milestone, not to what the milestone opened. */
+  .un-stamp .r { width: 118px; height: 3px; margin: 9px 0 3px; background: var(--gold); }
+  .un-stamp .n { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 21px; letter-spacing: 0.03em; color: var(--ink); }
+  .un-stamp .s { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.19em; color: rgba(20, 17, 13, 0.55); }
+  /* `MASTERED` AND `REACHED` ARE NOT THE SAME TRIGGER and the catalog is careful about it:
+     eight features want a node `mastered`, and `jlpt_dashboard` wants `vocabulary_n5`
+     merely `unlocked`. Saying "mastered" on that one would be a lie about when it fires. */
+  .un-stamp .w { margin-top: 7px; padding: 4px 12px 5px; background: var(--ink);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.17em;
+    color: var(--gold-hi); }
+
+  /* ---- and what it opened ---- */
+  .un-lead { position: absolute; left: 452px; top: 34px; width: 648px;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+    color: var(--gold-hi); paint-order: stroke fill;
+    -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
+  .un-list { position: absolute; left: 452px; top: 62px; width: 648px; height: 282px;
+    display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .un-card { flex: none; height: 86px; border: 0; padding: 0 18px; font: inherit;
+    text-align: left; cursor: pointer; display: flex; align-items: center; gap: 16px;
+    transform: skewX(-8deg);
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
+    box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transition: background 0.24s ease, box-shadow 0.24s ease; }
+  .un-card.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
+    box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px rgba(20, 17, 13, 0.42); }
+  .un-card .g { flex: none; width: 46px; text-align: center; font-family: var(--jp);
+    font-weight: 400; font-size: 34px; line-height: 1; color: rgba(20, 17, 13, 0.3); }
+  .un-card .t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .un-card .t b { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 19px; line-height: 1.1; color: var(--ink); }
+  .un-card .t i { font-style: normal; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 10.5px; line-height: 1.45; color: rgba(20, 17, 13, 0.6); }
+  /* WHERE IT NOW LIVES, which is the half of this screen that stops it being a trophy.
+     "Conversation Mode is unlocked" is a fact about a flag; "The World, the Talk lane" is
+     somewhere you can go, and the card goes there. */
+  .un-card .w { flex: none; text-align: right; display: flex; flex-direction: column;
+    gap: 3px; white-space: nowrap; }
+  .un-card .w em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45); }
+  .un-card .w s { text-decoration: none; font-family: var(--jp); font-weight: 700;
+    font-size: 15px; line-height: 1; color: rgba(20, 17, 13, 0.5); }
+  .un-card.on .w s { color: var(--ink); }
+
+  .un-slab { position: absolute; left: 452px; top: 356px; width: 648px; height: 40px;
+    display: grid; place-items: center; transform: skewX(-8deg);
+    background: var(--hi); box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.17em;
+    color: #ffd9a1; white-space: nowrap; }
 
   /* ================================================================================
      A DECK'S BLOCKS, AT THE SCALE THE DECK ACTUALLY IS.
@@ -20141,6 +20236,7 @@ function hudRows() {
   if (hudBespoke() === 'world') return worldRows();
   if (hudBespoke() === 'scenes') return sceneRows();
   if (hudBespoke() === 'level') return levelRows();
+  if (hudBespoke() === 'unlock') return unlockRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -20781,6 +20877,129 @@ function levelPick() {
      which is where every other terminal on this menu stops. */
   if (!asOpen(AS_SEL)) { doFlash(0.2); punchShake(0.24); return; }
   doFlash(0.16);
+}
+
+/* ================================================================================================
+   THE UNLOCK MOMENT -- what `domain/feature_catalog.py` has been describing to nobody.
+
+   THE CATALOG IS REAL AND SO IS EVERY TRIGGER BELOW. Nine features, five moments, transcribed on
+   2026-08-31: `listening_mode` wants `hiragana` mastered, `conversation_mode` wants `grammar_n5`,
+   `kanji_mode` wants `vocabulary_n5` AND `grammar_n5`, `reading_mode` and `advanced_analytics`
+   both want `reading`, `jlpt_dashboard` wants `vocabulary_n5` merely UNLOCKED, and `tutor_chat`
+   chains off `conversation_mode` rather than off any node at all. `themes` and `achievements`
+   have empty requirements and never have a moment, which is why they are not here.
+
+   THREE THINGS FIRE AT ONCE ON GRAMMAR, and that fell out of the data rather than being arranged.
+   `conversation_mode` lands on `grammar_n5`; `kanji_mode` wants vocabulary too and vocabulary is
+   the step before, so it completes at the same instant; and `tutor_chat` depends on
+   `conversation_mode`, so it chains in the same breath. Finishing step five is the biggest event
+   in the game and nothing in the app has ever said so.
+
+   HOW YOU GET HERE, AND WHY IT IS A KEY. In the real app this fires on the way BACK from a study
+   session -- you finish a deck, the service emits `FeatureEvent`, and the menu shows this before
+   it shows anything else. The mockup has no session to come back from, so `U` on the path screen
+   fires the moment belonging to the step you are standing on, and refuses on a step that opens
+   nothing. Tying it to the step rather than giving it a free-floating debug key is the closer lie.
+   ================================================================================================ */
+const UNLOCKS = [
+  { node: 'hiragana', on: 'MASTERED', opens: [
+    { en: 'LISTENING MODE', jp: '聴解', glyph: '聴', sec: 'DRILLS', where: 'PRACTICE · DRILLS',
+      d: 'Audio-first drills — you hear the word before you see it' },
+  ] },
+  /* THE ONE THAT IS NOT "MASTERED". `jlpt_dashboard` asks for `vocabulary_n5` at status
+     `unlocked`, so The Exam appears when you REACH vocabulary, not when you finish it. */
+  { node: 'vocabulary_n5', on: 'REACHED', opens: [
+    { en: 'THE EXAM', jp: '検定', glyph: '検', sec: 'JLPT', where: 'A SECTION OF ITS OWN',
+      d: 'Readiness for all five JLPT levels, and four ways to test it' },
+  ] },
+  { node: 'grammar_n5', on: 'MASTERED', opens: [
+    { en: 'CONVERSATION', jp: '会話', glyph: '会', sec: 'READING', where: 'THE WORLD · TALK',
+      d: 'Two scenes with someone who answers back, spoken or typed' },
+    { en: 'KANJI MODE', jp: '漢字', glyph: '漢', sec: 'STUDY', where: 'THE PATH · STEP 09',
+      d: 'The kanji decks, and every drill that runs on them' },
+    { en: 'FREE TALK', jp: '自由会話', glyph: '自', sec: 'READING', where: 'THE WORLD · TALK',
+      d: 'No script and no objectives — the tutor corrects you as you go' },
+  ] },
+  { node: 'reading', on: 'MASTERED', opens: [
+    { en: 'THE LIBRARY', jp: '読解', glyph: '読', sec: 'READING', where: 'THE WORLD · READ',
+      d: 'Thirty real stories from Aozora Bunko, graded easiest to hardest' },
+    { en: 'DEEPER FIGURES', jp: '統計', glyph: '統', sec: 'RECORDS', where: 'YOU · THE LEDGER',
+      d: 'Accuracy by deck and by hour, and what has started drifting' },
+  ] },
+];
+/* -1 is off. It is not a place you can be by default: nothing navigates here. */
+let UN_AT = -1, UN_SEL = 0;
+
+const unFor = (nodeId) => UNLOCKS.findIndex((u) => u.node === nodeId);
+/* THE PATH'S CURSOR DOES NOT WALK THE STEPS -- it addresses the open step and the cleared
+   pile, and the open step is KANJI, which unlocks nothing. So `U` shows the moment belonging
+   to the step you are on, or failing that the last one you passed, which is the one a learner
+   standing at step nine most recently lived through. On the moment itself, `U` walks the
+   other three. `UNLOCKS` is in path order, which is what makes this a scan and not a sort. */
+const unAtOrBefore = (i) => {
+  let best = -1;
+  UNLOCKS.forEach((u, k) => { if (unStep(u) <= i) best = k; });
+  return best;
+};
+const unNow = () => (UN_AT >= 0 ? UNLOCKS[UN_AT] : null);
+/* the step's own index in the path, so the stamp can say 05 / 16 without a second list */
+const unStep = (u) => STUDY_PATH.findIndex((s) => s.id === u.node);
+
+function unlockMarkup() {
+  const u = unNow();
+  if (!u) return '';
+  const step = unStep(u), S = STUDY_PATH[step];
+  const seal = (String(S.jp).match(/[぀-ヿ一-龯]/) || [S.en[0]])[0];
+  const cards = u.opens.map((o, i) => `<button class="un-card" data-i="${i}">`
+    + `<span class="g">${o.glyph}</span>`
+    + `<span class="t"><b>${o.en}</b><i>${o.d}</i></span>`
+    + `<span class="w"><em>${o.where}</em><s>${o.jp}</s></span>`
+    + `</button>`).join('');
+  return `<div class="un-stamp">`
+      + `<span class="k">${seal}</span><span class="r"></span>`
+      + `<span class="n">${S.en}</span>`
+      + `<span class="s">STEP ${String(step + 1).padStart(2, '0')}`
+        + ` / ${String(STUDY_PATH.length).padStart(2, '0')}</span>`
+      + `<span class="w">${u.on}</span>`
+    + `</div>`
+    /* the count is in the words because one and three are different events, and a screen that
+       said "THIS JUST OPENED" for both would be flattening the bigger one */
+    + `<div class="un-lead">${u.opens.length === 1 ? 'AND THIS JUST OPENED'
+      : 'AND ' + ['', 'ONE', 'TWO', 'THREE'][u.opens.length] + ' THINGS JUST OPENED AT ONCE'}</div>`
+    + `<div class="un-list">${cards}</div>`
+    + `<div class="un-slab"></div>`;
+}
+
+function unlockLayout() {
+  const u = unNow();
+  if (!u) return;
+  UN_SEL = Math.max(0, Math.min(UN_SEL, u.opens.length - 1));
+  hudEl.querySelectorAll('.un-card').forEach((el, i) => el.classList.toggle('on', i === UN_SEL));
+  const slab = hudEl.querySelector('.un-slab');
+  /* `secLabel`, NOT `where`. The card's `where` is a description -- \"A SECTION OF ITS OWN\"
+     is a true thing to say about The Exam and a nonsense thing to press. The slab names the
+     destination, and it takes the name from `ITEMS` so it can never drift from the row. */
+  const it = ITEMS.find((x) => x.en === u.opens[UN_SEL].sec);
+  if (slab) slab.textContent = `GO TO ${it ? secLabel(it) : 'IT'} · ENTER ▸`;
+}
+
+function unlockRows() {
+  const u = unNow();
+  if (!u) return [];
+  return u.opens.map((o, i) => ({
+    no: String(i + 1).padStart(2, '0'), en: o.en, jp: o.jp, big: o.en, small: o.jp,
+    meta: o.where, pct: 0, figs: [], next: ['', '', ''],
+  }));
+}
+
+/* THE MOMENT ENDS BY GOING SOMEWHERE, which is the whole point of drawing it. Every other
+   terminal on this menu stops at the app; this one hands you to the section it just opened. */
+function unlockPick() {
+  const u = unNow();
+  if (!u) return;
+  const sec = u.opens[UN_SEL].sec;
+  UN_AT = -1;
+  enterSection(sec);
 }
 
 /* ================================================================================================
@@ -21950,6 +22169,7 @@ const L3_SUB = {
   library: '読みものを選んでください · CHOOSE SOMETHING TO READ',
   scenes: '場面を選んでください · CHOOSE A CONVERSATION',
   level: 'この級が求めるもの · WHAT THIS LEVEL ASKS OF YOU',
+  unlock: '新しく開いたもの · SOMETHING JUST OPENED',
 };
 
 function worldMarkup() {
@@ -22052,6 +22272,10 @@ function sceneRows() {
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
+    /* ASKED BEFORE ANYTHING ELSE. An unlock moment is not addressed by `HUD.tile` like the
+       deck and the feed are -- it is an event that happens to be standing at level three,
+       and while it is up it is the only thing there. */
+    if (UN_AT >= 0) return 'unlock';
     /* the drills lane, one level inside PRACTICE */
     if (HUD.sec === 'DRILLS') return 'modes';
     /* THE WORLD'S TWO LANES EACH OPEN SOMETHING DIFFERENT, so which screen this is depends on
@@ -22107,7 +22331,9 @@ function hudDraw(force) {
             /* the two scenes PLUS the free-talk strip, which is a third thing you can stand on
                and is not in `SCENES` because it is not one */
             : bespoke === 'scenes' ? SCENES.length + 1
-              : bespoke === 'level' ? AS_MODES.length : all.length;
+              : bespoke === 'level' ? AS_MODES.length
+                : bespoke === 'unlock' ? (unNow() ? unNow().opens.length : 1)
+                  : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -22130,7 +22356,8 @@ function hudDraw(force) {
     bespoke === 'lanes' ? String(PR_AT) : '',
     bespoke === 'world' ? W_AT + '/' + String(W_SHUT) : '',
     bespoke === 'scenes' ? String(SC_AT) : '',
-    bespoke === 'level' ? AS_SEL + '/' + LV_AT : ''].join('|');
+    bespoke === 'level' ? AS_SEL + '/' + LV_AT : '',
+    bespoke === 'unlock' ? UN_AT + '/' + UN_SEL : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -22155,6 +22382,10 @@ function hudBuild(rows) {
       /* and THE EXAM's level three is a rung, addressed by `AS_SEL` for the same reason */
       || (HUD.sec === 'JLPT' && (() => { const L = lvLevel();
         return L ? [L.id + ' 検定', 'JLPT ' + L.id] : null; })())
+      /* an unlock moment is named for the MILESTONE that fired it, not for what it opened --
+         the thing that just happened is that you finished a step */
+      || (UN_AT >= 0 && (() => { const u = unNow(); if (!u) return null;
+        const S = STUDY_PATH[unStep(u)]; return [S.jp, S.en]; })())
       || (SUBTILES[HUD.sec] || []).find((t) => t[0] === HUD.tile)
       || DECK_NAMES[HUD.tile] || [HUD.tile, ''])
     : null;
@@ -22271,6 +22502,8 @@ function hudBuild(rows) {
                       ? `<div class="modes">${scenesMarkup()}</div>`
                       : bespoke === 'level'
                         ? `<div class="level">${levelMarkup()}</div>`
+                        : bespoke === 'unlock'
+                          ? `<div class="unlock">${unlockMarkup()}</div>`
               : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -22503,6 +22736,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'world') { worldLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'scenes') { scenesLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'level') { levelLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'unlock') { unlockLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -23019,6 +23253,37 @@ addEventListener('keydown', (e) => {
       AS_SEL = HUD.cur; LV_AT = 0; HUD.level = 3; hudDraw();
       e.preventDefault(); return;
     }
+  }
+  /* ---- U ON THE PATH FIRES THE STEP'S UNLOCK MOMENT ----
+     In the app this arrives on the way back from a session; there is no session here, so it
+     hangs off the step it belongs to rather than off a free-floating debug key. A step that
+     opens nothing refuses, which is eleven of the sixteen. */
+  if (hudBespoke() === 'path' && (e.key === 'u' || e.key === 'U')) {
+    const at = paShown(), S = STUDY_PATH[at];
+    const k = S && unFor(S.id) >= 0 ? unFor(S.id) : unAtOrBefore(at);
+    if (k < 0) { doFlash(0.16); e.preventDefault(); return; }
+    UN_AT = k; UN_SEL = 0; HUD.level = 3; hudDraw();
+    e.preventDefault(); return;
+  }
+  /* ---- THE MOMENT: walk what opened, Enter goes there ---- */
+  if (hudBespoke() === 'unlock') {
+    const many = unNow().opens.length;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      UN_SEL = (UN_SEL + 1) % many; hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      UN_SEL = (UN_SEL + many - 1) % many; hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') { unlockPick(); e.preventDefault(); return; }
+    /* five moments exist and four of them are behind or ahead of wherever you stand */
+    if (e.key === 'u' || e.key === 'U') {
+      UN_AT = (UN_AT + 1) % UNLOCKS.length; UN_SEL = 0; hudDraw();
+      e.preventDefault(); return;
+    }
+    /* CLEARED, THEN LET GO. `hudBack` owns the camera and the swap for every level three,
+       so Escape is not handled here -- the flag is dropped and the global back runs, which
+       is why this block sits after the others: they have already decided they are not up. */
+    if (e.key === 'Escape' || e.key === 'Backspace') UN_AT = -1;
   }
   /* ---- ONE RUNG: the four modes, on the four arrows ---- */
   if (hudBespoke() === 'level') {
