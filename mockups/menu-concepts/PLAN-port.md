@@ -118,12 +118,31 @@ it. Last because it needs the path (phase 4) to fire from.
 - **`@react-three/fiber`** — **no**, and see problem 1. It would put the scene inside the tree it
   has to outlive.
 
-## What I would want answered before phase 0
+## The three decisions, taken 2026-08-31
 
-1. **Scope: A, B or C.** Everything above assumes B.
-2. **Is 52 MB and a 3.1 s cold boot acceptable?** If not, phase 0 becomes an optimisation project
-   first — the lightmap is 7.6 MB of PNG that should be a compressed texture, and `world.glb` has
-   never been Draco'd or meshopt'd. Both are real wins and neither has been tried.
-3. **Does the old chrome stay reachable?** During phases 2–5 the tree and the flat views coexist.
-   A titlebar escape hatch back to today's UI makes each phase safe to ship; without one, every
-   phase is all-or-nothing.
+**1. Scope is B — the tree.** L1–L3 port; the six current views become the L4 things you do.
+`App.css` is not touched. The seam is deliberate and stated: the menu is the chrome, the app is
+what happens inside a session.
+
+**2. Phase 0 optimises before it renders.** 52 MB and 3.1 s are not accepted as given. Two things
+have never been tried and both are real: the lightmap is **7.6 MB of PNG** that should be a
+compressed texture, and `world.glb` has never been Draco'd or meshopt'd. Phase 0's deliverable is
+a before/after number, and the packaged-app boot time measured rather than inferred from a headed
+browser on a local HTTP server.
+
+**3. The old chrome stays reachable — a titlebar toggle.** The tree and the flat views coexist
+through phases 2–5. Every phase ships on its own and a regression is a switch away from being
+worked around rather than a blocked release. The toggle is temporary and comes out at phase 6;
+it is the one piece of scaffolding this plan is willing to build.
+
+### What that changes about phase 0
+
+It stops being "render the valley in Electron" and becomes:
+
+- measure the packaged app's real cold boot, not the dev server's;
+- compress the lightmap and quantise/compress `world.glb`, measuring each separately;
+- **then** render it behind whatever `home` draws today, with the number to show for it.
+
+The gate stays the same: if the honest post-optimisation number is still unacceptable, the port
+stops there and the design stays a mockup — which is a real outcome and cheaper to discover in
+phase 0 than in phase 4.
