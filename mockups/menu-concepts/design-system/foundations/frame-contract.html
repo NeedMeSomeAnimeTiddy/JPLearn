@@ -128,10 +128,26 @@
     <td class="n">horizontal:<br>0.0598 &times; height<br><br>vertical:<br>0.0105 &times; width</td>
     <td>a 236-tall card<br>a 96-tall rail<br>a 944-wide year band<br>a 660-wide menu row</td>
     <td class="n">14.1px each side<br>5.7px each side<br>9.9px top and bottom<br>6.9px top and bottom</td></tr>
+  <tr><td>skew + <b>counter</b>-roll<br><code>skewX(-8) rotate(1)</code><br>the second card in
+      every lane row</td>
+    <td class="n">horizontal:<br>0.0790 &times; height<br><br>vertical:<br>0.0087 &times; width</td>
+    <td>a 330-tall lane card<br>a 272-tall scene card</td>
+    <td class="n">26.1px each side<br>21.5px each side</td></tr>
   <tr><td>skew only<br><code>skewX(-8)</code><br>the ascent's columns</td>
     <td class="n">horizontal:<br>0.0703 &times; height<br><br>vertical: none</td>
     <td>a 352-tall column</td><td class="n">24.7px each side</td></tr>
 </table>
+<p class="lede" style="margin-top:10px">
+  <b>The second row is the one that catches people, including the person who wrote the first.</b>
+  Rows of cards alternate their roll so they lean against each other — card one is
+  <code>rotate(-1.2deg)</code>, card two is <code>rotate(1deg)</code> — and those two are not
+  mirror images. At <code>-1.2</code> the roll partly CANCELS the skew; at <code>+1</code> it
+  ADDS to it, and the card bleeds <b>a third further</b> sideways for the same height.
+  <span class="warn">Lay any row of cards against the WORSE of its two, not against the first
+  one.</span> Practice's lanes never showed it because its cards are 291 wide and the row had
+  20px of slack; The World's are 445, and laid on the first card's number the right-hand one
+  measured 4px into the moat with CSS that looked symmetrical.
+</p>
 <p class="lede" style="margin-top:10px">
   So the stage's 160 and 1120 become an authored <b>174 and 1106</b> for a card, <b>166 and 1114</b>
   for a rail, <b>185 and 1095</b> for a full-height column. And the vertical one is the expensive

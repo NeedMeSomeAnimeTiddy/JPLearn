@@ -31,7 +31,7 @@ Six become five, and a first-run player sees one unlocked.
 | --- | --- | --- | --- |
 | 1 | **The Path** 道 | the spine — all new material, and the only thing that unlocks anything | always |
 | 2 | **Practice** 練習 | using what the path taught: reviews, drills, daily games | first cards exist |
-| 3 | **The World** 実践 | real Japanese — reading and conversation | `reading` / `scripted_conv` nodes |
+| 3 | **The World** 実践 | real Japanese — reading and conversation | `grammar_n5` — see below |
 | 4 | **The Exam** 検定 | JLPT readiness and mocks | `jlpt_n5` node |
 | 5 | **You** 記録 | streak, year, level, achievements, settings | always |
 
@@ -44,6 +44,13 @@ Plus **Look it up** 引く — an overlay on one key from any level, not a secti
 - **DRILLS → a lane in Practice.** Drilling is done *to* material the path gave you; it was never
   a peer of the curriculum.
 - **READING → a lane in The World**, joined by conversation, which today has no home at all.
+  **Built 2026-08-31, and the unlock order came out the opposite way round from what this plan
+  assumed.** `domain/feature_catalog.py` opens `conversation_mode` at `grammar_n5` — step five of
+  sixteen — where `reading_mode` waits for `reading` at step eleven, and `tutor_chat` (free talk)
+  chains off `conversation_mode`. So **Talk opens six steps before Read**, the section's own gate
+  is GRAMMAR rather than READING, and there is a six-step window in which The World is open and
+  half of it is not. That window is a real state most early accounts will sit in, so the Read lane
+  draws it (press `L` on the screen) rather than the mockup pretending the section arrives whole.
 - **JLPT → The Exam.** Same shape, gains the level three it never had.
 - **RECORDS → You.** Gains achievements, history and settings.
 - **New: Look it up.** `dictionary-search`, `kanji-detail`, `lookup-sentence`, `assistant-chat`
@@ -59,7 +66,7 @@ streak, XP, level. *Built; the hero and the progressive reveal are new.*
 | --- | --- | --- | --- |
 | The Path | the journey, 16 milestones **[built]** | a deck's blocks **[built]** · today's words **[built]** · an unlock moment **[new]** | the study session *(in the app)* |
 | Practice | three lanes **[new]** | review **[new]** · drill picker **[briefed]** · daily games **[built]** | the game runs *(in the app)* |
-| The World | two lanes **[new]** | the library **[built]** · pick a scene **[to design]** | the reader · the conversation *(in the app)* |
+| The World | two lanes **[built]** | the library **[built]** · pick a scene **[built]** | the reader · the conversation *(in the app)* |
 | The Exam | the ascent **[built]** | a level **[briefed]** | the exam runs *(in the app)* |
 | You | the ledger **[built]** | achievements · history · settings **[to design]** | — |
 

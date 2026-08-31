@@ -67,15 +67,19 @@
 </p>
 
 <div class="note">
-  <b>Twelve screens, three levels.</b>
+  <b>Fourteen screens, three levels.</b>
   <table>
     <tr><th>LEVEL 1</th><td>the standing menu — the hero, and five section rows beneath it</td></tr>
     <tr><th>LEVEL 2</th><td>six: The Path's path &middot; Practice's lanes &middot; The World's
-      library &middot; The Exam's ascent &middot; You's ledger &middot; and the daily road, which is
+      lanes &middot; The Exam's ascent &middot; You's ledger &middot; and the daily road, which is
       reached from inside Practice rather than from a row of its own</td></tr>
-    <tr><th>LEVEL 3</th><td>five: the deck &middot; the feed &middot; the cleared pile &middot;
-      the drill modes &middot; the daily road</td></tr>
+    <tr><th>LEVEL 3</th><td>seven: the deck &middot; the feed &middot; the cleared pile &middot;
+      the drill modes &middot; the daily road &middot; the library &middot; the scene picker</td></tr>
   </table>
+  <p style="margin:9px 0 0"><b>Two sections have lanes now, and they are the same component.</b>
+  Practice's three and The World's two are one card doing one job — "which of these do you want to
+  do", nothing ordered, nothing gated against its neighbour. A learner who has read one should not
+  have to read the other.</p>
 </div>
 
 <h2>THE FOUR SHAPES</h2>
@@ -158,15 +162,58 @@
 </figure>
 
 <figure>
-  <img src="../assets/screen-library.png" alt="READING, the library">
+  <img src="../assets/screen-world.png" alt="The World, the two lanes">
   <figcaption>
-    <div class="name"><b>THE LIST</b><i>READING &middot; LEVEL 2 &middot; 30 TEXTS</i><u>list</u></div>
+    <div class="name"><b>THE TWO LANES</b><i>THE WORLD &middot; LEVEL 2 &middot; 2 LANES</i><u>peers</u></div>
+    <p><b>The same card as Practice's, two-up.</b> Reading and conversation — and until this screen
+      existed the section opened straight onto the library, so a section named for both was one lane
+      wide while three places in the mockup already promised two. Classes are <code>.pr-*</code>
+      plus <code>.wd-*</code>.</p>
+    <p><b>The extra width is spent on the inside.</b> Two cards across the stage are 445 wide against
+      Practice's 291, and a card that just got 154px bigger without saying anything more is a door
+      with a bigger label on it. Each lane lists the three things you would actually pick, which also
+      makes level three a zoom rather than a surprise.</p>
+    <p><b>Nothing here carries vermilion</b>, and that is the difference from the screen it copies.
+      Practice's review lane owes you something; The World is the section you visit because you want
+      to. Same component, opposite colour law, because the DATA is different.</p>
+    <p>The gate chip on each card names the milestone that opened it, and it is one element with two
+      states: a quiet credit when the milestone is reached, the lock when it is not. Press
+      <b>L</b> for the six-step window in which Talk is open and Read is not
+      (<code>assets/screen-world-shut.png</code>) — a shut lane keeps its figure, its list and its
+      size and redraws its CONTENT, because locked it was claiming 38% on texts it cannot open.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-library.png" alt="The World, the library">
+  <figcaption>
+    <div class="name"><b>THE LIST</b><i>THE WORLD &middot; LEVEL 3 &middot; 30 TEXTS</i><u>list</u></div>
     <p>Thirty items, all open, none unlocking another, no correct order. The selected row grows
-      38&rarr;100px and only then admits its detail. Classes are <code>.lb-*</code>.</p>
+      38&rarr;100px and only then admits its detail. Classes are <code>.lb-*</code>. It was this
+      section's whole level two until the lanes arrived and pushed it one level in; nothing about the
+      drawing changed.</p>
     <p><b>The clearest example of the contract's overflow rule.</b> Six of thirty are painted, with
       counts on the two edges saying where the rest went and a thirty-bar strip in the foot. Distance
       from the selection is drawn as a VEIL over opaque paper rather than as opacity — a faded row
       fades into the street otherwise, and you can read the road through the page.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-scenes.png" alt="The World, picking a scene">
+  <figcaption>
+    <div class="name"><b>THE SCENE PICKER</b><i>THE WORLD &middot; LEVEL 3 &middot; 2 SCENES</i><u>peers</u></div>
+    <p><b>Two cards and a strip, because there are two scenes.</b>
+      <code>src/lib/scenarios/index.ts</code> exports exactly Order at a Cafe and Ask for Directions
+      in Shinjuku, so a grid built for twelve would have drawn ten empty slots or, worse, ten
+      invented ones. Titles, NPCs, descriptions and every objective with its <code>required</code>
+      flag are the scenario files' own strings. Classes are <code>.sc-*</code>.</p>
+    <p><b>Free talk is the strip, not a third card.</b> It has no objectives, no NPC and no end, so a
+      card with three empty rows would have made it look like a scene that failed to load. Required
+      objectives are solid, optional ones hollow — the difference <code>required: false</code> makes
+      when the tutor marks you at the end.</p>
+    <p>When the app grows more scenes this becomes a road. Until it does, two scenes get to be two
+      scenes, and each is wide enough to show what it will actually ask of you.</p>
   </figcaption>
 </figure>
 
