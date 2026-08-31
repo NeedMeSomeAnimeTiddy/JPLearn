@@ -80,8 +80,10 @@ today. No HUD, no navigation change. **This must be first**: if 52 MB and a 3.1 
 acceptable in the packaged app, nothing after it matters. Deliverable is a number, not a screen.
 
 **1 · The two overlays.** `/` and `,`, independent of everything else, and the cheapest real value
-in the whole port — `searchDictionary`, `getKanjiDetail`, `lookupSentence` and `downloadDictionary`
-are **all already in `preload.cjs` and called by nothing**. This is a UI over a wire that exists.
+in the whole port. ~~`searchDictionary`, `getKanjiDetail`, `lookupSentence` and `downloadDictionary`
+are all already in `preload.cjs` and called by nothing.~~ **Wrong — all four are wired; see the
+phase 1 section.** The gap was the *door*: no `/` anywhere, the dictionary reachable only from
+inside a study session, and `lookupSentence` with no UI at all.
 
 **2 · L1 replaces `home`.** The standing menu becomes the front door; the five rows point at the
 existing flat views. First phase anyone can see. `HomeView` (334 lines) retires.
@@ -295,7 +297,7 @@ phase ever wants to click a building.
 Boot and frame rate are unchanged by any of it: 1420 ms to app content, 864 ms for the world
 behind it, 139 fps.
 
-## Final phase 0 position
+## Final phase 0 position (before phase 1)
 
 | | value |
 | --- | --- |
@@ -359,3 +361,85 @@ the app loses a backdrop, not a feature.
   mockup has its own, more careful version of this pass; when the world module ports, that one
   wins and this one goes.
 - A crude two-light rig standing in for the sunset. It is not the design and is not meant to be.
+
+---
+
+# Phase 1 — done, 2026-09-01
+
+## The phase's premise was wrong, and the correction is the interesting part
+
+This plan said the four lookup commands were **"all already in `preload.cjs` and called by
+nothing"**, and that phase 1 was "a UI over a wire that exists". Checked, on 2026-09-01:
+
+| command | claimed | actually |
+| --- | --- | --- |
+| `searchDictionary` | called by nothing | **`DictionaryPopup.tsx`** — 752 lines of real dictionary |
+| `downloadDictionary` | called by nothing | **`SetupWizard.tsx`** |
+| `getKanjiDetail` | called by nothing | **`features/kanji-detail/useKanjiDetail.ts`** |
+| `lookupSentence` | called by nothing | **`useStudySession.ts:1327`**, to seed a round |
+
+All four are wired. Building "a dictionary UI" would have been building a second one.
+
+**The real gap was the door, not the answers.** `DictionaryPopup` opens only from inside study
+contexts (`openDictionaryForCurrentRound`, and the passage/reading views). There was no `/`
+binding anywhere in the app, `lookupSentence` had no UI at all — it could seed a round and never
+answer a question — and settings was on `Ctrl+,` only. The mockup's line for this screen is
+*ONE FIELD · ANY LEVEL*, and "any level" was the part that did not exist.
+
+## What shipped
+
+`src/features/lookup/` — 6 files, following the feature-module convention, plus 10 tests.
+
+- **`/` from anywhere** opens one field. The route is inferred: one kanji asks `kanji-detail`,
+  anything longer asks `dictionary-search`, and every query also asks `lookup-sentence`, because
+  a sentence lookup complements a query rather than competing with one.
+- **The five routes are drawn along the foot** with a mark each, so the inference is never a guess
+  and you can see where the answers are without visiting them. The two model-backed routes are
+  named and disabled — doors this overlay does not walk through.
+- **Enter hands off** to `KanjiDetailPanel` or `DictionaryPopup` — the panels that already do this
+  properly. Nothing is redrawn.
+- **`,` from anywhere** opens the existing `AppSettingsModal`. `Ctrl+,` still works; this adds a
+  door rather than moving one.
+- Both bare keys are ignored while anything is being typed into, the same guard `?` already used.
+
+**Asked sequentially, and that is not an oversight.** `CLAUDE.md` is explicit that the bridge is
+serial and that a timed-out request rejects *every* other in flight — three concurrent lookups
+would make one slow dictionary look like three broken routes. The route the query asked for goes
+first. There is a test that fails if the calls ever overlap.
+
+**An absence is drawn as an absence.** With no offline dictionary, `語` answers with its level and
+its components 言 口 五 and says in italic grey what the download would add. A word says
+*"The offline dictionary is not installed — add it from Settings (,)"* — the one message that
+connects the two doors. Electron's `Error invoking remote method '…'` wrapper is peeled off first;
+it is a sentence about IPC, not about Japanese.
+
+## It brings the frame contract with it
+
+The menu is authored on a 1280×720 board, and `zoom: var(--u)` is what makes `left: 250px` mean
+the same place in any window. The overlay carries that stage, skew and all, because it is the one
+screen that can stand on it alone — **phase 2 needs it anyway**. The tokens (`--washi`, `--ink`,
+`--gold-hi`, `--hi`) are scoped to the overlay root, never `:root`: this app has 348
+`border-radius` declarations and the seam is supposed to be deliberate.
+
+## Four things only running it could have found
+
+- **The app's own CSS styles every input.** `input:focus-visible` in `App.css` paints a 2px accent
+  outline — a rounded box floating on washi paper, in a design with no rounded corners. Focus now
+  moves to the field's underline, which turns vermilion.
+- **`z-index: 10050` was not enough.** The window titlebar painted straight through the scrim:
+  `elementFromPoint` over it returned the titlebar, not the overlay. z-index is only a rank
+  *within a stacking context* — the fix is `createPortal` to `document.body`, not a bigger number.
+- **`学校` climbed out of its tile.** The 68px character tile is sized for one character; the
+  threshold for setting a query smaller was off by one.
+- **Three of my own probes measured the wrong screen.** A clean `userData` dir means first run,
+  so the app showed the **SetupWizard** and then **onboarding** — `Ctrl+K` did not work either,
+  which is what proved it was the harness and not the new code. Setup is gated by
+  `<JPLEARN_USER_DATA_DIR>/models/.setup-done`; onboarding is gated by the *backend*
+  (`learningPathStatus.onboarding_complete`), so it cannot be shortcut from the renderer.
+
+## Verified
+
+10 new tests (stable over five consecutive runs), **845 passing overall**, 8 a11y tests, lint
+clean. Driven live in Electron against the real bridge: `/` opens from the home screen, `語`
+returns N5 and 言 口 五 from `kanji-detail`, the absent fields read as absent, `,` opens settings,
+Escape closes both, and a comma typed into the field goes into the field.

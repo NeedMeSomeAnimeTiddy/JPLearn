@@ -1,0 +1,201 @@
+/* ==================================================================================================
+   LOOK IT UP -- the first piece of the menu's language to reach the app.
+
+   IT BRINGS ITS OWN STAGE. The menu is authored against a 1280x720 board and every position in it
+   is a coordinate on that board; `zoom` scales the whole thing to whatever window it lands in, so
+   `left: 250px` means the same place at any size. Phase 2 needs that stage for the menu proper --
+   this is it, arriving early because an overlay is the one screen that can stand on it alone.
+
+   THE TOKENS ARE SCOPED, NOT GLOBAL. The app has 348 border-radius declarations and none of these
+   variables; defining them on :root would be the start of an accidental re-skin. They live on the
+   overlay root and go no further, which is the seam the port plan asks for: the menu is the
+   chrome, the app is what happens inside a session.
+   ================================================================================================== */
+.lk-open {
+  position: fixed;
+  inset: 0;
+  /* the mockup says 60, but it only had to sit above a valley. Here the app's own chrome goes up
+     to 10000, and an overlay the titlebar punches through is not an overlay. */
+  z-index: 10050;
+
+  --washi: #f2ead8;
+  --ink: #14110d;
+  --hi: #e34a33;
+  --gold-hi: #e8c47c;
+  --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+  --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", "Arial", sans-serif;
+}
+
+.lk-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 11, 18, 0.66);
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+/* the board. `zoom` rather than `transform: scale` because the menu was authored against it and
+   the difference is not cosmetic -- zoom scales layout, so the coordinates stay honest. */
+.lk-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1280px;
+  height: 720px;
+  margin: -360px 0 0 -640px;
+  zoom: var(--lk-u, 1);
+  pointer-events: none;
+}
+
+.lk-frame > * { pointer-events: auto; }
+
+.lk-sheet {
+  position: absolute;
+  left: 250px;
+  top: 152px;
+  width: 780px;
+  display: flex;
+  flex-direction: column;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  background: var(--washi);
+  box-shadow: 12px 15px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+}
+
+.lk-cap {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  padding: 7px 20px 8px;
+  background: var(--ink);
+  white-space: nowrap;
+}
+.lk-cap b { font-family: var(--jp); font-weight: 700; font-size: 13px; color: var(--gold-hi); }
+.lk-cap i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.2em; color: var(--gold-hi);
+}
+.lk-cap s {
+  margin-left: auto; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.45);
+}
+
+/* THE FIELD IS THE WHOLE INTERFACE, so it is drawn as one: an underline the width of the sheet
+   and the query set large. Unlike the mockup this one is a real input, so the caret is the
+   browser's -- but the input is stripped back to nothing so the sheet still reads as paper. */
+.lk-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 13px;
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.lk-field .q {
+  flex: none; font-family: var(--lat-ui); font-weight: 700; font-size: 20px; line-height: 1;
+  color: rgba(20, 17, 13, 0.3);
+}
+/* THE APP STYLES EVERY INPUT AND THIS ONE IS NOT THE APP'S. `input:focus-visible` in App.css
+   paints a 2px accent outline with a 2px offset, which on this sheet reads as a rounded box
+   floating on paper -- a border-radius in a design that has none. It is overridden rather than
+   removed: focus moves to the field's own underline, which turns vermilion. */
+.lk-open .lk-field input {
+  flex: 1 1 auto; min-width: 0; border: 0; background: transparent; padding: 0;
+  border-radius: 0; box-shadow: none; appearance: none; -webkit-appearance: none;
+  font-family: var(--jp); font-weight: 700; font-size: 26px; line-height: 1.2; color: var(--ink);
+  caret-color: var(--hi);
+}
+.lk-open .lk-field input:focus,
+.lk-open .lk-field input:focus-visible { outline: none; box-shadow: none; }
+.lk-open .lk-field:focus-within { box-shadow: inset 0 -2px 0 var(--hi); }
+.lk-field input::placeholder { color: rgba(20, 17, 13, 0.26); }
+.lk-route {
+  flex: none; margin-left: auto; padding: 4px 12px 5px; background: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  color: var(--gold-hi); white-space: nowrap;
+}
+.lk-route.busy { color: rgba(232, 196, 124, 0.5); }
+
+/* ---- the answer ---- */
+.lk-ans { padding: 15px 20px 4px; display: flex; gap: 20px; min-height: 168px; }
+.lk-big {
+  flex: none; width: 116px; height: 116px; display: grid; place-items: center;
+  background: var(--ink); font-family: var(--jp); font-weight: 700; font-size: 68px;
+  line-height: 1; color: var(--gold-hi);
+}
+.lk-big.small {
+  font-size: 30px; line-height: 1.15; padding: 0 8px; text-align: center;
+  overflow: hidden; word-break: break-all;
+}
+.lk-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.lk-line { display: flex; align-items: baseline; gap: 11px; }
+.lk-line em {
+  flex: none; width: 96px; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45);
+}
+.lk-line > span {
+  flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 12px;
+  line-height: 1.45; color: rgba(20, 17, 13, 0.75);
+}
+.lk-line > span.jp {
+  font-family: var(--jp); font-weight: 700; font-size: 17px; line-height: 1.35; color: var(--ink);
+}
+/* AN ABSENCE IS DRAWN AS AN ABSENCE. The parts an optional download would fill are set in italic
+   grey and say what is missing -- never as an empty row, and never as a zero. */
+.lk-line.none > span { color: rgba(20, 17, 13, 0.34); font-style: italic; }
+.lk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lk-chips i {
+  font-style: normal; padding: 4px 10px 5px; background: rgba(20, 17, 13, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  font-family: var(--jp); font-weight: 700; font-size: 16px; line-height: 1; color: var(--ink);
+}
+.lk-chips i.lat {
+  font-family: var(--lat-ui); font-size: 9.5px; letter-spacing: 0.14em; padding: 7px 10px;
+  color: rgba(20, 17, 13, 0.62);
+}
+.lk-note {
+  padding: 0 20px 14px; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.13em; line-height: 1.6; color: var(--hi);
+}
+.lk-note.quiet { color: rgba(20, 17, 13, 0.4); }
+
+/* ---- the five routes, along the foot ---- */
+.lk-routes { display: flex; box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.2); }
+.lk-r {
+  flex: 1; min-width: 0; padding: 9px 12px 11px; border: 0; background: transparent;
+  text-align: left; box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.14); cursor: pointer;
+  font: inherit;
+}
+.lk-r:last-child { box-shadow: none; }
+.lk-r b {
+  display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.42);
+}
+.lk-r i {
+  display: block; margin-top: 4px; font-style: normal; font-family: var(--jp); font-weight: 700;
+  font-size: 13px; line-height: 1.2; color: rgba(20, 17, 13, 0.62);
+}
+.lk-r.on { background: var(--ink); box-shadow: none; }
+.lk-r.on b { color: rgba(232, 196, 124, 0.65); }
+.lk-r.on i { color: var(--gold-hi); }
+/* the two that need a model running are dimmed always -- they are doors, and this overlay does
+   not pretend to have walked through them */
+.lk-r.off { cursor: default; }
+.lk-r.off b, .lk-r.off i { color: rgba(20, 17, 13, 0.28); }
+/* a route that answered gets a mark, so you can see where the answers are without visiting each */
+.lk-r u {
+  float: right; text-decoration: none; font-family: var(--lat-ui); font-weight: 900;
+  font-size: 8.5px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.34);
+}
+.lk-r.on u { color: rgba(232, 196, 124, 0.6); }
+.lk-r:focus-visible { outline: 2px solid var(--hi); outline-offset: -3px; }
+
+.lk-hint {
+  position: absolute; left: 250px; top: 604px; width: 780px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-open * { animation: none !important; transition: none !important; }
+}

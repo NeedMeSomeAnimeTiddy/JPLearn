@@ -53,6 +53,7 @@ import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
+import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { useAppNavigation, VIEW_PARENT } from './features/navigation'
@@ -302,6 +303,7 @@ function App() {
   )
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
+  const lookup = useLookup()
 
   function openDailyGames(): void {
     closeKanjiDetail()
@@ -1247,7 +1249,39 @@ function App() {
         return
       }
 
+      /* `/` OPENS THE LOOKUP FROM ANYWHERE, and `,` opens settings the same way. Both are bare
+         keys because that is what the menu was designed around -- and both are ignored the moment
+         anything is being typed into, which is the same guard `?` already uses for the keyboard
+         cheatsheet. Ctrl+, keeps working; this adds a door, it does not move one. */
+      if (!isTypingTarget(event.target) && (event.key === '/' || event.key === ',')) {
+        event.preventDefault()
+        if (event.key === '/') {
+          if (lookup.isOpen) lookup.close()
+          else {
+            setShowSettings(false)
+            lookup.open()
+          }
+          return
+        }
+        lookup.close()
+        if (showSettings) {
+          setShowSettings(false)
+        } else {
+          setDictionaryOpen(false)
+          tutor.closeTutorPanel()
+          setShowOverview(false)
+          setShowSettings(true)
+        }
+        return
+      }
+
       if (event.key === 'Escape') {
+        /* topmost first: the lookup covers everything else while it is open */
+        if (lookup.isOpen) {
+          lookup.close()
+          return
+        }
+
         if (kanjiDetailCharacter) {
           closeKanjiDetail()
           return
@@ -2598,6 +2632,14 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      {/* the lookup is chrome, not session UI -- it stands above everything and is reachable
+          from any screen, which is the one thing the app's own dictionary could never be */}
+      <LookupOverlay
+        controller={lookup}
+        onOpenKanjiDetail={openKanjiDetail}
+        onOpenDictionary={(query) => openDictionary(query)}
+      />
 
       <DictionaryPopup
         open={dictionaryOpen}
