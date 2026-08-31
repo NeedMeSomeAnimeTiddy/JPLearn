@@ -2136,7 +2136,7 @@
   /* ---- the level strip ---- */
   /* narrower than the year on purpose: it is the one plate below the stage, and at 944 its
      right end ran under the key hints in the corner */
-  .lg-lv { left: 200px; top: 424px; width: 880px; height: 44px;
+  .lg-lv { left: 200px; top: 424px; width: 672px; height: 44px;
     display: flex; align-items: stretch; background: rgba(10, 9, 6, 0.86);
     box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
     transform: skewX(-8deg) rotate(-1.2deg); }
@@ -2220,6 +2220,7 @@
   .hud[data-screen="scenes"] .hud-detail { display: none; }
   .hud[data-screen="level"] .hud-detail { display: none; }
   .hud[data-screen="unlock"] .hud-detail { display: none; }
+  .hud[data-screen="wall"] .hud-detail { display: none; }
   /* the road's up-next card is hidden under `[data-course]`; this screen is not a course
      and was inheriting it into the bottom-right corner, over the key hints */
   .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs,
@@ -2230,7 +2231,9 @@
   .hud[data-screen="level"] .hud-next,
   .hud[data-screen="level"] .hud-figs,
   .hud[data-screen="unlock"] .hud-next,
-  .hud[data-screen="unlock"] .hud-figs { display: none; }
+  .hud[data-screen="unlock"] .hud-figs,
+  .hud[data-screen="wall"] .hud-next,
+  .hud[data-screen="wall"] .hud-figs { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2634,6 +2637,116 @@
     background: var(--hi); box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45);
     font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.17em;
     color: #ffd9a1; white-space: nowrap; }
+
+  /* ================================================================================
+     YOU'S LEVEL THREE -- the badge wall, and the only one of the three things the plan
+     listed for this level that survived contact with the app.
+
+     WHY NOT HISTORY. The ledger's level two already IS the history: 52 weeks of real
+     activity with accuracy per bar, and `lgSheet` opens every one of the six figures
+     onto its own reading. A second screen called "history" would either redraw the
+     year band or invent data the bridge does not have -- there is no general history
+     command, only `assistant-chat-history` and `jlpt-exam-history`, both narrow.
+
+     WHY NOT SETTINGS. `AppSettingsModal` exists and is a tabbed modal: theme,
+     typography, animation, study display. That is the right shape for settings, which
+     are reachable from anywhere and are not a destination in a progression tree. It
+     belongs with "Look it up" as an overlay, not as a rung of this section.
+
+     WHAT IS LEFT IS REAL AND HAS NEVER BEEN DRAWN. Twenty-five badges in four groups,
+     every name and description out of `features/achievements/constants.ts`. The ledger
+     showed eight of them as anonymous pips inside the level bar.
+
+     FOUR BANDS, ONE PER GROUP, AND NOTHING FOLDS. The longest group is eleven and
+     eleven seals fit -- 11 x 46 + 10 x 10 = 606, against 712 of usable row. This is
+     the rare set that fits the stage whole, so the overflow rule has nothing to do.
+     ================================================================================ */
+  .wall { position: relative; margin-top: 6px; margin-left: -52px;
+    width: calc(100vw / var(--u)); height: 470px; }
+
+  .bw-rows { position: absolute; left: 176px; top: 34px; width: 924px; height: 248px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .bw-row { flex: 1; min-height: 0; display: flex; align-items: center; gap: 22px;
+    /* see `.bw-seals` -- the row's gap is for the label, not for eleven seals */
+    padding: 0 18px; transform: skewX(-8deg);
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(207,198,171,var(--paper)) 100%);
+    box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
+  .bw-lab { flex: none; width: 186px; display: flex; align-items: baseline; gap: 9px; }
+  .bw-lab b { font-family: var(--jp); font-weight: 700; font-size: 15px; line-height: 1;
+    color: var(--ink); }
+  .bw-lab i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); }
+  .bw-lab u { margin-left: auto; text-decoration: none; font-family: var(--lat);
+    font-style: italic; font-weight: 900; font-size: 13px; color: rgba(20, 17, 13, 0.7); }
+  /* 186 + 22 + (11 x 46 + 10 x 10) + 36 of padding = 850 in a 924 row. Laid flat on the
+     row's own gap it was 970, because a flex gap is between EVERY pair. */
+  .bw-seals { flex: none; display: flex; align-items: center; gap: 10px; }
+
+  /* ---- a seal ---- */
+  /* EARNED IS STAMPED AND UNEARNED IS HOLLOW, which is the whole drawing. A hanko is
+     either pressed or it is not; a half-tone third state would be inventing a degree
+     of earned that the data does not have -- `earned` is a boolean everywhere it is
+     computed, in `useAchievements` and in the catalog both. */
+  .bw-seal { flex: none; width: 46px; height: 46px; border: 0; padding: 0; cursor: pointer;
+    display: grid; place-items: center; font: inherit;
+    background: none; box-shadow: inset 0 0 0 1.5px rgba(20, 17, 13, 0.26);
+    font-family: var(--jp); font-weight: 700; font-size: 20px; line-height: 1;
+    color: rgba(20, 17, 13, 0.32);
+    transition: background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease; }
+  /* the numeric ones are Latin and want their own face, and they want to be smaller --
+     "100" at the kanji's 20px runs out of a 46px seal */
+  .bw-seal.num { font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 15px; letter-spacing: -0.01em; }
+  .bw-seal.got { background: var(--ink); color: var(--gold-hi);
+    box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4); }
+  .bw-seal.on { box-shadow: inset 0 0 0 2px var(--hi); }
+  .bw-seal.got.on { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 2px var(--hi); }
+
+  /* ---- what the selected seal is ---- */
+  .bw-detail { position: absolute; left: 176px; top: 302px; width: 924px; height: 84px;
+    display: flex; align-items: center; gap: 20px; padding: 0 22px;
+    transform: skewX(-8deg) rotate(-1.2deg);
+    background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(233,227,212,var(--paper)) 100%);
+    box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2); }
+  .bw-big { flex: none; width: 66px; height: 66px; display: grid; place-items: center;
+    font-family: var(--jp); font-weight: 700; font-size: 30px; line-height: 1;
+    box-shadow: inset 0 0 0 2px rgba(20, 17, 13, 0.26); color: rgba(20, 17, 13, 0.34); }
+  .bw-big.num { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px; }
+  .bw-big.got { background: var(--ink); color: var(--gold-hi); box-shadow: none; }
+  .bw-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .bw-txt b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px;
+    line-height: 1.1; color: var(--ink); }
+  .bw-txt i { font-style: normal; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 11.5px; line-height: 1.45; color: rgba(20, 17, 13, 0.62); }
+  .bw-state { flex: none; display: flex; flex-direction: column; align-items: flex-end;
+    gap: 5px; white-space: nowrap; }
+  .bw-state b { padding: 4px 12px 5px; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.16em;
+    background: rgba(20, 17, 13, 0.14); color: rgba(20, 17, 13, 0.55); }
+  .bw-state.got b { background: var(--ink); color: var(--gold-hi); }
+  /* WHAT IT TAKES, on the ones you have not got -- a wall of locked seals that will not
+     say what opens them is a wall of questions. The descriptions are the catalog's own,
+     so this costs nothing but the room to print them. */
+  .bw-state i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 8.5px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.45); }
+
+  /* ---- and the way in, taken out of the level bar ---- */
+  /* THE BADGES WERE PIPS INSIDE `.lg-lv`, which made the doorway to a whole screen a
+     decoration on a different figure -- and an unaddressable one, because `.lg-lv` is
+     itself the button. Split out, the level keeps 672 of the foot band and the badges
+     take 194 at its right end, which puts them next to the level in the cursor's walk
+     rather than under it. */
+  .lg-ach { left: 886px; top: 424px; width: 194px; height: 44px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; background: rgba(10, 9, 6, 0.86);
+    box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+    transform: skewX(-8deg) rotate(-1.2deg); }
+  .lg-ach .lg-pips { gap: 2px; }
+  .lg-ach .lg-pips i { width: 6px; height: 6px; }
+  .lg-ach em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap; }
 
   /* ================================================================================
      A DECK'S BLOCKS, AT THE SCALE THE DECK ACTUALLY IS.
@@ -20237,6 +20350,7 @@ function hudRows() {
   if (hudBespoke() === 'scenes') return sceneRows();
   if (hudBespoke() === 'level') return levelRows();
   if (hudBespoke() === 'unlock') return unlockRows();
+  if (hudBespoke() === 'wall') return wallRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -20405,12 +20519,9 @@ function lgData() {
       rankJp: '七級', lv: 7, xpIn: 640, xpOf: 900, xpAll: 12480, reviews: 15406 };
 }
 
-/* the real milestone set out of `achievement-milestones`, with its real earned flags */
-function lgBadges(D) {
-  const rev = (t) => ({ k: t.toLocaleString() + ' REVIEWS', got: D.reviews >= t });
-  const stk = (t) => ({ k: t + '-DAY STREAK', got: D.best >= t });
-  return [rev(100), rev(500), rev(1000), stk(3), stk(7), stk(14), stk(30), stk(100)];
-}
+/* `lgBadges` IS GONE. It was eight synthetic entries -- three review counts and five streak
+   lengths -- standing in for a badge set nothing had drawn. `BADGES` is the real twenty-five
+   out of `features/achievements/constants.ts`, and the pips read from it now. */
 
 /* a bar's colour IS its accuracy -- a blend up the gold ramp over 70..100 */
 function lgAccColor(acc) {
@@ -20444,14 +20555,15 @@ function ledgerRows() {
     mk('RANK', '段級', D.rank + ' GRADE'),
     mk('THE YEAR', '一年', D.y.active + ' OF ' + D.y.total + ' DAYS'),
     mk('LEVEL', '等級', 'LEVEL ' + D.lv),
+    /* SEVENTH, AND THE ONLY ONE THAT IS A PLACE. The other six are figures with a sheet
+       under them; this one opens a screen, which is why it sits at the end of the walk
+       rather than among them. */
+    mk('ACHIEVEMENTS', '章', bwGot() + ' OF ' + BADGES.length),
   ];
 }
 
 function ledgerMarkup() {
   const D = lgData();
-  const badges = lgBadges(D);
-  const got = badges.filter((b) => b.got).length;
-  const next = badges.find((b) => !b.got);
   return `<div class="lg-wrap">`
     + `<button class="lg-f lg-streak lg-plate" data-i="0">`
       + `<span class="lg-cap"><b>連続 STREAK</b>`
@@ -20488,10 +20600,14 @@ function ledgerMarkup() {
         + `<i>${D.xpOf - D.xpIn} XP TO LEVEL ${D.lv + 1}</i></span>`
         + `<span class="lg-xpbar"><i style="width:${Math.round(D.xpIn / D.xpOf * 100)}%"></i>`
         + `</span></span>`
-      + `<span class="lg-badges"><span class="lg-pips">`
-      + badges.map((b) => `<i class="${b.got ? 'got' : ''}"></i>`).join('')
-      + `</span><span>${got} / ${badges.length} · `
-      + `${next ? 'NEXT ' + next.k : 'ALL EARNED'}</span></span></button>`
+      + `</button>`
+    /* THE DOORWAY OUT OF THE LEDGER. It was eight anonymous pips inside the level bar --
+       a decoration on another figure, and unaddressable, because `.lg-lv` is itself the
+       button. It is twenty-five now and it is its own plate. */
+    + `<button class="lg-f lg-ach" data-i="6">`
+      + `<span class="lg-pips">`
+      + BADGES.map((b) => `<i class="${b.got() ? 'got' : ''}"></i>`).join('')
+      + `</span><em>${bwGot()} / ${BADGES.length} EARNED · SEE THEM ▸</em></button>`
     + `</div>`;
 }
 
@@ -21000,6 +21116,156 @@ function unlockPick() {
   const sec = u.opens[UN_SEL].sec;
   UN_AT = -1;
   enterSection(sec);
+}
+
+/* ================================================================================================
+   THE BADGE WALL -- YOU'S LEVEL THREE.
+
+   EVERY NAME AND DESCRIPTION BELOW IS `features/achievements/constants.ts`, transcribed on
+   2026-08-31 -- twenty-five badges in the four groups `useAchievements` merges: the six a feature
+   unlock grants, three review counts, five streak lengths, eleven curriculum milestones. The
+   ledger has been drawing eight of these as anonymous pips inside the level bar.
+
+   EARNED IS DERIVED, NOT AUTHORED. Every flag below is computed from state this mockup already
+   asserts somewhere else: the path's open step for the curriculum ones, `lgData().reviews` and
+   `.best` for the counted ones, and the ascent's own readiness for the five JLPT ones. Hand-listing
+   sixteen trues would have gone stale the moment any of those moved -- the same trap the deck
+   screen's segment row and THE WORLD's text list were built to avoid.
+
+   THE GLYPHS ARE THE ONE INVENTED THING, and most of them barely are: the six unlock seals take
+   the character the section or lane already carries in this file, the counted ones show their own
+   number, and the JLPT ones show their level. Only the curriculum seals were chosen, and each is
+   the first character of that step's own Japanese name. 読 appears twice on purpose -- mastering
+   `reading` is exactly what unlocks `reading_mode`, so one event wears one glyph in both groups.
+   ================================================================================================ */
+const BW_GROUPS = [
+  { jp: '解放', en: 'UNLOCKED', of: 'WHAT THE PATH OPENED' },
+  { jp: '積み重ね', en: 'VOLUME', of: 'REVIEWS COUNTED' },
+  { jp: '連続', en: 'STREAK', of: 'DAYS IN A ROW' },
+  { jp: '節目', en: 'MILESTONES', of: 'STEPS AND LEVELS' },
+];
+
+/* is this path step behind the one you are standing on? */
+const bwDone = (id) => {
+  const i = STUDY_PATH.findIndex((s) => s.id === id);
+  return i >= 0 && i < paHere();
+};
+/* jlpt_dashboard wants `vocabulary_n5` merely REACHED, which is a different test */
+const bwReached = (id) => {
+  const i = STUDY_PATH.findIndex((s) => s.id === id);
+  return i >= 0 && i <= paHere();
+};
+const bwReady = (k) => asPct(AS_LEVELS[k]) >= AS_READY;
+
+const BADGES = [
+  { g: 0, glyph: '聴', n: 'Sound Catcher', d: 'Unlocked listening practice by mastering Hiragana.',
+    got: () => bwDone('hiragana') },
+  { g: 0, glyph: '会', n: 'First Words', d: 'Unlocked conversation practice by mastering N5 grammar.',
+    got: () => bwDone('grammar_n5') },
+  { g: 0, glyph: '漢', n: 'Character Seeker',
+    d: 'Unlocked kanji study by mastering N5 vocabulary and grammar.',
+    got: () => bwDone('vocabulary_n5') && bwDone('grammar_n5') },
+  { g: 0, glyph: '読', n: 'Bookworm', d: 'Unlocked reading mode by mastering free conversation.',
+    got: () => bwDone('reading') },
+  { g: 0, glyph: '検', n: 'Exam Ready', d: 'Unlocked the JLPT prep dashboard.',
+    got: () => bwReached('vocabulary_n5') },
+  { g: 0, glyph: '師', n: 'AI Companion',
+    d: 'Unlocked the AI tutor by progressing through conversation.',
+    got: () => bwDone('grammar_n5') },
+
+  { g: 1, glyph: '100', num: true, n: 'Century Club', d: 'Completed 100 reviews.',
+    got: () => lgData().reviews >= 100 },
+  { g: 1, glyph: '500', num: true, n: 'Dedicated Learner', d: 'Completed 500 reviews.',
+    got: () => lgData().reviews >= 500 },
+  { g: 1, glyph: '1K', num: true, n: 'Review Master', d: 'Completed 1,000 reviews.',
+    got: () => lgData().reviews >= 1000 },
+
+  { g: 2, glyph: '3', num: true, n: 'Getting Started', d: 'Reached a 3-day study streak.',
+    got: () => lgData().best >= 3 },
+  { g: 2, glyph: '7', num: true, n: 'Week Warrior', d: 'Reached a 7-day study streak.',
+    got: () => lgData().best >= 7 },
+  { g: 2, glyph: '14', num: true, n: 'Two Weeks Strong', d: 'Reached a 14-day study streak.',
+    got: () => lgData().best >= 14 },
+  { g: 2, glyph: '30', num: true, n: 'Monthly Master', d: 'Reached a 30-day study streak.',
+    got: () => lgData().best >= 30 },
+  { g: 2, glyph: '100', num: true, n: 'Streak Legend', d: 'Reached a 100-day study streak.',
+    got: () => lgData().best >= 100 },
+
+  { g: 3, glyph: '入', n: 'First Steps', d: 'Completed the tutorial.',
+    got: () => bwDone('tutorial') },
+  { g: 3, glyph: 'ひ', n: 'Hiragana Master', d: 'Mastered every Hiragana character.',
+    got: () => bwDone('hiragana') },
+  { g: 3, glyph: 'カ', n: 'Katakana Master', d: 'Mastered every Katakana character.',
+    got: () => bwDone('katakana') },
+  { g: 3, glyph: '話', n: 'Conversationalist', d: 'Completed scripted conversation practice.',
+    got: () => bwDone('scripted_conv') },
+  { g: 3, glyph: '自', n: 'Free Talker', d: 'Reached free conversation practice.',
+    got: () => bwDone('free_conv') },
+  { g: 3, glyph: '読', n: 'Avid Reader', d: 'Reached reading practice.',
+    got: () => bwDone('reading') },
+  { g: 3, glyph: 'N5', num: true, n: 'JLPT N5 Ready', d: 'Reached JLPT N5 readiness.',
+    got: () => bwReady(0) },
+  { g: 3, glyph: 'N4', num: true, n: 'JLPT N4 Ready', d: 'Reached JLPT N4 readiness.',
+    got: () => bwReady(1) },
+  { g: 3, glyph: 'N3', num: true, n: 'JLPT N3 Ready', d: 'Reached JLPT N3 readiness.',
+    got: () => bwReady(2) },
+  { g: 3, glyph: 'N2', num: true, n: 'JLPT N2 Ready', d: 'Reached JLPT N2 readiness.',
+    got: () => bwReady(3) },
+  { g: 3, glyph: 'N1', num: true, n: 'JLPT N1 Ready', d: 'Reached JLPT N1 readiness.',
+    got: () => bwReady(4) },
+];
+let BW_SEL = 0;
+
+const bwOf = (g) => BADGES.map((b, i) => [b, i]).filter(([b]) => b.g === g);
+const bwGot = () => BADGES.filter((b) => b.got()).length;
+
+function wallMarkup() {
+  const rows = BW_GROUPS.map((G, g) => {
+    const mine = bwOf(g);
+    const got = mine.filter(([b]) => b.got()).length;
+    const seals = mine.map(([b, i]) => `<button class="bw-seal${b.num ? ' num' : ''}`
+      + `${b.got() ? ' got' : ''}" data-i="${i}">${b.glyph}</button>`).join('');
+    return `<div class="bw-row"><span class="bw-lab"><b>${G.jp}</b><i>${G.en}</i>`
+      + `<u>${got} / ${mine.length}</u></span>`
+      + `<span class="bw-seals">${seals}</span></div>`;
+  }).join('');
+  return `<div class="bw-rows">${rows}</div><div class="bw-detail"></div>`;
+}
+
+function wallLayout() {
+  BW_SEL = Math.max(0, Math.min(BW_SEL, BADGES.length - 1));
+  hudEl.querySelectorAll('.bw-seal').forEach((el, i) => el.classList.toggle('on', i === BW_SEL));
+  const d = hudEl.querySelector('.bw-detail');
+  if (!d) return;
+  const b = BADGES[BW_SEL], got = b.got(), G = BW_GROUPS[b.g];
+  /* THE DESCRIPTION IS THE REQUIREMENT. Every one of the catalog's strings says what earns the
+     badge, so an unearned seal has something to say without a second field being invented. */
+  d.innerHTML = `<span class="bw-big${b.num ? ' num' : ''}${got ? ' got' : ''}">${b.glyph}</span>`
+    + `<span class="bw-txt"><b>${b.n}</b><i>${b.d}</i></span>`
+    + `<span class="bw-state${got ? ' got' : ''}"><b>${got ? 'EARNED' : 'NOT YET'}</b>`
+    + `<i>${G.jp} · ${G.of}</i></span>`;
+}
+
+function wallRows() {
+  return BADGES.map((b, i) => ({
+    no: String(i + 1).padStart(2, '0'), en: b.n.toUpperCase(), jp: BW_GROUPS[b.g].jp,
+    big: b.n.toUpperCase(), small: BW_GROUPS[b.g].jp,
+    meta: b.got() ? 'EARNED' : 'NOT YET', pct: 0, figs: [], next: ['', '', ''],
+  }));
+}
+
+/* WALKING A WALL IS TWO AXES. Left and right run the whole set of twenty-five in order, so every
+   badge is reachable by holding one key; up and down jump a group, which is what makes the far end
+   of eleven milestones two presses away rather than twenty. The column is kept where it can be --
+   moving between rows of different lengths has to land somewhere, and the nearest seat in the
+   shorter row is the least surprising one. */
+function wallStep(d) {
+  const b = BADGES[BW_SEL];
+  const g = Math.max(0, Math.min(BW_GROUPS.length - 1, b.g + d));
+  if (g === b.g) return;
+  const col = bwOf(b.g).findIndex(([, i]) => i === BW_SEL);
+  const to = bwOf(g);
+  BW_SEL = to[Math.min(col, to.length - 1)][1];
 }
 
 /* ================================================================================================
@@ -22170,6 +22436,7 @@ const L3_SUB = {
   scenes: '場面を選んでください · CHOOSE A CONVERSATION',
   level: 'この級が求めるもの · WHAT THIS LEVEL ASKS OF YOU',
   unlock: '新しく開いたもの · SOMETHING JUST OPENED',
+  wall: '二十五の印 · TWENTY-FIVE SEALS, AND WHAT EACH ONE TAKES',
 };
 
 function worldMarkup() {
@@ -22276,6 +22543,8 @@ function hudBespoke() {
        deck and the feed are -- it is an event that happens to be standing at level three,
        and while it is up it is the only thing there. */
     if (UN_AT >= 0) return 'unlock';
+    /* YOU'S LEVEL THREE, and its only one -- see the note by `.wall`. */
+    if (HUD.sec === 'RECORDS') return 'wall';
     /* the drills lane, one level inside PRACTICE */
     if (HUD.sec === 'DRILLS') return 'modes';
     /* THE WORLD'S TWO LANES EACH OPEN SOMETHING DIFFERENT, so which screen this is depends on
@@ -22333,7 +22602,8 @@ function hudDraw(force) {
             : bespoke === 'scenes' ? SCENES.length + 1
               : bespoke === 'level' ? AS_MODES.length
                 : bespoke === 'unlock' ? (unNow() ? unNow().opens.length : 1)
-                  : all.length;
+                  : bespoke === 'wall' ? BADGES.length
+                    : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -22357,7 +22627,8 @@ function hudDraw(force) {
     bespoke === 'world' ? W_AT + '/' + String(W_SHUT) : '',
     bespoke === 'scenes' ? String(SC_AT) : '',
     bespoke === 'level' ? AS_SEL + '/' + LV_AT : '',
-    bespoke === 'unlock' ? UN_AT + '/' + UN_SEL : ''].join('|');
+    bespoke === 'unlock' ? UN_AT + '/' + UN_SEL : '',
+    bespoke === 'wall' ? String(BW_SEL) : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -22386,6 +22657,7 @@ function hudBuild(rows) {
          the thing that just happened is that you finished a step */
       || (UN_AT >= 0 && (() => { const u = unNow(); if (!u) return null;
         const S = STUDY_PATH[unStep(u)]; return [S.jp, S.en]; })())
+      || (HUD.sec === 'RECORDS' && ['章', 'ACHIEVEMENTS'])
       || (SUBTILES[HUD.sec] || []).find((t) => t[0] === HUD.tile)
       || DECK_NAMES[HUD.tile] || [HUD.tile, ''])
     : null;
@@ -22504,6 +22776,8 @@ function hudBuild(rows) {
                         ? `<div class="level">${levelMarkup()}</div>`
                         : bespoke === 'unlock'
                           ? `<div class="unlock">${unlockMarkup()}</div>`
+                          : bespoke === 'wall'
+                            ? `<div class="wall">${wallMarkup()}</div>`
               : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -22640,6 +22914,9 @@ function hudBuild(rows) {
   hudEl.querySelectorAll('.lv-mode').forEach((b) => {
     b.addEventListener('click', () => { LV_AT = +b.dataset.m; levelPick(); hudDraw(); });
   });
+  hudEl.querySelectorAll('.bw-seal').forEach((b) => {
+    b.addEventListener('click', () => { BW_SEL = +b.dataset.i; hudDraw(); });
+  });
   hudEl.querySelectorAll('.cs-tab').forEach((b) => {
     b.addEventListener('click', () => {
       if (performance.now() - dragEnded < 140) return;
@@ -22737,6 +23014,7 @@ function hudSync(rows) {
   if (hudBespoke() === 'scenes') { scenesLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'level') { levelLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'unlock') { unlockLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'wall') { wallLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -23013,6 +23291,11 @@ addEventListener('keydown', (e) => {
       LG_OPEN = false; hudDraw();
       e.preventDefault(); e.stopImmediatePropagation(); return;
     }
+    /* six figures open a sheet; the seventh opens a screen */
+    if (e.key === 'Enter' && HUD.cur === 6) {
+      LG_OPEN = false; BW_SEL = 0; HUD.level = 3; hudDraw();
+      e.preventDefault(); return;
+    }
     if (e.key === 'Enter') { LG_OPEN = !LG_OPEN; hudDraw(); e.preventDefault(); return; }
     /* W swaps the whole ledger to a bad week -- streak of one, a year mostly empty, level one.
        A records screen that has only ever been seen on a good account has not been tested. */
@@ -23264,6 +23547,19 @@ addEventListener('keydown', (e) => {
     if (k < 0) { doFlash(0.16); e.preventDefault(); return; }
     UN_AT = k; UN_SEL = 0; HUD.level = 3; hudDraw();
     e.preventDefault(); return;
+  }
+  /* ---- THE WALL: left and right run all twenty-five, up and down jump a group ---- */
+  if (hudBespoke() === 'wall') {
+    if (e.key === 'ArrowRight') {
+      BW_SEL = Math.min(BADGES.length - 1, BW_SEL + 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowLeft') {
+      BW_SEL = Math.max(0, BW_SEL - 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowDown') { wallStep(1); hudDraw(); e.preventDefault(); return; }
+    if (e.key === 'ArrowUp') { wallStep(-1); hudDraw(); e.preventDefault(); return; }
+    /* a badge is a record, not a door -- there is nothing under one to open */
+    if (e.key === 'Enter') { doFlash(0.14); e.preventDefault(); return; }
   }
   /* ---- THE MOMENT: walk what opened, Enter goes there ---- */
   if (hudBespoke() === 'unlock') {
