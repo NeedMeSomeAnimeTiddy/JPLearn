@@ -82,7 +82,13 @@ Plus **Look it up** 引く — an overlay on one key from any level, not a secti
   section is a separate gate, so a total above the pass mark with that section below 19 (or 38
   at N4/N5) is still a fail. It also draws what the app *cannot* project — there is no
   listening content, so `overall_passes` is always False and the total is hatched, not zeroed.
-- **RECORDS → You.** Gains achievements, history and settings.
+- **RECORDS → You.** Gains achievements. **Built 2026-08-31 — and history and settings did not
+  survive the app.** History is already the ledger's level two: 52 weeks of real activity with
+  accuracy per bar, and `lgSheet` opens each of its six figures onto its own reading. A second
+  screen would redraw the year band or invent data — there is no general history command on the
+  bridge, only `assistant-chat-history` and `jlpt-exam-history`, both narrow. Settings is
+  `AppSettingsModal`, a tabbed modal, and that is the right shape for it: reachable from anywhere,
+  not a destination in a progression tree. **Settings joins "Look it up" as an overlay.**
 - **New: Look it up.** `dictionary-search`, `kanji-detail`, `lookup-sentence`, `assistant-chat`
   and `assistant-chat-ocr` all exist on the bridge and appear nowhere in the menu.
 
@@ -98,7 +104,7 @@ streak, XP, level. *Built; the hero and the progressive reveal are new.*
 | Practice | three lanes **[new]** | review **[new]** · drill picker **[briefed]** · daily games **[built]** | the game runs *(in the app)* |
 | The World | two lanes **[built]** | the library **[built]** · pick a scene **[built]** | the reader · the conversation *(in the app)* |
 | The Exam | the ascent **[built]** | a level **[built]** | the exam runs *(in the app)* |
-| You | the ledger **[built]** | achievements · history · settings **[to design]** | — |
+| You | the ledger **[built]** | the badge wall **[built]** · ~~history~~ · ~~settings~~ — see below | — |
 
 Everything marked *(in the app)* exists as a React feature today and is not a menu screen —
 `features/study-session`, `MinigameView`, `features/daily-games`, `features/passages`

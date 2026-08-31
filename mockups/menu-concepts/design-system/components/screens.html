@@ -1,7 +1,7 @@
-<!-- @dsCard group="Components" name="The screens" subtitle="Eighteen screens across three levels, each a real 1280×720 plate" width="1360" height="14700" -->
+<!-- @dsCard group="Components" name="The screens" subtitle="Fifteen screens across three levels, each a real 1280×720 plate" width="1360" height="15650" -->
 <!doctype html>
 <meta charset="utf-8">
-<title>The eighteen screens that exist</title>
+<title>The fifteen screens that exist</title>
 <style>
   :root {
     --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --gold: #cfa45c; --gold-hi: #e8c47c;
@@ -47,7 +47,7 @@
   td { color: rgba(242,234,216,0.76); }
 </style>
 
-<h1>The eighteen screens that exist</h1>
+<h1>The fifteen screens that exist</h1>
 <p class="lede">
   <code>built.html</code> documents five OBJECTS — the menu row, the road tablet, the hero card, the
   heading slab, the caption chip. It is still correct about those. This card is which SCREENS they
@@ -55,11 +55,11 @@
 </p>
 <p class="lede">
   <b>Every plate below is the real mockup at 1280&times;720 with the clock frozen at 17:30.</b> One
-  hour for all eighteen, so what differs between them is shape rather than lighting — for the ground
+  hour for all fifteen, so what differs between them is shape rather than lighting — for the ground
   each section actually stands on across the day, see <code>foundations/backdrops.html</code>.
 </p>
 <p class="lede">
-  <b>All eighteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
+  <b>All fifteen sit on the frame contract</b> (<code>foundations/frame-contract.html</code>): the
   drawing inside x&nbsp;160&ndash;1120 / y&nbsp;192&ndash;576, bare valley 160px either side,
   whole-set summaries in the foot band. Read that card before designing a new one — in particular
   the part about skew being paint rather than layout, which is what puts a screen in the moat while
@@ -67,16 +67,20 @@
 </p>
 
 <div class="note">
-  <b>Eighteen screens, three levels.</b>
+  <b>Fifteen screens, three levels — counted, not estimated.</b>
+  <p style="margin:6px 0 0">This number has drifted upward for weeks because it was counting
+  PLATES: every state of a screen and every half of a pair. A screen is one drawing the menu can
+  show, which is one value of <code>hudBespoke()</code> plus the road and the standing menu. Thirteen
+  bespoke, the road, the menu. The plates below still outnumber them, deliberately — a locked level
+  and an open one are one screen and two pictures.</p>
   <table>
-    <tr><th>LEVEL 1</th><td>the standing menu — the hero, and five section rows beneath it</td></tr>
-    <tr><th>LEVEL 2</th><td>six: The Path's path &middot; Practice's lanes &middot; The World's
-      lanes &middot; The Exam's ascent &middot; You's ledger &middot; and the daily road, which is
-      reached from inside Practice rather than from a row of its own</td></tr>
-    <tr><th>LEVEL 3</th><td>ten: the deck &middot; the feed &middot; the cleared pile &middot;
-      the drill modes &middot; the daily road &middot; the library &middot; the scene picker &middot;
-      one JLPT level, open or shut &middot; and the unlock moment, which is the one screen here
-      that is an EVENT rather than a place &mdash; nothing navigates to it</td></tr>
+    <tr><th>LEVEL 1</th><td><b>1</b> — the standing menu: the hero, and five section rows</td></tr>
+    <tr><th>LEVEL 2</th><td><b>6</b> — path &middot; lanes &middot; world &middot; ascent &middot;
+      ledger &middot; and the daily road, reached from inside Practice rather than from a row of
+      its own</td></tr>
+    <tr><th>LEVEL 3</th><td><b>8</b> — deck &middot; feed &middot; library &middot; scene picker
+      &middot; drill modes &middot; one JLPT level &middot; the unlock moment &middot; the badge
+      wall</td></tr>
   </table>
   <p style="margin:9px 0 0"><b>Two sections have lanes now, and they are the same component.</b>
   Practice's three and The World's two are one card doing one job — "which of these do you want to
@@ -229,6 +233,11 @@
       weekly bars, height for volume and colour for accuracy. Classes are <code>.lg-*</code>.</p>
     <p>It must survive a bad week: press W in the mockup for a streak of one and a year mostly empty.
       A records screen that only looks good on a good account has not been tested.</p>
+    <p><b>Six of its seven things are figures and the seventh is a door.</b> The badges used to be
+      eight pips inside the level bar — the entrance to a whole screen drawn as a decoration on a
+      different figure, and unaddressable, since the level bar is itself the button. They are their
+      own plate at the right of the foot band now, which puts them beside the level in the cursor's
+      walk rather than under it.</p>
   </figcaption>
 </figure>
 
@@ -325,6 +334,27 @@
     <p>Four of the seventeen exist on exactly one deck &mdash; Stroke Order is kanji only, Vibe
       Check is grammar only, Compound Builder and Conjugation Drill are vocabulary only. That is
       what this screen is made of, and the reason a flat list of seventeen would be a lie.</p>
+  </figcaption>
+</figure>
+
+<figure>
+  <img src="../assets/screen-wall.png" alt="You, the badge wall">
+  <figcaption>
+    <div class="name"><b>THE WALL</b><i>YOU &middot; LEVEL 3 &middot; 25 BADGES</i><u>peers</u></div>
+    <p><b>Twenty-five seals in the four groups <code>useAchievements</code> merges</b>, every name
+      and description out of <code>features/achievements/constants.ts</code>. The ledger had been
+      drawing eight of them as anonymous pips inside the level bar. Classes are <code>.bw-*</code>.</p>
+    <p><b>Earned is stamped and unearned is hollow</b>, and there is no third state — <code>earned</code>
+      is a boolean everywhere it is computed, so a half-tone would be inventing a degree of earned
+      the data does not have. The description doubles as the requirement, so a locked seal still
+      says what opens it; a wall that will not is a wall of questions.</p>
+    <p><b>A band is as long as its group.</b> Laid at the full stage width they were four identical
+      slabs with three seals on one and eleven on another, mostly empty paper. Sized to their content
+      the band's LENGTH is the group's size — a figure the screen was not drawing before.</p>
+    <p><b>The plan wanted three things at this level and two did not survive the app.</b> History is
+      already the ledger: 52 weeks with accuracy per bar, and every figure opens onto its own reading.
+      Settings is <code>AppSettingsModal</code>, and a tabbed modal reachable from anywhere is the
+      right shape for settings — it belongs with "Look it up" as an overlay, not as a rung.</p>
   </figcaption>
 </figure>
 
