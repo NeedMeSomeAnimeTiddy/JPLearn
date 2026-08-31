@@ -250,9 +250,60 @@ because it counts neither three's ArrayBuffers nor anything on the GPU.
 **+359 MB is the honest price of the valley**, and it is the only number here that gives pause.
 Boot is +90 ms, frame rate is not a problem, install is +20 MB — memory is the cost.
 
-One lever has not been pulled: three keeps a CPU-side copy of every vertex attribute after
-uploading it to the GPU, and `BufferAttribute.onUpload` frees them. That should take a bite out
-of the 253 MB renderer figure and is untried. **Do that before treating 778 MB as final.**
+### The lever, pulled
+
+three keeps a CPU-side copy of every vertex attribute after uploading it, and
+`BufferAttribute.onUpload` frees them. It was worth **15 MB**, not the ~150 MB the gap between a
+42.6 MB JS heap and a 289 MB renderer process suggested.
+
+First, though, **63 MB of the original +359 MB was garbage V8 had not collected**. Forcing
+collection is the difference between a cost and a queue, and every figure below is post-GC:
+
+| | Tab | GPU | total |
+| --- | --- | --- | --- |
+| valley off | 99.8 MB | 107.6 MB | 422.2 MB |
+| valley on, no lever | 289.1 MB | 211.1 MB | 716.3 MB |
+| **+ `onUpload`** | **272.4 MB** | 211.1 MB | **701.2 MB** |
+| + force full upload | 262.6 MB | 236.9 MB | 715.5 MB |
+| + release parser | 273.3 MB | 215.4 MB | 706.8 MB |
+
+**Two of the four things tried were not worth doing, and knowing which is the point.**
+
+- **`onUpload` freed 40.1 MB of arrays across 629 attributes but returned only 15 MB.** glTF
+  accessors are *views* over shared per-bufferView `ArrayBuffer`s, and a buffer only goes when
+  every view of it does.
+- **Forcing the whole valley to upload on frame one made things worse.** It frees the 328
+  attributes belonging to frustum-culled geometry — but uploading shapes the camera has never
+  seen cost 25.8 MB of GPU memory to save 9.8 MB of renderer memory. Deferred is strictly
+  better: it converges on the same place if you visit everywhere and stays cheaper if you don't.
+- **Releasing `GLTFParser.associations` changed nothing** (706.8 against 701.2, inside the
+  noise). The map really does hold 22,087 entries pinning every discarded mesh, but `gltf` is a
+  local that nothing outlives, so it was already collectable. An earlier reading that said
+  otherwise was the diagnostic handle holding `gltf` itself. The call stays as a **guard** — one
+  line against the day a later phase keeps the loader for its cameras — and is commented as one.
+
+**Where the +294 MB actually is:** ~103 MB of it is GPU buffers for 2.8 M triangles, which is
+irreducible without less geometry. Of the ~173 MB in the renderer process, only ~16 MB was ever
+freeable CPU arrays; the rest is Chromium's own mirror of the GPU buffers plus the object graph.
+**There is no further easy win here — the next one is fewer triangles, not better housekeeping.**
+
+Freeing the arrays has two real consequences, both handled: a lost WebGL context can no longer be
+re-uploaded, so the valley reloads itself from the file instead; and ray-picking world geometry is
+gone, which costs nothing while the menu is screen-space but is the thing to remember if a later
+phase ever wants to click a building.
+
+Boot and frame rate are unchanged by any of it: 1420 ms to app content, 864 ms for the world
+behind it, 139 fps.
+
+## Final phase 0 position
+
+| | value |
+| --- | --- |
+| app on screen | **+90 ms** over no valley |
+| world behind it | ~0.9–1.1 s later |
+| frame rate | **117–165 fps** |
+| package | **492 MB** (baseline 472 MB) |
+| memory | **701 MB** (baseline 422 MB) — **+279 MB** |
 
 ## Three measurements that were wrong before they were right
 

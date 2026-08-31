@@ -30,6 +30,8 @@ export type ValleyMarks = {
   triangles: number
   geometries: number
   textures: number
+  freedAttributes: number
+  freedMB: number
 }
 
 type Handle = {
@@ -96,6 +98,70 @@ function collapseToInstances(root: Object3D): { before: number; after: number } 
     after++
   }
   return { before, after }
+}
+
+/* GIVE THE VERTICES BACK ONCE THE GPU HAS THEM. three keeps the CPU-side typed array of every
+   attribute alive forever after uploading it, because it has no way of knowing you will not want
+   to read or re-upload it. This world is 2.8 million triangles and never changes a vertex, so
+   those arrays are a second copy of the whole valley sitting in the renderer process. Nulling the
+   array inside `onUpload` is the documented way to drop it: three grabs a local reference before
+   invoking the callback, so the upload itself completes.
+
+   THE PRICE IS THAT THE SCENE CANNOT BE REBUILT. If the WebGL context is lost -- a driver reset,
+   a GPU hang, waking from sleep -- three re-uploads from arrays that are no longer there and the
+   valley comes back empty. That is handled below by rebuilding from the file, which is the only
+   honest answer: there is no copy left to recover from.
+
+   It also gives up ray-picking against world geometry, which needs the position array to test
+   triangles. The menu is screen-space and picks nothing in the world, so that is not a loss here
+   -- but it is the thing to remember if a later phase ever wants to click a building. */
+function freeCpuCopiesAfterUpload(root: Object3D): { attributes: number; bytes: number } {
+  const seenGeometry = new Set<string>()
+  const seenInterleaved = new Set<unknown>()
+  /* the callbacks fire during the render that follows, so this is filled in after we return it --
+     the caller reads it once a frame has actually been drawn */
+  const stats = { attributes: 0, bytes: 0 }
+
+  const release = (holder: { array: ArrayLike<number> | null }) => {
+    const arr = holder.array as ArrayBufferView | null
+    if (!arr) return
+    stats.bytes += arr.byteLength
+    stats.attributes++
+    /* three reads `array` into a local before calling this, so dropping it here is safe */
+    holder.array = null
+  }
+
+  root.traverse((o) => {
+    const m = o as Mesh
+    if (!m.isMesh || !m.geometry) return
+    const g = m.geometry as BufferGeometry
+    if (seenGeometry.has(g.uuid)) return
+    seenGeometry.add(g.uuid)
+
+    /* bounds FIRST -- they are computed from the array, and three computes them lazily at cull
+       time, which is after the upload that is about to take the array away */
+    if (!g.boundingSphere) g.computeBoundingSphere()
+    if (!g.boundingBox) g.computeBoundingBox()
+
+    const buffers: { array: ArrayLike<number> | null; onUpload: (cb: () => void) => unknown }[] = []
+    for (const attribute of Object.values(g.attributes)) {
+      const inter = attribute as unknown as { isInterleavedBufferAttribute?: boolean; data?: unknown }
+      if (inter.isInterleavedBufferAttribute && inter.data) {
+        /* several attributes share one interleaved buffer; free the buffer once, not per view */
+        if (seenInterleaved.has(inter.data)) continue
+        seenInterleaved.add(inter.data)
+        buffers.push(inter.data as (typeof buffers)[number])
+      } else {
+        buffers.push(attribute as unknown as (typeof buffers)[number])
+      }
+    }
+    if (g.index) buffers.push(g.index as unknown as (typeof buffers)[number])
+
+    for (const b of buffers) {
+      b.onUpload(() => release(b))
+    }
+  })
+  return stats
 }
 
 function countTriangles(root: Object3D): number {
@@ -190,9 +256,29 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
 
   const camera = pickCamera(root, window.innerWidth / Math.max(1, window.innerHeight))
 
+  /* registered before the first render, because the callbacks fire during the upload that render
+     performs; `freed` is empty until then */
+  const freed = freeCpuCopiesAfterUpload(root)
+
+  /* AN ATTRIBUTE IS ONLY RELEASED WHEN THREE UPLOADS IT, and three only uploads what it draws --
+     so geometry outside the opening shot keeps its array until the camera first reaches it. That
+     is the right bargain and it was measured: forcing the whole valley to upload on frame one to
+     free those arrays gave back 9.8 MB of renderer memory and cost 25.8 MB of GPU memory, because
+     shapes the camera has never seen became resident for nothing. Deferred is strictly better --
+     it converges on the same place if you visit everywhere, and stays cheaper if you do not. */
   const tFrame0 = performance.now()
   renderer.render(scene, camera)
   const firstFrameMs = performance.now() - tFrame0
+
+  /* LET GO OF THE LOADER -- A GUARD, NOT A SAVING, and measured as exactly that. GLTFParser keeps
+     an `associations` map from every object it built back to the glTF that described it: 22,087
+     entries here, pinning all 21,484 meshes the instancing pass just discarded, plus the file's
+     whole binary chunk. Today `gltf` is a local that nothing outlives, so clearing it changes
+     nothing (706.8 MB against 701.2 MB, inside the noise). It stays because the day something
+     does hold onto `gltf` -- for the cameras, for animations -- this is what stops that from
+     silently retaining the entire pre-instancing scene. */
+  const parser = (gltf as unknown as { parser?: { associations?: Map<unknown, unknown> } }).parser
+  parser?.associations?.clear()
 
   const marks: ValleyMarks = {
     fetchMs: Math.round(fetchMs),
@@ -205,7 +291,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     triangles: countTriangles(root),
     geometries: renderer.info.memory.geometries,
     textures: renderer.info.memory.textures,
+    freedAttributes: freed.attributes,
+    freedMB: +(freed.bytes / 1048576).toFixed(1),
   }
+
+  /* THE CONTEXT CAN BE LOST AND THE VERTICES ARE GONE. Nothing on the CPU can redraw this scene,
+     so the only recovery is to load the world again from the file. Rare -- a driver reset or a
+     GPU hang -- but silent breakage would be worse than a second of reloading. */
+  canvas.addEventListener('webglcontextlost', (event) => {
+    event.preventDefault()
+    console.warn('[valley] WebGL context lost; the world is being loaded again')
+    handle?.dispose()
+    void mountValley(url).catch((error) => console.warn('[valley] reload failed:', error))
+  })
 
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight, false)
