@@ -48,6 +48,7 @@
     "react-activity-calendar": "^3.2.1",
     "react-dom": "^19.2.7",
     "react-type-animation": "^3.2.0",
+    "three": "^0.185.1",
     "unofficial-jisho-api": "^2.3.4",
     "update-electron-app": "^3.3.0",
     "wanakana": "^5.3.1"
@@ -62,6 +63,7 @@
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.0.2",
     "axe-core": "^4.12.1",
     "concurrently": "^10.0.3",

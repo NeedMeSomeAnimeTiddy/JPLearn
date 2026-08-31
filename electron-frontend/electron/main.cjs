@@ -2013,7 +2013,13 @@ function loadMainWindow(win) {
     win.setTitle('JPLearn')
   })
 
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  // JPLEARN_VALLEY=off suppresses the 3D menu backdrop. It travels as a query rather than an env
+  // read in the renderer because the flag has to be visible to the very first script that runs,
+  // which is what makes an honest with/without boot comparison possible from one build.
+  win.loadFile(
+    path.join(__dirname, '..', 'dist', 'index.html'),
+    (process.env.JPLEARN_VALLEY || '').trim() === 'off' ? { query: { valley: 'off' } } : undefined,
+  )
 
   // Inject locally downloaded fonts from the assets store if available.
   // Falls back to system fonts silently — no user action needed.

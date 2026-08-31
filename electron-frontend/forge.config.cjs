@@ -14,6 +14,18 @@ module.exports = {
     // Path without extension - Forge appends .ico on Windows, .icns on macOS.
     icon: "./assets/icon",
     extraResource,
+    // Everything the renderer needs is already bundled into dist/ by vite. Shipping the sources
+    // it was built from puts them in the asar twice: public/ is copied verbatim into dist/, and
+    // node_modules/three ships ~26MB of examples and sources for a library vite already inlined
+    // into three-vendor.js. Measured: dropping both took the package from 570MB to 500MB.
+    ignore: [
+      /^\/public($|\/)/,
+      /^\/node_modules\/three($|\/)/,
+      /^\/src($|\/)/,
+      /^\/mockups($|\/)/,
+      /^\/out($|\/)/,
+      /^\/\.smoke($|\/)/,
+    ],
   },
   hooks: {
     // Remove large runtime-only directories from bundled extraResources.

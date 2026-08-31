@@ -1,0 +1,16 @@
+# The world the menu stands in, quantized for the app.
+#
+# world.glb here is a BUILD ARTIFACT, twice over: it is exported from environment.blend, and then
+# run through KHR_mesh_quantization to get from 44.6 MB to 29.1 MB. It is ignored for the same
+# reason `mockups/menu-concepts/models/world.glb` is -- 29 MB a revision would dominate the history
+# of a repository that is 50 MB packed in total, and it can be regenerated from a source that is
+# itself not in git.
+#
+# WHICH MEANS A FRESH CLONE CANNOT BUILD THE VALLEY, and that is an open question rather than a
+# settled one. Phase 0 measured the cost of the world; how it reaches a machine that has never had
+# it -- LFS, a release asset, a fetch script, or a first-run download -- is phase 1's to answer.
+# Until then the app is expected to boot without it: `mountValley` catches its own failure and the
+# app loses a backdrop, not a feature.
+
+world.glb
+night_lightmap.png

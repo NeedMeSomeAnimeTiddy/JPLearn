@@ -12,6 +12,12 @@ export default defineConfig({
           if (!id.includes('node_modules')) {
             return undefined
           }
+          // three is loaded lazily by the valley, after the app has painted. Left in `vendor` it
+          // would be pulled into the entry graph and parsed on the critical path, which is the
+          // opposite of the point -- the world is allowed to arrive late, the app is not.
+          if (id.includes('node_modules/three')) {
+            return 'three-vendor'
+          }
           if (id.includes('node_modules/react')) {
             return 'react-vendor'
           }

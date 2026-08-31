@@ -146,3 +146,165 @@ It stops being "render the valley in Electron" and becomes:
 The gate stays the same: if the honest post-optimisation number is still unacceptable, the port
 stops there and the design stays a mockup — which is a real outcome and cheaper to discover in
 phase 0 than in phase 4.
+
+---
+
+# Phase 0 — done, 2026-08-31
+
+The valley renders inside the packaged Electron app. Every number below was measured on this
+machine against `out/JPLearn-win32-x64/JPLearn.exe`, three cold boots each, median reported.
+
+## What shipped
+
+`three` 0.185.1 as a real dependency, `src/valley/valley.ts` (a module, **not** a component),
+mounted from `main.tsx` after first paint, behind everything `home` draws. 244 lines. No HUD, no
+navigation change, no flights — exactly what the phase said.
+
+## Compressing the world
+
+| | size | vs base | fetch | parse | **total load** | triangles |
+| --- | --- | --- | --- | --- | --- | --- |
+| baseline (float32) | 44.59 MB | — | 200 ms | 593 ms | **792 ms** | 2,809,553 |
+| **quantized** (`KHR_mesh_quantization`) | **29.09 MB** | −34.8% | 130 ms | 633 ms | **763 ms** | 2,809,553 |
+| quantized + meshopt | 14.43 MB | −67.7% | 66 ms | 657 ms | **723 ms** | 2,809,553 |
+| draco | 7.43 MB | −83.3% | 57 ms | 647 ms | **704 ms** | 2,808,409 |
+
+**Compression buys install size, not boot time.** 88 ms separates a 44 MB file from a 7 MB one,
+because the asset is on local disk and the parse cost is building 21,486 mesh objects, not
+decoding bytes. Every variant preserves all 21,072 nodes, 9 cameras and every node name; draco
+alone is lossy, quietly dropping 1,144 triangles.
+
+### Why the answer is `quantize` and not the smaller two
+
+`script-src 'self'` in `index.html` forbids `WebAssembly.instantiate`. **meshopt and Draco are
+both wasm, so both are impossible without adding `'wasm-unsafe-eval'` to the CSP.** Quantization
+is the only one three reads natively. Trading a CSP relaxation for 15 MB of install size, in an
+app that ships 492 MB, is not a trade worth making — and it costs 40 ms.
+
+The CSP did need one change regardless: `connect-src`/`img-src` gained `blob:`, because
+GLTFLoader hands embedded textures to the page as blob URLs and all eight were being refused.
+
+## The lightmap is not shipped
+
+`night_lightmap.png` is 4096×4096 RGB, 7.62 MB, and **nothing in phase 0 uses it** — the night
+rig has not been ported. Shipping it would be 7.6 MB of dead weight, so it was removed. The
+measurements stand for whoever ports the rig:
+
+| | size | vs base | error vs source |
+| --- | --- | --- | --- |
+| lossless PNG, max effort | 6.73 MB | −11.7% | none |
+| lossless WebP | 5.23 MB | −31.3% | none |
+| near-lossless WebP q60 | 3.18 MB | −58.2% | slight |
+| lossy WebP q95 | 2.84 MB | −63.6% | RMSE 6.72, **max 150/255** |
+| downscaled to 2048 | 465 KB | −94.0% | **RMSE 21.85** |
+
+The source was **not** badly compressed — a lossless re-encode wins only 11.7%. And the
+resolution is carrying real detail: halving it costs three times the error of any compression
+setting. A lightmap has hard discontinuities at UV island borders, which is precisely what
+DCT-based lossy compression handles worst, and a max error of 150/255 is light leaking across an
+island edge. **If it must shrink, lossless WebP at full resolution is the only free win.**
+
+## Packaging
+
+The app was shipping its own sources: `public/` is copied verbatim into `dist/` and then both
+went into the asar, and `node_modules/three` added ~26 MB of examples and sources for a library
+vite had already inlined. A forge `ignore` list fixes it.
+
+| | package | app.asar |
+| --- | --- | --- |
+| baseline, before any of this | 472 MB | 104.8 MB |
+| valley + duplicated assets | 570 MB | — |
+| **valley, deduplicated** | **492 MB** | **126.5 MB** |
+
+**+20 MB over baseline** for a 29 MB world, because the cleanup gave back more than the world costs.
+
+## The boot, A/B from one build
+
+`JPLEARN_VALLEY=off` disables the valley, so both arms are the same binary.
+
+| | valley OFF | valley ON | delta |
+| --- | --- | --- | --- |
+| app content on screen | 1514 ms | 1604 ms | **+90 ms** |
+| world standing behind it | — | +1126 ms after that | |
+| sustained frame rate | — | **117–165 fps** | |
+| meshes → drawables | — | 21,484 → **345** | |
+
+The valley waits for first contentful paint before it starts. That is not caution, it was
+measured: kicking the import off at module scope cost first paint 1212 ms → 3992 ms, because
+parsing 21,000 nodes is about a second of unbroken main-thread work and the browser had not
+painted yet when it began.
+
+## The one real cost: memory
+
+From Electron's own `getAppMetrics()`, not `usedJSHeapSize` — which reports 9.5 MB either way,
+because it counts neither three's ArrayBuffers nor anything on the GPU.
+
+| process | valley OFF | valley ON | delta |
+| --- | --- | --- | --- |
+| Tab (renderer) | 98.8 MB | 351.8 MB | **+253.0 MB** |
+| GPU | 107.3 MB | 211.5 MB | **+104.2 MB** |
+| Browser | 165.3 MB | 167.2 MB | +1.9 MB |
+| Utility | 47.5 MB | 47.5 MB | — |
+| **total** | **418.9 MB** | **778.1 MB** | **+359.2 MB** |
+
+**+359 MB is the honest price of the valley**, and it is the only number here that gives pause.
+Boot is +90 ms, frame rate is not a problem, install is +20 MB — memory is the cost.
+
+One lever has not been pulled: three keeps a CPU-side copy of every vertex attribute after
+uploading it to the GPU, and `BufferAttribute.onUpload` frees them. That should take a bite out
+of the 253 MB renderer figure and is untried. **Do that before treating 778 MB as final.**
+
+## Three measurements that were wrong before they were right
+
+Recorded because each would have sent the decision the wrong way.
+
+- **The first baseline was the splash screen.** 1.68 s to paint, 9.5 MB heap, zero canvases —
+  all of it the splash window, not the app. The real window is created hidden and shown on
+  `ready-to-show`, so Chromium records **no paint entries for it at all**; a probe that waits for
+  first-contentful-paint on the app window waits forever. Readiness is now polled from outside.
+- **A "lossless" PNG re-encode at −63%** was sharp silently palettizing to 256 colours
+  (`colorType 3`). The real lossless figure is −11.7%. A 256-colour lightmap would band visibly.
+- **`usedJSHeapSize` shows no difference whatsoever** between a booted app and a booted app
+  holding 2.8 M triangles. Every memory number here comes from the process metrics instead.
+
+## Reproducing the asset
+
+`electron-frontend/public/models/world.glb` is a build artifact and is **not in git** — 29 MB a
+revision would dominate a repository that is 50 MB packed, and its own source
+(`mockups/menu-concepts/models/world.glb`) is not tracked either, for the same reason. It is made
+from that file with:
+
+```bash
+npm i @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions
+```
+
+```js
+import { NodeIO } from '@gltf-transform/core'
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions'
+import { quantize } from '@gltf-transform/functions'
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS)
+const doc = await io.read('mockups/menu-concepts/models/world.glb')
+await doc.transform(quantize({ quantizePosition: 14, quantizeNormal: 10,
+  quantizeTexcoord: 12, quantizeColor: 8, quantizeGeneric: 12 }))
+await io.write('electron-frontend/public/models/world.glb', doc)
+```
+
+Do **not** add `weld()` or `dedup()` to that chain. Welding wins 0.07 MB, because the world's
+duplicate vertices carry distinct normals and welding them would change the shading; `dedup()`
+collapses 53 materials to 20, and the mockup mutates materials for the night rig, so shared
+instances would leak light between objects that only happened to look alike.
+
+**A fresh clone cannot build the valley.** That is an open question, not a settled one: LFS, a
+release asset, a fetch script or a first-run download are all live options and phase 1 should
+pick one. Until then the app boots fine without it — `mountValley` swallows its own failure and
+the app loses a backdrop, not a feature.
+
+## What phase 1 inherits
+
+- A canvas that is mounted once, outside React, and never unmounts — the thing problem 1 said the
+  architecture turns on. It survives every React render because React has never heard of it.
+- An off switch (`JPLEARN_VALLEY=off`) that is the seed of the phase-3 titlebar toggle.
+- An instancing collapse that turns the authored world's 21,484 meshes into 345 drawables. The
+  mockup has its own, more careful version of this pass; when the world module ports, that one
+  wins and this one goes.
+- A crude two-light rig standing in for the sunset. It is not the design and is not meant to be.
