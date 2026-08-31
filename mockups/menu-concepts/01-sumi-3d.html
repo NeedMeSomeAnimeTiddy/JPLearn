@@ -2749,6 +2749,112 @@
     font-size: 9px; letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap; }
 
   /* ================================================================================
+     LOOK IT UP -- the one thing in the tree that is not a screen.
+
+     IT IS AN OVERLAY, ON ONE KEY, FROM ANYWHERE. Every other drawing in this file
+     stands on the stage and belongs to a section; this one belongs to none of them and
+     obeys the frame rather than the contract -- the contract governs where a SCREEN may
+     stand, and an overlay is not standing anywhere, it is on top. The scrim and the
+     design-pixel frame are the ledger's own (`.lg-open` / `.lg-frame`), because a modal
+     that opened differently from the other modal would be a second thing to learn.
+
+     ONE FIELD, AND WHAT YOU TYPE PICKS THE ANSWER. Five bridge commands have existed
+     the whole time and none of them appears in the menu: `dictionary-search`,
+     `kanji-detail`, `lookup-sentence`, `assistant-chat`, `assistant-chat-ocr`. Five
+     doors is four too many for a thing you reach mid-sentence, so there is one field and
+     the route is inferred. The routes are drawn along the foot so the inference is never
+     a guess you have to make.
+
+     AND IT SAYS WHAT IT CANNOT ANSWER. Two of the five need a running model and one
+     needs an optional download that is not installed here -- so `語` comes back with
+     components and a level and no readings, and `食べる` comes back with nothing at all.
+     Both are real states of this app today, and drawing the full answer for either would
+     be drawing a machine that is not plugged in.
+     ================================================================================ */
+  .lk-open { position: fixed; inset: 0; z-index: 60; }
+  .lk-scrim { position: absolute; inset: 0; background: rgba(8, 11, 18, 0.66); border: 0; }
+  .lk-frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
+    zoom: var(--u); pointer-events: none; }
+  .lk-frame > * { pointer-events: auto; }
+  .lk-sheet { position: absolute; left: 250px; top: 152px; width: 780px;
+    display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
+    background: var(--washi);
+    box-shadow: 12px 15px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
+
+  .lk-cap { display: flex; align-items: baseline; gap: 11px; padding: 7px 20px 8px;
+    background: var(--ink); white-space: nowrap; }
+  .lk-cap b { font-family: var(--jp); font-weight: 700; font-size: 13px; color: var(--gold-hi); }
+  .lk-cap i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.2em; color: var(--gold-hi); }
+  .lk-cap s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.16em;
+    color: rgba(242, 234, 216, 0.45); }
+
+  /* THE FIELD IS THE WHOLE INTERFACE, so it is drawn as one -- an underline the width of
+     the sheet, the query set large, and a caret that does not blink because a mockup that
+     blinks is a mockup you cannot screenshot twice the same. */
+  .lk-field { display: flex; align-items: center; gap: 12px; padding: 16px 20px 13px;
+    box-shadow: inset 0 -2px 0 var(--ink); }
+  .lk-field .q { flex: none; font-family: var(--lat-ui); font-weight: 700; font-size: 20px;
+    line-height: 1; color: rgba(20, 17, 13, 0.3); }
+  .lk-field .t { flex: 0 1 auto; min-width: 0; font-family: var(--jp); font-weight: 700;
+    font-size: 26px; line-height: 1.2; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lk-field .c { flex: none; width: 2px; height: 26px; margin-left: -4px;
+    background: var(--hi); }
+  .lk-route { flex: none; margin-left: auto; padding: 4px 12px 5px; background: var(--ink);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+    color: var(--gold-hi); white-space: nowrap; }
+
+  /* ---- the answer ---- */
+  .lk-ans { padding: 15px 20px 4px; display: flex; gap: 20px; min-height: 168px; }
+  .lk-big { flex: none; width: 116px; height: 116px; display: grid; place-items: center;
+    background: var(--ink); font-family: var(--jp); font-weight: 700; font-size: 68px;
+    line-height: 1; color: var(--gold-hi); }
+  .lk-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+  .lk-line { display: flex; align-items: baseline; gap: 11px; }
+  .lk-line em { flex: none; width: 96px; font-style: normal; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.16em;
+    color: rgba(20, 17, 13, 0.45); }
+  .lk-line span { flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 12px; line-height: 1.45; color: rgba(20, 17, 13, 0.75); }
+  .lk-line span.jp { font-family: var(--jp); font-weight: 700; font-size: 17px;
+    line-height: 1.35; color: var(--ink); }
+  /* the parts the optional download would fill, drawn as absent rather than as empty --
+     see the note by `.as-track.none`, which is the same argument */
+  .lk-line.none span { color: rgba(20, 17, 13, 0.34); font-style: italic; }
+  .lk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lk-chips i { font-style: normal; padding: 4px 10px 5px; background: rgba(20, 17, 13, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+    font-family: var(--jp); font-weight: 700; font-size: 16px; line-height: 1;
+    color: var(--ink); }
+  .lk-chips i.lat { font-family: var(--lat-ui); font-size: 9.5px; letter-spacing: 0.14em;
+    padding: 7px 10px; color: rgba(20, 17, 13, 0.62); }
+  .lk-note { padding: 0 20px 14px; font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9px; letter-spacing: 0.13em; line-height: 1.6; color: var(--hi); }
+
+  /* ---- the five routes, along the foot ---- */
+  .lk-routes { display: flex; box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.2); }
+  .lk-r { flex: 1; min-width: 0; padding: 9px 12px 11px;
+    box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.14); }
+  .lk-r:last-child { box-shadow: none; }
+  .lk-r b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+    letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.42); }
+  .lk-r i { display: block; margin-top: 4px; font-style: normal; font-family: var(--jp);
+    font-weight: 700; font-size: 13px; line-height: 1.2; color: rgba(20, 17, 13, 0.62); }
+  .lk-r.on { background: var(--ink); box-shadow: none; }
+  .lk-r.on b { color: rgba(232, 196, 124, 0.65); }
+  .lk-r.on i { color: var(--gold-hi); }
+  /* the two that need a model running are dimmed always -- they are doors, and the mockup
+     does not pretend to have walked through them */
+  .lk-r.off b, .lk-r.off i { color: rgba(20, 17, 13, 0.28); }
+
+  .lk-hint { position: absolute; left: 250px; top: 604px; width: 780px; text-align: center;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+    color: var(--gold-hi); paint-order: stroke fill;
+    -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.8); }
+
+  /* ================================================================================
      A DECK'S BLOCKS, AT THE SCALE THE DECK ACTUALLY IS.
 
      The road paints the selected block plus four either side and one bar per block in the
@@ -21267,6 +21373,141 @@ function wallStep(d) {
   const to = bwOf(g);
   BW_SEL = to[Math.min(col, to.length - 1)][1];
 }
+
+/* ================================================================================================
+   LOOK IT UP -- the last thing in the tree, and the only one that is not a screen.
+
+   FIVE COMMANDS, ONE FIELD. `dictionary-search`, `kanji-detail`, `lookup-sentence`,
+   `assistant-chat` and `assistant-chat-ocr` have all been on the bridge since long before this
+   menu existed and not one of them appears in it. Two of the five cannot even be reached from the
+   renderer: `dictionarySearch` has no caller anywhere in `src/`, and `lookupSentence` exists only
+   as a type in `electron.d.ts`.
+
+   EVERY ANSWER BELOW WAS RUN, NOT WRITTEN. The kanji answers are `kanji-detail` output on this
+   machine on 2026-08-31 -- 語 really does decompose to 言 口 五, and its level really is tagged
+   N5 from the deck rather than from the dictionary. The sentence is `lookup-sentence` output,
+   character for character, reading and translation included. And the word answer is the real
+   error: `build_dictionary_search_payload` raises "Offline dictionary index is not installed",
+   because the dictionary is an optional download and it is not installed here.
+
+   SO TWO OF THE FIVE ROUTES ARE DRAWN DARK. The tutor and the OCR workbench need a model running;
+   the mockup names them as doors and does not walk through them. Drawing a fabricated tutor reply
+   would be drawing a machine that is not plugged in -- the same rule that hatched the listening
+   bar on THE EXAM's level three rather than scoring it zero.
+   ================================================================================================ */
+const LK_ROUTES = [
+  { k: 'kanji', en: 'ONE KANJI', jp: '漢字', cmd: 'kanji-detail' },
+  { k: 'word', en: 'A WORD', jp: '辞書', cmd: 'dictionary-search' },
+  { k: 'sentence', en: 'A PHRASE', jp: '例文', cmd: 'lookup-sentence' },
+  { k: 'tutor', en: 'A QUESTION', jp: '質問', cmd: 'assistant-chat', off: true },
+  { k: 'ocr', en: 'A SCREENSHOT', jp: '画像', cmd: 'assistant-chat-ocr', off: true },
+];
+
+const LK_SAMPLES = [
+  { q: '語', r: 'kanji', big: '語',
+    lines: [
+      ['LEVEL', 'N5 · tagged from the deck, not from the dictionary'],
+      ['CATEGORY', 'Kanji N5 · Study & Language'],
+    ],
+    chips: ['言', '口', '五'], chipLab: 'COMPONENTS',
+    /* the four fields `kanji-detail` returns empty without the download */
+    absent: [['READINGS', 'on and kun readings need the offline dictionary'],
+      ['MEANINGS', 'and so do the English meanings, the compounds and the stroke count']],
+    note: 'THE OFFLINE DICTIONARY IS NOT INSTALLED · WHAT IS SHOWN IS THE COMMITTED DATA' },
+
+  { q: '道', r: 'kanji', big: '道',
+    lines: [
+      ['LEVEL', 'N4 · the only one of these that is not N5'],
+      ['CATEGORY', 'Kanji N4 · Places & Buildings'],
+    ],
+    chips: ['込', '自', '并', '首'], chipLab: 'COMPONENTS',
+    absent: [['READINGS', 'on and kun readings need the offline dictionary'],
+      ['MEANINGS', 'and so do the English meanings, the compounds and the stroke count']],
+    note: 'THE PATH IS NAMED FOR THIS CHARACTER, AND THE APP CANNOT YET TELL YOU HOW TO READ IT' },
+
+  { q: '食べる', r: 'word', big: '辞',
+    lines: [],
+    absent: [['DICTIONARY', 'Offline dictionary index is not installed'],
+      ['WOULD GIVE', 'the reading, a primary gloss and the rest of them, and the pitch'
+        + ' accent — the whole of DictionaryCardSummary'],
+      ['AND FOR KANJI', 'the on and kun readings, the meanings, the stroke count, the'
+        + ' classical radical, and every compound the character appears in']],
+    note: 'A WORD NEEDS THE DOWNLOAD ENTIRELY · A KANJI DOES NOT, WHICH IS WHY 語 ANSWERED' },
+
+  { q: '学校', r: 'sentence', big: '例',
+    lines: [
+      ['SENTENCE', '学校に全てを求めることはできない。', 'jp'],
+      ['READING', 'gakkou ni subete wo motomeru koto ha deki nai .'],
+      ['ENGLISH', "One can't expect everything from schools."],
+    ],
+    note: 'FOUND IN THE SENTENCE DECK · THE FIRST OF ITS ROWS THAT CONTAINS WHAT YOU TYPED' },
+];
+let LK_ON = false, LK_AT = 0;
+
+function lkBuild() {
+  let el = document.querySelector('.lk-open');
+  if (el) return el;
+  el = document.createElement('div');
+  el.className = 'lk-open';
+  el.hidden = true;
+  el.innerHTML = `<button class="lk-scrim" aria-label="Close"></button>`
+    + `<div class="lk-frame"><div class="lk-sheet"></div>`
+    + `<div class="lk-hint">← → ANOTHER QUERY · ESC CLOSES</div></div>`;
+  document.body.appendChild(el);
+  el.querySelector('.lk-scrim').addEventListener('click', lkClose);
+  return el;
+}
+
+function lkDraw() {
+  const el = lkBuild();
+  el.hidden = !LK_ON;
+  if (!LK_ON) return;
+  const S = LK_SAMPLES[LK_AT], R = LK_ROUTES.find((r) => r.k === S.r);
+  const line = ([lab, val, cls]) => `<span class="lk-line"><em>${lab}</em>`
+    + `<span class="${cls || ''}">${val}</span></span>`;
+  const absent = ([lab, val]) => `<span class="lk-line none"><em>${lab}</em>`
+    + `<span>${val}</span></span>`;
+  el.querySelector('.lk-sheet').innerHTML =
+    `<div class="lk-cap"><b>引く</b><i>LOOK IT UP</i>`
+      + `<s>ONE FIELD · FIVE ANSWERS · ANY LEVEL</s></div>`
+    + `<div class="lk-field"><span class="q">/</span>`
+      + `<span class="t">${S.q}</span><span class="c"></span>`
+      + `<span class="lk-route">${R.cmd}</span></div>`
+    + `<div class="lk-ans"><span class="lk-big">${S.big}</span>`
+      + `<span class="lk-body">`
+        + (S.lines || []).map(line).join('')
+        + (S.chips ? `<span class="lk-line"><em>${S.chipLab}</em>`
+          + `<span class="lk-chips">${S.chips.map((c) => `<i>${c}</i>`).join('')}</span></span>` : '')
+        + (S.absent || []).map(absent).join('')
+      + `</span></div>`
+    + `<div class="lk-note">${S.note}</div>`
+    + `<div class="lk-routes">`
+      + LK_ROUTES.map((r) => `<span class="lk-r${r.k === S.r ? ' on' : ''}`
+        + `${r.off ? ' off' : ''}"><b>${r.en}</b><i>${r.jp}</i></span>`).join('')
+    + `</div>`;
+}
+
+function lkOpen() { LK_ON = true; LK_AT = 0; lkDraw(); }
+function lkClose() { LK_ON = false; lkDraw(); }
+function lkStep(d) {
+  LK_AT = (LK_AT + d + LK_SAMPLES.length) % LK_SAMPLES.length;
+  lkDraw();
+}
+
+/* CAPTURE, BECAUSE IT HAS TO WORK FROM ANYWHERE. Every other key in this file belongs to a screen
+   and is read by that screen's own block; this one belongs to no screen, so it is taken before any
+   of them get a look and it stops the event dead. `/` is the key every search field in every
+   application already answers to, and nothing in this file was using it. */
+addEventListener('keydown', (e) => {
+  if (!LK_ON && (e.key === '/' || (e.key === '?' && e.shiftKey))) {
+    lkOpen(); e.preventDefault(); e.stopImmediatePropagation(); return;
+  }
+  if (!LK_ON) return;
+  if (e.key === 'Escape' || e.key === 'Backspace' || e.key === '/') lkClose();
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') lkStep(1);
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') lkStep(-1);
+  e.preventDefault(); e.stopImmediatePropagation();
+}, true);
 
 /* ================================================================================================
    THE DECK SCREEN -- a deck's blocks, at the scale the deck actually is.
