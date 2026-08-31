@@ -30,10 +30,13 @@ Worse, persistence happens inside the read, so **whoever calls first consumes th
 `useAchievements` already calls it, meaning opening the badge wall silently burns the unlock the
 menu wanted to celebrate.
 
-**The fix is one field**: `FeatureStatusPayload` gains `just_unlocked: bool`, set from `events`.
-It is a `@dataclass` in `desktop_bridge.py`, so `scripts/generate_ts_types.py` regenerates the
-renderer type — no hand-written duplicate. Until that lands, the mockup's moment is a drawing
-of something the bridge cannot yet announce.
+**Fixed 2026-08-31, and it took two fields rather than one.** `just_unlocked: bool` says which
+features *this call* transitioned — true at most once, for whichever surface asks first, which is
+right only for a caller that knows it runs first after a session. `unlocked_at: str | None` is the
+durable half: `user_feature_unlocks.unlocked_at` had been written since the table existed and read
+by nothing, so `load_feature_unlock_times()` now reads it back and a surface can remember the last
+timestamp it showed instead of racing for the flag. The renderer type is regenerated, not
+hand-written. **The bridge can announce the moment now; nothing in the renderer draws it yet.**
 
 **2. The curriculum is a menu of the other menus.**
 `STUDY_PATH` / `domain/progression_curriculum.py` is 16 nodes, and ten of them are `kind: 'goto'`
