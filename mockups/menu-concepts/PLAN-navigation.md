@@ -101,7 +101,7 @@ streak, XP, level. *Built; the hero and the progressive reveal are new.*
 | section | L2 — the shape | L3 — the thing | L4 — doing it |
 | --- | --- | --- | --- |
 | The Path | the journey, 16 milestones **[built]** | a deck's blocks **[built]** · today's words **[built]** · an unlock moment **[built]** | the study session *(in the app)* |
-| Practice | three lanes **[new]** | review **[new]** · drill picker **[briefed]** · daily games **[built]** | the game runs *(in the app)* |
+| Practice | three lanes **[built]** | drill picker **[built]** · daily games **[built]** · review *(a session, not a screen)* | the game runs *(in the app)* |
 | The World | two lanes **[built]** | the library **[built]** · pick a scene **[built]** | the reader · the conversation *(in the app)* |
 | The Exam | the ascent **[built]** | a level **[built]** | the exam runs *(in the app)* |
 | You | the ledger **[built]** | the badge wall **[built]** · ~~history~~ · ~~settings~~ — see below | — |
