@@ -2216,10 +2216,15 @@
   .hud[data-screen="library"] .hud-detail { display: none; }
   .hud[data-screen="modes"] .hud-detail { display: none; }
   .hud[data-screen="lanes"] .hud-detail { display: none; }
+  .hud[data-screen="world"] .hud-detail { display: none; }
+  .hud[data-screen="scenes"] .hud-detail { display: none; }
   /* the road's up-next card is hidden under `[data-course]`; this screen is not a course
      and was inheriting it into the bottom-right corner, over the key hints */
   .hud[data-screen="modes"] .hud-next, .hud[data-screen="modes"] .hud-figs,
-  .hud[data-screen="lanes"] .hud-next, .hud[data-screen="lanes"] .hud-figs { display: none; }
+  .hud[data-screen="lanes"] .hud-next, .hud[data-screen="lanes"] .hud-figs,
+  .hud[data-screen="world"] .hud-next, .hud[data-screen="world"] .hud-figs,
+  .hud[data-screen="scenes"] .hud-next,
+  .hud[data-screen="scenes"] .hud-figs { display: none; }
 
   /* ================================================================================
      JLPT IS A LADDER, NOT A ROAD.
@@ -2715,6 +2720,189 @@
     font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
     color: var(--gold-hi); paint-order: stroke fill;
     -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
+
+  /* ================================================================================
+     THE WORLD'S TWO LANES -- the same card as PRACTICE's, two-up instead of three.
+
+     WHY THE SAME COMPONENT. Both screens answer "which of these do you want to do",
+     nothing on either is ordered or gated against its neighbour, and a learner who has
+     learned PRACTICE's screen should not have to learn this one. So `.pr-lane` is reused
+     whole and this block adds exactly two things it did not need: a list of what is
+     inside the lane, and the milestone that opened it.
+
+     THE EXTRA WIDTH IS SPENT ON THE INSIDE. Two cards across the stage are 445 wide
+     against PRACTICE's 291, and a card that just got 154px bigger without saying anything
+     more is a door with a bigger label on it. Each lane shows the three things you would
+     actually pick, which also makes level three a zoom rather than a surprise.
+
+     AND NOTHING HERE IS AN OBLIGATION, so nothing carries the vermilion. PRACTICE's review
+     lane owes you something; THE WORLD is the section you visit because you want to.
+     `.pr-lane.duty` is simply never set here, and the selected slab comes out in the
+     ink-and-gold that every other non-duty lane already uses.
+
+     184/906, AND THE TWO CARDS DO NOT HAVE THE SAME BLEED. This was laid at 182/916 from
+     the frame contract's own rule -- half-extent = 0.5w + 0.0598h -- and the right card
+     measured 4px into the moat anyway. The rule is written for `rotate(-1.2deg)`, where
+     the lean partly CANCELS the skew; the second card in every lane row is
+     `rotate(1deg)`, where it ADDS to it:
+
+        card 1  skewX(-8) rotate(-1.2)  ->  [[ 1.00272, -0.11953], [-0.02094, 0.99978]]
+        card 2  skewX(-8) rotate( 1.0)  ->  [[ 0.99740, -0.15797], [ 0.01745, 0.99985]]
+
+     x half-extent is 0.5(|a|w + |c|h), so at h=330 card 1 bleeds 19.7px per side and card
+     2 bleeds 26.1 -- a third more. It never showed up on PRACTICE because its cards are
+     291 wide and the whole row had 20px of slack; at 445 it does. Any two-up or four-up
+     row must be laid against the WORSE of the two, which is what 906 is.
+
+     Top 46 rather than PRACTICE's 40 is the same story on the other axis: a 441-wide card
+     leans 4.7px vertically where a 291-wide one leans 3.0, and the selected card lifts 6
+     on top of that.
+     ================================================================================ */
+  .lanes.two { left: 184px; top: 46px; width: 906px; }
+
+  /* THE GATE IS ONE ELEMENT WITH TWO STATES, the same law the ledger's rule obeys: when the
+     milestone is reached it is a quiet credit for who opened this lane, and when it is not
+     it is the lock, naming the step. Two elements for one fact would be two places to
+     disagree about whether the lane is open. */
+  .wd-gate { display: flex; align-items: center; gap: 7px; padding: 7px 15px 0;
+    font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+    letter-spacing: 0.15em; color: rgba(20, 17, 13, 0.42); }
+  .wd-gate i { font-style: normal; font-family: var(--jp); font-weight: 700;
+    font-size: 11px; letter-spacing: 0.06em; line-height: 1;
+    color: rgba(20, 17, 13, 0.34); }
+  .pr-lane.shut .wd-gate { color: var(--hi); }
+  .pr-lane.shut .wd-gate i { color: var(--hi); opacity: 0.7; }
+
+  /* ---- what is inside the lane ---- */
+  .wd-list { display: flex; flex-direction: column; gap: 4px;
+    padding: 9px 15px 0; min-width: 0; }
+  .wd-item { display: flex; align-items: baseline; gap: 9px; min-width: 0;
+    padding-bottom: 4px; border-bottom: 1px solid rgba(20, 17, 13, 0.11); }
+  .wd-item:last-child { border-bottom: 0; }
+  /* THE JAPANESE IS THE TITLE AND THE ENGLISH IS THE GLOSS, which is the way round every
+     other list of MATERIAL in this file runs. The L1 rows are English-led because those
+     are the app's own words; these are the material's own. */
+  .wd-item b { flex: none; max-width: 186px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-family: var(--jp); font-weight: 700; font-size: 12.5px;
+    line-height: 1.3; color: var(--ink); }
+  .wd-item em { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-style: normal; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 10px; letter-spacing: 0.02em; color: rgba(20, 17, 13, 0.55); }
+  .wd-item u { flex: none; text-decoration: none; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.12em;
+    color: rgba(20, 17, 13, 0.5); }
+  /* THE ONE THAT IS NOT A SCENE. Free talk sits in the same list because it is a third
+     thing you can enter, and it is hollow because it is not authored content with a start
+     and an end -- see the note by `WORLD_LANES`. */
+  .wd-item.open b, .wd-item.open em { color: rgba(20, 17, 13, 0.45); }
+  .wd-item.open u { color: var(--hi); }
+
+  /* A SHUT LANE IS STILL A LANE. It keeps its figure, its list and its size -- the whole
+     point of showing a locked thing rather than hiding it is that you can see what is in
+     there -- and loses only the paper's brightness and the slab's invitation. */
+  .pr-lane.shut { background: linear-gradient(178deg, rgba(196,188,166,var(--paper)) 0%,
+      rgba(170,163,142,var(--paper)) 100%); }
+  .pr-lane.shut .pr-glyph { color: rgba(20, 17, 13, 0.14); }
+  .pr-lane.shut .pr-fig b, .pr-lane.shut .wd-item b { color: rgba(20, 17, 13, 0.45); }
+  .pr-lane.shut.on .pr-slab { background: rgba(20, 17, 13, 0.4);
+    color: rgba(242, 234, 216, 0.6); }
+
+  /* ================================================================================
+     PICKING A SCENE -- level three of the TALK lane.
+
+     TWO CARDS AND A STRIP, because there are two scenes. `src/lib/scenarios/index.ts`
+     exports exactly `CAFE_ORDER_SCENARIO` and `SHINJUKU_DIRECTIONS_SCENARIO`, and a grid
+     built for twelve would have drawn ten empty slots or, worse, ten invented ones. When
+     the app grows more scenes this becomes a road; until it does, two scenes get to be two
+     scenes and each is wide enough to show its real objectives.
+
+     FREE TALK IS THE STRIP, NOT A THIRD CARD. It has no objectives, no NPC and no end --
+     `tutor_chat` is an open chat gated behind `conversation_mode` -- so giving it a card
+     with three empty rows would have made it look like a scene that failed to load.
+     ================================================================================ */
+  .scenes { position: absolute; left: 184px; top: 46px; width: 908px; height: 272px;
+    display: flex; gap: 26px; }
+  .sc-card { flex: 1; min-width: 0; border: 0; padding: 0; font: inherit; text-align: left;
+    cursor: pointer; display: flex; flex-direction: column;
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
+    box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transform: skewX(-8deg) rotate(-1.2deg);
+    transition: transform 0.26s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.26s ease,
+      background 0.26s ease; }
+  .sc-card:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+  .sc-card.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
+    box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+    transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px); }
+  .sc-card.on:nth-child(2) { transform: skewX(-8deg) rotate(1deg) translateY(-6px); }
+
+  /* THE NPC IS THE CAP, because who you are talking to is the first thing you want to know
+     about a conversation, and it is the one fact the scenario data leads with. */
+  .sc-who { flex: none; display: flex; align-items: baseline; gap: 9px;
+    padding: 8px 15px 9px; background: var(--ink); white-space: nowrap; }
+  .sc-who b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+    letter-spacing: 0.2em; color: var(--gold-hi); }
+  .sc-who i { font-style: normal; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 9px; letter-spacing: 0.13em; color: rgba(232, 196, 124, 0.55); }
+  .sc-title { padding: 12px 15px 0; display: flex; flex-direction: column; gap: 3px; }
+  .sc-title b { font-family: var(--jp); font-weight: 700; font-size: 21px; line-height: 1.15;
+    color: var(--ink); }
+  .sc-title i { font-style: italic; font-family: var(--lat); font-weight: 900;
+    font-size: 14px; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.62); }
+  .sc-d { padding: 8px 15px 0; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 10.5px; line-height: 1.5; color: rgba(20, 17, 13, 0.62); }
+  /* THE OBJECTIVES ARE THE SCENARIO'S OWN, required ones solid and optional ones hollow --
+     which is the difference `required: false` makes when the tutor marks you at the end. */
+  .sc-obj { display: flex; flex-direction: column; gap: 3px; padding: 9px 15px 0; }
+  .sc-obj span { display: flex; align-items: baseline; gap: 8px;
+    font-family: var(--lat-ui); font-weight: 600; font-size: 9.5px; letter-spacing: 0.04em;
+    color: rgba(20, 17, 13, 0.6); }
+  .sc-obj span s { flex: none; width: 6px; height: 6px; text-decoration: none;
+    background: rgba(20, 17, 13, 0.55); transform: translateY(-1px); }
+  .sc-obj span.opt { color: rgba(20, 17, 13, 0.4); }
+  .sc-obj span.opt s { background: none;
+    box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.4); }
+  .sc-foot { margin-top: auto; padding: 0 15px 10px; font-family: var(--lat-ui);
+    font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
+    color: rgba(20, 17, 13, 0.45); }
+  .sc-slab { flex: none; height: 28px; display: grid; place-items: center;
+    background: rgba(20, 17, 13, 0.13); font-family: var(--lat-ui); font-weight: 700;
+    font-size: 9.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6);
+    white-space: nowrap; transition: background 0.24s ease, color 0.24s ease; }
+  .sc-card.on .sc-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
+
+  /* SKEW WITHOUT LEAN. The strip is 916 wide and 54 tall, and a rotation on a box that wide
+     grows it 9.6px vertically at each end -- which would put its bottom edge through the
+     foot band. Skewed only, it ends at frame 558. */
+  /* `left: 0; right: 0` rather than a width, so the strip cannot fall out of step with
+     the row above it the next time the row is re-laid. */
+  .sc-free { position: absolute; left: 0; right: 0; top: 294px; height: 54px;
+    border: 0; padding: 0 16px; font: inherit; cursor: pointer; text-align: left;
+    display: flex; align-items: center; gap: 14px;
+    background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
+      rgba(203,193,164,var(--paper)) 100%);
+    box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+    transform: skewX(-8deg);
+    transition: box-shadow 0.24s ease, background 0.24s ease; }
+  .sc-free.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+      rgba(235,230,217,var(--paper)) 100%);
+    box-shadow: 8px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15); }
+  .sc-free .g { flex: none; font-family: var(--jp); font-weight: 400; font-size: 30px;
+    line-height: 1; color: rgba(20, 17, 13, 0.26); }
+  .sc-free .n { flex: none; display: flex; flex-direction: column; gap: 3px; }
+  .sc-free .n b { font-family: var(--jp); font-weight: 700; font-size: 15px; line-height: 1;
+    color: var(--ink); }
+  .sc-free .n i { font-style: italic; font-family: var(--lat); font-weight: 900;
+    font-size: 11px; letter-spacing: 0.04em; line-height: 1;
+    color: rgba(20, 17, 13, 0.55); }
+  .sc-free .d { flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600;
+    font-size: 10px; line-height: 1.45; color: rgba(20, 17, 13, 0.55); }
+  .sc-free .k { flex: none; padding: 5px 11px; background: rgba(20, 17, 13, 0.13);
+    font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
+    color: rgba(20, 17, 13, 0.6); white-space: nowrap;
+    transition: background 0.24s ease, color 0.24s ease; }
+  .sc-free.on .k { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
 
   .modes { position: relative; margin-top: 6px; margin-left: -52px;
     width: calc(100vw / var(--u)); height: 470px; }
@@ -5678,8 +5866,12 @@ const ITEMS = [
   { jp: '日課', en: 'DAILY', label: 'DAILY GAMES', kanji: '日', under: 'DRILLS',
     desc: "Today's four puzzles — two still open", descJp: '毎日の四つのパズル', badge: 2 },
   { jp: '実践', en: 'READING', label: 'THE WORLD', kanji: '実', ord: 3,
-    desc: 'Real Japanese — thirty texts, and conversation', descJp: '読みものと会話',
-    opens: 'reach READING on the path' },
+    desc: 'Real Japanese — thirty texts, and two conversations', descJp: '読みものと会話',
+    /* GRAMMAR, NOT READING, and the catalog is what says so. This section is reading AND
+       conversation, and `domain/feature_catalog.py` opens `conversation_mode` at `grammar_n5`
+       — step five — where `reading_mode` waits for `reading` at step eleven. A section opens
+       when its FIRST lane does, so the gate is the earlier of the two. */
+    opens: 'reach GRAMMAR on the path' },
   { jp: '練習', en: 'DRILLS', label: 'PRACTICE', kanji: '練', ord: 2,
     desc: 'Reviews, seventeen drills and the daily puzzles', descJp: '復習・訓練・日課' },
   { jp: '検定', en: 'JLPT', label: 'THE EXAM', kanji: '検', ord: 4,
@@ -17046,11 +17238,15 @@ function standData() {
     /* THE WORLD is reading AND conversation now, so its figure is texts rather than grades --
        the grades are a fact about the library, one level in. */
     READING: {
-      tok: '30 TEXTS',
+      /* TWO LANES, the same shape PRACTICE's token takes -- and the slab stops naming the
+         library, because the library is one level further in than it used to be. */
+      tok: '2 LANES',
       lab: 'REAL JAPANESE', val: 'READ AND TALK',
       kind: 'fig', fig: '30', figLab: 'TEXTS TO READ',
-      slab: 'OPEN THE LIBRARY \u25b8',
-      sug: 'Short texts, N5', sugJp: '\u77ed\u6587', sugBtn: 'READ \u25b8',
+      slab: 'ENTER THE WORLD \u25b8',
+      /* what the app would pick first here is the text you are part-way through, not a band */
+      sug: 'Mike the Paper Seller', sugJp: '\u307f\u3051\u306e \u3054\u3046\u304c\u3044\u3084\u3055\u3093',
+      sugBtn: 'RESUME \u25b8',
     },
     DRILLS: {
       /* PRACTICE absorbed the daily puzzles: its figure is what is actually waiting, with the
@@ -17083,7 +17279,11 @@ function standData() {
    is the first-run view, on L, which locks everything the curriculum has not opened yet. */
 let FIRST_RUN = false;
 const atL1 = (i) => !ITEMS[i].under;
-const secLocked = (i) => !!(ITEMS[i].locked || (FIRST_RUN && ITEMS[i].opens));
+/* `ITEMS[i] &&`, BECAUSE THE HERO IS A ROW AND IS NOT A SECTION. `active` starts at `HERO_ROW`,
+   which is -1, and the first-run key asks `secLocked(active)` before it steps -- so pressing L on
+   a freshly opened menu threw on `ITEMS[-1].locked` and took the whole first-run view down with
+   it. The hero can never be locked: it is the app's own suggestion, not a place. */
+const secLocked = (i) => !!(ITEMS[i] && (ITEMS[i].locked || (FIRST_RUN && ITEMS[i].opens)));
 const secLabel = (it) => it.label || it.en;
 /* "reach JLPT N5 on the path" -> "JLPT N5 OPENS IT". The unlock sentence lives in `.st-detail`,
    which only an OPEN row shows, and a locked row can never be opened -- so without this the one
@@ -19799,6 +19999,8 @@ function hudRows() {
   if (hudBespoke() === 'library') return libraryRows();
   if (hudBespoke() === 'modes') return modeRows();
   if (hudBespoke() === 'lanes') return laneRows();
+  if (hudBespoke() === 'world') return worldRows();
+  if (hudBespoke() === 'scenes') return sceneRows();
   /* STUDY's level two is the course. Sixteen steps against the five rows that fit, so what the
      list holds is a window — `PATH.lo` is its top and `pathGo` is what moves it. */
   if (HUD.sec === 'STUDY' && HUD.level === 2) return pathRows();
@@ -21394,11 +21596,210 @@ function lanePick() {
   /* review runs a session, which is the app rather than the menu -- the same place every other
      terminal on this menu stops */
 }
+/* ================================================================================================
+   THE WORLD'S TWO LANES -- reading and conversation, and the second one had no door at all.
+
+   THIS IS THE SECTION THE RESTRUCTURE INVENTED AND THEN LEFT HALF-BUILT. READING kept opening
+   straight onto the library, so the section called THE WORLD was one lane wide while three
+   separate places in this file already promised two: its own description says "thirty texts, and
+   conversation", its figure reads READ AND TALK, and STUDY_PATH's `scripted_conv` and `free_conv`
+   both carry `to: null` and refuse out loud. `features/scenario-tutor/` is one of the most
+   finished things in the repo and until now nothing in this menu pointed at it.
+
+   THE UNLOCK ORDER IS THE OPPOSITE OF WHAT THE PLAN ASSUMED, and it came out of
+   `domain/feature_catalog.py` rather than out of my head. `conversation_mode` wants `grammar_n5`
+   mastered -- step five of sixteen. `reading_mode` wants `reading` -- step eleven. So TALK opens
+   six steps BEFORE READ, and the section as a whole opens at GRAMMAR, not at READING. The gate
+   chip on each card says which milestone opened it, which is the only place in this menu where
+   the progression's own ordering is visible on the thing it gates.
+
+   THE LANES ARE PEERS AND NEITHER IS OWED. That is the difference from PRACTICE, which looks
+   identical and is not: reviews there are an obligation and carry the vermilion, and nothing
+   here is. You come to THE WORLD because you want to.
+   ================================================================================================ */
+
+/* THE THREE TEXTS YOU WOULD ACTUALLY PICK, derived from `LIB_READ` rather than written out:
+   whatever is part-read first, then the easiest untouched ones. Hand-listing them would have
+   gone stale the moment the progress map changed, which is the same trap the deck screen's
+   segment row was built to avoid. */
+function wdReading() {
+  const going = LIB.map((_, i) => i).filter((i) => LIB_READ[i] > 0 && LIB_READ[i] < 100)
+    .map((i) => [i, LIB_READ[i] + '%']);
+  const fresh = LIB.map((_, i) => i).filter((i) => !LIB_READ[i]).map((i) => [i, 'NEW']);
+  return going.concat(fresh).slice(0, 3)
+    .map(([i, tag]) => ({ jp: LIB[i][0], en: LIB[i][2], tag }));
+}
+
+const WORLD_LANES = [
+  { k: 'read', en: 'READ', jp: '読解', glyph: '読',
+    gate: 'OPENED BY READING', gateJp: '読解',
+    d: 'Thirty real stories from Aozora Bunko, graded easiest to hardest',
+    fig: String(LIB.length), figLab: 'TEXTS',
+    /* A SHUT LANE SHOWS A DIFFERENT ACCOUNT, and it has to. Drawn from `LIB_READ` while
+       locked it said 38% and 64% on texts the learner cannot open -- a progress bar on a
+       door that has never been through. The state this card draws is step ten, so the
+       texts are the easiest three and none of them has been touched. */
+    items: (shut) => shut
+      ? LIB.slice(0, 3).map((t) => ({ jp: t[0], en: t[2], tag: 'NEW' }))
+      : wdReading(),
+    foot: (shut) => shut ? 'NONE READ YET · 4 BANDS BY DIFFICULTY'
+      : Object.values(LIB_READ).filter((p) => p >= 100).length
+        + ' FINISHED · 4 BANDS BY DIFFICULTY',
+    act: 'OPEN THE LIBRARY' },
+  /* TWO, NOT TWELVE. `src/lib/scenarios/index.ts` exports exactly two scenarios, and the figure
+     on this card is the number the app can actually run today. Free talk is not counted in it
+     because it is not a scene -- it is listed under the two, hollow, and it is the strip on the
+     screen this card opens. */
+  { k: 'talk', en: 'TALK', jp: '会話', glyph: '会',
+    gate: 'OPENED BY GRAMMAR', gateJp: '文法',
+    d: 'Hold a conversation with someone who answers back — speak it or type it',
+    fig: '2', figLab: 'SCENES',
+    items: () => SCENES.map((s) => ({ jp: s.jp, en: s.en, tag: s.obj.length + ' GOALS' }))
+      .concat([{ jp: '自由会話', en: 'Free Talk', tag: 'ANY TOPIC', open: true }]),
+    foot: () => 'NOTHING PLAYED YET · THE TUTOR MARKS YOU AT THE END',
+    act: 'PICK A SCENE' },
+];
+let W_AT = 0;
+/* the six-step window in which the section is open and READ is not -- see `worldLayout` */
+let W_SHUT = false;
+
+/* ================================================================================================
+   THE TWO SCENES, transcribed from `src/lib/scenarios/cafeOrder.ts` and
+   `shinjukuDirections.ts` on 2026-08-31. Titles, Japanese titles, descriptions, NPC names and
+   every objective with its `required` flag are the files' own strings. The Japanese NPC labels
+   are mine -- the data carries `name` and `role` in English only.
+   ================================================================================================ */
+const SCENES = [
+  { id: 'cafe-order', jp: 'カフェで注文する', en: 'Order at a Cafe',
+    who: 'BARISTA', whoJp: 'CAFE STAFF',
+    d: 'Practice ordering a drink, choosing a size, and deciding eat-in or takeaway at a Japanese cafe.',
+    obj: [['Greet the barista', 0], ['Order a drink', 1], ['Choose a size', 1],
+      ['Say eat-in or takeaway', 1], ['Confirm the order', 1], ['Thank the barista', 0]],
+    foot: 'NOT PLAYED · BEGINNER AND INTERMEDIATE LINES' },
+  { id: 'shinjuku-directions', jp: '新宿で道を尋ねる',
+    en: 'Ask for Directions in Shinjuku',
+    who: 'PASSERBY', whoJp: 'STRANGER NEAR THE STATION',
+    d: 'Practice politely getting someone’s attention, asking for directions, and confirming what they told you.',
+    obj: [['Get their attention politely', 1], ['Ask for directions to your destination', 1],
+      ['Confirm the directions by repeating them back', 1],
+      ['Ask what a word means (optional)', 0], ['Thank them politely', 1]],
+    foot: 'NOT PLAYED · BEGINNER AND INTERMEDIATE LINES' },
+];
+let SC_AT = 0;
+
+/* "CHOOSE A LEVEL" is the deck screens' line and it is wrong for both of these: one is thirty
+   texts and the other is two conversations. */
+const L3_SUB = {
+  library: '読みものを選んでください · CHOOSE SOMETHING TO READ',
+  scenes: '場面を選んでください · CHOOSE A CONVERSATION',
+};
+
+function worldMarkup() {
+  /* the class is written by `worldLayout`; the CONTENT has to know too, because a locked
+     lane is a different account and not just a dimmer one */
+  const cards = WORLD_LANES.map((L, i) => { const shut = W_SHUT && L.k === 'read';
+    return `<button class="pr-lane" data-i="${i}">`
+    + `<span class="pr-cap"><b>${L.en}</b><i>${L.jp}</i></span>`
+    + `<span class="pr-glyph">${L.glyph}</span>`
+    + `<span class="pr-fig"><b>${L.fig}</b><i>${L.figLab}</i></span>`
+    + `<span class="pr-d">${L.d}</span>`
+    + `<span class="wd-gate"><i>${L.gateJp}</i>${L.gate}</span>`
+    + `<span class="wd-list">` + L.items(shut).map((t) => `<span class="wd-item${t.open ? ' open' : ''}">`
+      + `<b>${t.jp}</b><em>${t.en}</em><u>${t.tag}</u></span>`).join('') + `</span>`
+    + `<span class="pr-foot">${L.foot(shut)}</span>`
+    + `<span class="pr-slab"></span></button>`; }).join('');
+  return `<div class="lanes two">${cards}</div>`
+    /* NOT "NOTHING IS MARKED", which is what this said first and which the scene cards flatly
+       contradict two keypresses away -- the tutor marks a conversation at the end of it. What is
+       true of the whole section is that none of it is SCHEDULED: no card in here is due, ever. */
+    + `<div class="pr-note">実践 · REAL JAPANESE, NOT EXERCISES — NOTHING IN HERE IS EVER DUE</div>`;
+}
+
+function worldLayout() {
+  W_AT = Math.max(0, Math.min(W_AT, WORLD_LANES.length - 1));
+  hudEl.querySelectorAll('.pr-lane').forEach((el, i) => {
+    const on = i === W_AT, L = WORLD_LANES[i];
+    el.classList.toggle('on', on);
+    /* `shut` IS NOT `FIRST_RUN`, and tying it to that was wrong twice over. On a first run
+       THE WORLD is locked entire, so a first-run lock inside it could never be seen; and
+       the state this draws is not the beginning of the game at all. It is the window
+       between step five and step eleven -- GRAMMAR has opened the section and TALK with
+       it, and READING has not arrived yet -- which is six steps long and is what most of
+       an early account will actually see. It gets its own key, `L` on this screen, the
+       same way the ledger's bad week and the deck's 76 blocks get theirs. */
+    el.classList.toggle('shut', !!(W_SHUT && L.k === 'read'));
+    el.querySelector('.pr-slab').textContent = el.classList.contains('shut')
+      ? 'REACH READING ON THE PATH'
+      : on ? `${L.act} · ENTER ▸` : L.act;
+  });
+}
+
+function worldRows() {
+  return WORLD_LANES.map((L, i) => ({
+    no: String(i + 1).padStart(2, '0'), en: L.en, jp: L.jp, big: L.en, small: L.jp,
+    meta: L.figLab, pct: 0, figs: [], next: ['', '', ''],
+  }));
+}
+
+function worldPick() {
+  if (W_SHUT && WORLD_LANES[W_AT].k === 'read') { doFlash(0.16); return; }
+  HUD.level = 3;
+  hudDraw();
+}
+
+/* ---- level three of the TALK lane ---- */
+function scenesMarkup() {
+  const cards = SCENES.map((S, i) => `<button class="sc-card" data-i="${i}">`
+    + `<span class="sc-who"><b>${S.who}</b><i>${S.whoJp}</i></span>`
+    + `<span class="sc-title"><b>${S.jp}</b><i>${S.en}</i></span>`
+    + `<span class="sc-d">${S.d}</span>`
+    /* THE HOLLOW MARKER ALREADY SAYS OPTIONAL, so the one objective whose own label ends in
+       "(optional)" has it trimmed -- the data is quoted, not the redundancy. */
+    + `<span class="sc-obj">` + S.obj.map(([t, req]) => `<span class="${req ? '' : 'opt'}">`
+      + `<s></s>${t.replace(/\s*\(optional\)$/i, '')}</span>`).join('') + `</span>`
+    + `<span class="sc-foot">${S.foot}</span>`
+    + `<span class="sc-slab"></span></button>`).join('');
+  return `<div class="scenes">${cards}`
+    + `<button class="sc-free" data-i="${SCENES.length}">`
+    + `<span class="g">自</span>`
+    + `<span class="n"><b>自由会話</b><i>FREE TALK</i></span>`
+    + `<span class="d">No script and no objectives — say anything you like, and the tutor answers, corrects you, and turns what you got wrong into cards.</span>`
+    + `<span class="k"></span></button></div>`;
+}
+
+function scenesLayout() {
+  SC_AT = Math.max(0, Math.min(SC_AT, SCENES.length));
+  hudEl.querySelectorAll('.sc-card').forEach((el, i) => {
+    el.classList.toggle('on', i === SC_AT);
+    el.querySelector('.sc-slab').textContent = i === SC_AT
+      ? 'START THE CONVERSATION · ENTER ▸' : 'START THE CONVERSATION';
+  });
+  const free = hudEl.querySelector('.sc-free');
+  if (free) {
+    const on = SC_AT === SCENES.length;
+    free.classList.toggle('on', on);
+    free.querySelector('.k').textContent = on ? 'START TALKING · ENTER ▸' : 'START TALKING';
+  }
+}
+
+function sceneRows() {
+  return SCENES.map((S, i) => ({
+    no: String(i + 1).padStart(2, '0'), en: S.en, jp: S.jp, big: S.en, small: S.jp,
+    meta: S.obj.length + ' GOALS', pct: 0, figs: [], next: ['', '', ''],
+  })).concat([{ no: String(SCENES.length + 1).padStart(2, '0'), en: 'FREE TALK',
+    jp: '自由会話', big: 'FREE TALK', small: '自由会話',
+    meta: 'ANY TOPIC', pct: 0, figs: [], next: ['', '', ''] }]);
+}
+
 function hudBespoke() {
   /* A DECK'S BLOCKS AND THE FEED ARE LEVEL THREE, not level two. */
   if (HUD.level === 3) {
     /* the drills lane, one level inside PRACTICE */
     if (HUD.sec === 'DRILLS') return 'modes';
+    /* THE WORLD'S TWO LANES EACH OPEN SOMETHING DIFFERENT, so which screen this is depends on
+       which lane you came through -- the only place in this file where level three is chosen by
+       the lane rather than by the tile. */
+    if (HUD.sec === 'READING') return WORLD_LANES[W_AT].k === 'read' ? 'library' : 'scenes';
     if (HUD.sec !== 'STUDY') return null;
     if (STUDY_BLOCKS[HUD.tile]) return 'deck';
     if (STUDY_FEED[HUD.tile]) return 'feed';
@@ -21408,8 +21809,10 @@ function hudBespoke() {
   /* THE COURSE STOPS BEING A ROAD. Sixteen milestones, one of them current -- the same chain the
      deck screen draws, and for the same reason. */
   if (HUD.sec === 'STUDY') return 'path';
-  /* READING is the only flat, ungated set in the menu -- see the note above `.library` */
-  if (HUD.sec === 'READING') return 'library';
+  /* THE WORLD IS TWO LANES NOW, and the library moved one level in behind the READ one --
+     see the note by `WORLD_LANES`. It used to be this section's whole level two, which is what
+     made a section named for reading AND conversation one lane wide. */
+  if (HUD.sec === 'READING') return 'world';
   if (HUD.sec === 'RECORDS') return 'ledger';
   /* PRACTICE'S LEVEL TWO IS ITS THREE LANES. The seventeen modes moved one level in when the
      section absorbed the reviews and the daily puzzles -- see the note by `.lanes`. */
@@ -21439,7 +21842,11 @@ function hudDraw(force) {
        shared cursor is pinned rather than being asked to address seventeen things */
     const span = bespoke === 'deck' || bespoke === 'path' ? 2
       : bespoke === 'feed' ? 6 : bespoke === 'library' ? LIB.length
-        : bespoke === 'modes' ? 1 : bespoke === 'lanes' ? PR_LANES.length : all.length;
+        : bespoke === 'modes' ? 1 : bespoke === 'lanes' ? PR_LANES.length
+          : bespoke === 'world' ? WORLD_LANES.length
+            /* the two scenes PLUS the free-talk strip, which is a third thing you can stand on
+               and is not in `SCENES` because it is not one */
+            : bespoke === 'scenes' ? SCENES.length + 1 : all.length;
     HUD.cur = Math.max(0, Math.min(HUD.cur, span - 1));
     HUD.at = HUD.cur;
     rows = all;
@@ -21459,7 +21866,9 @@ function hudDraw(force) {
     bespoke === 'library' ? 'lib' : '',
     bespoke === 'feed' ? FD_BUDGET + '/' + FD_DONE : '',
     bespoke === 'modes' ? DR_SEL + '/' + DR_DECK + '/' + DR_ZONE : '',
-    bespoke === 'lanes' ? String(PR_AT) : ''].join('|');
+    bespoke === 'lanes' ? String(PR_AT) : '',
+    bespoke === 'world' ? W_AT + '/' + String(W_SHUT) : '',
+    bespoke === 'scenes' ? String(SC_AT) : ''].join('|');
   if (force || key !== hudKey) { hudKey = key; hudBuild(rows); hudPrevAt = -1; }
   hudSync(rows);
   /* the counter is written from here, not from whoever moved the cursor, so it cannot disagree
@@ -21476,6 +21885,11 @@ function hudBuild(rows) {
   const tile = HUD.level === 3
     ? ((HUD.sec === 'STUDY' && (() => { const s = STUDY_PATH.find((x) => x.deck === HUD.tile);
       return s ? [s.jp, s.en] : null; })())
+      /* THE WORLD'S LEVEL THREE IS A LANE, NOT A TILE. Which screen you are on was decided
+         by `W_AT` on the way in, so its name comes from the same place -- the section has no
+         subtiles at all and `HUD.tile` is whatever the last section left behind. */
+      || (HUD.sec === 'READING' && (() => { const L = WORLD_LANES[W_AT];
+        return L ? [L.jp, L.en] : null; })())
       || (SUBTILES[HUD.sec] || []).find((t) => t[0] === HUD.tile)
       || DECK_NAMES[HUD.tile] || [HUD.tile, ''])
     : null;
@@ -21495,9 +21909,15 @@ function hudBuild(rows) {
     ? ((String(tile[0]).match(/[\u3040-\u30ff\u4e00-\u9faf]/) || [it.kanji])[0])
     : it.kanji;
   const headBody = HUD.level === 3
-    ? `<div class="hud-kick">${it.en} \u2014 ${tile[1]}</div>`
+    /* `secLabel`, NOT `it.en`. Levels one and two have said THE WORLD and PRACTICE since
+       the restructure and this line still said READING and DRILLS -- one section under two
+       names, one level apart. */
+    ? `<div class="hud-kick">${secLabel(it)} \u2014 ${tile[1]}</div>`
       + `<div class="hud-title"><b>${tile[0]}</b><i>${tile[1]}</i></div>`
-      + `<div class="hud-sub">\u30ec\u30d9\u30eb\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044 \u00b7 CHOOSE A LEVEL</div>`
+      /* CHOOSE A LEVEL is the deck screens' line. A screen that is not a list of levels
+         says what it is instead -- see `L3_SUB`. */
+      + `<div class="hud-sub">${L3_SUB[hudBespoke()]
+        || '\u30ec\u30d9\u30eb\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044 \u00b7 CHOOSE A LEVEL'}</div>`
     /* A FOLDED SECTION HAS NO ORDINAL, because it is not a row at level one -- DAILY is reached
        from inside PRACTICE, so its kicker names the way in rather than a number it does not have.
        And the count is `l1Count()`, not a hard six: the menu is five rows now. */
@@ -21580,6 +22000,10 @@ function hudBuild(rows) {
                 ? `<div class="modes">${modesMarkup()}</div>`
                 : bespoke === 'lanes'
                   ? `<div class="modes">${lanesMarkup()}</div>`
+                  : bespoke === 'world'
+                    ? `<div class="modes">${worldMarkup()}</div>`
+                    : bespoke === 'scenes'
+                      ? `<div class="modes">${scenesMarkup()}</div>`
               : shaped
       ? `<div class="course-shape">${courseMarkup(rows)}</div>`
       : `<div class="hud-list${rows.length > 4 ? ' five' : ''}">${list}</div>`;
@@ -21803,6 +22227,8 @@ function hudSync(rows) {
   if (hudBespoke() === 'library') { libraryLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'modes') { modesLayout(); hudPrevAt = HUD.at; return; }
   if (hudBespoke() === 'lanes') { lanesLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'world') { worldLayout(); hudPrevAt = HUD.at; return; }
+  if (hudBespoke() === 'scenes') { scenesLayout(); hudPrevAt = HUD.at; return; }
   if (courseShaped()) {
     /* the cards carry no `.on` class -- being selected changes their size, offset, depth and text
        rather than adding a state, so the whole layout is rewritten from the cursor every sync */
@@ -22148,6 +22574,37 @@ addEventListener('keydown', (e) => {
       PR_AT = Math.max(0, PR_AT - 1); hudDraw(); e.preventDefault(); return;
     }
     if (e.key === 'Enter') { lanePick(); e.preventDefault(); return; }
+  }
+  /* ---- THE WORLD'S TWO LANES, AND ITS SCENE PICKER: the same four arrows and Enter ----
+     Deliberately identical to PRACTICE's, because the screens are the same component doing
+     the same job. The scene picker walks its three positions in ONE line rather than in two
+     zones -- the free-talk strip is the third thing in the list, not a second axis. */
+  if (hudBespoke() === 'world') {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      W_AT = Math.min(WORLD_LANES.length - 1, W_AT + 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      W_AT = Math.max(0, W_AT - 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'Enter') { worldPick(); e.preventDefault(); return; }
+    /* BEFORE READING ARRIVED. The selection is pushed onto TALK when READ shuts, because a
+       cursor resting on a lane you cannot enter is the same defect as a road folding under
+       one -- see `drNearest`. */
+    if (e.key === 'l' || e.key === 'L') {
+      W_SHUT = !W_SHUT;
+      if (W_SHUT) W_AT = WORLD_LANES.findIndex((L) => L.k === 'talk');
+      hudDraw(); e.preventDefault(); return;
+    }
+  }
+  if (hudBespoke() === 'scenes') {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      SC_AT = Math.min(SCENES.length, SC_AT + 1); hudDraw(); e.preventDefault(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      SC_AT = Math.max(0, SC_AT - 1); hudDraw(); e.preventDefault(); return;
+    }
+    /* the conversation itself is the app, which is where every other terminal here stops */
+    if (e.key === 'Enter') { doFlash(0.18); e.preventDefault(); return; }
   }
   /* ---- DRILLS' TWO AXES, ON THE FOUR ARROWS AND NOTHING ELSE ----
      Left and right walk the modes this deck OFFERS -- never the folded ones, so the cursor
