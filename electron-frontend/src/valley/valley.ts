@@ -35,6 +35,7 @@ import {
   type Rig,
 } from './lighting'
 import { ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, sizeShafts, updateSunUv } from './shafts'
+import { buildClouds, type CloudField } from './clouds'
 import { registerFlights } from './flights'
 import type { MenuSectionKey } from '../features/menu'
 
@@ -89,6 +90,7 @@ let flownTo: MenuSectionKey | null = null
 let rig: Rig | null = null
 let sunDisc: Mesh | null = null
 let sunAt: Vector3 | null = null
+let clouds: CloudField | null = null
 /* NEVER SET `shadowMap.needsUpdate` DIRECTLY. In the mockup that flag was consumed by whichever
    render came next, which was the lake reflection -- a pass that clips at the waterline -- so the
    one shadow build in the world was drawn against a clipped scene, and the valley had no shadows
@@ -425,6 +427,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     scene.add(sunDisc)
     /* the main camera sees the world AND the atmosphere; the mask pass turns this one off */
     camera.layers.enable(ATMOS_LAYER)
+    /* THE RING IS CENTRED ON THE VALLEY, NOT ON THE CAMERA. Anchoring it to the eye would make it a
+       skybox -- clouds that never move relative to you, which is exactly the flat-gradient problem
+       one step further out. Centred on the world, a flight across 11,000 units genuinely slides
+       them against the mountains, which is the whole reason to make them geometry. */
+    clouds = buildClouds(scene, new Vector3(0, 0, 0))
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* ONE SHADOW BUILD. `autoUpdate` is off below: redrawing 4096 squared of a five-million
        triangle valley every frame is worth double digits of fps, and nothing in the world moves. */
@@ -525,13 +532,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       if (sunDisc) faceSun(sunDisc, _eye)
     }
 
-    /* THE SUN AS THE SKY SEES IT is a direction FROM THE EYE, so the scattering lobes hold still
-       while the camera flies and swing when it turns. */
-    if (sunAt) {
-      _eye.set(cam.px, cam.py, cam.pz)
-      updateSkyDir(sunAt, _eye)
-      if (sunDisc) faceSun(sunDisc, _eye)
-    }
+    /* the sky drifts on the same capped clock as everything else, so a dropped frame slows the
+       weather rather than teleporting it */
+    if (clouds) clouds.drift(dt / 1000)
 
     camera.position.set(cam.px, cam.py, cam.pz)
     if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix() }
@@ -571,6 +574,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       if (rig) { scene.remove(rig.key, rig.key.target, rig.fill, rig.fill.target, rig.hemi); rig = null }
       if (sunDisc) { scene.remove(sunDisc); sunDisc = null }
       sunAt = null
+      clouds?.dispose()
+      clouds = null
       disposeShafts()
       renderer.dispose()
       canvas.remove()
