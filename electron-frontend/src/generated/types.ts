@@ -161,6 +161,11 @@ export interface ProgressionNodeStatusPayload {
   is_tracked: boolean
 }
 
+export interface FeatureRequirementPayload {
+  node_id: string
+  status: string
+}
+
 export interface FeatureStatusPayload {
   feature_id: string
   name: string
@@ -169,6 +174,7 @@ export interface FeatureStatusPayload {
   badges: string[]
   just_unlocked: boolean
   unlocked_at: string | null
+  requires: FeatureRequirementPayload[]
 }
 
 export interface XPProgressPayload {

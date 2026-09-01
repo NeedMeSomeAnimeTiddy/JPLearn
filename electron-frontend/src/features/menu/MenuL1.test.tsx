@@ -26,8 +26,8 @@ function installApi(unlocked: string[]) {
   window.jplearnDesktop = {
     getFeatureState: vi.fn(async () => ({
       features: [
-        { feature_id: 'conversation_mode', name: 'Conversation', category: 'world', is_unlocked: unlocked.includes('conversation_mode'), badges: [], just_unlocked: false, unlocked_at: null },
-        { feature_id: 'jlpt_dashboard', name: 'JLPT', category: 'exam', is_unlocked: unlocked.includes('jlpt_dashboard'), badges: [], just_unlocked: false, unlocked_at: null },
+        { feature_id: 'conversation_mode', name: 'Conversation', category: 'world', is_unlocked: unlocked.includes('conversation_mode'), badges: [], just_unlocked: false, unlocked_at: null, requires: [] },
+        { feature_id: 'jlpt_dashboard', name: 'JLPT', category: 'exam', is_unlocked: unlocked.includes('jlpt_dashboard'), badges: [], just_unlocked: false, unlocked_at: null, requires: [] },
       ],
     })),
   } as unknown as Window['jplearnDesktop']

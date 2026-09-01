@@ -749,6 +749,20 @@ class ProgressionNodeStatusPayload:
 
 
 @dataclass(frozen=True)
+class FeatureRequirementPayload:
+    """One progression condition a feature waits on.
+
+    ``status`` is reported because ``mastered`` and ``unlocked`` are NOT the same
+    trigger and the catalog is careful about it: eight features want a node mastered
+    and ``jlpt_dashboard`` wants ``vocabulary_n5`` merely reached. A surface that
+    announced "mastered" on that one would be lying about when it fired.
+    """
+
+    node_id: str
+    status: str
+
+
+@dataclass(frozen=True)
 class FeatureStatusPayload:
     """One catalog feature, its state, and when that state arrived.
 
@@ -768,6 +782,11 @@ class FeatureStatusPayload:
     badges: tuple[str, ...] = ()
     just_unlocked: bool = False
     unlocked_at: str | None = None
+    #: What the catalog asks for, with feature chains already resolved to the
+    #: progression they bottom out at — ``tutor_chat`` waits on ``conversation_mode``,
+    #: which waits on ``grammar_n5``, and a renderer must not re-walk that itself.
+    #: Empty for the two features that are always available.
+    requires: tuple[FeatureRequirementPayload, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -2032,6 +2051,39 @@ def build_progression_status() -> dict[str, object]:
     return {"nodes": result}
 
 
+def _resolved_requirements(
+    feature_id: str, by_id: dict[str, object], seen: frozenset[str] = frozenset(),
+) -> tuple[FeatureRequirementPayload, ...]:
+    """Return the progression a feature waits on, through any feature chain.
+
+    Tier 3 features depend on other FEATURES rather than on nodes — ``tutor_chat``
+    waits on ``conversation_mode``, which waits on ``grammar_n5`` — so the milestone
+    that actually fires them is one hop away. Resolving that here keeps the walk on
+    the side of the wall that owns the catalog; a renderer doing it would be a second
+    reading of the dependency graph.
+
+    ``seen`` guards a cycle. The catalog has none today and nothing asserts that it
+    cannot grow one, and a recursion error in the bridge takes every other command
+    down with it.
+    """
+    feature = by_id.get(feature_id)
+    if feature is None or feature_id in seen:
+        return ()
+    requirement = feature.requirement
+    out = [
+        FeatureRequirementPayload(node_id=cond.node_id, status=cond.required_status)
+        for cond in requirement.progression_conditions
+    ]
+    for dependency in requirement.feature_dependencies:
+        out.extend(_resolved_requirements(dependency.feature_id, by_id, seen | {feature_id}))
+    # de-duplicated, because two chains can bottom out on the same node
+    unique: list[FeatureRequirementPayload] = []
+    for entry in out:
+        if entry not in unique:
+            unique.append(entry)
+    return tuple(unique)
+
+
 def build_feature_unlock_status() -> dict[str, object]:
     """Return unlock status for all features in the catalog."""
     init_study_db()
@@ -2053,6 +2105,7 @@ def build_feature_unlock_status() -> dict[str, object]:
     # did. See FeatureStatusPayload for which of the two a caller should trust.
     just_unlocked = {ev.feature_id for ev in events}
     unlocked_times = load_feature_unlock_times()
+    by_id = {feat.feature_id: feat for feat in JPLEARN_FEATURES}
     result = []
     for feat in JPLEARN_FEATURES:
         badge_descriptors = tuple(
@@ -2068,6 +2121,7 @@ def build_feature_unlock_status() -> dict[str, object]:
                     badges=badge_descriptors,
                     just_unlocked=feat.feature_id in just_unlocked,
                     unlocked_at=unlocked_times.get(feat.feature_id),
+                    requires=_resolved_requirements(feat.feature_id, by_id),
                 )
             )
         )

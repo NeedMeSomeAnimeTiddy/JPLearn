@@ -57,9 +57,9 @@ import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks,
-  MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed,
+  MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed, Unlock,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
-  heroFromStudyBlock, crownFrom, type MenuSectionKey,
+  unlockMoment, heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
@@ -324,7 +324,6 @@ function App() {
       return next
     })
   }, [])
-  const menu = useMenuL1(menuFrontDoor)
 
   function openDailyGames(): void {
     closeKanjiDetail()
@@ -590,6 +589,15 @@ function App() {
   // The 16-node curriculum graph (issue #78 Phase 4). Fetched only while Home is
   // on screen — it is the only consumer, and the bridge is strictly serial.
   const progression = useProgression(view === 'home')
+
+  /* `enabled` is "the menu is the surface you are looking at", not "the menu is the front door".
+     That is what makes it ask again on the way back from a study session -- which is when a feature
+     actually unlocks, and the only reason the moment below can fire at all.
+
+     IT SITS HERE RATHER THAN WITH THE REST OF THE MENU STATE because it reads `progression.nodes`,
+     and the features are evaluated against the progression: asking first would be asking about last
+     cycle's nodes. */
+  const menu = useMenuL1(menuFrontDoor && view === 'home', progression.nodes)
 
   const cursor = useCursor(
     settings as unknown as { cursor: CursorSettings },
@@ -1271,6 +1279,27 @@ function App() {
      converts them one at a time by registering a screen, and nothing here changes. */
   const menuPath = useMenuPath(openMenuSection)
 
+  /* ==================================================================================================
+     THE UNLOCK MOMENT, WHICH IS AN EVENT AND NOT A PLACE.
+
+     It is the one screen here you did not navigate to, so it does not appear over wherever you
+     happened to be standing: `menuLevel` goes to a level nothing matches while it is up, and
+     continuing from it leaves you at the front door. Gating at the source rather than adding
+     `&& !moment` to twelve render branches is also what stops an L2 board painting for one frame
+     under the moment's own wash before a reset effect could fire.
+     ================================================================================================== */
+  const moment = useMemo(
+    () => unlockMoment(menu.pendingUnlocks, progression.nodes),
+    [menu.pendingUnlocks, progression.nodes],
+  )
+  const resetMenuPath = menuPath.reset
+  useEffect(() => {
+    /* `ROOT` is a module constant, so this is idempotent and cannot loop through `menuPath` */
+    if (moment) resetMenuPath()
+  }, [moment, resetMenuPath])
+  const menuLevel = moment ? 0 : menuPath.level
+
+
   /* THE CAMERA CARRIES THE NAVIGATION, and this is the pair of calls that make it do so.
 
      ENTERING FLIES FIRST AND CHANGES THE SCREEN AT 82% OF THE MOVE, so the section's board is
@@ -1297,7 +1326,7 @@ function App() {
   /* THE WORLD'S TWO FIGURES, fetched only once the screen asking for them is up — see the note in
      `useWorldData`. `worldLanes` is memoised because `Lanes` watches the array it is given, and a
      fresh one on every render would re-subscribe its keydown listener for nothing. */
-  const worldOpen = view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'READING'
+  const worldOpen = view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'READING'
   const world = useWorldData(worldOpen)
   const worldCards = useMemo(
     () => worldLanes({
@@ -1309,7 +1338,7 @@ function App() {
 
   /* THE ASCENT'S ONE CALL, on the same terms: asked when the ladder is up, memoised because the
      screen watches the array it is given. */
-  const examOpen = view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'JLPT'
+  const examOpen = view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'JLPT'
   const exam = useReadiness(examOpen)
   const examRungs = useMemo(() => ascentRungs(exam.readiness), [exam.readiness])
   /* WHICH RUNG LEVEL THREE IS ABOUT. The ascent's cursor is the ascent's own state -- it is not in
@@ -1336,7 +1365,7 @@ function App() {
     [progression.nodes, menuNode],
   )
   /* fetched only while one of the two screens is up: `null` is what stops the hook asking */
-  const deckScreenOpen = menuPath.level === 3 && menuPath.screen === 'deck'
+  const deckScreenOpen = menuLevel === 3 && menuPath.screen === 'deck'
   const menuDeck = useDeckBlocks(deckScreenOpen ? activeDeckSlug : null)
   /* the feed itself is `vocabFeed` above -- App already holds one for the deck under study, and a
      second instance would be a second round trip answering the same question */
@@ -2262,7 +2291,7 @@ function App() {
       {/* Home is the main landing surface; keep it mounted only for home view. */}
       {/* L2 — one section at a time. A section with no screen here never reaches level two:
           `useMenuPath` passes it straight through to the flat view instead. */}
-      {view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'STUDY' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'STUDY' ? (
         <PathL2
           nodes={progression.nodes}
           loading={progression.loading}
@@ -2274,7 +2303,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'deck' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'deck' ? (
         <Deck
           title={menuMilestone}
           slug={activeDeckSlug}
@@ -2293,7 +2322,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'feed' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'feed' ? (
         <Feed
           title={menuMilestone}
           feed={vocabFeed}
@@ -2305,7 +2334,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'DRILLS' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'DRILLS' ? (
         <Lanes
           jp="練習" en="PRACTICE"
           note="練習 · NOTHING NEW IS TAUGHT HERE — THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU"
@@ -2337,7 +2366,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'drills' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'drills' ? (
         <Drills
           deck={activeScript}
           onStart={(deck, mode) => {
@@ -2349,7 +2378,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'level' && examDetail ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'level' && examDetail ? (
         <ExamLevel
           level={examDetail}
           onStart={() => {
@@ -2360,7 +2389,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'library' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'library' ? (
         <Library
           rows={libraryRows(world.passages)}
           loading={!world.passages}
@@ -2373,11 +2402,11 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'wall' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'wall' ? (
         <Wall onUp={leaveMenuLevel} />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'scenes' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'scenes' ? (
         <Scenes
           scenes={buildScenes(world.sessions)}
           onPick={(scenarioId) => {
@@ -2395,7 +2424,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'RECORDS' ? (
+      {view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'RECORDS' ? (
         <Ledger
           summary={summary}
           xp={xpProgress}
@@ -2414,7 +2443,14 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuPath.level === 1 ? (
+      {/* THE MOMENT TAKES THE STAGE. It is drawn before the front door rather than over it, because
+          it is the only screen here that is an event -- and `menuLevel` has already closed every
+          other menu branch, so this is the whole of the menu while it is up. */}
+      {view === 'home' && menuFrontDoor && moment ? (
+        <Unlock moment={moment} onContinue={menu.dismissUnlocks} />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuLevel === 1 ? (
         <MenuL1
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}

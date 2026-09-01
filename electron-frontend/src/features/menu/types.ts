@@ -1,3 +1,5 @@
+import type { FeatureStatusPayload } from '../../generated/types'
+
 export type MenuSectionKey = 'STUDY' | 'DRILLS' | 'READING' | 'JLPT' | 'RECORDS'
 
 export interface MenuGate {
@@ -53,4 +55,8 @@ export interface MenuController {
   /** feature ids that are unlocked, from `getFeatureState`; null until it has answered */
   unlocked: Set<string> | null
   isLocked: (section: MenuSection) => boolean
+  /** features that opened since this surface last announced one; empty is the usual case */
+  pendingUnlocks: FeatureStatusPayload[]
+  /** stop announcing them, and remember the mark that says so */
+  dismissUnlocks: (mark: string) => void
 }

@@ -1737,3 +1737,106 @@
   color: var(--gold-hi); paint-order: stroke fill;
   -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
 }
+
+/* ==================================================================================================
+   THE UNLOCK MOMENT — the only screen in this menu that is an EVENT rather than a place.
+
+   IT IS PEERS, NOT A SIXTH SHAPE. One to three things opened at once, unordered, all available,
+   which is the peers rule exactly — and a moment that invented its own shape would be a moment
+   nobody could read. What makes it a moment is that it is the only thing on the stage and that you
+   did not navigate to it.
+
+   THE CARDS ARE A FIXED HEIGHT AND THE BAND CENTRES THEM. Flexed to share the band instead, one
+   unlock gets a card three times the height of a card in a set of three — and the single most
+   important moment in the game renders as one line of type floating in the middle of a blank sheet,
+   which reads as a load failure rather than as emphasis. The weight of a moment is the NUMBER of
+   cards; a card is a card.
+
+   THE STAMP'S RULE IS GOLD AND THE SLAB IS VERMILION, not the other way round. A hanko is vermilion
+   in life, and drawing it that way here would put the loudest colour in the interface on a thing you
+   cannot press, an inch from the thing you can. The colour law outranks the reference.
+   ================================================================================================== */
+
+/* the moment darkens the valley on its own, because it is not somewhere you walked to */
+.un-open::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: rgba(8, 11, 18, 0.42);
+}
+
+.un-stamp {
+  position: absolute; left: 180px; top: 212px; width: 250px; height: 300px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  background: linear-gradient(178deg, #fbf8f1 0%, #e7e0ce 100%);
+  box-shadow: 8px 11px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.un-stamp .k {
+  font-family: var(--jp); font-weight: 700; font-size: 92px; line-height: 0.9; color: var(--ink);
+}
+/* THE RULE IS THE STAMP'S EDGE, and it is the one gold thing on this screen — the section accent
+   belongs to the milestone, not to what the milestone opened. */
+.un-stamp .r { width: 118px; height: 3px; margin: 9px 0 3px; background: var(--gold); }
+.un-stamp .n {
+  max-width: 210px; text-align: center; font-family: var(--lat); font-style: italic;
+  font-weight: 900; font-size: 21px; letter-spacing: 0.03em; line-height: 1.1; color: var(--ink);
+}
+.un-stamp .s {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.19em;
+  color: rgba(20, 17, 13, 0.55); text-align: center; max-width: 210px; line-height: 1.4;
+}
+.un-stamp .w {
+  margin-top: 7px; padding: 4px 12px 5px; background: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.17em;
+  color: var(--gold-hi);
+}
+/* no single milestone opened all of them, so the stamp says that rather than picking one */
+.un-nostamp { gap: 10px; }
+
+.un-lead {
+  position: absolute; left: 452px; top: 206px; width: 648px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
+}
+.un-list {
+  position: absolute; left: 452px; top: 232px; width: 648px; height: 280px;
+  display: flex; flex-direction: column; justify-content: center; gap: 12px;
+}
+.un-card {
+  flex: none; height: 86px; padding: 0 20px; display: flex; align-items: center; gap: 16px;
+  transform: skewX(-8deg);
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+}
+.un-card .t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.un-card .t b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 24px; line-height: 1;
+  color: var(--ink);
+}
+.un-card .t i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.17em; color: rgba(20, 17, 13, 0.58);
+}
+.un-card .b {
+  flex: none; padding: 5px 11px 6px; background: rgba(20, 17, 13, 0.82);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8px; letter-spacing: 0.16em;
+  color: var(--gold-hi); white-space: nowrap;
+}
+
+/* ONE VERMILION, AND IT IS THE WAY OUT. Everything else on this screen is something that happened;
+   this is the only thing you do. */
+.un-slab {
+  position: absolute; left: 452px; top: 524px; width: 648px; height: 34px;
+  border: 0; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; background: var(--hi); transform: skewX(-8deg);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.45);
+}
+.un-slab:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 4px; }
+.un-slab em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.16em; color: rgba(255, 246, 236, 0.75);
+}
+.un-slab b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.15em;
+  color: #fff6ec;
+}

@@ -1507,6 +1507,55 @@ def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monke
     assert first_conjugation_block["card_ids"]
 
 
+def test_feature_status_resolves_a_chain_to_the_progression_it_bottoms_out_at(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A tier-3 feature waits on another FEATURE, so its milestone is one hop away.
+
+    ``tutor_chat`` requires ``conversation_mode``, which requires ``grammar_n5`` mastered
+    — and a surface naming the milestone that fired an unlock has to walk that. Doing it
+    on the renderer side would be a second reading of the dependency graph.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    by_id = {f.feature_id: f for f in desktop_bridge.JPLEARN_FEATURES}
+    resolved = desktop_bridge._resolved_requirements("tutor_chat", by_id)
+
+    assert [(r.node_id, r.status) for r in resolved] == [("grammar_n5", "mastered")]
+
+
+def test_feature_status_keeps_mastered_and_unlocked_apart(tmp_path: Path, monkeypatch) -> None:
+    """The catalog is careful about the difference and the payload has to be too.
+
+    Eight features want a node mastered; ``jlpt_dashboard`` wants ``vocabulary_n5`` merely
+    reached. A surface that said "mastered" on that one would be lying about when it fired.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    by_id = {f.feature_id: f for f in desktop_bridge.JPLEARN_FEATURES}
+    exam = desktop_bridge._resolved_requirements("jlpt_dashboard", by_id)
+    kana = desktop_bridge._resolved_requirements("listening_mode", by_id)
+
+    assert [(r.node_id, r.status) for r in exam] == [("vocabulary_n5", "unlocked")]
+    assert [(r.node_id, r.status) for r in kana] == [("hiragana", "mastered")]
+
+
+def test_feature_status_reports_no_requirement_for_the_always_available(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Two of the nine are gated on nothing, and an empty tuple says so."""
+    _use_temp_db(tmp_path, monkeypatch)
+
+    features = cast(dict[str, Any], desktop_bridge.build_feature_unlock_status())["features"]
+    by_id = {f["feature_id"]: f for f in features}
+
+    assert by_id["themes"]["requires"] == ()
+    assert by_id["kanji_mode"]["requires"] == (
+        {"node_id": "vocabulary_n5", "status": "mastered"},
+        {"node_id": "grammar_n5", "status": "mastered"},
+    )
+
+
 def test_build_block_progress_reports_the_gate_it_applied(tmp_path: Path, monkeypatch) -> None:
     """The threshold is what a block's mastery figure is *for*, so it is reported.
 
