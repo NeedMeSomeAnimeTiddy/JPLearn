@@ -42,6 +42,8 @@ import { buildLanterns, type LanternField } from './lanterns'
 import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
+import { buildLake, type Lake } from './lake'
+import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
 import { registerFlights } from './flights'
@@ -103,6 +105,8 @@ let lanterns: LanternField | null = null
 let nightMap: NightMap | null = null
 let windows: WindowField | null = null
 let ground: Heightfield | null = null
+let lake: Lake | null = null
+let mirror: Reflection | null = null
 let coverTex: ReturnType<typeof makeCoverTexture> | null = null
 /* WHERE THE VIEWER IS, ASKED ONCE. `Intl` is cheap but not free and the answer cannot change
    inside a session; the sun's altitude is what moves. */
@@ -134,6 +138,7 @@ let shadowDirty = false
 /* `?rays=off` -- the shafts cost a second scene pass, so they get their own switch the way the
    whole valley does, and the same reason: the only honest way to price a thing is to boot without it */
 const shafts = new URLSearchParams(window.location.search).get('rays') !== 'off'
+const water = new URLSearchParams(window.location.search).get('water') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -470,6 +475,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        one step further out. Centred on the world, a flight across 11,000 units genuinely slides
        them against the mountains, which is the whole reason to make them geometry. */
     clouds = buildClouds(scene, new Vector3(0, 0, 0))
+    /* the water and its mirror. `?water=off` because a second full scene render is the one
+       thing in this valley that can be measured out of a slow machine's budget. */
+    if (water) { lake = buildLake(scene); mirror = createReflection() }
 
     /* THE AIR GOES ON AFTER THE SUN IS PLACED, because the cover's projection is the sun's own
        direction -- patch first and the shadows fall from wherever the uniform happened to start.
@@ -623,6 +631,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* and the cover creeps with them, on the same clock */
     driftCover(dt / 1000)
     windows?.tick(dt / 1000)
+    lake?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -646,6 +655,12 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
          one, which is exactly how the mockup lost every shadow in the valley. */
       renderSkyMask({ renderer, scene, camera, disc: sunDisc })
     }
+
+    /* THE MIRROR IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather than
+       after it -- a pending build would otherwise land in the reflection instead of the real one,
+       which is exactly how the mockup lost every shadow in the valley. Same reason as the sky
+       mask above, and the two now sit together. */
+    if (lake && mirror) mirror.render(renderer, scene, camera, lake.mesh)
 
     /* and the shadow build goes HERE, in the last gap before the render -- see `shadowDirty` */
     if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false }
@@ -677,6 +692,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       nightMap = null
       windows = null
       ground = null
+      lake?.dispose()
+      lake = null
+      mirror?.dispose()
+      mirror = null
       coverTex?.dispose()
       coverTex = null
       disposeShafts()
