@@ -208,6 +208,50 @@ export function solarState(date: Date, lat: number, lon: number): SolarState {
 }
 
 /* ==================================================================================================
+   THE ARC, IN FRAME COORDINATES — u across, v down, both fractions of the canvas.
+
+   The sun in this picture has always been placed by COMPOSITION rather than by bearing: `placeSun`
+   unprojects a screen point through the home camera and puts the sun 50,000 units down that ray.
+   That is why the approved shot has it in the middle of the frame and 30% down, and it is why the
+   port has been able to freeze it there.
+
+   ACROSS IS INVENTED. Sunrise at the left edge, sunset a hair past centre, straight between. There
+   is no astronomy in it and there does not need to be — the valley faces one way, the menu is
+   composed against one sight line, and a real azimuth would swing the sun behind the camera for
+   half the day.
+
+   UP IS NOT INVENTED. Height in frame is the sun's REAL elevation drawn at the camera's own scale:
+   42 degrees of vertical field over the canvas, so one degree of sun is about 0.0238 of the frame,
+   measured down from where zero elevation actually falls in this shot. And that number is not
+   guessed either — the approved dusk had the sun at 7.46 degrees at v = 0.300, which puts the true
+   horizon at 0.478, well below the ridge line because the ridge is high ground.
+
+   WHICH MEANS THE APPROVED COMPOSITION STOPS BEING A KEYFRAME. It is simply what this mapping
+   produces at that altitude, and it will still be what it produces in December and in five years.
+   The one liberty is the TANH, which compresses the top of the arc: drawn honestly a 54-degree
+   summer noon lands a screen and a half above the frame, and through tanh it grazes the top edge
+   instead. The compression is negligible below about twelve degrees, so every hour anyone has
+   composed anything for is untouched.
+   ================================================================================================== */
+export const SUN_ARC = {
+  uRise: 0.06,
+  uSet: 0.53,
+  /** where zero elevation falls in the menu's framing */
+  vHorizon: 0.478,
+  /** one degree of altitude, in frames, with the tanh correction already in it */
+  perDeg: 0.0249,
+  /** the altitude at which the compression starts to bite */
+  squash: 20,
+}
+
+/** where to put the sun on screen, given how high it is and how far through the day it is */
+export function arcPlace(alt: number, p: number): { u: number; v: number } {
+  const u = SUN_ARC.uRise + (SUN_ARC.uSet - SUN_ARC.uRise) * MathUtils.clamp(p, -0.35, 1.35)
+  const a = SUN_ARC.squash * Math.tanh(alt / SUN_ARC.squash)
+  return { u, v: MathUtils.clamp(SUN_ARC.vHorizon - a * SUN_ARC.perDeg, -0.22, 0.95) }
+}
+
+/* ==================================================================================================
    AND WHERE THE VIEWER IS, WHICH IS A GUESS AND IS LABELLED ONE.
    ================================================================================================== */
 

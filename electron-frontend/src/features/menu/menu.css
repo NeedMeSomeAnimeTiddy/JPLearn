@@ -328,12 +328,18 @@
    lit valley now holds these screens to, and the ascent's translucent columns were tuned against a
    world that was accidentally black.
    ================================================================================================== */
+/* AND THE BAND FOLLOWS THE SUN, which the day cycle is what made necessary. 0.28 was measured
+   against a valley at dusk, and at noon the same band leaves the hint line -- gold type with a dark
+   stroke, drawn for a dark ground -- sitting on lit grass. `--sky` is the one number the day cycle
+   hands the chrome: 0 at midnight, 1 at noon. The band takes a little over half its weight from it,
+   so night keeps the composition it was tuned for and midday gets the help it needs. */
 .mn-open::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  --band: calc(0.24 + 0.26 * var(--sky, 0.5));
   background: linear-gradient(180deg,
     rgba(14, 17, 26, 0) 0%,
     rgba(14, 17, 26, 0) 77.8%,
-    rgba(14, 17, 26, 0.28) 100%);
+    rgba(14, 17, 26, var(--band)) 100%);
 }
 
 /* the screen container is focusable so its arrow keys work; it must not draw a ring for that */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Color } from 'three'
 import {
-  DAY_STOPS, FALLBACK_LAT, ZONE_AT, dayPalette, siteFor, solarState,
+  DAY_STOPS, FALLBACK_LAT, SUN_ARC, ZONE_AT, arcPlace, dayPalette, siteFor, solarState,
 } from './daycycle'
 import { KEY_COLOUR, KEY_INTENSITY, FILL_COLOUR, FILL_INTENSITY, HEMI_INTENSITY } from './lighting'
 
@@ -129,5 +129,53 @@ describe('where the viewer is', () => {
     expect(s.alt).toBeGreaterThan(60)
     expect(s.H0).toBeGreaterThan(0)
     expect(s.H0).toBeLessThan(Math.PI)
+  })
+})
+
+describe('the arc the sun is drawn on', () => {
+  it('reproduces the approved composition instead of storing it', () => {
+    /* THIS IS THE WHOLE POINT OF DOING IT BY MAPPING. The shot Robbie approved had the sun at
+       7.46 degrees and 30% down the frame; that is not a keyframe anybody maintains, it is simply
+       what `vHorizon − tanh-squashed altitude × perDeg` produces at that altitude — in December
+       and in five years too. If this drifts, the picture at the top of the port's history stops
+       being reachable. */
+    expect(arcPlace(7.46, 0.936).v).toBeCloseTo(0.300, 3)
+    expect(arcPlace(7.46, 0.936).u).toBeCloseTo(0.500, 2)
+  })
+
+  it('puts the true horizon below the ridge line, because the ridge is high ground', () => {
+    expect(arcPlace(0, 0.5).v).toBeCloseTo(SUN_ARC.vHorizon, 6)
+    expect(SUN_ARC.vHorizon).toBeGreaterThan(0.42)
+  })
+
+  it('walks the sun left to right across the day', () => {
+    expect(arcPlace(1, 0).u).toBeCloseTo(SUN_ARC.uRise, 6)
+    expect(arcPlace(1, 1).u).toBeCloseTo(SUN_ARC.uSet, 6)
+    expect(arcPlace(1, 0.5).u).toBeGreaterThan(arcPlace(1, 0.2).u)
+  })
+
+  it('keeps a summer noon in the frame rather than a screen and a half above it', () => {
+    /* drawn honestly, 54 degrees lands far off the top; the tanh grazes the edge instead */
+    const noon = arcPlace(54, 0.5).v
+    expect(noon).toBeGreaterThan(-0.22)
+    expect(noon).toBeLessThan(0.1)
+  })
+
+  it('leaves every hour anyone has composed for untouched', () => {
+    /* MEASURED IN FRAMES, NOT IN DEGREES, which is the units that matter and the first version of
+       this test got wrong: at 12 degrees the squash costs 1.26 degrees, which sounds like a lot
+       and is 3% of the canvas. At the approved 7.5 it is under 1%. */
+    for (const alt of [0, 2, 5, 7.5, 10, 12]) {
+      const honest = SUN_ARC.vHorizon - alt * SUN_ARC.perDeg
+      expect(Math.abs(arcPlace(alt, 0.5).v - honest)).toBeLessThan(0.035)
+    }
+    const approved = SUN_ARC.vHorizon - 7.5 * SUN_ARC.perDeg
+    expect(Math.abs(arcPlace(7.5, 0.5).v - approved)).toBeLessThan(0.01)
+  })
+
+  it('drops the sun below the frame once it has set', () => {
+    /* which is what stops a white disc hanging at dusk all night */
+    expect(arcPlace(-6, 0.5).v).toBeGreaterThan(SUN_ARC.vHorizon)
+    expect(arcPlace(-30, 0.5).v).toBeGreaterThan(0.9)
   })
 })

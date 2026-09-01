@@ -31,15 +31,15 @@ import {
 } from './flight'
 import { DESTINATIONS } from './destinations'
 import {
-  FOG_COLOUR, FOG_DENSITY, SKY_U, faceSun, gradeDisc, gradeSky, installRig, makeSunDisc,
-  placeSun, updateSkyDir, type Rig,
+  FOG_COLOUR, FOG_DENSITY, SKY_U, aimKey, faceSun, gradeDisc, gradeSky, installRig,
+  makeSunDisc, placeSun, updateSkyDir, type Rig,
 } from './lighting'
 import {
   ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, setGlow, sizeShafts, updateSunUv,
 } from './shafts'
 import { buildClouds, type CloudField } from './clouds'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
-import { dayPalette, siteHere, solarState } from './daycycle'
+import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
 import { registerFlights } from './flights'
 import type { MenuSectionKey } from '../features/menu'
 
@@ -113,6 +113,8 @@ const hourOverride = (() => {
    degree a minute, and every write below costs a uniform upload or a light rebuild */
 let lastDayAt = -1e9
 let fogBase = 0
+let homeAim: Vector3 | null = null
+let homeAspect = 16 / 9
 /** how often the sun is asked where it is */
 const DAY_BEAT_MS = 2000
 /* NEVER SET `shadowMap.needsUpdate` DIRECTLY. In the mockup that flag was consumed by whichever
@@ -443,6 +445,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        50,000 out so it stands behind Fuji rather than inside it -- and then everything else takes
        its bearing from that one point: the key light, the sky's two scattering lobes, and the disc
        you can actually see. A sun placed by coordinate is a sun nobody composed. */
+    /* the home framing is KEPT, because the sun is composed against it rather than against
+       wherever the camera has flown to -- see SUN_ARC */
+    homeAim = homeTgt.clone()
+    homeAspect = aspect
     sunAt = placeSun(HOME_EYE, homeTgt, HOME_FOV, aspect)
     rig = installRig(scene, sunAt)
     sunDisc = makeSunDisc()
@@ -473,7 +479,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
-    if (rig) applyDay(scene, renderer, rig, altitudeNow(), fogBase)
+    if (rig) applyDay(scene, renderer, rig, sunNow(), fogBase)
     lastDayAt = performance.now()
     /* ONE SHADOW BUILD. `autoUpdate` is off below: redrawing 4096 squared of a five-million
        triangle valley every frame is worth double digits of fps, and nothing in the world moves. */
@@ -536,7 +542,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
-    if (rig) applyDay(scene, renderer, rig, altitudeNow(), fogBase)
+    if (rig) applyDay(scene, renderer, rig, sunNow(), fogBase)
     lastDayAt = performance.now()
   })
 
@@ -589,7 +595,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        eye can catch, and each pass writes twenty uniforms and dirties the shadow map. */
     if (rig && now - lastDayAt > DAY_BEAT_MS) {
       lastDayAt = now
-      applyDay(scene, renderer, rig, altitudeNow(), fogBase)
+      applyDay(scene, renderer, rig, sunNow(), fogBase)
     }
 
     camera.position.set(cam.px, cam.py, cam.pz)
@@ -661,8 +667,9 @@ const _mistWhite = new Color(0xffffff)
 let uiSkyLast = -1
 
 function applyDay(
-  scene: Scene, renderer: WebGLRenderer, rig: Rig, alt: number, fogBase: number,
+  scene: Scene, renderer: WebGLRenderer, rig: Rig, sun: SolarState, fogBase: number,
 ): void {
+  const alt = sun.alt
   const m = dayPalette(alt)
   const n = m.numbers
   const c = m.colours
@@ -690,6 +697,18 @@ function applyDay(
 
   setGlow({ rayAmt: n.rayAmt, haloAmt: n.haloAmt, coreAmt: n.coreAmt }, c.rayCol, c.haloCol)
   if (sunDisc) gradeDisc(sunDisc, c.discCore, c.discMid, n.discCoreG, n.discCoronaG)
+
+  /* AND THE SUN ITSELF MOVES, which is the half the palette cannot do. Left where the boot
+     composed it, the disc hangs at dusk all night and every shadow in the valley points where it
+     pointed at 7.5 degrees -- a night lit from the west by a sun that set hours ago. */
+  if (homeAim && sunAt) {
+    const { u, v } = arcPlace(alt, sun.p)
+    sunAt.copy(placeSun(HOME_EYE, homeAim, HOME_FOV, homeAspect, u, v))
+    sunDisc?.position.copy(sunAt)
+    aimKey(rig.key, sunAt)
+    /* the cover's blobs fall along the light, so they swing with it */
+    aimCover(sunAt)
+  }
   if (clouds) clouds.material.emissive.copy(c.cloudEmis)
 
   /* GUARDED ON A REAL CHANGE. Writing a custom property on :root invalidates style for the whole
@@ -704,14 +723,14 @@ function applyDay(
   shadowDirty = true
 }
 
-/** the sun's height right now, or at the hour the query string asked for */
-function altitudeNow(): number {
+/** where the sun is right now, or at the hour the query string asked for */
+function sunNow(): SolarState {
   if (!site) site = siteHere()
   const when = new Date()
   if (hourOverride !== null) {
     when.setHours(Math.floor(hourOverride), Math.round((hourOverride % 1) * 60), 0, 0)
   }
-  return solarState(when, site[0], site[1]).alt
+  return solarState(when, site[0], site[1])
 }
 
 export function valleyHandle() {
