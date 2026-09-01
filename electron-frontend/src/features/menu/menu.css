@@ -630,15 +630,24 @@
   padding: 0 11px; background: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34);
 }
 .as-plinth.here { background: var(--gold); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
+/* THE ONE PLACE ON THIS SCREEN THAT WAS BEING CARRIED BY THE VALLEY. At 0.6 over a black world
+   this read perfectly and over the lit pagoda the crowd walks through the digits -- which is the
+   contract's rule exactly: everything above y560 brings its own ground, and a screen that needed
+   the world to be dark was never legible, it was being carried.
+
+   Opaque, and lifted off the ink the open plinths use so a locked level still reads as inert. The
+   text alphas are solved against it rather than chosen: on #231f19 washi at 0.30 gives a contrast
+   of 2.47, which is what "0 / 2,193 MASTERED" was set at and why it could not be read. 0.52 gives
+   4.6, and the id at 0.58 gives 5.5 -- both still well under the gold an open plinth gets. */
 .as-plinth.locked {
-  background: rgba(12, 10, 8, 0.6);
+  background: #231f19;
   box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16);
 }
 .as-plinth b {
   font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; color: var(--gold-hi);
 }
 .as-plinth.here b { font-size: 17px; color: var(--ink); }
-.as-plinth.locked b { color: rgba(242, 234, 216, 0.5); }
+.as-plinth.locked b { color: rgba(242, 234, 216, 0.58); }
 .as-plinth i {
   font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
   letter-spacing: 0.1em; line-height: 1.35; color: rgba(242, 234, 216, 0.58);
@@ -650,7 +659,7 @@
   color: rgba(242, 234, 216, 0.5);
 }
 .as-plinth.here u { color: rgba(20, 17, 13, 0.62); }
-.as-plinth.locked u { color: rgba(242, 234, 216, 0.3); }
+.as-plinth.locked u { color: rgba(242, 234, 216, 0.52); }
 
 /* THE READY BADGE IS GOLD BECAUSE GOLD IS EARNED — it is the only thing on this screen that says a
    level is finished rather than in progress. The target's badge is not gold for the same reason:

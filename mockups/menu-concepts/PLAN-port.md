@@ -903,3 +903,47 @@ walker loops — all of it described in the lighting memory.
 
 **954 tests across 87 files**, 8 a11y, lint clean.
 
+## The legibility pass, and the bug it was hiding
+
+The lit valley was supposed to have cost the L2 screens their contrast. It mostly had not — and
+finding that out took three instruments, each wrong in its own way, before the pixels settled it.
+
+- **The first read `backgroundColor` up the ancestors** to find what each label stood on, and called
+  the lane slabs and the path rows groundless at a contrast of 1.00. Every card in this menu is
+  painted with a LINEAR GRADIENT, and a gradient leaves `backgroundColor` transparent.
+- **The second measured the tonal spread inside each label's box** and flagged 36 of 42 labels on
+  THE PATH. That figure is dominated by how much of a box is glyph rather than paper, so ordinary
+  secondary type — `pj-want`, `mn-desc` — scored as failures while reading perfectly.
+- **The third asked the question the contract actually asks**: does the world REACH this label?
+  Two frames, one over the lit valley and one with the canvas hidden, and any label whose pixels
+  move is one the world is carrying. That one works, and its answer was that the type was fine
+  nearly everywhere: the crown scored 1.01 on the second instrument purely because that instrument
+  ignores the 4.6px ink keyline which IS its ground.
+
+### And then the zoom found what none of the numbers had
+
+`--gold` was never defined. `stage.css` shipped `--gold-hi` without it, and the ascent paints every
+column's fill with `var(--gold)` and only the selected one with `var(--gold-hi)`.
+
+An undefined custom property does not throw and does not warn — the declaration is invalid at
+computed-value time and the property falls back to its initial value, so `background: var(--gold)`
+is `background: transparent`. **Four of the five bars on the ladder drew as empty tracks and the
+target's plinth let the pagoda through its own name.** Against phase 0's accidentally-black valley
+none of that was visible; it survived a build, a lint, 954 tests and several rounds of looking at
+the screen, and was found by lighting the world and then zooming in at 2x.
+
+`menu.css.test.ts` now asserts that every `var(--x)` in the menu's three stylesheets is declared in
+one of them or set from TypeScript (`--acc`, `--lk-u`), and that nothing is declared and never read.
+Checked by deleting `--gold` again: two of its three tests fail.
+
+### One real violation, and its numbers are solved rather than chosen
+
+`.as-plinth.locked` at `rgba(12, 10, 8, 0.6)` — over a black world it read perfectly, and over the
+lit pagoda the crowd walks through the digits. Opaque now, at `#231f19`, lifted off the ink the open
+plinths use so a locked level still reads as inert. On that ground washi at 0.30 gives a contrast of
+2.47, which is what `0 / 2,193 MASTERED` was set at and why it could not be read; 0.52 gives 4.6 and
+the level id at 0.58 gives 5.5. Re-measured: **0.0% of every plinth's box moves when the world is
+taken away**, against 72–100% before.
+
+**957 tests across 88 files**, 8 a11y, lint clean.
+

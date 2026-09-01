@@ -17,6 +17,14 @@
   --washi: #f2ead8;
   --ink: #14110d;
   --hi: #e34a33;
+  /* TWO GOLDS, AND THE PORT SHIPPED ONE. `--gold` is the earned, settled one and `--gold-hi` the
+     lit one; the ascent uses both -- every column's fill is `--gold` and only the target's is
+     `--gold-hi`. Missing, `background: var(--gold)` is an INVALID declaration rather than an
+     error, so it computes to transparent and the element simply has no ground: four of the five
+     bars on the ladder drew empty and the target's plinth let the pagoda through it. Nothing
+     logged, nothing threw, and against a black valley it was invisible -- it took lighting the
+     world and then zooming into the pixels to see that the chart had no bars in it. */
+  --gold: #cfa45c;
   --gold-hi: #e8c47c;
   --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
   --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
