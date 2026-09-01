@@ -40,6 +40,7 @@ import {
 import { buildClouds, type CloudField } from './clouds'
 import { buildLanterns, type LanternField } from './lanterns'
 import { buildNightMap, type NightMap } from './nightmap'
+import { buildWindows, type WindowField } from './windows'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
 import { registerFlights } from './flights'
@@ -99,6 +100,7 @@ let sunAt: Vector3 | null = null
 let clouds: CloudField | null = null
 let lanterns: LanternField | null = null
 let nightMap: NightMap | null = null
+let windows: WindowField | null = null
 let coverTex: ReturnType<typeof makeCoverTexture> | null = null
 /* WHERE THE VIEWER IS, ASKED ONCE. `Intl` is cheap but not free and the answer cannot change
    inside a session; the sun's altitude is what moves. */
@@ -487,6 +489,12 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       mats.forEach((m) => breathe(m, land))
     })
+
+    /* AFTER THE AIR, and that ordering is the opposite of the lanterns' for the opposite reason:
+       `windowLife` CHAINS onto whatever `onBeforeCompile` is already there, so it has to find
+       `breathe`'s. Run first, it would be overwritten and the town would keep one bedtime. */
+    windows = buildWindows(root)
+    console.info(`[valley] windows: ${windows.spots} on ${windows.meshes} meshes`)
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
@@ -600,6 +608,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     if (clouds) clouds.drift(dt / 1000)
     /* and the cover creeps with them, on the same clock */
     driftCover(dt / 1000)
+    windows?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -652,6 +661,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       lanterns = null
       nightMap?.dispose()
       nightMap = null
+      windows = null
       coverTex?.dispose()
       coverTex = null
       disposeShafts()
@@ -729,6 +739,9 @@ function applyDay(
      before it is properly dark and left on a while after, which is what a town does. */
   lanterns?.setOn(n.lampOn)
   nightMap?.setOn(n.lampOn)
+  /* the windows keep their own hours off the CLOCK rather than off the sun: a bedtime is
+     a decision about the time, not about how high the sun is. */
+  windows?.setHour(hourNow())
 
   /* GUARDED ON A REAL CHANGE. Writing a custom property on :root invalidates style for the whole
      document, and doing that sixty times a second to move a number by 0.0004 is a recalculation of
@@ -740,6 +753,13 @@ function applyDay(
   /* the shadow map is drawn once and only redrawn when something moves it -- and the sun moving
      is exactly that */
   shadowDirty = true
+}
+
+/** the hour of the day this valley is standing in, 0..24 */
+function hourNow(): number {
+  if (hourOverride !== null) return hourOverride
+  const t = new Date()
+  return t.getHours() + t.getMinutes() / 60
 }
 
 /** where the sun is right now, or at the hour the query string asked for */

@@ -36,6 +36,14 @@ export const LAMP_NOT = /(pole|post|stand|bracket|base)/i
 /** the ones that are a candle behind paper rather than behind stone */
 export const LAMP_PAPER = /(chochin|gaslamp|andon|lamp)/i
 
+/* AND A MATERIAL CAN SAY SO ITSELF, which is the rule that reaches the windows. Object names
+   carry the lamp patterns above, but a building is not called a lantern -- `PROP_inn_1` and
+   `PROP_bathhouse` are inns and bathhouses, and what glows on them is a material slot named
+   `EMIT_window`. Any material whose NAME begins with EMIT is a lamp, at paper strength, and
+   adding one in Blender is the whole of adding a light to this world. Measured here: two of the
+   world's fifty-three materials qualify, over fifteen meshes. */
+export const LAMP_EMIT_MAT = /^emit/i
+
 /** the flame's own colour, for anything the model did not author an emission for */
 export const LAMP_COLOUR = 0xffa94e
 export const GAIN_PAPER = 1.35
@@ -80,11 +88,13 @@ export function buildLanterns(root: Object3D): LanternField {
     if (!mesh.isMesh) return
     /* `collapseToInstances` renames what it batches to `inst:<first member>`, so the name test has
        to survive that prefix -- which it does, because it is unanchored. */
-    if (!LAMP_RE.test(o.name) || LAMP_NOT.test(o.name)) return
     const src = mesh.material as MeshStandardMaterial | MeshStandardMaterial[]
     if (Array.isArray(src) || !src?.isMeshStandardMaterial) return
+    /* the material's own name wins: an EMIT slot is a light wherever it has been put */
+    const emit = LAMP_EMIT_MAT.test(src.name ?? '')
+    if (!emit && (!LAMP_RE.test(o.name) || LAMP_NOT.test(o.name))) return
 
-    const paper = LAMP_PAPER.test(o.name)
+    const paper = emit || LAMP_PAPER.test(o.name)
     const key = src.uuid + (paper ? '|p' : '|s')
     let clone = swap.get(key)
     if (!clone) {
