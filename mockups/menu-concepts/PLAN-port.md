@@ -844,3 +844,62 @@ owes, and it is bigger than the flights were.**
 **954 tests across 87 files**, 8 a11y, lint clean. Driven live: still at rest, the screen arriving
 at 82% of the move rather than over a camera still crossing the valley, Escape taking the board off
 at once and the camera following it home — landing on pixels identical to the frame it left from.
+
+## The lighting, and then the shafts
+
+Robbie asked for the lighting after the flights handed him a working camera in a valley that read
+as night. All four of the mockup's layers are in now.
+
+**The rig, the graded sky and the sun** came first: key `0xffc189` at 6.4 against a `0x6f8bd6` fill
+at 1.35 and a hemisphere at 0.44, `Landscape_Props_SkyDome_001` keeping its painted image and taking
+a per-fragment grade on top, and a disc that TERMINATES with about one percent of limb. Shadows at
+4096 square over a ±9000 box, one build, `normalBias` 4 rather than 12 — twelve units is most of a
+fence post, so the small stuff cast nothing and the meadow read as evenly lit ground under a low
+sun, which is the one thing it cannot be. The sun is placed by COMPOSITION: unprojected through
+the standing camera at the middle of frame, 30% down, 50,000 out.
+
+**Then the shafts**, which are the layer the previous pass stopped short of because they need to
+know what is open sky. The mockup gets that free from a full-resolution normals-and-depth prepass
+it runs for its ink outlines; this port has no outlines, so it renders the cheapest thing that
+answers the one question the march asks — the whole scene in black on a white field, at half
+resolution, with `scene.overrideMaterial`. Then a 28-step jittered radial march, a separable
+gaussian each way, and one additive overlay carrying the shafts, the aureole and the bleed.
+
+**The atmosphere needed a layer of its own.** The dome and the disc are meshes like anything else,
+so on the default layer they fill the mask solid and there is no sky anywhere to shaft through.
+`ATMOS_LAYER` is turned off for the mask pass and left on for the render — and it takes them out of
+the shadow map for free, because three tests an object's layers against the LIGHT's.
+
+**And the mask pass is where a pending shadow build would have landed.** It is a whole scene pass
+sitting immediately before the real render, which is precisely the shape of the mockup's own bug:
+its one shadow map was consumed by the lake reflection, a pass that clips at the waterline, and the
+valley had no shadows in it for weeks. `shadowDirty` is lowered immediately before the main render
+and nowhere else, so there is never a pending build while the mask runs.
+
+### What it costs, measured
+
+At 1,280 × 822 with vsync off: **2.10 ms a frame with the shafts against 1.06 without** — they
+double the cost of drawing the valley, which is exactly what a second scene pass over 2.8 million
+triangles should do. Both pin at the 165 Hz cap with vsync on, so the first measurement said 165
+against 165 and meant nothing.
+
+So the mask pass is **skipped outright when the sun is off screen**, which is most of this menu:
+four of the five destinations face away from it, and a mask marched toward a sun nobody can see is
+a whole scene pass drawn for a glow multiplied by zero. `?rays=off` turns the layer off entirely,
+the way `?valley=off` does the world.
+
+### Still owed
+
+The **legibility pass**. The ascent's columns are `rgba(12,10,8,0.72)` and I tuned them against a
+valley that was accidentally black; over a lit pagoda the plinth text and the lock chips lose their
+footing. The frame contract already names this failure — *everything above y560 brings its own
+ground, and a screen that needed the global scrim to be legible was never legible, it was being
+carried*. Mine was being carried. The contract's foot band is ported now (nothing across the top
+three quarters, 0% at y560 to 28% at y720), but the L2 screens want a pass against real lit plates.
+
+And the valley is lit but not **alive**: no day cycle, no lanterns, no crowd idle, no walkers. That
+is a separate system and a large one — 362 clustered lantern lights, 1,059 idling figures, closed
+walker loops — all of it described in the lighting memory.
+
+**954 tests across 87 files**, 8 a11y, lint clean.
+

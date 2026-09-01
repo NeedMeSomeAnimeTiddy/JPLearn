@@ -34,6 +34,7 @@ import {
   FOG_COLOUR, FOG_DENSITY, faceSun, gradeSky, installRig, makeSunDisc, placeSun, updateSkyDir,
   type Rig,
 } from './lighting'
+import { ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, sizeShafts, updateSunUv } from './shafts'
 import { registerFlights } from './flights'
 import type { MenuSectionKey } from '../features/menu'
 
@@ -94,6 +95,9 @@ let sunAt: Vector3 | null = null
    in it for weeks. This port has a single render per frame so the trap cannot bite yet; the flag
    is kept anyway, so the day a second pass appears the rule is already here. */
 let shadowDirty = false
+/* `?rays=off` -- the shafts cost a second scene pass, so they get their own switch the way the
+   whole valley does, and the same reason: the only honest way to price a thing is to boot without it */
+const shafts = new URLSearchParams(window.location.search).get('rays') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -374,6 +378,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       const m = dome as Mesh
       m.castShadow = false
       m.receiveShadow = false
+      /* the sky is not geometry as far as the shafts are concerned -- see ATMOS_LAYER */
+      m.layers.set(ATMOS_LAYER)
       const mats = Array.isArray(m.material) ? m.material : [m.material]
       mats.forEach(gradeSky)
     } else {
@@ -415,7 +421,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     rig = installRig(scene, sunAt)
     sunDisc = makeSunDisc()
     sunDisc.position.copy(sunAt)
+    sunDisc.layers.set(ATMOS_LAYER)
     scene.add(sunDisc)
+    /* the main camera sees the world AND the atmosphere; the mask pass turns this one off */
+    camera.layers.enable(ATMOS_LAYER)
+    sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* ONE SHADOW BUILD. `autoUpdate` is off below: redrawing 4096 squared of a five-million
        triangle valley every frame is worth double digits of fps, and nothing in the world moves. */
     shadowDirty = true
@@ -474,6 +484,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     renderer.setSize(window.innerWidth, window.innerHeight, false)
     camera.aspect = window.innerWidth / Math.max(1, window.innerHeight)
     camera.updateProjectionMatrix()
+    sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
   })
 
 
@@ -527,9 +538,23 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     _aim.set(cam.tx, cam.ty, cam.tz)
     camera.lookAt(_aim)
     if (cam.roll) camera.rotateZ(MathUtils.degToRad(cam.roll))
+    /* WHERE THE SUN IS ON SCREEN IS ASKED ONCE, HERE, because both the mask pass and the overlay
+       need it and the mask pass is skipped outright when the answer is "nowhere". */
+    if (sunDisc && shafts) {
+      updateSunUv(sunDisc, camera)
+      /* THE SKY MASK IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather
+         than after it -- a pending build would otherwise land in this pass instead of the real
+         one, which is exactly how the mockup lost every shadow in the valley. */
+      renderSkyMask({ renderer, scene, camera, disc: sunDisc })
+    }
+
     /* and the shadow build goes HERE, in the last gap before the render -- see `shadowDirty` */
     if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false }
     renderer.render(scene, camera)
+
+    /* the glow goes on OVER the finished frame, so the main render still goes straight to the
+       canvas and nothing about the colour path changes */
+    if (sunDisc && shafts) renderGlow({ renderer, scene, camera, disc: sunDisc })
   }
   frame()
 
@@ -546,6 +571,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       if (rig) { scene.remove(rig.key, rig.key.target, rig.fill, rig.fill.target, rig.hemi); rig = null }
       if (sunDisc) { scene.remove(sunDisc); sunDisc = null }
       sunAt = null
+      disposeShafts()
       renderer.dispose()
       canvas.remove()
       handle = null
