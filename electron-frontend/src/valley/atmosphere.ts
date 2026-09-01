@@ -49,21 +49,22 @@ export const CLOUD_SHADOW_DRIFT = 0.0016
    warm the fog and the key already carry. A neutral grey mist under a sunset reads as a rendering
    default. */
 export const MIST_COLOUR = 0xf0d3bd
-/* SCALE HEIGHT, AND IT IS NOT THE MOCKUP'S 380 -- THE TWO WORLDS ARE NOT THE SAME SIZE.
-   The mockup stands its home camera at y = 60 and tuned this against a lens 426 units above the
-   water. This port's home eye is at y = 2,000 and Fuji's summit measures 7,220, so the same picture
-   is laid out roughly seven times larger in units. Carried over unchanged, 380 units of scale
-   height put the camera six scale-heights up and the integral along a downward ray came out
-   seventy times the path length: measured, it took the lake from a mean of (39,36,37) to
-   (91,71,61) -- the water dissolved into cream and the shot lost its subject. Scaled with the
-   world it behaves as intended. */
-export const MIST_HEIGHT = 2600
+/* 380 UNITS OF SCALE HEIGHT, WHICH IS THE MOCKUP'S OWN NUMBER — read off its live uniforms rather
+   than off its source, after a round of tuning here that was a fix for nothing.
+
+   The story is worth keeping. The lake region measured (39,36,37) with the mist off and (91,71,61)
+   with it on, which read as the water dissolving into cream, so this was rescaled on a theory that
+   the two worlds were different sizes. They are not: both stand the camera at (·, 2000, 6000) with
+   fov 43, and both measure Fuji's summit at y 7,220. Asked directly, the mockup's own lake region
+   reads (109,70,71) — BRIGHTER than the version that looked broken. The valley floor at this hour
+   really is that hazy; what looked like a bug was the feature. */
+export const MIST_HEIGHT = 380
 /* AND THE AMOUNT WITH IT. With the eye 2,300 above the floor the base density is amt·exp(−0.885) =
    0.41·amt, and a look down the valley to the lake runs about 12,000 units at 1.6x the path length,
    which lands near 13% -- haze you can see through, which is what haze is. */
-export const MIST_AMOUNT = 0.000018
+export const MIST_AMOUNT = 0.00013
 /** the valley floor, which is what the field is measured from */
-export const MIST_Y = -300
+export const MIST_Y = -360
 
 /* WHERE THE RIM TURNS ON AND HOW HARD, and these are the mockup's own numbers rather than mine.
    The first pass here guessed 0.35 and washed the whole far meadow warm -- ground seen from above
