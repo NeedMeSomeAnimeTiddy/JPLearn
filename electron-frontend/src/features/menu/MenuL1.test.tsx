@@ -26,8 +26,8 @@ function installApi(unlocked: string[]) {
   window.jplearnDesktop = {
     getFeatureState: vi.fn(async () => ({
       features: [
-        { feature_id: 'conversation_mode', name: 'Conversation', category: 'world', is_unlocked: unlocked.includes('conversation_mode'), badges: [], just_unlocked: false, unlocked_at: null, requires: [] },
-        { feature_id: 'jlpt_dashboard', name: 'JLPT', category: 'exam', is_unlocked: unlocked.includes('jlpt_dashboard'), badges: [], just_unlocked: false, unlocked_at: null, requires: [] },
+        { feature_id: 'conversation_mode', name: 'Conversation', category: 'world', is_unlocked: unlocked.includes('conversation_mode'), badges: [], just_unlocked: false, unlocked_at: null, requires: [{ node_id: 'grammar_n5', status: 'mastered' }] },
+        { feature_id: 'jlpt_dashboard', name: 'JLPT', category: 'exam', is_unlocked: unlocked.includes('jlpt_dashboard'), badges: [], just_unlocked: false, unlocked_at: null, requires: [{ node_id: 'vocabulary_n5', status: 'unlocked' }] },
       ],
     })),
   } as unknown as Window['jplearnDesktop']
@@ -66,8 +66,11 @@ describe('the L1 menu', () => {
     render(<Harness block={block()} />)
 
     await waitFor(() => expect(document.querySelectorAll('.mn-row.locked').length).toBe(2))
-    expect(screen.getByText(/reach GRAMMAR on the path/i)).toBeTruthy()
-    expect(screen.getByText(/reach JLPT N5 on the path/i)).toBeTruthy()
+    /* READ OFF THE CATALOG, not restated here: the milestone comes from the curriculum and the
+       trigger word from the requirement, so "reach GRAMMAR on the path" -- which named a step the
+       path draws as GRAMMAR N5, and called a mastered gate a reached one -- cannot come back. */
+    expect(screen.getByText(/GRAMMAR N5 · MASTERED/i)).toBeTruthy()
+    expect(screen.getByText(/VOCABULARY N5 · REACHED/i)).toBeTruthy()
     /* the two that are always open must never be locked, whatever the catalog says */
     expect(screen.getByText('THE PATH').closest('.mn-row')?.className).not.toContain('locked')
     expect(screen.getByText('YOU').closest('.mn-row')?.className).not.toContain('locked')

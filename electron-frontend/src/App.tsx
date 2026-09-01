@@ -1318,9 +1318,9 @@ function App() {
   const worldCards = useMemo(
     () => worldLanes({
       passages: world.passages, sessions: world.sessions,
-      unlocked: menu.unlocked, nodes: progression.nodes,
+      unlocked: menu.unlocked, gateOf: menu.gateOf,
     }),
-    [world.passages, world.sessions, menu.unlocked, progression.nodes],
+    [world.passages, world.sessions, menu.unlocked, menu.gateOf],
   )
 
   /* THE ASCENT'S ONE CALL, on the same terms: asked when the ladder is up, memoised because the

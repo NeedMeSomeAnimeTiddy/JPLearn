@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { HERO_INDEX, MENU_SECTIONS } from '../constants'
-import type { MenuController, MenuCrown, MenuHero, MenuSectionKey } from '../types'
+import type { MenuController, MenuCrown, MenuHero, MenuSection, MenuSectionKey } from '../types'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -17,7 +17,15 @@ const ROW_TOP = 248
 const ROW_PITCH = 74
 
 export function MenuL1({ controller, hero, crown, onOpenSection, onRunHero }: MenuL1Props) {
-  const { active, setActive, step, isLocked } = controller
+  const { active, setActive, step, isLocked, gateOf } = controller
+
+  /* WHAT A LOCKED ROW IS WAITING FOR, read off `domain/feature_catalog.py` rather than restated
+     here. The section carries only the feature id now; the milestone and whether it must be
+     MASTERED or merely REACHED both come from the same call that decided the row was shut. */
+  const lockLine = (section: MenuSection): string | null => {
+    const gate = section.gate ? gateOf(section.gate.feature) : null
+    return gate ? `${gate.en} · ${gate.word}` : null
+  }
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -107,7 +115,7 @@ export function MenuL1({ controller, hero, crown, onOpenSection, onRunHero }: Me
                   onClick={() => !locked && onOpenSection(section.key)}
                   aria-disabled={locked}
                   aria-label={locked
-                    ? `${section.label} — locked, ${section.gate?.opens}`
+                    ? `${section.label} — locked, ${lockLine(section) ?? 'not open yet'}`
                     : `${section.label} — ${section.desc}`}
                 >
                   <span className="mn-mark">
@@ -120,7 +128,7 @@ export function MenuL1({ controller, hero, crown, onOpenSection, onRunHero }: Me
                       <span className="mn-jp">{section.jp}</span>
                     </span>
                     {locked
-                      ? <span className="mn-lock">LOCKED · {section.gate?.opens}</span>
+                      ? <span className="mn-lock">LOCKED · {lockLine(section) ?? 'NOT OPEN YET'}</span>
                       : <span className="mn-desc">{section.desc}</span>}
                   </span>
                 </button>

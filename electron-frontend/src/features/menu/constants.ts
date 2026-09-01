@@ -33,13 +33,13 @@ export const MENU_SECTIONS: readonly MenuSection[] = [
     key: 'READING', label: 'THE WORLD', jp: '実践', glyph: '実', ord: 3,
     desc: 'Real Japanese — texts to read, and conversations to hold',
     accent: '#4f9d6b',
-    gate: { feature: 'conversation_mode', opens: 'reach GRAMMAR on the path' },
+    gate: { feature: 'conversation_mode' },
   },
   {
     key: 'JLPT', label: 'THE EXAM', jp: '検定', glyph: '検', ord: 4,
     desc: 'How ready you are, and four ways to find out',
     accent: '#5b86c4',
-    gate: { feature: 'jlpt_dashboard', opens: 'reach JLPT N5 on the path' },
+    gate: { feature: 'jlpt_dashboard' },
   },
   {
     key: 'RECORDS', label: 'YOU', jp: '記録', glyph: '記', ord: 5,

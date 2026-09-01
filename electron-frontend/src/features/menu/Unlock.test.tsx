@@ -242,10 +242,10 @@ describe('the mark, through the hook that owns it', () => {
     const getFeatureState = install([feature()])
     const { rerender } = renderHook(
       ({ token }) => useMenuL1(true, token),
-      { initialProps: { token: [] as unknown[] } },
+      { initialProps: { token: [] as ProgressionNodeView[] } },
     )
     await waitFor(() => expect(getFeatureState).toHaveBeenCalledTimes(1))
-    rerender({ token: ['grammar_n5'] })
+    rerender({ token: NODES })
     await waitFor(() => expect(getFeatureState).toHaveBeenCalledTimes(2))
   })
 

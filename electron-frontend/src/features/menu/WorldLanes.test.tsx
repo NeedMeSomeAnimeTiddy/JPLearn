@@ -5,6 +5,7 @@ import type { Passage } from '../passages'
 import type { ProgressionNodeView } from '../progression'
 import type { ScenarioSessionPayload } from '../../generated/types'
 import { SCENARIOS } from '../../lib/scenarios'
+import { gateWords } from './unlock'
 import { Lanes } from './components/Lanes'
 import { worldLanes, READ_FEATURE, TALK_FEATURE, LANE_ITEMS } from './worldLanes'
 
@@ -37,8 +38,17 @@ const open = new Set([READ_FEATURE, TALK_FEATURE])
 /* the six-step window: GRAMMAR has opened the section and TALK with it, READING has not arrived */
 const window6 = new Set([TALK_FEATURE])
 
+/* THE GATE IS RESOLVED FOR THESE LANES, NOT LOOKED UP BY THEM. `useMenuL1` reads `requires` off
+   the feature payload and names the milestone; this stands in for that one call, so the lanes are
+   tested against the shape they actually receive rather than against a node list they no longer
+   see. */
+const gates: Record<string, ReturnType<typeof gateWords>> = {
+  [READ_FEATURE]: gateWords([{ node_id: 'reading', status: 'mastered' }], NODES),
+  [TALK_FEATURE]: gateWords([{ node_id: 'grammar_n5', status: 'mastered' }], NODES),
+}
+
 const build = (over: Partial<Parameters<typeof worldLanes>[0]> = {}) => worldLanes({
-  passages: LIBRARY, sessions: [], unlocked: open, nodes: NODES, ...over,
+  passages: LIBRARY, sessions: [], unlocked: open, gateOf: (id) => gates[id] ?? null, ...over,
 })
 
 function show(lanes = build()) {
@@ -116,11 +126,21 @@ describe('what the world lanes are made of', () => {
 
   it('names one milestone in the chip and the same one in the unlock sentence', () => {
     const [read, talk] = build({ unlocked: new Set<string>() })
-    expect(read.opens).toBe('reach READING on the path')
+    /* AND IT SAYS WHICH TRIGGER, which the authored sentence never did: both of these want their
+       step MASTERED, and "reach READING on the path" was quietly wrong about that. */
+    expect(read.opens).toBe('READING · MASTERED')
     expect(read.gate?.en).toContain('READING')
     /* TALK's step is GRAMMAR N5, which is the name the path screen itself draws for it */
-    expect(talk.opens).toBe('reach GRAMMAR N5 on the path')
+    expect(talk.opens).toBe('GRAMMAR N5 · MASTERED')
     expect(talk.gate?.en).toContain('GRAMMAR N5')
+  })
+
+  it('draws no chip at all until the catalog has answered', () => {
+    /* a chip reading "OPENS AT" with no step is worse than no chip, and on a first paint the
+       feature payload has not landed yet */
+    const [read] = build({ gateOf: () => null })
+    expect(read.gate?.en).toBe('')
+    expect(read.opens).toBe('not open yet')
   })
 
   it('makes nothing here an obligation', () => {
@@ -156,7 +176,7 @@ describe('the world screen', () => {
     /* it keeps its figure and its list — the point of drawing a locked thing is seeing inside */
     expect(read.querySelector('.pr-fig b')?.textContent).toBe(String(LIBRARY.length))
     expect(read.querySelectorAll('.wd-item')).toHaveLength(3)
-    expect(read.querySelector('.pr-slab')?.textContent).toBe('reach READING on the path')
+    expect(read.querySelector('.pr-slab')?.textContent).toBe('READING · MASTERED')
     fireEvent.click(read)
     expect(onPick).not.toHaveBeenCalled()
   })

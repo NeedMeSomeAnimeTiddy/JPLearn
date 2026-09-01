@@ -1,4 +1,4 @@
-import type { FeatureStatusPayload } from '../../generated/types'
+import type { FeatureRequirementPayload, FeatureStatusPayload } from '../../generated/types'
 import type { ProgressionNodeView } from '../progression'
 import { milestone } from './pathL2'
 
@@ -115,6 +115,43 @@ export function unlockMoment(
     })),
     mark: highWater(features),
   }
+}
+
+/* ==================================================================================================
+   AND THE SAME FIELD ANSWERS "WHAT OPENS THIS", which is the last thing in this menu that was
+   transcribed rather than read.
+
+   `MENU_SECTIONS` carried "reach GRAMMAR on the path" as an authored string, and it was wrong twice
+   over: the milestone the path draws is GRAMMAR N5, and `conversation_mode` wants it MASTERED
+   rather than merely reached. `worldLanes` had the same shape one level down, naming its two nodes
+   by hand so it could look their names up. Both now read the requirement the bridge reports, so a
+   change to `domain/feature_catalog.py` cannot leave a lock line describing the old gate.
+   ================================================================================================== */
+
+export interface GateWords {
+  /** the milestone, in the curriculum's own words */
+  en: string
+  jp: string
+  /** MASTERED or REACHED — not the same trigger, and the catalog uses both */
+  word: string
+}
+
+export function gateWords(
+  requires: readonly FeatureRequirementPayload[] | undefined,
+  nodes: readonly ProgressionNodeView[],
+): GateWords | null {
+  /* A FEATURE CAN WAIT ON MORE THAN ONE STEP -- `kanji_mode` wants two -- and the one that opens it
+     is the LAST of them, which is a fact about the learner rather than about the catalog. The
+     curriculum is an ordered chain, so the last in `nodes` order is the one still to come. */
+  if (!requires?.length) return null
+  const order = (nodeId: string) => nodes.findIndex((node) => node.node_id === nodeId)
+  const last = [...requires].sort((a, b) => order(a.node_id) - order(b.node_id)).pop()
+  if (!last) return null
+  /* AND A CURRICULUM THAT HAS NOT ANSWERED STILL DRAWS. `milestone` falls back to the node's own
+     id in title case -- `grammar_n5` reads GRAMMAR N5 -- which is the same bargain the path screen
+     already strikes: a slightly wrong label is a small wrong thing and a blank gate is a large one.
+     The case where nothing is known at all is `requires` being absent, which is caught above. */
+  return { ...milestone(nodes, last.node_id), word: statusWord(last.status) }
 }
 
 /* WHERE EACH ONE LIVES, so the moment can say what to do with it rather than only that it happened.

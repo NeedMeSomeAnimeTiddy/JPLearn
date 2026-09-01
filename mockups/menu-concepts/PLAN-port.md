@@ -1294,7 +1294,21 @@ All six phases have landed. What is left is not the port:
   a fresh clone cannot build the valley. The LFS / release-asset / fetch-script decision is open.
 - **The valley being alive** — the day cycle, the 362 clustered lantern lights, the 1,059 idling
   crowd figures and the walker loops are a separate system that phase 0 deliberately did not port.
-- `MENU_SECTIONS` still says THE WORLD opens when you "reach GRAMMAR on the path", where the path
-  and THE WORLD both draw **GRAMMAR N5** — the last place a milestone is transcribed rather than
-  read from the curriculum.
+### The last transcription, closed
+
+`MENU_SECTIONS` said THE WORLD opens when you "reach GRAMMAR on the path". That sentence was wrong
+twice: the step the path draws is **GRAMMAR N5**, and `conversation_mode` wants it **mastered**
+rather than merely reached — a distinction `domain/feature_catalog.py` is careful about and the
+authored copy flattened. `worldLanes` had the same shape one level down, naming `reading` and
+`grammar_n5` by hand so it could look their names up.
+
+`feature-unlocks` reports `requires` now, so both read it: the milestone comes from the curriculum
+and the trigger word from the requirement. Live on a fresh account:
+
+> LOCKED · **GRAMMAR N5 · MASTERED**   ·   LOCKED · **VOCABULARY N5 · REACHED**
+
+One defect came out of it that nothing else would have caught: `useMenuL1(enabled, nodes = [])`
+makes a **new array every render**, and the fetch effect depends on it — fetch, setState, render,
+fresh `[]`, fetch again. A test expecting two calls counted **46,580**. The empty case is one shared
+module constant now.
 

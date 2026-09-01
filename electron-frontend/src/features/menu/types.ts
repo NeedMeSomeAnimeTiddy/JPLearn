@@ -1,12 +1,14 @@
 import type { FeatureStatusPayload } from '../../generated/types'
+import type { GateWords } from './unlock'
 
 export type MenuSectionKey = 'STUDY' | 'DRILLS' | 'READING' | 'JLPT' | 'RECORDS'
 
 export interface MenuGate {
-  /** the id in `domain/feature_catalog.py` that opens this section */
+  /* THE ID, AND NOTHING ELSE. What that feature waits for used to be an authored sentence here --
+     "reach GRAMMAR on the path" -- which was wrong twice: the path draws GRAMMAR N5, and
+     `conversation_mode` wants it mastered rather than merely reached. `feature-unlocks` reports
+     the requirement now, so the lock line is read. */
   feature: string
-  /** the curriculum milestone, in the words a learner would use */
-  opens: string
 }
 
 export interface MenuSection {
@@ -55,6 +57,8 @@ export interface MenuController {
   /** feature ids that are unlocked, from `getFeatureState`; null until it has answered */
   unlocked: Set<string> | null
   isLocked: (section: MenuSection) => boolean
+  /** what a locked section is waiting for, read off the catalog rather than restated */
+  gateOf: (featureId: string) => GateWords | null
   /** features that opened since this surface last announced one; empty is the usual case */
   pendingUnlocks: FeatureStatusPayload[]
   /** stop announcing them, and remember the mark that says so */

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FeatureStatusPayload } from '../../generated/types'
 import { HERO_INDEX, MENU_SECTIONS } from './constants'
 import type { MenuController, MenuSection } from './types'
-import { UNLOCK_SEEN_KEY, highWater, newlyUnlocked } from './unlock'
+import { UNLOCK_SEEN_KEY, gateWords, highWater, newlyUnlocked } from './unlock'
+import type { GateWords } from './unlock'
+import type { ProgressionNodeView } from '../progression'
 
 /* WHAT IS UNLOCKED IS READ, NOT DECIDED. `domain/feature_catalog.py` gates nine features behind
    curriculum milestones and the bridge has reported them since long before this menu existed;
@@ -27,10 +29,20 @@ import { UNLOCK_SEEN_KEY, highWater, newlyUnlocked } from './unlock'
    Measured live: mastering a deck mid-session and returning to the menu drew nothing, and the
    moment arrived on the trip after. `progressionToken` is whatever changes when that sync has
    landed, so the second read is the one that counts. */
-export function useMenuL1(enabled: boolean, progressionToken?: unknown): MenuController {
+/* A DEFAULT PARAMETER IS A NEW ARRAY EVERY RENDER, and this effect depends on it. Written as
+   `nodes = []` in the signature, a caller that omits it handed the effect a fresh identity on each
+   pass: fetch, setState, render, fresh `[]`, fetch again. Measured by a test that expected two
+   calls and counted 46,580. The empty case is one shared object. */
+const NO_NODES: readonly ProgressionNodeView[] = []
+
+export function useMenuL1(
+  enabled: boolean, nodes: readonly ProgressionNodeView[] = NO_NODES,
+): MenuController {
   const [active, setActiveState] = useState<number>(HERO_INDEX)
   const [unlocked, setUnlocked] = useState<Set<string> | null>(null)
   const [pendingUnlocks, setPendingUnlocks] = useState<FeatureStatusPayload[]>([])
+  /* kept whole, because the lock lines are read off `requires` and not off a second table */
+  const [features, setFeatures] = useState<FeatureStatusPayload[]>([])
   /* what this surface has already announced. Read once and then held, because the mark is written
      on dismissal and re-reading storage mid-flight would race that write. */
   const seenRef = useRef<string | null | undefined>(undefined)
@@ -49,6 +61,7 @@ export function useMenuL1(enabled: boolean, progressionToken?: unknown): MenuCon
           if (feature.is_unlocked) open.add(feature.feature_id)
         }
         setUnlocked(open)
+        setFeatures(features)
 
         if (seenRef.current === undefined) {
           try { seenRef.current = window.localStorage.getItem(UNLOCK_SEEN_KEY) } catch { seenRef.current = null }
@@ -69,7 +82,7 @@ export function useMenuL1(enabled: boolean, progressionToken?: unknown): MenuCon
         if (alive) setUnlocked(null)
       })
     return () => { alive = false }
-  }, [enabled, progressionToken])
+  }, [enabled, nodes])
 
   /* DISMISSING IS WHAT ADVANCES THE MARK, not showing. A moment that was drawn and never seen --
      the app closed, the window lost -- should still be waiting next time. */
@@ -92,6 +105,12 @@ export function useMenuL1(enabled: boolean, progressionToken?: unknown): MenuCon
     })
   }, [])
 
+  /** what a section is waiting for, in the curriculum's words — null while nothing is known */
+  const gateOf = useCallback((featureId: string): GateWords | null => {
+    const feature = features.find((entry) => entry.feature_id === featureId)
+    return gateWords(feature?.requires, nodes)
+  }, [features, nodes])
+
   const isLocked = useCallback((section: MenuSection) => {
     if (!section.gate) return false
     if (!unlocked) return false
@@ -99,7 +118,7 @@ export function useMenuL1(enabled: boolean, progressionToken?: unknown): MenuCon
   }, [unlocked])
 
   return useMemo<MenuController>(
-    () => ({ active, setActive, step, unlocked, isLocked, pendingUnlocks, dismissUnlocks }),
-    [active, setActive, step, unlocked, isLocked, pendingUnlocks, dismissUnlocks],
+    () => ({ active, setActive, step, unlocked, isLocked, gateOf, pendingUnlocks, dismissUnlocks }),
+    [active, setActive, step, unlocked, isLocked, gateOf, pendingUnlocks, dismissUnlocks],
   )
 }

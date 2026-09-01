@@ -1,9 +1,8 @@
 import { SCENARIOS } from '../../lib/scenarios'
 import { sortByDifficulty, type Passage } from '../passages'
-import type { ProgressionNodeView } from '../progression'
 import type { ScenarioSessionPayload } from '../../generated/types'
 import type { Lane, LaneItem } from './lanes'
-import { milestone } from './pathL2'
+import type { GateWords } from './unlock'
 
 /* ==================================================================================================
    THE WORLD, LEVEL TWO — two lanes: read, and talk.
@@ -30,16 +29,17 @@ export interface WorldInputs {
   sessions: readonly ScenarioSessionPayload[] | null
   /** unlocked feature ids, or null while the catalog has not answered — nothing is shut until it does */
   unlocked: ReadonlySet<string> | null
-  /** the curriculum's own nodes, so the gate chips name their milestone in the path's words */
-  nodes: readonly ProgressionNodeView[]
+  /** what a feature is waiting for, read off the catalog — `useMenuL1` resolves it */
+  gateOf: (featureId: string) => GateWords | null
 }
 
 /** the id of the feature each lane waits on, straight from `domain/feature_catalog.py` */
 export const READ_FEATURE = 'reading_mode'
 export const TALK_FEATURE = 'conversation_mode'
-/** and the curriculum node each of those features waits on, from the same file */
-const READ_NODE = 'reading'
-const TALK_NODE = 'grammar_n5'
+/* THE NODE EACH ONE WAITS ON IS NOT WRITTEN DOWN HERE ANY MORE. It used to be -- `reading` and
+   `grammar_n5`, copied out of the same file the feature ids come from -- so that these lanes could
+   look their names up. `feature-unlocks` reports the requirement now, and `gateOf` resolves it, so
+   a catalog change cannot leave a gate chip crediting the wrong step. */
 
 /** how many rows a lane shows of what is inside it */
 export const LANE_ITEMS = 3
@@ -78,7 +78,7 @@ function talkItems(): LaneItem[] {
   }])
 }
 
-export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs): Lane[] {
+export function worldLanes({ passages, sessions, unlocked, gateOf }: WorldInputs): Lane[] {
   /* nothing is shut until the catalog answers — the same default L1 draws with */
   const readShut = unlocked ? !unlocked.has(READ_FEATURE) : false
   const talkShut = unlocked ? !unlocked.has(TALK_FEATURE) : false
@@ -86,8 +86,8 @@ export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs)
   const scenes = SCENARIOS.length
   /* WHAT OPENS IT IS THE MILESTONE'S OWN NAME, not a second transcription of it — the sentence is
      built from the same step the gate chip credits, so the two can never say different things. */
-  const readStep = milestone(nodes, READ_NODE)
-  const talkStep = milestone(nodes, TALK_NODE)
+  const readStep = gateOf(READ_FEATURE)
+  const talkStep = gateOf(TALK_FEATURE)
 
   return [
     {
@@ -97,7 +97,7 @@ export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs)
       fig: passages ? String(passages.length) : '—',
       figLab: passages ? 'TEXTS' : 'NOT COUNTED YET',
       absent: !passages,
-      gate: { en: gateWords(readShut, readStep.en), jp: readStep.jp },
+      gate: { en: gateLine(readShut, readStep), jp: readStep?.jp ?? '' },
       items: passages ? readItems(passages) : [],
       /* WHAT IS TRUE OF THESE THIRTY, and it is not the mockup's "4 BANDS BY DIFFICULTY": every
          one of them reports `difficulty_label: 'beginner'`, so there is one band and a score
@@ -105,7 +105,7 @@ export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs)
       foot: 'EVERY ONE GRADED BEGINNER · WHAT YOU READ IS NOT KEPT BETWEEN VISITS',
       act: 'OPEN THE LIBRARY',
       shut: readShut,
-      opens: `reach ${readStep.en} on the path`,
+      opens: opensLine(readStep),
     },
     {
       key: 'talk',
@@ -114,7 +114,7 @@ export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs)
       /* TWO, NOT TWELVE. `src/lib/scenarios/index.ts` exports exactly two scenarios, and this is
          the number the app can actually run today. */
       fig: String(scenes), figLab: scenes === 1 ? 'SCENE' : 'SCENES',
-      gate: { en: gateWords(talkShut, talkStep.en), jp: talkStep.jp },
+      gate: { en: gateLine(talkShut, talkStep), jp: talkStep?.jp ?? '' },
       items: talkItems(),
       /* THE SESSIONS ARE REAL, unlike the reading progress above: `scenario_sessions` is a table
          and `listScenarioSessions` reads it, so this lane gets to count where the other cannot. */
@@ -125,7 +125,7 @@ export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs)
           : `${played} PLAYED · THE TUTOR MARKS YOU AT THE END`,
       act: 'PICK A SCENE',
       shut: talkShut,
-      opens: `reach ${talkStep.en} on the path`,
+      opens: opensLine(talkStep),
     },
   ]
 }
@@ -133,6 +133,15 @@ export function worldLanes({ passages, sessions, unlocked, nodes }: WorldInputs)
 /* ONE CHIP, TWO STATES — INCLUDING ITS WORDS. The mockup kept one string and turned it vermilion,
    which left a lane reading "OPENED BY READING" in red on a door that has never opened. The colour
    is the state and so is the tense. */
-function gateWords(shut: boolean, step: string): string {
-  return shut ? `OPENS AT ${step}` : `OPENED BY ${step}`
+/* THE CHIP, AND THE SLAB THAT REPLACES THE INVITATION WHEN THE LANE IS SHUT. Both say the same
+   milestone and both now say which trigger it is: `reading_mode` wants `reading` MASTERED, and
+   "reach READING on the path" was quietly wrong about that. Nothing is drawn at all until the
+   catalog has answered — a chip reading "OPENS AT" with no step is worse than no chip. */
+function gateLine(shut: boolean, step: GateWords | null): string {
+  if (!step) return ''
+  return shut ? `OPENS AT ${step.en}` : `OPENED BY ${step.en}`
+}
+
+function opensLine(step: GateWords | null): string {
+  return step ? `${step.en} · ${step.word}` : 'not open yet'
 }

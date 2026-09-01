@@ -33,9 +33,9 @@ export type { DeckBlocks } from './useDeckBlocks'
 export { feedHead, feedNote, feedAt, kanjiOf, wordKanji, wordSize } from './feed'
 export {
   unlockMoment, newlyUnlocked, highWater, stampNode, statusWord,
-  UNLOCK_SEEN_KEY, UNLOCK_LEADS_TO,
+  UNLOCK_SEEN_KEY, UNLOCK_LEADS_TO, gateWords,
 } from './unlock'
-export type { UnlockMoment, UnlockCard } from './unlock'
+export type { UnlockMoment, UnlockCard, GateWords } from './unlock'
 export type { FeedHead, WordKanji } from './feed'
 export type { LevelDetail, ExamMode, LastMock } from './examLevel'
 export type { LibraryRow, LibraryView } from './library'
