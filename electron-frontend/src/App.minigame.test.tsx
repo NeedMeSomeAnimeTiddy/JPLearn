@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { openDeck } from './test-entry'
 import App from './App'
 
 // Mock TypeAnimation to render text immediately instead of character-by-character.
@@ -55,19 +56,6 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-function clickTopMenuCard(label: string): void {
-  const menuCards = Array.from(document.querySelectorAll('.cassette')) as HTMLButtonElement[]
-  const button = menuCards.find((card) => {
-    const title = card.querySelector('.cassette-title')
-    return title?.textContent?.trim().toLowerCase() === label.toLowerCase()
-  })
-  if (!button) {
-    throw new Error(`Top menu card not found for ${label}`)
-  }
-  fireEvent.click(button)
-  fireEvent.click(button)
-}
-
 function clickTilePrimaryAction(tileButton: HTMLElement): void {
   // Cassette carousel: first click focuses/selects the cassette, second click
   // launches the now-focused minigame.
@@ -79,7 +67,7 @@ function clickTilePrimaryAction(tileButton: HTMLElement): void {
 async function openHandwritingRound(): Promise<void> {
   render(<App />)
   await screen.findByRole('button', { name: /open shortcuts/i })
-  clickTopMenuCard('Hiragana')
+  openDeck('Hiragana')
   const handwritingTiles = await screen.findAllByRole('button', { name: /Handwriting/i })
   clickTilePrimaryAction(handwritingTiles[0])
 }
@@ -421,7 +409,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
 
     expect((await screen.findAllByText(/Romaji Sprint/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
@@ -437,7 +425,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
 
     expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
@@ -450,7 +438,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
 
     expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
   })
@@ -550,7 +538,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
 
     fireEvent.click(await screen.findByRole('button', { name: /toggle answer confidence capture/i }))
 
@@ -569,7 +557,7 @@ describe('Minigame menu', () => {
     }))
   })
 
-  it('shows the Up next block on the main menu and opens the suggested setup page', async () => {
+  it("the menu's hero runs the drill it names, rather than opening a section", async () => {
     window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify({
       hiragana: {},
       katakana: {},
@@ -589,13 +577,14 @@ describe('Minigame menu', () => {
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
 
-    expect(await screen.findByRole('heading', { name: /Up next/i })).toBeTruthy()
-    expect(screen.getByText(/10 min · Starter-safe/i)).toBeTruthy()
-
-    // The row launches the drill the engine chose, rather than landing on the
-    // hub for the learner to pick one.
-    const rowButton = await screen.findByRole('button', { name: /Vocabulary · Meaning Match/i })
-    fireEvent.click(rowButton)
+    /* THE CARD NAMES THE DRILL AND SAYS WHAT PRESSING IT DOES. `HomeView`'s "Up next" row was the
+       only thing in the app that launched the engine's own choice, and it retired with the toggle
+       -- which left this card reading REVIEW THESE over a named drill and then dropping the learner
+       at a section to pick one for themselves. */
+    const hero = await screen.findByRole('button', { name: /UP NEXT/i })
+    expect(hero.textContent).toContain('Meaning Match')
+    expect(hero.textContent).toMatch(/REVIEW THESE|START THIS/)
+    fireEvent.click(hero)
 
     expect(await screen.findByRole('heading', { name: /Mini Game Map/i })).toBeTruthy()
     expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
@@ -607,7 +596,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Grammar')
+    openDeck('Grammar')
 
     expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
@@ -671,7 +660,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Grammar')
+    openDeck('Grammar')
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
     clickTilePrimaryAction(typedTiles[0])
@@ -696,7 +685,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
     const contextTiles = await screen.findAllByRole('button', { name: /Particle Cloze/i })
     clickTilePrimaryAction(contextTiles[0])
 
@@ -714,7 +703,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
     const storyTiles = await screen.findAllByRole('button', { name: /Imposter/i })
     clickTilePrimaryAction(storyTiles[0])
 
@@ -744,7 +733,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Kanji')
+    openDeck('Kanji')
     const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
     clickTilePrimaryAction(matchTiles[0])
 
@@ -813,7 +802,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Kanji')
+    openDeck('Kanji')
 
     const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
     clickTilePrimaryAction(typedTiles[0])
@@ -870,7 +859,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Kanji')
+    openDeck('Kanji')
     const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
     clickTilePrimaryAction(strokeTiles[0])
 
@@ -1075,7 +1064,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Grammar')
+    openDeck('Grammar')
 
     const assemblyTiles = await screen.findAllByRole('button', { name: /Sentence Assembly/i })
     clickTilePrimaryAction(assemblyTiles[0])
@@ -1102,7 +1091,7 @@ describe('Minigame menu', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
 
     // Hiragana: listening modes should appear
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
     await screen.findAllByText(/Romaji Sprint/i)
     expect((await screen.findAllByText(/Recognition/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
@@ -1110,14 +1099,13 @@ describe('Minigame menu', () => {
     cleanup()
     window.localStorage.clear()
     /* this test re-renders App mid-way, and the clear above took the front-door flag with it */
-    window.localStorage.setItem('jplearn.menu.frontDoor', 'off')
 
     window.jplearnDesktop = baseDesktopApi
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
 
     // Katakana: both listening modes must appear
-    clickTopMenuCard('Katakana')
+    openDeck('Katakana')
     expect((await screen.findAllByText(/Recognition/i)).length).toBeGreaterThan(0)
     expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
   })
@@ -1135,7 +1123,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
 
     const audioTiles = await screen.findAllByRole('button', { name: /Recognition/i })
     clickTilePrimaryAction(audioTiles[0])
@@ -1179,7 +1167,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
 
     const dictationTiles = await screen.findAllByRole('button', { name: /Dictation/i })
     clickTilePrimaryAction(dictationTiles[0])
@@ -1225,7 +1213,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
 
     const lockedCassette = await screen.findByRole('button', { name: /recognition is locked/i })
     expect(lockedCassette.className).toContain('is-locked')
@@ -1281,7 +1269,7 @@ describe('Minigame menu', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
 
     const lockedCassette = await screen.findByRole('button', { name: /speech recall is locked/i })
     expect(lockedCassette.className).toContain('is-locked')
@@ -1311,7 +1299,7 @@ describe('Minigame menu', () => {
 
       render(<App />)
       await screen.findByRole('button', { name: /open shortcuts/i })
-      clickTopMenuCard('Hiragana')
+      openDeck('Hiragana')
 
       const cassettes = await screen.findAllByRole('button', { name: /focus |launch |is locked/i })
       expect(cassettes.length).toBeGreaterThan(0)

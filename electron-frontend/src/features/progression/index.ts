@@ -1,6 +1,5 @@
 export { useProgression } from './useProgression'
 export type { ProgressionApi } from './useProgression'
-export { ProgressionMap } from './components/ProgressionMap'
 export {
   LOCKED_NODE_REASON,
   NODE_DESTINATIONS,

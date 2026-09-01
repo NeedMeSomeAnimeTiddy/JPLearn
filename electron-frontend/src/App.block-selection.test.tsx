@@ -8,6 +8,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { openDeck } from './test-entry'
 import App from './App'
 import { PREFS_STORAGE_KEY } from './lib/appStorage'
 
@@ -106,7 +107,6 @@ beforeEach(() => {
     /* this suite clears storage in its own beforeEach, which runs after the setup file's --
        so the classic front door is re-stated here. These tests are about the flow behind
        the door, not the door. */
-  window.localStorage.setItem('jplearn.menu.frontDoor', 'off')
   window.jplearnDesktop = makeApi()
 })
 
@@ -115,15 +115,6 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-function clickTopMenuCard(label: string): void {
-  const menuCards = Array.from(document.querySelectorAll('.cassette')) as HTMLButtonElement[]
-  const button = menuCards.find(
-    (card) => card.querySelector('.cassette-title')?.textContent?.trim().toLowerCase() === label.toLowerCase(),
-  )
-  if (!button) throw new Error(`Top menu card not found for ${label}`)
-  fireEvent.click(button)
-  fireEvent.click(button)
-}
 
 /** A block row in the tracklist. Named by its own cell, not the whole row —
  *  the row also carries a track number, a mastery figure and a screen-reader
@@ -167,7 +158,7 @@ function poolLabel(): string {
 async function openHiraganaHub(): Promise<void> {
   render(<App />)
   await screen.findByRole('button', { name: /open shortcuts/i })
-  clickTopMenuCard('Hiragana')
+  openDeck('Hiragana')
   await waitFor(() => expect(document.querySelectorAll('.hub-block-chip').length).toBeGreaterThan(0))
 }
 
@@ -260,7 +251,7 @@ describe('block multi-select', () => {
 
     render(<App />)
     await screen.findByRole('button', { name: /open shortcuts/i })
-    clickTopMenuCard('Vocabulary')
+    openDeck('Vocabulary')
 
     await waitFor(() => expect(getBlockProgress).toHaveBeenCalledWith('vocab_n5'))
     expect(getDeckCards).toHaveBeenCalledWith('vocab_n5')

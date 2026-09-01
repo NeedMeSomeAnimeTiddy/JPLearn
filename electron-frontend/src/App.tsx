@@ -39,7 +39,6 @@ import { CloseConfirmDialog } from './components/CloseConfirmDialog'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AppTitlebar } from './components/AppTitlebar'
 import { AppSettingsModal } from './components/AppSettingsModal'
-import { HomeView } from './views/HomeView'
 import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
@@ -108,7 +107,7 @@ import {
 import './App.css'
 import { useBlockSelection, describeSelection } from './features/block-selection'
 import { useVocabFeed, isFedDeck } from './features/vocab-feed'
-import { useProgression, ProgressionMap, LOCKED_NODE_REASON } from './features/progression'
+import { useProgression, LOCKED_NODE_REASON } from './features/progression'
 import type { ProgressionNodeView } from './features/progression'
 import { computeMinigameLockReasons } from './lib/minigameAvailability'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
@@ -312,18 +311,6 @@ function App() {
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
   const lookup = useLookup()
-  /* PHASE 2: the valley menu is the front door, and the old home screen is one click away.
-     Persisted so the choice survives a restart; the toggle comes out at phase 6. */
-  const [menuFrontDoor, setMenuFrontDoor] = useState<boolean>(() => {
-    try { return window.localStorage.getItem('jplearn.menu.frontDoor') !== 'off' } catch { return true }
-  })
-  const toggleMenuFrontDoor = useCallback(() => {
-    setMenuFrontDoor((previous) => {
-      const next = !previous
-      try { window.localStorage.setItem('jplearn.menu.frontDoor', next ? 'on' : 'off') } catch { /* private mode */ }
-      return next
-    })
-  }, [])
 
   function openDailyGames(): void {
     closeKanjiDetail()
@@ -597,7 +584,7 @@ function App() {
      IT SITS HERE RATHER THAN WITH THE REST OF THE MENU STATE because it reads `progression.nodes`,
      and the features are evaluated against the progression: asking first would be asking about last
      cycle's nodes. */
-  const menu = useMenuL1(menuFrontDoor && view === 'home', progression.nodes)
+  const menu = useMenuL1(view === 'home', progression.nodes)
 
   const cursor = useCursor(
     settings as unknown as { cursor: CursorSettings },
@@ -1326,7 +1313,7 @@ function App() {
   /* THE WORLD'S TWO FIGURES, fetched only once the screen asking for them is up — see the note in
      `useWorldData`. `worldLanes` is memoised because `Lanes` watches the array it is given, and a
      fresh one on every render would re-subscribe its keydown listener for nothing. */
-  const worldOpen = view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'READING'
+  const worldOpen = view === 'home' && menuLevel === 2 && menuPath.section === 'READING'
   const world = useWorldData(worldOpen)
   const worldCards = useMemo(
     () => worldLanes({
@@ -1338,7 +1325,7 @@ function App() {
 
   /* THE ASCENT'S ONE CALL, on the same terms: asked when the ladder is up, memoised because the
      screen watches the array it is given. */
-  const examOpen = view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'JLPT'
+  const examOpen = view === 'home' && menuLevel === 2 && menuPath.section === 'JLPT'
   const exam = useReadiness(examOpen)
   const examRungs = useMemo(() => ascentRungs(exam.readiness), [exam.readiness])
   /* WHICH RUNG LEVEL THREE IS ABOUT. The ascent's cursor is the ascent's own state -- it is not in
@@ -1520,7 +1507,7 @@ function App() {
         /* THE TREE FIRST, THEN THE FLAT MAP. Inside the menu, Escape means "up one level"; the
            `up()` boolean is what stops it becoming a key that silently does nothing at the root,
            where it must fall through to the app's own parent chain instead. */
-        if (view === 'home' && menuFrontDoor && leaveMenuLevel()) {
+        if (view === 'home' && leaveMenuLevel()) {
           return
         }
 
@@ -1579,7 +1566,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view, menuFrontDoor, menuPath])
+  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -1774,10 +1761,11 @@ function App() {
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
   }, [activeScript, closeKanjiDetail, closeShortcutMenu, resetSessionWithLives, resolveScriptMinigame, startSession])
-
-  // `overrides` lets a caller set session preferences the destination implies —
-  // an "Up next" row raised by `leeches_detected` arrives with leech focus on.
-  // Anything left unset keeps whatever the learner last chose.
+  /* LAUNCH THE DRILL THE ENGINE CHOSE, rather than landing on a hub for the learner to pick one.
+     This came back with the menu hero: `HomeView`'s "Up next" row was its only caller and retired
+     with it, which left the hero card saying REVIEW THESE over a named drill and a card count and
+     then opening a section instead. A card that promises an action has to perform it, and the
+     recommendation payload has carried the drill and the leech-focus override all along. */
   const jumpToScriptHubSetup = useCallback((
     script: ScriptKey,
     minigame: MinigameKey,
@@ -2047,10 +2035,27 @@ function App() {
 
   /* the hero runs the thing rather than opening a section — except where the thing IS a place,
      in which case it hands off to the section it named, so you end up where the card said */
+  /* THE HERO PERFORMS WHAT IT PROMISES. The card names the drill the engine chose and how many
+     cards are due, and its slab says REVIEW THESE -- so it runs that drill rather than dropping the
+     learner at the section to choose one for themselves. `HomeView`'s "Up next" row did exactly
+     this and was the only thing that did; retiring it left the promise with nothing behind it.
+
+     WITH NOTHING RECOMMENDED THERE IS NOTHING TO RUN, and the card says so too: its slab reads
+     OPEN THE PATH, so a section is the honest destination. */
   const runMenuHero = useCallback(() => {
-    const hero = heroFromStudyBlock(studyBlock)
-    openMenuSection(hero.section ?? 'STUDY')
-  }, [openMenuSection, studyBlock])
+    const top = studyBlock?.recommendations?.[0]
+    if (top?.minigame) {
+      jumpToScriptHubSetup(
+        top.section as ScriptKey,
+        top.minigame as MinigameKey,
+        top.leech_focus_enabled === null || top.leech_focus_enabled === undefined
+          ? undefined
+          : { leechFocusEnabled: top.leech_focus_enabled },
+      )
+      return
+    }
+    openMenuSection(heroFromStudyBlock(studyBlock).section ?? 'STUDY')
+  }, [jumpToScriptHubSetup, openMenuSection, studyBlock])
 
   // Titlebar callbacks: named here rather than inlined in the titlebar JSX so the
   // titlebar component receives bare handlers instead of raw state setters.
@@ -2291,7 +2296,7 @@ function App() {
       {/* Home is the main landing surface; keep it mounted only for home view. */}
       {/* L2 — one section at a time. A section with no screen here never reaches level two:
           `useMenuPath` passes it straight through to the flat view instead. */}
-      {view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'STUDY' ? (
+      {view === 'home' && menuLevel === 2 && menuPath.section === 'STUDY' ? (
         <PathL2
           nodes={progression.nodes}
           loading={progression.loading}
@@ -2303,7 +2308,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'deck' ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'deck' ? (
         <Deck
           title={menuMilestone}
           slug={activeDeckSlug}
@@ -2322,7 +2327,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'feed' ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'feed' ? (
         <Feed
           title={menuMilestone}
           feed={vocabFeed}
@@ -2334,7 +2339,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'DRILLS' ? (
+      {view === 'home' && menuLevel === 2 && menuPath.section === 'DRILLS' ? (
         <Lanes
           jp="練習" en="PRACTICE"
           note="練習 · NOTHING NEW IS TAUGHT HERE — THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU"
@@ -2366,7 +2371,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'drills' ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'drills' ? (
         <Drills
           deck={activeScript}
           onStart={(deck, mode) => {
@@ -2378,7 +2383,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'level' && examDetail ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'level' && examDetail ? (
         <ExamLevel
           level={examDetail}
           onStart={() => {
@@ -2389,7 +2394,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'library' ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'library' ? (
         <Library
           rows={libraryRows(world.passages)}
           loading={!world.passages}
@@ -2402,11 +2407,11 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'wall' ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'wall' ? (
         <Wall onUp={leaveMenuLevel} />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 3 && menuPath.screen === 'scenes' ? (
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'scenes' ? (
         <Scenes
           scenes={buildScenes(world.sessions)}
           onPick={(scenarioId) => {
@@ -2424,7 +2429,7 @@ function App() {
         />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 2 && menuPath.section === 'RECORDS' ? (
+      {view === 'home' && menuLevel === 2 && menuPath.section === 'RECORDS' ? (
         <Ledger
           summary={summary}
           xp={xpProgress}
@@ -2446,87 +2451,17 @@ function App() {
       {/* THE MOMENT TAKES THE STAGE. It is drawn before the front door rather than over it, because
           it is the only screen here that is an event -- and `menuLevel` has already closed every
           other menu branch, so this is the whole of the menu while it is up. */}
-      {view === 'home' && menuFrontDoor && moment ? (
+      {view === 'home' && moment ? (
         <Unlock moment={moment} onContinue={menu.dismissUnlocks} />
       ) : null}
 
-      {view === 'home' && menuFrontDoor && menuLevel === 1 ? (
+      {view === 'home' && menuLevel === 1 ? (
         <MenuL1
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
           crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress)}
           onOpenSection={enterMenuSection}
           onRunHero={runMenuHero}
-        />
-      ) : null}
-
-      {view === 'home' && !menuFrontDoor ? (
-        <HomeView
-          navDirection={navDirection}
-          studyPlan={studyPlan}
-          learningPathStatus={learningPathStatus}
-          studyBlock={studyBlock}
-          onSelectScript={(script) => {
-            // Check readiness before navigating — show modal for challenging/advanced
-            const readiness = learningPathStatus?.steps.find((s) => s.section_id === script)?.readiness
-            const needsWarning = (readiness === 'challenging' || readiness === 'advanced') && !warnedSectionsRef.current.has(script)
-            if (needsWarning) {
-              const LABELS: Record<ScriptKey, string> = {
-                hiragana: 'Hiragana', katakana: 'Katakana', kanji_n5: 'Kanji (N5)',
-                vocab_n5: 'N5 Vocabulary', grammar_patterns: 'N5 Grammar', sentence_examples: 'Sentences',
-              }
-              setWarningModal({
-                sectionId: script,
-                label: LABELS[script] ?? script,
-                readiness: readiness as SectionReadiness,
-                reason: readiness === 'advanced'
-                  ? 'This section builds on content you haven\'t started yet.'
-                  : 'Prerequisites are still in progress.',
-              })
-            } else {
-              setActiveScript(script)
-              navigate('script_hub', 'forward')
-            }
-          }}
-          onOpenJlptPrep={() => {
-            const sectionId = 'jlpt_prep'
-            const shouldWarn = !warnedSectionsRef.current.has(sectionId)
-            if (shouldWarn) {
-              setWarningModal({
-                sectionId,
-                label: 'JLPT Preparation',
-                readiness: 'advanced',
-                reason: 'JLPT prep combines multiple skills and is most effective once your foundations are in place.',
-              })
-              return
-            }
-
-            setDictionaryOpen(false)
-            setShowOverview(false)
-            setShowSettings(false)
-            tutor.closeTutorPanel()
-            navigate('jlpt_prep', 'forward')
-          }}
-          onOpenPassages={() => {
-            setDictionaryOpen(false)
-            setShowOverview(false)
-            setShowSettings(false)
-            navigate('passage_hub', 'forward')
-          }}
-          onOpenDailyGames={openDailyGames}
-          onJumpToSetup={jumpToScriptHubSetup}
-          progressionMap={
-            <ProgressionMap
-              nodes={progression.nodes}
-              current={progression.current}
-              onOpenNode={(nodeId) => {
-                // Soft gating: an open node goes straight through, a gated one
-                // raises the confirmation handled below.
-                const node = progression.requestOpen(nodeId)
-                if (node) openProgressionNode(node)
-              }}
-            />
-          }
         />
       ) : null}
 
@@ -2843,7 +2778,7 @@ function App() {
   )
 
   return (
-    <main className={view === 'home' && menuFrontDoor ? 'app-shell mn-showing' : 'app-shell'}>
+    <main className={view === 'home' ? 'app-shell mn-showing' : 'app-shell'}>
       <AppTitlebar
         windowDrag={windowDrag}
         shortcutMenuRef={shortcutMenuRef}
@@ -2873,8 +2808,6 @@ function App() {
         canTitlebarForward={nav.canHistoryForward}
         titlebarHistoryBack={nav.historyBack}
         titlebarHistoryForward={nav.historyForward}
-        menuFrontDoor={menuFrontDoor}
-        onToggleMenuFrontDoor={toggleMenuFrontDoor}
         settings={settings}
         pomodoro={pomodoro}
         tutor={tutor}

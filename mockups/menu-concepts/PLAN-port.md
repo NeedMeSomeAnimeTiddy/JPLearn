@@ -1195,9 +1195,106 @@ legibility instrument in this port to answer confidently and wrongly.
 
 **1,068 tests across 93 files**, 8 a11y, lint clean.
 
-### Phase 5 is done
+#### Phase 5 is done
 
-All seven level threes are built. What is left of the port is phase 6 — the unlock moment
-(`FeatureStatusPayload` has carried `just_unlocked` and `unlocked_at` since 2026-08-31 and nothing
-draws it) and taking the titlebar toggle out.
+All seven level threes are built.
+## Phase 6, part one — the unlock moment
+
+`domain/feature_catalog.py` has gated nine capabilities behind curriculum milestones since long
+before this menu existed, and no React file has ever drawn the transition. The app was built to grow
+and arrives fully grown.
+
+**It reads `unlocked_at`, not `just_unlocked`, and the payload says why.** `just_unlocked` is true
+only for the call that *caused* the transition — and two surfaces call `getFeatureState` on mount,
+this menu and `useAchievements`, so whichever asks first consumes it and the other sees false. The
+docstring names the fix: a surface that wants to show an unlock exactly once remembers the last
+timestamp it displayed and compares. That mark is per-surface, which is correct — the achievements
+wall showing a badge is not this menu having announced it.
+
+**An absent mark announces nothing.** A fresh install unlocks `themes` and `achievements`
+immediately and an existing account is already full of them, so a missing mark read as the beginning
+of time would open the app on a moment congratulating you for things you did not just do. A surface
+that has never looked has witnessed no transitions: the first read stores the mark and shows
+nothing, and the next real unlock is later than it.
+
+### What the stamp names
+
+The milestone that fired it, **not** what it opened — and where several open at once, that is the
+*intersection* of what they waited on. Clearing GRAMMAR N5 opens Conversation Mode, Kanji Mode and
+Tutor Chat from three different requirement lists with one node in common. Verified live:
+
+> 解放 SOMETHING OPENED · 3 NEW THINGS
+> 文法 **GRAMMAR N5** · ON THE PATH · **MASTERED**
+> Conversation Mode · Kanji Mode · Tutor Chat
+
+**Where the intersection is not exactly one node there is no stamp.** Also verified live: Listening
+Mode (`hiragana` mastered) and JLPT Dashboard (`vocabulary_n5` *reached*) landed in the same read,
+and the screen said *NO ONE STEP OPENED ALL OF THESE* rather than picking a winner. An absence is
+drawn as an absence.
+
+`feature-unlocks` gained `requires` for the same reason `block-progress` gained `unlock_threshold`
+last commit: the renderer must not re-derive a rule that lives in `domain/`. Tier-3 chains are
+resolved on the bridge side, so `tutor_chat` reports `grammar_n5 mastered` rather than the feature it
+hangs off. **MASTERED and REACHED are kept apart** because the catalog keeps them apart — eight
+features want a node mastered and `jlpt_dashboard` wants one merely reached.
+
+### Two fetch bugs found by measuring, not by reading
+
+The menu asked for feature state **once per App mount**. Two consequences, both wrong: a section
+unlocked mid-session stayed drawn shut until relaunch, and the moment could never fire — the only
+fetch happened before the thing that caused it.
+
+And features are **evaluated against the progression**, whose node rows only the progression's own
+two commands write. So a feature read landing first in the strictly serial bridge is judged against
+last cycle's nodes. Measured live: mastering a deck mid-session and returning to the menu drew
+nothing, and the moment arrived on the trip *after*. It now asks on every return, after the
+progression has answered — and with that, a milestone earned while the app is running fires on the
+first return with no relaunch.
+
+## Phase 6, part two — the toggle comes out, and `HomeView` retires
+
+The third decision called the titlebar toggle "the one piece of scaffolding this plan is willing to
+build". It is gone, and with it `HomeView` (334 lines), the flat `ProgressionMap`, the cassette
+carousel and the daily-goal widget — all four had no other caller. The old `jplearn.menu.frontDoor`
+key is now inert: verified live by setting it to `off` and reloading, which changes nothing.
+
+**The cost was measured before it was paid**: flipping the test-setup default first, to see what
+actually broke, gave 42 failures in 4 files rather than the 50 suites feared. Four of those files
+carried an identical private `clickTopMenuCard` that clicked a deck cassette twice; all four now
+share one `openDeck`, which presses the digit shortcut `App` has bound on `window` the whole time.
+Suites that waited on HomeView's Daily Games button purely as a *readiness* signal now wait on the
+titlebar, which every surface has.
+
+### What retiring a screen nearly took with it
+
+`HomeView`'s "Up next" row was **the only thing in the app that launched the drill the engine
+chose** — `jumpToScriptHubSetup`, carrying the recommendation's minigame and its leech-focus
+override. Deleting the screen made that function dead code, and deleting the dead code would have
+left the menu's hero card reading *REVIEW THESE · 15 · Vocabulary* and then dropping the learner at
+a section to pick a drill themselves. A card that promises an action has to perform it. The hero now
+runs the recommendation, and names the drill while it is at it — `display_label` is the bridge's
+sentence about the *section*, and on its own it left the card starting a mode it never mentioned.
+
+The one test that caught this was the one asserting HomeView's row "launches the drill the engine
+chose, rather than landing on the hub" — it failed for exactly the right reason.
+
+`App.progression.test.tsx` lost its course-rail and expanded-list groups with the surface they
+tested, and kept its soft-gate group, which is the only coverage anywhere of *a locked step asks
+once, then opens*. It gained one more: **a confirmed gated step now reaches the same level three an
+open one does**, which is the bug the live probe found in the deck-and-feed commit and which no test
+had.
+
+**1,078 tests across 94 files**, 8 a11y, lint clean, 1,645 python tests.
+
+## The port is done
+
+All six phases have landed. What is left is not the port:
+
+- **~70 commits unpushed**, and `world.glb` and `night_lightmap.png` exist only on this machine, so
+  a fresh clone cannot build the valley. The LFS / release-asset / fetch-script decision is open.
+- **The valley being alive** — the day cycle, the 362 clustered lantern lights, the 1,059 idling
+  crowd figures and the walker loops are a separate system that phase 0 deliberately did not port.
+- `MENU_SECTIONS` still says THE WORLD opens when you "reach GRAMMAR on the path", where the path
+  and THE WORLD both draw **GRAMMAR N5** — the last place a milestone is transcribed rather than
+  read from the curriculum.
 

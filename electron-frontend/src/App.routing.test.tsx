@@ -19,6 +19,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { openDeck } from './test-entry'
 import App from './App'
 
 vi.mock('react-type-animation', () => ({
@@ -125,7 +126,6 @@ beforeEach(() => {
     /* this suite clears storage in its own beforeEach, which runs after the setup file's --
        so the classic front door is re-stated here. These tests are about the flow behind
        the door, not the door. */
-  window.localStorage.setItem('jplearn.menu.frontDoor', 'off')
   window.jplearnDesktop = makeApi()
 })
 
@@ -146,23 +146,14 @@ function currentView(): ViewName | 'unknown' {
   if (screen.queryByRole('heading', { name: 'Passages' })) return 'passage_hub'
   if (screen.queryByRole('heading', { name: 'Crossword' })) return 'daily_games'
   if (screen.queryByRole('heading', { name: 'JLPT Preparation' })) return 'jlpt_prep'
-  if (screen.queryByRole('button', { name: 'Daily Games' })) return 'home'
+  /* HOME IS THE VALLEY MENU NOW. `HomeView` and its Daily Games button retired with phase 6's
+     toggle; `.mn-rows` is the menu's own row column and is on the stage at every level of it. */
+  if (document.querySelector('.mn-frame')) return 'home'
   return 'unknown'
 }
 
 function expectView(name: ViewName): Promise<void> {
   return waitFor(() => { expect(currentView()).toBe(name) })
-}
-
-/** The cassette carousel needs two clicks: focus, then launch. */
-function clickTopMenuCard(label: string): void {
-  const menuCards = Array.from(document.querySelectorAll('.cassette')) as HTMLButtonElement[]
-  const button = menuCards.find(
-    (card) => card.querySelector('.cassette-title')?.textContent?.trim().toLowerCase() === label.toLowerCase(),
-  )
-  if (!button) throw new Error(`Top menu card not found for ${label}`)
-  fireEvent.click(button)
-  fireEvent.click(button)
 }
 
 /**
@@ -187,7 +178,7 @@ describe('view -> parent (Escape back-navigation)', () => {
     render(<App />)
     await expectView('home')
 
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
     await expectView('script_hub')
 
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -220,7 +211,7 @@ describe('view -> parent (Escape back-navigation)', () => {
     render(<App />)
     await expectView('home')
 
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
     await expectView('script_hub')
 
     // Same two-click cassette pattern as the top menu.
@@ -249,7 +240,7 @@ describe('history stack (titlebar back/forward)', () => {
     await expectView('home')
 
     // home -> script_hub -> home -> passage_hub
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
     await expectView('script_hub')
     fireEvent.keyDown(window, { key: 'Escape' })
     await expectView('home')
@@ -289,7 +280,7 @@ describe('history stack (titlebar back/forward)', () => {
     // Two hops before the first Back: `canTitlebarBack` is derived from a ref
     // read during render, so it only reflects a navigation once a later render
     // happens. See the note on waitForEnabled.
-    clickTopMenuCard('Hiragana')
+    openDeck('Hiragana')
     await expectView('script_hub')
     await openFromShortcutMenu('Passages')
     await expectView('passage_hub')

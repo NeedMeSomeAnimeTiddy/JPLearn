@@ -80,7 +80,7 @@ function mount() {
 }
 
 async function openScenarioPractice() {
-  await screen.findByRole('button', { name: 'Daily Games' })
+  await screen.findByRole('button', { name: /open shortcuts/i })
   fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
   const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
   fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
@@ -95,6 +95,10 @@ function respondWithin(dialog: HTMLElement, text: string) {
   fireEvent.click(within(dialog).getByRole('button', { name: 'Submit response' }))
 }
 
+/* THE APP IS READY WHEN THE TITLEBAR IS. These suites waited on `HomeView`'s own Daily Games
+   button purely as a "the app has finished loading" signal, and that screen retired with phase 6's
+   toggle. The titlebar is on every surface, so its shortcuts button does not depend on which
+   screen won the race. */
 describe('Scenario Practice — end-to-end typed flow', () => {
   it('completes Order at a Cafe through the real UI, then replays and returns to the Tutor menu', async () => {
     mount()

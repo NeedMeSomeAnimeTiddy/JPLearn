@@ -1,3 +1,4 @@
+import { MINIGAMES } from '../../constants'
 import type { StudyBlockPayload, XPProgressPayload } from '../../generated/types'
 import type { MenuCrown, MenuHero, MenuSectionKey } from './types'
 
@@ -57,10 +58,15 @@ export function heroFromStudyBlock(block: StudyBlockPayload | null | undefined):
   }
 
   const due = top.review_count ?? 0
+  /* THE CARD NAMES THE DRILL, because pressing it starts that drill. `display_label` is the
+     bridge's sentence about the section -- "Start studying Vocabulary" -- and on its own it left
+     the slab promising REVIEW THESE and then launching a mode the card never mentioned. The drill
+     is a separate field on the same recommendation, and `MINIGAMES` is where its name lives. */
+  const drill = MINIGAMES.find((game) => game.key === top.minigame)?.title
   return {
     cap: 'UP NEXT', capJp: '次は',
     fig: due > 0 ? String(due) : '—',
-    figEm: top.display_label,
+    figEm: drill && top.section_label ? `${top.section_label} · ${drill}` : top.display_label,
     figLab: due > 0 ? 'CARDS DUE' : 'NEW MATERIAL',
     /* the reason is the bridge's own, in its own words -- the card has to be auditable */
     why: reasonSentence(top.reason),

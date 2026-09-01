@@ -43,25 +43,3 @@ if (typeof HTMLCanvasElement !== 'undefined') {
   // stub toDataURL for jsdom
   HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,'
 }
-
-/* THE FRONT DOOR IS THE CLASSIC HOME SCREEN IN TESTS, DELIBERATELY.
-   Phase 2 of the menu port makes the valley menu the app's default front door, with the old
-   `HomeView` one titlebar click away. Almost every suite here starts by reaching for something on
-   that old screen — a deck cassette, the "Up next" heading, the Daily Games button — because what
-   they are testing is the flow behind the door, not the door.
-
-   Set in a global `beforeEach` rather than once, because ten of these suites call
-   `localStorage.clear()` in their own `afterEach`: set once, the flag survives exactly the first
-   test in each file and every later one silently gets the new front door instead. Setup-file
-   hooks run before file-level ones, so this re-establishes it for every test.
-
-   The menu has its own tests, and they opt back in. */
-import { beforeEach } from 'vitest'
-
-beforeEach(() => {
-  try {
-    window.localStorage.setItem('jplearn.menu.frontDoor', 'off')
-  } catch {
-    /* no localStorage here; the menu's own tests are the ones that care */
-  }
-})

@@ -65,17 +65,21 @@ function mount() {
   return render(<App />)
 }
 
+/* THE APP IS READY WHEN THE TITLEBAR IS. These suites waited on `HomeView`'s own Daily Games
+   button purely as a "the app has finished loading" signal, and that screen retired with phase 6's
+   toggle. The titlebar is on every surface, so its shortcuts button does not depend on which
+   screen won the race. */
 describe('Shared Tutor popup navigation', () => {
   it('renders exactly one Tutor entry point in the titlebar (no separate Tutor-chat or OCR buttons)', async () => {
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     expect(screen.getAllByRole('button', { name: /open tutor|close tutor/i })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /open ocr translator|close ocr translator/i })).toBeNull()
   })
 
   it('opens the Tutor menu by default and navigates into an activity via Back/Close semantics', async () => {
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
     const dialog = await screen.findByRole('dialog', { name: 'Tutor menu' })
@@ -98,7 +102,7 @@ describe('Shared Tutor popup navigation', () => {
   it('the chat-disabled setting hides only the Chat menu item, never the Tutor button, Scenario Practice, or Image Translation', async () => {
     window.localStorage.setItem('jplearn-desktop-settings-v1', JSON.stringify({ assistantChatEnabled: false }))
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
 
     expect(screen.getByRole('button', { name: 'Open Tutor' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
@@ -110,7 +114,7 @@ describe('Shared Tutor popup navigation', () => {
 
   it('all four command palette entries open the shared popup at the right place', async () => {
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
 
     fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
     let search = await screen.findByRole('textbox', { name: /search commands/i })
@@ -154,7 +158,7 @@ describe('Romaji-to-kana conversion toggle', () => {
 
   it('is on by default in the Tutor chat input, and a shared button toggles it off and back on', async () => {
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
     const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
     fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
@@ -176,7 +180,7 @@ describe('Romaji-to-kana conversion toggle', () => {
 
   it('shares the same toggle state with Scenario Practice — turning it off in chat also turns it off there', async () => {
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
     let menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
     fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
@@ -206,7 +210,7 @@ describe('Romaji-to-kana conversion toggle', () => {
 
   it('persists the toggle choice across a popup close and reopen', async () => {
     mount()
-    await screen.findByRole('button', { name: 'Daily Games' })
+    await screen.findByRole('button', { name: /open shortcuts/i })
     fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
     const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
     fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))

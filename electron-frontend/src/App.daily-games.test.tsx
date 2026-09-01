@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { openDailyGames } from './test-entry'
 import App from './App'
 
 vi.mock('react-type-animation', () => ({
@@ -99,9 +100,14 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+/** Back on the front door, whichever level of the menu it landed on. */
+async function backAtTheMenu(): Promise<void> {
+  await waitFor(() => { expect(document.querySelector('.mn-frame')).toBeTruthy() })
+}
+
 async function openMissedWordReview(): Promise<void> {
   if (!screen.queryByRole('heading', { name: 'Typing Blitz' })) {
-    fireEvent.click(await screen.findByRole('button', { name: 'Daily Games' }))
+    await openDailyGames()
   }
   const typingTile = (await screen.findByRole('heading', { name: 'Typing Blitz' })).closest('article')
   fireEvent.click(within(typingTile!).getByRole('button', { name: 'Play' }))
@@ -135,7 +141,11 @@ describe('Daily Games navigation', () => {
     window.jplearnDesktop = desktopApi as unknown as typeof window.jplearnDesktop
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Daily Games' }))
+    /* THREE DOORS, AND ONE OF THEM IS NEW. `HomeView`'s Daily Games button was two of the four
+       this test used to walk, and it retired with phase 6's toggle. Its replacement is the menu's
+       own route -- PRACTICE, then the DAILY GAMES lane -- which is worth more than pressing the
+       titlebar twice was. */
+    await openDailyGames()
     expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
     const matchPairsTile = screen.getByRole('heading', { name: 'Match Pairs' }).closest('article')
     fireEvent.click(within(matchPairsTile!).getByRole('button', { name: 'Play' }))
@@ -143,18 +153,18 @@ describe('Daily Games navigation', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: /back to games/i }), { key: 'Escape' })
     expect(await screen.findByRole('button', { name: 'Back to main menu' })).toBeTruthy()
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(await screen.findByRole('button', { name: 'Daily Games' })).toBeTruthy()
+    await backAtTheMenu()
 
-    fireEvent.click(screen.getByRole('button', { name: /open shortcuts/i }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Daily Games' }))
+    fireEvent.click(await screen.findByRole('button', { name: /PRACTICE —/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /DAILY GAMES —/i }))
     expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
-    expect(await screen.findByRole('button', { name: 'Daily Games' })).toBeTruthy()
+    await backAtTheMenu()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Daily Games' }))
+    await openDailyGames()
     expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
-    expect(await screen.findByRole('button', { name: 'Daily Games' })).toBeTruthy()
+    await backAtTheMenu()
 
     fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
     const commandSearch = await screen.findByRole('textbox', { name: /search commands/i })
@@ -168,7 +178,7 @@ describe('Daily Games navigation', () => {
     window.jplearnDesktop = review.api as unknown as typeof window.jplearnDesktop
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Daily Games' }))
+    await openDailyGames()
     const typingTile = (await screen.findByRole('heading', { name: 'Typing Blitz' })).closest('article')
     fireEvent.click(within(typingTile!).getByRole('button', { name: 'Play' }))
     const input = await screen.findByLabelText(/type the japanese word/i)
@@ -176,7 +186,8 @@ describe('Daily Games navigation', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
 
     expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Daily Games' })).toBeNull()
+    /* Escape stopped at the hub rather than carrying on out to the front door */
+    expect(document.querySelector('.mn-frame')).toBeNull()
   })
 
   it('hydrates a deduplicated cross-deck missed-word queue in supplied order without loading the study queue', async () => {
