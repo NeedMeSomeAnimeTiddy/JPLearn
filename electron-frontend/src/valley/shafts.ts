@@ -204,6 +204,21 @@ function blit(renderer: WebGLRenderer, mat: ShaderMaterial, to: WebGLRenderTarge
 const _white = new Color(0xffffff)
 const _clear = new Color()
 
+/* THE GLOW MOVES WITH THE SUN'S HEIGHT, so the day cycle needs a way in. The uniforms are private
+   because nothing else has any business writing them, and a setter is a smaller door than an
+   export of the material. `rayCol` and `haloCol` come in as linear Colors already mixed by
+   `dayPalette`, so they are copied rather than set from hex a second time. */
+export function setGlow(
+  m: { rayAmt: number; haloAmt: number; coreAmt: number },
+  rayCol: Color, haloCol: Color,
+): void {
+  matGlow.uniforms.rayAmt.value = m.rayAmt
+  matGlow.uniforms.haloAmt.value = m.haloAmt
+  matGlow.uniforms.coreAmt.value = m.coreAmt
+  ;(matGlow.uniforms.rayCol.value as Color).copy(rayCol)
+  ;(matGlow.uniforms.haloCol.value as Color).copy(haloCol)
+}
+
 export function sizeShafts(width: number, height: number, dpr: number): void {
   const w = Math.max(1, Math.floor(width * dpr) >> 1)
   const h = Math.max(1, Math.floor(height * dpr) >> 1)

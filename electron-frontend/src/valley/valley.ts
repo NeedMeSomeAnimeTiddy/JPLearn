@@ -31,12 +31,15 @@ import {
 } from './flight'
 import { DESTINATIONS } from './destinations'
 import {
-  FOG_COLOUR, FOG_DENSITY, faceSun, gradeSky, installRig, makeSunDisc, placeSun, updateSkyDir,
-  type Rig,
+  FOG_COLOUR, FOG_DENSITY, SKY_U, faceSun, gradeDisc, gradeSky, installRig, makeSunDisc,
+  placeSun, updateSkyDir, type Rig,
 } from './lighting'
-import { ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, sizeShafts, updateSunUv } from './shafts'
+import {
+  ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, setGlow, sizeShafts, updateSunUv,
+} from './shafts'
 import { buildClouds, type CloudField } from './clouds'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
+import { dayPalette, siteHere, solarState } from './daycycle'
 import { registerFlights } from './flights'
 import type { MenuSectionKey } from '../features/menu'
 
@@ -93,6 +96,25 @@ let sunDisc: Mesh | null = null
 let sunAt: Vector3 | null = null
 let clouds: CloudField | null = null
 let coverTex: ReturnType<typeof makeCoverTexture> | null = null
+/* WHERE THE VIEWER IS, ASKED ONCE. `Intl` is cheap but not free and the answer cannot change
+   inside a session; the sun's altitude is what moves. */
+let site: readonly [number, number] | null = null
+/* THE HOUR OVERRIDE, so a screenshot of dusk does not have to be taken at dusk. `?hour=21.5`
+   or `?hour=21:30`, matching the mockup's own `?time=`. */
+const hourOverride = (() => {
+  const raw = new URLSearchParams(window.location.search).get('hour')
+  if (!raw) return null
+  const hm = /^(\d{1,2})[:.](\d{2})$/.exec(raw)
+  if (hm) return +hm[1] + +hm[2] / 60
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+})()
+/* the day is re-evaluated on a slow beat rather than per frame: the sun moves a quarter of a
+   degree a minute, and every write below costs a uniform upload or a light rebuild */
+let lastDayAt = -1e9
+let fogBase = 0
+/** how often the sun is asked where it is */
+const DAY_BEAT_MS = 2000
 /* NEVER SET `shadowMap.needsUpdate` DIRECTLY. In the mockup that flag was consumed by whichever
    render came next, which was the lake reflection -- a pass that clips at the waterline -- so the
    one shadow build in the world was drawn against a clipped scene, and the valley had no shadows
@@ -449,6 +471,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       mats.forEach((m) => breathe(m, land))
     })
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
+    /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
+    fogBase = FOG_DENSITY
+    if (rig) applyDay(scene, renderer, rig, altitudeNow(), fogBase)
+    lastDayAt = performance.now()
     /* ONE SHADOW BUILD. `autoUpdate` is off below: redrawing 4096 squared of a five-million
        triangle valley every frame is worth double digits of fps, and nothing in the world moves. */
     shadowDirty = true
@@ -508,6 +534,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     camera.aspect = window.innerWidth / Math.max(1, window.innerHeight)
     camera.updateProjectionMatrix()
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
+    /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
+    fogBase = FOG_DENSITY
+    if (rig) applyDay(scene, renderer, rig, altitudeNow(), fogBase)
+    lastDayAt = performance.now()
   })
 
 
@@ -553,6 +583,14 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     if (clouds) clouds.drift(dt / 1000)
     /* and the cover creeps with them, on the same clock */
     driftCover(dt / 1000)
+
+    /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
+       degree a minute; at that rate a two-second beat is thirty times finer than anything the
+       eye can catch, and each pass writes twenty uniforms and dirties the shadow map. */
+    if (rig && now - lastDayAt > DAY_BEAT_MS) {
+      lastDayAt = now
+      applyDay(scene, renderer, rig, altitudeNow(), fogBase)
+    }
 
     camera.position.set(cam.px, cam.py, cam.pz)
     if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix() }
@@ -607,6 +645,73 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
 
   ;(window as unknown as { __VALLEY__?: ValleyMarks }).__VALLEY__ = marks
   return marks
+}
+
+/* ==================================================================================================
+   ONE PALETTE, WRITTEN OUT EVERYWHERE. Everything the sun touches reads from a single interpolated
+   row: the three lights, the fog and its colour, the exposure, the sky's horizon/zenith and its two
+   scattering lobes, the shafts' three amounts, the sun disc, the clouds' underside, and the one
+   number the chrome uses to decide how much sky it can hold itself up with.
+
+   THE MIST IS NOT A COLUMN IN THE TABLE, deliberately. Mist is water in the air lit by whatever is
+   lighting the air, so it is the haze colour with some of the saturation taken out of it — one
+   fewer thing to keep in step, and it can never disagree with the fog it is standing in.
+   ================================================================================================== */
+const _mistWhite = new Color(0xffffff)
+let uiSkyLast = -1
+
+function applyDay(
+  scene: Scene, renderer: WebGLRenderer, rig: Rig, alt: number, fogBase: number,
+): void {
+  const m = dayPalette(alt)
+  const n = m.numbers
+  const c = m.colours
+
+  rig.key.color.copy(c.keyCol); rig.key.intensity = n.keyI
+  rig.fill.color.copy(c.fillCol); rig.fill.intensity = n.fillI
+  rig.hemi.color.copy(c.hemiSky)
+  rig.hemi.groundColor.copy(c.hemiGnd)
+  rig.hemi.intensity = n.hemiI
+
+  const fog = scene.fog as FogExp2 | null
+  if (fog) { fog.color.copy(c.fogCol); fog.density = fogBase * n.fogK }
+  scene.background = (scene.background as Color | null)?.copy(c.fogCol) ?? new Color(c.fogCol)
+  renderer.toneMappingExposure = n.expo
+
+  ATMOS_U.uMistColor.value.copy(c.fogCol).lerp(_mistWhite, 0.35)
+
+  SKY_U.uHorizon.value.copy(c.skyHorizon)
+  SKY_U.uZenith.value.copy(c.skyZenith)
+  SKY_U.uHorizAmt.value = n.skyHorizAmt
+  SKY_U.uZenAmt.value = n.skyZenAmt
+  SKY_U.uBurn.value.copy(c.skyBurnCol); SKY_U.uBurnG.value = n.skyBurnG
+  SKY_U.uWide.value.copy(c.skyWideCol); SKY_U.uWideG.value = n.skyWideG
+  SKY_U.uTight.value.copy(c.skyTightCol); SKY_U.uTightG.value = n.skyTightG
+
+  setGlow({ rayAmt: n.rayAmt, haloAmt: n.haloAmt, coreAmt: n.coreAmt }, c.rayCol, c.haloCol)
+  if (sunDisc) gradeDisc(sunDisc, c.discCore, c.discMid, n.discCoreG, n.discCoronaG)
+  if (clouds) clouds.material.emissive.copy(c.cloudEmis)
+
+  /* GUARDED ON A REAL CHANGE. Writing a custom property on :root invalidates style for the whole
+     document, and doing that sixty times a second to move a number by 0.0004 is a recalculation of
+     every rule in the stylesheet for nothing. */
+  if (Math.abs(n.uiSky - uiSkyLast) > 0.004) {
+    uiSkyLast = n.uiSky
+    document.documentElement.style.setProperty('--sky', n.uiSky.toFixed(3))
+  }
+  /* the shadow map is drawn once and only redrawn when something moves it -- and the sun moving
+     is exactly that */
+  shadowDirty = true
+}
+
+/** the sun's height right now, or at the hour the query string asked for */
+function altitudeNow(): number {
+  if (!site) site = siteHere()
+  const when = new Date()
+  if (hourOverride !== null) {
+    when.setHours(Math.floor(hourOverride), Math.round((hourOverride % 1) * 60), 0, 0)
+  }
+  return solarState(when, site[0], site[1]).alt
 }
 
 export function valleyHandle() {

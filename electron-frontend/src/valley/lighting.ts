@@ -315,6 +315,19 @@ export function makeSunDisc(): Mesh {
 }
 
 /** the disc always faces the camera, which for a body at 50,000 units is a rotation nobody sees */
+/* AND THE DISC IS RE-STRUCK EVERY TIME THE SUN MOVES. A white noon disc hanging in a violet
+   twilight is the giveaway that the sky is a painting and the sun is a decal on it. */
+export function gradeDisc(
+  disc: Object3D, core: Color, mid: Color, coreG: number, coronaG: number,
+): void {
+  const mat = (disc as Mesh).material as ShaderMaterial | undefined
+  if (!mat?.uniforms) return
+  ;(mat.uniforms.uCore.value as Color).copy(core)
+  ;(mat.uniforms.uMid.value as Color).copy(mid)
+  mat.uniforms.uCoreG.value = coreG
+  mat.uniforms.uCoronaG.value = coronaG
+}
+
 export function faceSun(disc: Object3D, eye: Vector3): void {
   disc.lookAt(eye)
 }

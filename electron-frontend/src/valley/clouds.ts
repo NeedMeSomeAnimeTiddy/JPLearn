@@ -65,6 +65,9 @@ export const CLOUD_EMISSIVE = 0x6f6a82
 export interface CloudField {
   /** every cluster, so the caller can drift them */
   clusters: InstancedMesh[]
+  /* THE UNDERSIDE IS A DAY CHANNEL. Held at a fixed lavender it made every cloud in the midnight
+     sky glow pink, which is the one thing a cloud at midnight does not do. */
+  material: MeshLambertMaterial
   /** move the whole ring by `dt` seconds — see `driftClouds` */
   drift: (dt: number) => void
   dispose: () => void
@@ -162,7 +165,7 @@ export function buildClouds(scene: Scene, centre: Vector3): CloudField {
     material.dispose()
   }
 
-  return { clusters, drift, dispose }
+  return { clusters, material, drift, dispose }
 }
 
 /** how far round the ring a cluster has travelled after `seconds`, in degrees — for tests */
