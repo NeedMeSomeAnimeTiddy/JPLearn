@@ -29,12 +29,29 @@ const CSS = ['../../styles/stage.css', './menu.css', '../lookup/lookup.css']
      --lk-u  the stage's scale, written onto the frame by every screen's fit() */
 const SET_IN_TS = new Set(['--acc', '--lk-u'])
 
+/* AND A `var()` THAT CARRIES A FALLBACK IS ALREADY DEFINED, which is the whole difference between
+   `--sky` and `--gold`. `--sky` is written on :root by the valley's day cycle and is absent
+   entirely when the valley is off (`?valley=off` is a supported boot), so every read of it names
+   the value to use instead. `background: var(--gold)` named nothing, which is why it painted
+   transparent and nobody noticed for three phases. */
+const usedWithoutFallback = (css: string) => new Set(
+  [...css.matchAll(/var\(\s*(--[\w-]+)\s*([,)])/g)]
+    .filter((m) => m[2] === ')')
+    .map((m) => m[1]),
+)
+
 describe('the menu stylesheet', () => {
-  it('defines every custom property it uses', () => {
-    const used = new Set([...CSS.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]))
+  it('defines every custom property it uses without a fallback', () => {
+    const used = usedWithoutFallback(CSS)
     const declared = new Set([...CSS.matchAll(/(^|[;{\s])(--[\w-]+)\s*:/g)].map((m) => m[2]))
     const missing = [...used].filter((t) => !declared.has(t) && !SET_IN_TS.has(t))
     expect(missing).toEqual([])
+  })
+
+  it('gives a token the stylesheet cannot define a fallback, rather than trusting it to arrive', () => {
+    /* `--sky` runs 0 at midnight to 1 at noon and only exists while the valley is mounted */
+    expect(CSS).toMatch(/var\(--sky,\s*[\d.]+\)/)
+    expect(usedWithoutFallback(CSS).has('--sky')).toBe(false)
   })
 
   it('uses every custom property it defines', () => {
