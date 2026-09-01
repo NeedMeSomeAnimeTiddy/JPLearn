@@ -684,3 +684,196 @@
   color: var(--gold-hi); paint-order: stroke fill;
   -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
 }
+
+/* ==================================================================================================
+   THE LEDGER — YOU'S LEVEL TWO. Figures you read, not places you go.
+
+   IN STAGE COORDINATES. The mockup's ledger broke out of its panel with a negative margin the way
+   the ascent did; here the frame IS the stage, so the plates are laid straight onto it. The streak
+   and the rest sit side by side at the top, the year runs the full width beneath them, and the
+   level strip takes the FOOT BAND — which is what that band is for: it is the account's running
+   total, and moving it there gives the two cards and the year the stage to themselves.
+
+   THE SKEW SPENDS REAL HEIGHT HERE. A plate rolled -1.2deg rises 0.0105 x its own WIDTH at each
+   end, so the 944-wide year band is 20px taller painted than it is authored. That is why there are
+   three plates on the stage and not four.
+   ================================================================================================== */
+.lg-plate {
+  position: absolute;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+  transform: skewX(-8deg) rotate(-1.2deg);
+}
+.lg-cap {
+  display: flex; align-items: baseline; justify-content: space-between; white-space: nowrap;
+  padding: 6px 15px 7px; background: var(--ink); color: var(--gold-hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+}
+.lg-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
+
+/* ---- the streak, and the ghost of your best ---- */
+.lg-streak {
+  left: 176px; top: 214px; width: 540px; height: 210px; display: flex; flex-direction: column;
+}
+.lg-run { display: flex; align-items: flex-end; gap: 22px; padding: 16px 24px 0; }
+.lg-now {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 132px;
+  line-height: 0.8; letter-spacing: 0.01em; color: var(--ink);
+}
+.lg-nowlab { display: flex; flex-direction: column; gap: 5px; padding-bottom: 10px; }
+.lg-nowlab b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 28px; line-height: 1;
+  color: #b23320;
+}
+.lg-nowlab i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.5); white-space: nowrap;
+}
+/* THE GHOST IS THE WHOLE IDEA. Your best run is set in the same face at the same weight and
+   fifteen percent ink, so the current number is read against it without a second scale, a second
+   axis or a word of explanation. */
+.lg-ghost {
+  margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  padding-bottom: 12px;
+}
+.lg-ghost b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 92px;
+  line-height: 0.78; color: rgba(20, 17, 13, 0.15);
+}
+.lg-ghost i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.42); white-space: nowrap;
+}
+.lg-frz {
+  margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 10px 24px 12px;
+  background: rgba(20, 17, 13, 0.06); box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.62); white-space: nowrap;
+}
+.lg-frz s { display: flex; gap: 4px; text-decoration: none; }
+.lg-frz s i {
+  width: 22px; height: 22px; display: grid; place-items: center; background: var(--gold);
+  font-family: var(--jp); font-style: normal; font-size: 14px; color: var(--ink);
+}
+.lg-frz em { font-style: normal; }
+
+/* ---- the rest of the ledger ---- */
+.lg-rest {
+  position: absolute; left: 748px; top: 214px; width: 362px; height: 210px;
+  display: flex; flex-direction: column;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transform: skewX(-8deg) rotate(-1.2deg);
+}
+.lg-resthead {
+  flex: none; padding: 6px 18px 7px; background: rgba(20, 17, 13, 0.86); color: var(--gold-hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+  white-space: nowrap;
+}
+.lg-row {
+  position: relative; flex: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.22);
+}
+.lg-row:last-child { box-shadow: none; }
+.lg-rowlab { display: flex; flex-direction: column; gap: 4px; }
+.lg-rowlab b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.22em;
+  color: rgba(20, 17, 13, 0.52); white-space: nowrap;
+}
+.lg-rowlab i {
+  font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 15px;
+  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.72);
+}
+.lg-figure {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 50px; line-height: 1;
+  color: var(--ink);
+}
+.lg-figure em { font-style: inherit; font-size: 22px; }
+/* AN ABSENCE IS DRAWN AS ONE — an em dash and the reason, never a zero. A ledger that prints 0%
+   accuracy for an account that has never reviewed is stating a result it does not have. */
+.lg-none {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 40px;
+  color: rgba(20, 17, 13, 0.3);
+}
+.lg-none em {
+  font-family: var(--lat-ui); font-style: italic; font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.45); white-space: nowrap;
+}
+
+/* ---- the year ---- */
+/* WEEKLY BARS RATHER THAN THE APP'S CONTRIBUTION GRID, and the reason is geometry rather than
+   taste: 53 columns x 7 rows needs about 126px of height and there is not 126px between the cards
+   and the level strip. 52 weekly columns carry the same year in 78, and a bar whose HEIGHT is
+   volume and whose COLOUR is accuracy shows both channels at once, which one square per day
+   cannot. */
+.lg-year { left: 170px; top: 442px; width: 940px; height: 120px; display: flex; flex-direction: column; }
+.lg-bars { flex: 1; display: flex; align-items: flex-end; gap: 3px; padding: 9px 16px 10px; }
+.lg-bars i {
+  flex: 1; display: block; min-height: 2px; box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14);
+}
+/* AN EMPTY WEEK IS STILL DRAWN, as a floor tick. A week that renders as nothing at all is
+   indistinguishable from the end of the year, which is exactly the reading a records screen must
+   not give — and on a real account most weeks are empty, so this is the common case. */
+.lg-bars i.none { background: rgba(20, 17, 13, 0.13); box-shadow: none; }
+
+/* ---- the level strip, in the foot band ---- */
+.lg-lv {
+  position: absolute; left: 204px; top: 584px; width: 672px; height: 44px;
+  display: flex; align-items: stretch; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+  transform: skewX(-8deg) rotate(-1.2deg);
+}
+.lg-lvn {
+  flex: none; width: 104px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 1px; background: var(--gold);
+  box-shadow: inset -4px 0 0 var(--ink);
+}
+.lg-lvn span {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.24em;
+  color: rgba(20, 17, 13, 0.62); white-space: nowrap;
+}
+.lg-lvn b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px; line-height: 1;
+  color: var(--ink);
+}
+.lg-xp { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 20px; }
+.lg-xprow { display: flex; align-items: baseline; justify-content: space-between; }
+.lg-xprow b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+  color: rgba(242, 234, 216, 0.6); white-space: nowrap;
+}
+.lg-xprow i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap;
+}
+.lg-xpbar {
+  display: block; height: 13px; background: rgba(242, 234, 216, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.24);
+}
+.lg-xpbar i { display: block; height: 100%; background: var(--gold-hi); }
+
+/* THE HINT MOVES DOWN ON THIS SCREEN, because the level strip is the one plate that lives in the
+   foot band and the hint lives there too -- at 612 it ran straight through "0 / 150 XP THIS LEVEL".
+   Moving the strip up instead would push it back onto the year band, which is already at the
+   bottom of what the stage has: this screen simply has one more object in it than the others. */
+.lg-lv ~ .mn-hint { top: 648px; }
+
+/* ---- the doorway out, which is the one thing here that is a place ---- */
+.lg-ach {
+  position: absolute; left: 896px; top: 584px; width: 214px; height: 44px;
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 5px;
+  padding: 0 16px; border: 0; cursor: pointer; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+  transform: skewX(-8deg) rotate(-1.2deg);
+}
+.lg-ach:focus-visible { outline: 3px solid var(--hi); outline-offset: 5px; }
+.lg-pips { display: flex; gap: 3px; }
+.lg-pips i {
+  width: 6px; height: 11px; display: block; box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.32);
+}
+.lg-pips i.got { background: var(--gold); box-shadow: none; }
+.lg-ach em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.62); white-space: nowrap;
+}

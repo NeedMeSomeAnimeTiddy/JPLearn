@@ -662,7 +662,7 @@ application. It now saves and restores, and every test states the registry it wa
 | Practice | three lanes | **built** |
 | The World | two lanes | **built** |
 | The Exam | the ascent | passthrough → `jlpt_prep` |
-| You | the ledger | passthrough → the overview panel |
+| You | the ledger | **built** |
 
 **880 tests pass across 84 files**, 8 a11y, lint clean, and driven live: THE PATH stops at L2,
 the arrows walk it, Escape goes up one level rather than out, and PRACTICE still passes through.
@@ -946,4 +946,51 @@ the level id at 0.58 gives 5.5. Re-measured: **0.0% of every plinth's box moves 
 taken away**, against 72–100% before.
 
 **957 tests across 88 files**, 8 a11y, lint clean.
+
+## The ledger — YOU's level two, and the end of phase 4
+
+RECORDS IS A LEDGER, NOT A ROAD: its figures are things you READ, not places you go — there is
+nothing inside a streak to open — so it is the one section that does not get the road. The current
+run is set large with your best standing behind it in the same face at fifteen percent ink, so the
+two are read against each other without a second scale, a second axis or a word of explanation.
+
+**The year is real here and it was not in the mockup.** The mockup's own note says so: the lifetime
+count and the year's SHAPE came from the database, and the individual days were SYNTHESISED from
+those parameters, because a year of real dates is 365 lines of data to carry a drawing that only
+needs the distribution. `daily-activity` returns exactly that year — `{date, count, accuracy}` per
+day — so the bars here are the days themselves. Live on this account: **5 of 364 days, 19 reviews,
+74% accuracy**, which draws as two gold bars at the right-hand end of a band of floor ticks. That is
+what a real early account looks like and the screen has to survive it.
+
+### Two of the mockup's six figures are not drawn, because the app does not have them
+
+- **RANK** (段級, "7TH GRADE") is not a thing JPLearn tracks. There is no grade system anywhere in
+  `domain/`, and LEVEL is the app's own idea of the same shape — the mockup carries both.
+- **STUDY TIME** in hours has no source either: `session_history` carries `started_at_utc`,
+  `target_items`, `reviewed`, `correct` and `accuracy`, and no duration at all.
+
+A figure with no source is not drawn. That is a different thing from an absence of DATA, which this
+menu draws as an em dash and a sentence — printing "STUDY TIME —" would promise a measurement the
+app has never taken. What replaces them is REVIEWS, which the year already counts.
+
+### Where the calls are made from, and why this one differs
+
+The other four L2 screens take an `enabled` flag from `App`, because their hooks live there. This
+one makes its two calls from INSIDE the component, which is better and only possible here: it is
+mounted exactly when the ledger is up, so being mounted IS the flag. And the badge count comes from
+`useAchievements`, the app's own hook, which already folds three sources into one earned set —
+feature badges, milestone badges and node mastery. Re-deriving that would have been a second answer
+to a question the app has already answered.
+
+### One collision, and which object moved
+
+The level strip is the one plate that lives in the FOOT BAND, and the key hint lives there too: at
+y612 it ran straight through "0 / 150 XP THIS LEVEL". Moving the strip up instead would push it back
+onto the year band, which is already at the bottom of what the stage has — this screen simply has
+one more object in it than the others — so the hint moves down to 648 on this screen alone.
+
+**Phase 4 is done.** All five sections stop at their own level two; nothing passes through any more.
+The passthrough mechanism stays, because level three is the next thing to fill in the same way.
+
+**975 tests across 89 files**, 8 a11y, lint clean.
 

@@ -56,7 +56,7 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent,
+  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger,
   practiceLanes, worldLanes, ascentRungs, heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
@@ -2233,6 +2233,19 @@ function App() {
                opened straight onto its scenario picker rather than its menu */
             if (key === 'read') { navigate('passage_hub', 'forward'); return }
             tutor.openTutorPanel('scenarios')
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'RECORDS' ? (
+        <Ledger
+          summary={summary}
+          xp={xpProgress}
+          onOpenAchievements={() => {
+            /* the wall is level three (phase 5); until then the door opens the panel that shows
+               the badges today, which is what YOU passed straight through to before this screen */
+            setShowOverview(true)
           }}
           onUp={leaveMenuLevel}
         />
