@@ -41,6 +41,7 @@ import { buildClouds, type CloudField } from './clouds'
 import { buildLanterns, type LanternField } from './lanterns'
 import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
+import { bakeHeightfield, type Heightfield } from './heightfield'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
 import { registerFlights } from './flights'
@@ -101,6 +102,7 @@ let clouds: CloudField | null = null
 let lanterns: LanternField | null = null
 let nightMap: NightMap | null = null
 let windows: WindowField | null = null
+let ground: Heightfield | null = null
 let coverTex: ReturnType<typeof makeCoverTexture> | null = null
 /* WHERE THE VIEWER IS, ASKED ONCE. `Intl` is cheap but not free and the answer cannot change
    inside a session; the sun's altitude is what moves. */
@@ -476,6 +478,18 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* BEFORE THE AIR, and the ordering is not a preference -- see `buildLanterns`. Cloning a
        material after `breathe` has patched it copies the flag and not the patch, which would give
        every lantern a hole in the mist around it. */
+    /* THE GROUND, IN THE ONE WINDOW THERE IS FOR IT. `freeCpuCopiesAfterUpload` nulls every
+       position array after the first render, so this shares its slot with `findFujiPeak` -- and
+       the walk that comes later finds nothing and fails silently, which is exactly how that one
+       broke once already. */
+    const tGround = performance.now()
+    ground = bakeHeightfield(root)
+    console.info(
+      `[valley] ground: ${ground.stats.cells} cells, ${ground.stats.holes} filled, `
+      + `y ${Math.round(ground.stats.min)}..${Math.round(ground.stats.max)}, `
+      + `${Math.round(performance.now() - tGround)} ms`,
+    )
+
     lanterns = buildLanterns(root)
     /* the bake is a NIGHT layer and comes up exactly as the lanterns do */
     nightMap = buildNightMap(root)
@@ -662,6 +676,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       nightMap?.dispose()
       nightMap = null
       windows = null
+      ground = null
       coverTex?.dispose()
       coverTex = null
       disposeShafts()
