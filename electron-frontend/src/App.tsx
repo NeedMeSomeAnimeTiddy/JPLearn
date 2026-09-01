@@ -56,7 +56,7 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel,
+  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail,
   heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
@@ -2227,7 +2227,7 @@ function App() {
           onPick={(key) => {
             /* three genuinely different destinations, all of them places the app already has */
             if (key === 'games') { openDailyGames(); return }
-            if (key === 'drills') { jumpToScriptHubMinigame(activeScript, activeGame); return }
+            if (key === 'drills') { menuPath.enterScreen('drills'); return }
             jumpToScriptHub(activeScript)
           }}
           onUp={leaveMenuLevel}
@@ -2246,6 +2246,18 @@ function App() {
             /* TALK has a level three now -- picking the scene is a menu screen rather than the
                tutor's own picker, and it hands the CHOSEN scenario over rather than the list */
             menuPath.enterScreen('scenes')
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'drills' ? (
+        <Drills
+          deck={activeScript}
+          onStart={(deck, mode) => {
+            /* the drill itself runs in the script hub, which is where it has always run -- the
+               screen hands over BOTH axes rather than only the deck the hub happened to hold */
+            jumpToScriptHubMinigame(deck, mode)
           }}
           onUp={leaveMenuLevel}
         />

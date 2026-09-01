@@ -9,6 +9,11 @@ import { Wall } from './components/Wall'
 import { LIBRARY_WINDOW, libraryNote, libraryRows, libraryWindow } from './library'
 import { flatSeals, sealGroups, wallStep } from './wall'
 import { EXAM_MODES, levelDetail, sectionLine, unscored } from './examLevel'
+import {
+  TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, nearestOffered, railLayout, railStep,
+  tabScale,
+} from './drills'
+import { MINIGAMES, SCRIPT_MINIGAMES } from '../../constants'
 import type { LevelReadiness, Rung } from './ascent'
 
 const passage = (id: string, words: number, difficulty: number) => ({
@@ -201,5 +206,76 @@ describe('one rung of the ascent', () => {
     expect(EXAM_MODES.every((m) => m.purpose && m.label && m.description)).toBe(true)
     /* two of the four move the readiness figure, one measures it, one finds your level */
     expect(EXAM_MODES.filter((m) => m.purpose === 'MOVES THE NUMBER')).toHaveLength(2)
+  })
+})
+
+describe('the drills road', () => {
+  const modes = drillModes()
+
+  it('carries every mode the picker renders, and no more', () => {
+    expect(modes).toHaveLength(MINIGAMES.length)
+    expect(new Set(modes.map((m) => m.key)).size).toBe(MINIGAMES.length)
+  })
+
+  it('orders them by group so the road reads as chapters', () => {
+    /* MINIGAMES is in catalogue order, which interleaves the groups -- this is a derived ordering
+       rather than a second list to keep in step */
+    const orders = modes.map((m) => m.groupOrder)
+    expect([...orders]).toEqual([...orders].sort((a, b) => a - b))
+    expect(drillChapters(modes).length).toBeGreaterThan(1)
+  })
+
+  it('counts each deck’s offering out of the map rather than stating it', () => {
+    for (const d of drillDecks(modes)) {
+      expect(d.offers).toBe(SCRIPT_MINIGAMES[d.key].length)
+      expect(d.offers).toBeLessThanOrEqual(modes.length)
+    }
+  })
+
+  it('reads the deck map the other way round for each mode', () => {
+    const first = modes[0]
+    for (const deck of first.decks) expect(SCRIPT_MINIGAMES[deck]).toContain(first.key)
+  })
+
+  describe('the fold, which is in the widths', () => {
+    it('gives an unoffered mode width zero and leaves it out of the walk', () => {
+      const deck = 'sentence_examples' as const
+      const layout = railLayout(modes, deck, nearestOffered(modes, deck, 0))
+      expect(layout.list.length).toBe(SCRIPT_MINIGAMES[deck].length)
+      expect(layout.list.length).toBeLessThan(modes.length)
+      modes.forEach((m, i) => {
+        if (!m.decks.includes(deck)) expect(layout.widths[i]).toBe(0)
+      })
+    })
+
+    it('never lets the cursor rest on a folded mode', () => {
+      /* changing deck snaps outward from where you were, so the road never focuses a gap */
+      const deck = 'sentence_examples' as const
+      for (let i = 0; i < modes.length; i++) {
+        const landed = nearestOffered(modes, deck, i)
+        expect(modes[landed].decks).toContain(deck)
+      }
+    })
+
+    it('walks the offered list and stops at both of its ends', () => {
+      const deck = 'hiragana' as const
+      const start = nearestOffered(modes, deck, 0)
+      const layout = railLayout(modes, deck, start)
+      expect(railStep(layout, start, -1)).toBe(start)
+      const last = layout.list[layout.list.length - 1]
+      expect(railStep(railLayout(modes, deck, last), last, 1)).toBe(last)
+    })
+  })
+
+  it('gives the selection the wide tab and shrinks the rest with distance', () => {
+    const deck = 'hiragana' as const
+    const sel = nearestOffered(modes, deck, 0)
+    const layout = railLayout(modes, deck, sel)
+    expect(layout.widths[sel]).toBe(TAB_W_SEL)
+    const others = layout.list.filter((i) => i !== sel)
+    expect(Math.max(...others.map((i) => layout.widths[i]))).toBeLessThanOrEqual(TAB_W)
+    /* floored, so the far end of the road stays readable rather than collapsing */
+    expect(tabScale(99)).toBe(tabScale(5))
+    expect(tabScale(0)).toBe(1)
   })
 })

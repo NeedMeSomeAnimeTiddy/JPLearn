@@ -1057,3 +1057,46 @@ copy, the same lesson `--gold` taught.
 
 **1,007 tests across 91 files**, 8 a11y, lint clean.
 
+## The drills road — phase 5's fifth, and the last one that is not a deck
+
+Seventeen modes on a road, and the deck you run them on. **Both axes were already in the app**:
+`MINIGAMES` is the seventeen the picker renders, `MINIGAME_SKILL_GROUP` puts each in one of five
+groups, and `SCRIPT_MINIGAMES` says which of them a deck offers. Nothing is invented and every
+figure on the screen is counted out of that last map.
+
+**THE FOLD IS IN THE WIDTHS.** A mode the chosen deck does not offer is given width zero and the
+cursor walks the OFFERED list rather than all seventeen — the road closes over it with no special
+case anywhere else in the drawing, and no gap for the selection to land in. Changing deck snaps
+outward to the nearest mode that deck still offers, so the cursor can never rest on a fold. Live:
+**12 OF 17 MODES RUN ON HIRAGANA**, twelve tabs laid out, and *5 MODES DO NOT RUN ON HIRAGANA* said
+out loud beneath — a road that silently omitted them would read as a shorter catalogue.
+
+The road is TRANSLATED rather than scrolled: the selection is held at the strip's middle and the
+rail moves under it, so the thing you are choosing never moves and the catalogue does.
+
+**The order is derived, not a second list.** `MINIGAMES` is in catalogue order, which interleaves
+the groups; the road reads as five chapters, so it is sorted by each group's own `order` and then by
+catalogue position. The chapter name rides the tab that OPENS its chapter rather than a separate
+marker layer — with five chapters over a road that is already moving, a second layer is a second
+thing to keep in step.
+
+**And the hero says which decks offer it** — `SCRIPT_MINIGAMES` read the other way round, and the
+one fact a learner picking a drill cannot get anywhere else in the app. Romaji Sprint reads *ON 3 OF
+6 DECKS*.
+
+One observation for Robbie rather than a change: `MINIGAME_SKILL_GROUP` maps **`sentence_assembly`
+to `listening`**, so "Sentence Assembly" opens the LISTENING chapter. That is the app's own mapping
+and the screen reports it faithfully; whether arranging shuffled chunks belongs under listening is a
+question about the catalogue, not about this drawing.
+
+The screen also hands over BOTH axes when it starts a drill, where the lane above could only pass
+the deck the hub happened to be holding.
+
+**1,015 tests across 91 files**, 8 a11y, lint clean.
+
+### What is left of phase 5
+
+| screen | parent | why it is not next |
+| --- | --- | --- |
+| deck · feed | THE PATH · a milestone | block progress per deck and the 186-block vocabulary feed — two screens over `block-progress` and `deck-cards`, and the largest data surface in the menu |
+
