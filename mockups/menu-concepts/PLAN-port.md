@@ -1094,9 +1094,110 @@ the deck the hub happened to be holding.
 
 **1,015 tests across 91 files**, 8 a11y, lint clean.
 
-### What is left of phase 5
+## The deck and the feed — phase 5's last two, and the branch was six commits behind
 
-| screen | parent | why it is not next |
-| --- | --- | --- |
-| deck · feed | THE PATH · a milestone | block progress per deck and the 186-block vocabulary feed — two screens over `block-progress` and `deck-cards`, and the largest data surface in the menu |
+**The plan's own premise for these two was wrong, and measuring it first is what caught it.** This
+entry said "block progress per deck and the 186-block vocabulary feed". Neither half survived
+contact: 186 is the total block count across the *whole app* after vocabulary stopped being chunked
+(ten block-bearing decks), not a figure about vocabulary — and the vocabulary feed did not exist on
+this branch at all. `main` had merged it six commits earlier and `claude/menu-study-ui` had never
+taken them.
+
+So the first move was `git merge main`, which came in clean and brought three things: the feed's
+entire data layer (`domain/vocab_order.py`, `vocab-feed`/`vocab-feed-set`, `useVocabFeed`), the
+vocabulary levels losing their blocks, and — unprompted — the fix for the observation the drills
+road had reported. **`sentence_assembly` is `challenge` now, not `listening`.** Main had already
+found it.
+
+### Two screens, and the split is the backend's own
+
+`build_vocab_feed` refuses a deck that has blocks; `build_block_progress` answers an empty list for
+one that does not. The five vocabulary levels are on one side of that line and the six other decks
+are on the other, so `isFedDeck` is *read* rather than a second list being kept in step with it.
+Measured: `vocab_n5` is 0 blocks over 744 cards; `kanji_n5` is 6 blocks over 99.
+
+**The seventh script milestone goes straight through.** LISTENING's destination names hiragana *and
+a minigame* — it is about a mode, not about hiragana's blocks, which the HIRAGANA milestone already
+draws two rows above. Sending it to a block chain would put one deck behind two steps and answer
+neither.
+
+### The deck — three populations, and only two of them are buttons
+
+The chain is strict, so exactly one block is open. `compute_unlocked_count` walks in order and stops
+at the first block under the gate, so `unlocked` is a *prefix* and the frontier is the last true
+entry — not a count of mastered blocks, which would move the cursor a block early the moment a
+cleared block's mastery decayed below a gate it had already paid.
+
+The cleared pile can be reopened and the open block can be started. **The one ahead is drawn and
+deliberately not focusable**: naming the next block is context, offering it is a lie. Live on a
+seeded account: *6 BLOCKS · 99 CARDS · 50% CLEARED*, block 04 of 6 open at 33%, next up *Actions &
+Travel · 15 CARDS*, and *AND MORE AFTER IT 1*.
+
+**The gate is what the percentage is FOR, and the bridge now says so.** 33% is not a score, it is a
+key that turns at 70 — and the threshold lived only in Python. `block-progress` reports
+`unlock_threshold` in the same call that applied it, so the hero reads *OPENS BLOCK 05 AT 70%*
+rather than a bare figure. One of the two values was already hand-copied into `constants.tsx` as
+`CATEGORY_UNLOCK_THRESHOLD` and the kana one was nowhere; a gate the learner is shown has to come
+from the call that enforced it.
+
+The rail is a map: `flex: 1` segments across the whole width, so six blocks and forty-four are the
+same object at the same scale rule with no breakpoint. The pile is **paged, not scrolled** — nothing
+in this menu scrolls — so even a long deck is two pages and a grid move.
+
+**The chosen block is handed over.** `useBlockSelection` could add, add-all and clear but not *set*;
+`clear()` then `toggle()` is not the same thing, because both read a memoised `selected` and the
+second call in a tick sees the pre-clear list. It gained `select`, which is the verb the pile needs
+and the hook was missing.
+
+### The feed — and the queue does not empty, it shortens
+
+The mockup drew *3 DONE · 7 TO GO* and a rail with ticks on it. **There is no source for either.**
+`next_words` returns the words the learner has NOT STARTED, so studying one removes it from the list
+rather than crossing it off: the feed is recomputed, never consumed, and "done today" is a count
+nothing keeps. So the rail marks POSITION and the line under it says which — *5 QUEUED · THE LIST IS
+REBUILT, NOT TICKED OFF*.
+
+What is real are the denominators, and "here are ten words" is a card trick without one. Live:
+*297 / 744 READABLE WITH THE KANJI YOU KNOW*, *18 / 744 BEGUN AT ALL*, *70 KANJI KNOWN · THIS IS THE
+ORDER* — and that last figure is the one the whole ordering turns on, so clearing a kanji block is
+visibly what moved the first two.
+
+**The count, never the culprit.** `unknown_kanji` is a *number*; the set it was computed against
+lives in `_known_kanji()` and is not reported. The mockup coloured each chip individually because it
+authored its own `known` list. Marking the first n here would be drawing a specific claim out of a
+figure that does not carry one — a nicer picture and a false one. So the chips are plain and the
+line says *ALL 3 KANJI ARE ONES YOU HAVE MET*. It is also the more useful half: it says why the word
+is where it is in the order.
+
+`BUDGET_STEPS` moved out of `VocabFeedPanel` to `VOCAB_BUDGET_STEPS`, the same lesson `--gold`,
+`BADGE_ICONS` and `JLPT_MODE_META` each taught. And **set and focused are drawn differently**, or
+arrowing past a step looks exactly like changing it.
+
+### Two things the live probe found that no test would have
+
+**The soft gate bypassed the new level three.** `progression.pending` is one piece of shared state
+raised by three call sites, and its confirmation modal answered all of them with
+`openProgressionNode`. So an *open* milestone reached the deck screen and a *gated* one, once
+confirmed, went straight to the hub — same row, two destinations, decided by whether a dialog
+happened to appear. The modal now knows who asked.
+
+**The modal scrim stopped at the board.** `inset: 0` is the 1280×720 stage, so opening the pile
+dimmed the picture and left the moat and the letterboxing bright: a rectangle of undimmed sky around
+a darkened middle, which reads as a rendering fault rather than a modal.
+
+And one measurement that was wrong rather than one finding that was: a "flat" sample of the BEHIND
+card read a 190-point luminance spread with a peak of 198, which looked exactly like a lantern
+punching through a 0.9-alpha panel — the same failure the ascent's plinths and the wall's seals both
+had. **It was my sample box clipping a gold glyph.** At 0.9 the panels were composing to a 1-point
+spread. The cards are opaque now anyway, because the contract says everything above y560 brings its
+own ground and 0.9 is not ground — but the reason is the rule, not that reading. That is the third
+legibility instrument in this port to answer confidently and wrongly.
+
+**1,068 tests across 93 files**, 8 a11y, lint clean.
+
+### Phase 5 is done
+
+All seven level threes are built. What is left of the port is phase 6 — the unlock moment
+(`FeatureStatusPayload` has carried `just_unlocked` and `unlocked_at` since 2026-08-31 and nothing
+draws it) and taking the titlebar toggle out.
 

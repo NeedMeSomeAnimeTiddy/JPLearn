@@ -1,6 +1,5 @@
+import { VOCAB_BUDGET_STEPS } from '../constants'
 import type { VocabFeed } from '../types'
-
-const BUDGET_STEPS = [0, 5, 10, 20, 40] as const
 
 interface VocabFeedPanelProps {
   feed: VocabFeed
@@ -35,7 +34,7 @@ export function VocabFeedPanel({ feed }: VocabFeedPanelProps) {
       </div>
 
       <div className="hub-feed-budget" role="group" aria-label="New words a day">
-        {BUDGET_STEPS.map((step) => (
+        {VOCAB_BUDGET_STEPS.map((step) => (
           <button
             key={step}
             type="button"

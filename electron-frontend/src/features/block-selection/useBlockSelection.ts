@@ -18,6 +18,15 @@ export interface BlockSelection {
   cards: ScriptDeck['cards']
   isSelected: (index: number) => boolean
   toggle: (index: number) => void
+  /**
+   * Study exactly one block, replacing whatever was selected.
+   *
+   * The verb the hook was missing: it could add, add-all and clear, but not *set*.
+   * `clear()` then `toggle()` is not the same thing — both read `selected`, which is
+   * memoised from state, so the second call in a tick sees the pre-clear selection.
+   * The menu's deck screen hands a specific block over and needs that to be the one.
+   */
+  select: (index: number) => void
   selectAll: () => void
   /** Clear the selection, which studies the whole deck. */
   clear: () => void
@@ -89,6 +98,11 @@ export function useBlockSelection(
     [commit, selected, blocks],
   )
 
+  const select = useCallback(
+    (index: number) => commit(normalizeSelection([index], blocks)),
+    [commit, blocks],
+  )
+
   const selectAll = useCallback(
     () => commit(selectAllUnlocked(blocks)),
     [commit, blocks],
@@ -96,5 +110,5 @@ export function useBlockSelection(
 
   const clear = useCallback(() => commit([]), [commit])
 
-  return { selected, cards, isSelected, toggle, selectAll, clear }
+  return { selected, cards, isSelected, toggle, select, selectAll, clear }
 }

@@ -364,6 +364,9 @@ interface BlockInfo {
 interface BlockProgressPayload {
   slug: string
   blocks: BlockInfo[]
+  /** Mastery a block needs before it opens the next one. Absent on builds older than
+   *  the field — read it with a fallback rather than assuming a number. */
+  unlock_threshold?: number
 }
 
 interface OverviewCharacterMasteryPayload {

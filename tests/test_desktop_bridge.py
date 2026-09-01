@@ -12,6 +12,7 @@ import pytest
 from data import database
 from data import dictionary_repository
 from data.daily_games_repository import DailyGameAttempt, DailyGameWordOutcome, DailyGamesRepository
+from domain import blocks
 from domain.cards import Card, Deck
 from domain.decks import ALL_DECKS
 from domain.daily_games import DailyGamesStreakState, DailyGameWord, DailyWordPool
@@ -1504,6 +1505,39 @@ def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monke
     assert first_conjugation_block["unlocked"] is True
     assert first_sentence_block["card_ids"]
     assert first_conjugation_block["card_ids"]
+
+
+def test_build_block_progress_reports_the_gate_it_applied(tmp_path: Path, monkeypatch) -> None:
+    """The threshold is what a block's mastery figure is *for*, so it is reported.
+
+    Without it the renderer has to guess, and the two values differ by deck: kana keeps
+    the 0.80 gate, everything block-bearing below it uses the 0.70 category gate. A
+    screen that shows "62%" without saying it opens the next block at 70 is showing a
+    score for something that is not scored.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    kana = cast(dict[str, Any], desktop_bridge.build_block_progress("hiragana"))
+    kanji = cast(dict[str, Any], desktop_bridge.build_block_progress("kanji_n5"))
+
+    assert kana["unlock_threshold"] == blocks.unlock_threshold_for_slug("hiragana")
+    assert kanji["unlock_threshold"] == blocks.unlock_threshold_for_slug("kanji_n5")
+    assert kana["unlock_threshold"] != kanji["unlock_threshold"]
+
+
+def test_build_block_progress_reports_a_gate_even_for_a_fed_deck(tmp_path: Path, monkeypatch) -> None:
+    """A deck with no blocks still answers with the field, so the reader never branches.
+
+    The vocabulary levels stopped being chunked, so they come back with an empty list —
+    and a payload whose shape depends on whether the list is empty is one the renderer
+    has to test twice.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+
+    fed = cast(dict[str, Any], desktop_bridge.build_block_progress("vocab_n5"))
+
+    assert fed["blocks"] == []
+    assert isinstance(fed["unlock_threshold"], float)
 
 
 def test_record_game_result_narrative_tags_chapter_and_updates_context_stage(tmp_path: Path, monkeypatch) -> None:

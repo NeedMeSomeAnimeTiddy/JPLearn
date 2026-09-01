@@ -56,8 +56,9 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills,
-  practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail,
+  useMenuL1, useWorldData, useReadiness, useDeckBlocks,
+  MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed,
+  practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
   heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
@@ -106,7 +107,7 @@ import {
 } from './features/study-session'
 import './App.css'
 import { useBlockSelection, describeSelection } from './features/block-selection'
-import { useVocabFeed } from './features/vocab-feed'
+import { useVocabFeed, isFedDeck } from './features/vocab-feed'
 import { useProgression, ProgressionMap, LOCKED_NODE_REASON } from './features/progression'
 import type { ProgressionNodeView } from './features/progression'
 import { computeMinigameLockReasons } from './lib/minigameAvailability'
@@ -1314,6 +1315,57 @@ function App() {
   /* WHICH RUNG LEVEL THREE IS ABOUT. The ascent's cursor is the ascent's own state -- it is not in
      the path, because a cursor is not a place -- so the rung is carried across when it is opened. */
   const [examRung, setExamRung] = useState<string | null>(null)
+
+  /* ==================================================================================================
+     A MILESTONE'S LEVEL THREE — and which of the two it is, is the deck's answer, not a table.
+
+     Seven of the curriculum's sixteen nodes lead to a deck. Six of those are still cut into blocks
+     and get THE DECK; the vocabulary levels stopped being chunked and get THE FEED instead. The
+     split is the backend's own — `build_vocab_feed` refuses a deck with blocks and
+     `build_block_progress` answers an empty list for one without — so `isFedDeck` is read here
+     rather than a second list being kept in step with it.
+
+     THE SEVENTH IS LISTENING, AND IT GOES STRAIGHT THROUGH. Its destination names hiragana *and a
+     minigame*: the milestone is about a mode, not about hiragana's blocks, which the HIRAGANA
+     milestone already draws two rows above. Sending it to a block chain would put the same deck
+     behind two different steps and answer neither.
+     ================================================================================================== */
+  const [menuNode, setMenuNode] = useState<string | null>(null)
+  const menuMilestone = useMemo(
+    () => milestone(progression.nodes, menuNode ?? ''),
+    [progression.nodes, menuNode],
+  )
+  /* fetched only while one of the two screens is up: `null` is what stops the hook asking */
+  const deckScreenOpen = menuPath.level === 3 && menuPath.screen === 'deck'
+  const menuDeck = useDeckBlocks(deckScreenOpen ? activeDeckSlug : null)
+  /* the feed itself is `vocabFeed` above -- App already holds one for the deck under study, and a
+     second instance would be a second round trip answering the same question */
+
+  const routeMilestone = useCallback((node: ProgressionNodeView) => {
+    const destination = node.destination
+    /* a mode, or one of the nine milestones that is not a deck at all: the app's own door */
+    if (destination.kind !== 'script' || destination.minigame) { openProgressionNode(node); return }
+    setMenuNode(node.node_id)
+    setActiveScript(destination.script)
+    menuPath.enterScreen(isFedDeck(destination.script) ? 'feed' : 'deck')
+  }, [menuPath, openProgressionNode, setActiveScript])
+
+  /* WHO ASKED, WHICH THE CONFIRMATION DOES NOT OTHERWISE KNOW. `progression.pending` is one piece
+     of shared state raised by three call sites — this screen, the L1 map and the flat one — and its
+     modal used to answer all of them with `openProgressionNode`. Measured live on a fresh account:
+     an OPEN milestone reached the deck screen and a GATED one, once confirmed, went straight to the
+     hub. Same row, two destinations, decided by whether a dialog happened to appear. */
+  const milestoneRequestRef = useRef<string | null>(null)
+
+  const openMilestone = useCallback((nodeId: string) => {
+    milestoneRequestRef.current = nodeId
+    const node = progression.requestOpen(nodeId)
+    /* null means the gate raised its confirmation; the ref carries the answer to the modal */
+    if (!node) return
+    milestoneRequestRef.current = null
+    routeMilestone(node)
+  }, [progression, routeMilestone])
+
   const examDetail = useMemo(() => {
     const rung = examRungs.find((r) => r.level === examRung)
     const data = rung && exam.readiness ? exam.readiness.levels[rung.level] : null
@@ -2214,9 +2266,39 @@ function App() {
         <PathL2
           nodes={progression.nodes}
           loading={progression.loading}
-          onOpenNode={(nodeId) => {
-            /* the progression map's own pair, so soft-gating and its confirmation come free */
-            const node = progression.requestOpen(nodeId)
+          /* A MILESTONE THAT LEADS TO A DECK NOW STOPS AT ITS OWN LEVEL THREE rather than
+             dropping into the hub. `requestOpen` still runs first, so the soft gate and its
+             confirmation are unchanged for every one of the sixteen. */
+          onOpenNode={openMilestone}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'deck' ? (
+        <Deck
+          title={menuMilestone}
+          slug={activeDeckSlug}
+          blocks={menuDeck.blocks}
+          gate={menuDeck.gate}
+          loading={menuDeck.loading}
+          error={menuDeck.error}
+          onStart={(index) => {
+            /* THE CHOSEN BLOCK IS HANDED OVER, which is what the pile is for -- the hub's own
+               default is the furthest unlocked one and would quietly discard a revisit. */
+            blockSelection.select(index)
+            const node = progression.nodes.find((n) => n.node_id === menuNode)
+            if (node) openProgressionNode(node)
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'feed' ? (
+        <Feed
+          title={menuMilestone}
+          feed={vocabFeed}
+          onStart={() => {
+            const node = progression.nodes.find((n) => n.node_id === menuNode)
             if (node) openProgressionNode(node)
           }}
           onUp={leaveMenuLevel}
@@ -2518,10 +2600,15 @@ function App() {
           sectionLabel={progression.pending.name}
           readiness="advanced"
           reason={LOCKED_NODE_REASON}
-          onCancel={progression.cancelOpen}
+          onCancel={() => { milestoneRequestRef.current = null; progression.cancelOpen() }}
           onContinue={() => {
             const node = progression.confirmOpen()
-            if (node) openProgressionNode(node)
+            if (!node) return
+            /* the menu's own request goes back to the menu; the two maps keep their old door */
+            const fromMenu = milestoneRequestRef.current === node.node_id
+            milestoneRequestRef.current = null
+            if (fromMenu) routeMilestone(node)
+            else openProgressionNode(node)
           }}
         />
       )}

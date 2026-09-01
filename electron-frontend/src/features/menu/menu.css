@@ -1381,3 +1381,359 @@
   color: var(--gold-hi); paint-order: stroke fill;
   -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
 }
+
+/* ==================================================================================================
+   THE DECK — a milestone's level three, for the decks still cut into blocks.
+
+   THREE POPULATIONS, THREE TREATMENTS, AND ONLY TWO OF THEM ARE BUTTONS. The chain is strict, so
+   exactly one block is open: the pile behind you can be reopened, the open block can be started,
+   and the one ahead is drawn but deliberately not focusable, because it is context and not a
+   choice. A row of equal-looking cards would say the deck offers three doors when it offers two.
+
+   THE RAIL FITS SIX OR FORTY-FOUR BY CONSTRUCTION. Its segments are `flex: 1` over the whole width,
+   so the drawing never has a breakpoint in it — kanji N5's six read as six wide bands and
+   vocabulary's forty-four as a fine comb, and both are the same object at the same scale rule.
+   ================================================================================================== */
+.dk-row {
+  position: absolute; left: 166px; top: 222px; width: 948px; height: 262px;
+  display: flex; align-items: stretch; gap: 14px;
+}
+.dk-f, .dk-ahead {
+  min-width: 0; display: flex; flex-direction: column; border: 0; text-align: left;
+  transform: skewX(-8deg);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.44), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.dk-f { cursor: pointer; }
+.dk-f.on { box-shadow: 9px 11px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) translateY(-4px); }
+.dk-f:focus-visible { outline: 3px solid var(--hi); outline-offset: 5px; }
+
+/* the pile: a count, not a list. The list is the sheet, and that is what makes any one of
+   forty-three cleared blocks reachable without walking the chain. */
+/* OPAQUE, NOT 0.9 — AND THIS IS THE THIRD TIME. The ascent's locked plinths and the wall's
+   unearned seals both drew translucent and both read perfectly, because the world behind them
+   happened to be dark. These two cards are 262 tall and stand exactly where the festival lanterns
+   are: measured on the packaged app at 0.9, a supposedly flat stretch of the BEHIND card had a
+   190-point luminance spread and a peak of 198 — a lantern, straight through the card. The
+   contract's rule is that everything above y560 brings its OWN ground, and 0.9 is not ground. */
+.dk-behind { flex: 0 0 172px; background: #0a0906; padding-bottom: 12px; }
+.dk-behind[aria-disabled="true"] { cursor: default; opacity: 0.72; }
+.dk-behind .dk-cap { background: rgba(242, 234, 216, 0.14); }
+.dk-behind .dk-cap b { color: var(--gold-hi); }
+.dk-bignum {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 0 14px;
+}
+.dk-bignum b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 54px; line-height: 0.9;
+  color: var(--gold-hi);
+}
+.dk-bignum i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.62);
+}
+.dk-act {
+  margin: 0 14px; padding-top: 8px; border-top: 1px solid rgba(242, 234, 216, 0.22);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
+  color: var(--hi);
+}
+.dk-behind[aria-disabled="true"] .dk-act { color: rgba(242, 234, 216, 0.45); }
+
+/* the open block: paper, because it is the thing you act on */
+.dk-here {
+  flex: 1; background: linear-gradient(178deg, #fbf8f1 0%, #e9e3d4 100%);
+}
+.dk-cap {
+  display: flex; align-items: baseline; gap: 10px; padding: 6px 14px 7px;
+  background: var(--ink); white-space: nowrap; overflow: hidden;
+}
+.dk-cap b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.17em;
+  color: var(--gold-hi); overflow: hidden; text-overflow: ellipsis;
+}
+.dk-cap i {
+  margin-left: auto; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.5);
+}
+.dk-body { flex: 1; display: flex; flex-direction: column; gap: 7px; padding: 13px 16px 0; }
+.dk-name {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px; line-height: 1;
+  color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* the block's own first characters -- a name says what it is about, these say what is in it */
+.dk-chars {
+  font-family: var(--jp); font-weight: 700; font-size: 19px; letter-spacing: 0.08em;
+  color: rgba(20, 17, 13, 0.62); white-space: nowrap; overflow: hidden;
+}
+.dk-sub {
+  display: flex; justify-content: space-between; gap: 10px; font-family: var(--lat-ui);
+  font-weight: 700; font-size: 8.5px; letter-spacing: 0.15em; color: rgba(20, 17, 13, 0.55);
+}
+/* TWELVE SEGMENTS, NOT A BAR. A gate is a count of steps you can see yourself crossing, and a
+   smooth bar invites reading a precision off it that the mastery figure does not have. */
+.dk-gauge { margin-top: auto; display: flex; align-items: center; gap: 9px; padding-bottom: 11px; }
+.dk-segs { flex: 1; display: flex; gap: 3px; }
+.dk-segs i {
+  flex: 1; height: 12px; display: block; background: rgba(20, 17, 13, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.dk-segs i.got { background: var(--gold); box-shadow: none; }
+.dk-gauge b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px; color: var(--ink);
+}
+/* WHAT THE PERCENTAGE IS FOR -- not a score, a key, and this says what it turns */
+.dk-gate {
+  padding: 6px 16px 7px; background: rgba(20, 17, 13, 0.08);
+  border-top: 1px solid rgba(20, 17, 13, 0.16); font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.72);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dk-slab {
+  height: 30px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; background: var(--hi); white-space: nowrap;
+}
+.dk-slab em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.16em; color: rgba(255, 246, 236, 0.75);
+}
+.dk-slab b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+  color: #fff6ec;
+}
+
+/* AHEAD is drawn and not focusable: naming the next block is context, offering it is a lie */
+.dk-ahead { flex: 0 0 230px; background: #0a0906; padding-bottom: 12px; cursor: default; }
+.dk-ahead .dk-cap { background: rgba(242, 234, 216, 0.12); }
+.dk-next { flex: 1; display: flex; flex-direction: column; gap: 5px; padding: 12px 14px 0; }
+.dk-next span {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8px; letter-spacing: 0.16em;
+  color: rgba(242, 234, 216, 0.5);
+}
+.dk-next b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 18px; line-height: 1.1;
+  color: rgba(242, 234, 216, 0.88);
+}
+.dk-next i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.15em; color: rgba(242, 234, 216, 0.5);
+}
+.dk-locked {
+  margin: 0 14px; padding-top: 9px; border-top: 1px solid rgba(242, 234, 216, 0.22);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.dk-locked span {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8px; letter-spacing: 0.16em;
+  color: rgba(242, 234, 216, 0.5);
+}
+.dk-locked b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px; line-height: 1;
+  color: var(--gold-hi);
+}
+
+.dk-rail { position: absolute; left: 166px; top: 502px; width: 948px; }
+.dk-segrow { display: flex; gap: 2px; height: 15px; transform: skewX(-8deg); }
+.dk-segrow i {
+  flex: 1; min-width: 2px; display: block; background: rgba(242, 234, 216, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(8, 11, 18, 0.5);
+}
+.dk-segrow i.done { background: var(--gold); }
+.dk-segrow i.here { background: var(--hi); }
+.dk-segrow i.pick { background: var(--gold-hi); }
+.dk-railcap {
+  display: flex; justify-content: space-between; gap: 12px; margin-top: 7px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
+}
+
+/* the pile, opened. Paged rather than scrolled -- nothing in this menu scrolls. */
+.dk-open { position: absolute; inset: 0; z-index: 4; }
+/* THE SCRIM HAS TO LEAVE THE BOARD. `inset: 0` is the 1280x720 stage, so it dimmed the picture
+   and left the moat and the letterboxing above and below it bright -- a rectangle of undimmed sky
+   around a darkened middle, which reads as a rendering fault rather than a modal. The overspill is
+   in board units and is generous rather than exact, because the moat's real size depends on the
+   window and the scrim only has to be bigger than it. */
+.dk-scrim {
+  position: absolute; inset: -150%; border: 0; padding: 0; cursor: pointer;
+  background: rgba(8, 11, 18, 0.66);
+}
+.dk-sheet {
+  position: absolute; left: 176px; top: 200px; width: 928px;
+  display: flex; flex-direction: column; padding-bottom: 12px;
+  background: linear-gradient(178deg, #fbf8f1 0%, #e9e3d4 100%); transform: skewX(-8deg);
+  box-shadow: 10px 12px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+}
+.dk-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 14px 16px;
+}
+.dk-cell {
+  border: 0; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 9px 8px; min-width: 0; background: rgba(20, 17, 13, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.dk-cell.on { background: var(--gold); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.32); }
+.dk-cell:focus-visible { outline: 3px solid var(--hi); outline-offset: 3px; }
+.dk-cell b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px; line-height: 1;
+  color: rgba(20, 17, 13, 0.42);
+}
+.dk-cell em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.05em; line-height: 1.25; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.dk-cell i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 7.5px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.5);
+}
+.dk-pager {
+  display: flex; justify-content: space-between; gap: 12px; padding: 0 16px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.15em;
+  color: rgba(20, 17, 13, 0.55);
+}
+
+/* ==================================================================================================
+   THE FEED — the same milestone's level three, for the decks that stopped having blocks.
+
+   IT IS THE DECK SCREEN'S SIBLING AND NOT ITS VARIANT. The deck asks which chunk may be opened; the
+   feed asks what is being given today, and those are different enough that sharing a drawing would
+   mean one of them lying. What they do share is the rail at the foot, deliberately — same object,
+   same reading, so a learner walking the path meets one shape and not two.
+
+   AND THE RAIL HAS NO TICKS ON IT. `next_words` returns what has not been STARTED, so studying a
+   word removes it from tomorrow's list rather than crossing it off today's: the queue is rebuilt,
+   never consumed. Marks for "done" would be a count nothing keeps.
+   ================================================================================================== */
+.fd-row {
+  position: absolute; left: 166px; top: 222px; width: 948px; height: 262px;
+  display: flex; align-items: stretch; gap: 16px;
+}
+.fd-hero {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; border: 0; text-align: left;
+  cursor: pointer; background: linear-gradient(178deg, #fbf8f1 0%, #e9e3d4 100%);
+  transform: skewX(-8deg);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.44), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.fd-hero.on { box-shadow: 9px 11px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) translateY(-4px); }
+.fd-hero:focus-visible { outline: 3px solid var(--hi); outline-offset: 5px; }
+.fd-cap {
+  display: flex; align-items: baseline; gap: 10px; padding: 6px 14px 7px; background: var(--ink);
+  white-space: nowrap; overflow: hidden;
+}
+.fd-cap b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.17em;
+  color: var(--gold-hi);
+}
+.fd-cap i {
+  margin-left: auto; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.5);
+}
+.fd-body { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 10px 16px 0; }
+.fd-word {
+  font-family: var(--jp); font-weight: 700; line-height: 1.05; color: var(--ink);
+  white-space: nowrap; overflow: hidden;
+}
+.fd-read {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+  color: rgba(20, 17, 13, 0.55);
+}
+.fd-gloss {
+  font-family: var(--lat-ui); font-weight: 600; font-size: 13px; line-height: 1.35;
+  color: rgba(20, 17, 13, 0.82);
+}
+/* the chips are plain: the payload counts the new kanji, it never names them */
+.fd-uses { margin-top: auto; display: flex; align-items: center; gap: 6px; padding-bottom: 10px; }
+.fd-uses i {
+  font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 17px; line-height: 1;
+  padding: 4px 6px 5px; color: var(--ink); background: rgba(20, 17, 13, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.22);
+}
+.fd-uses s {
+  margin-left: 4px; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.58);
+}
+.fd-theme {
+  padding: 5px 16px 6px; background: rgba(20, 17, 13, 0.08);
+  border-top: 1px solid rgba(20, 17, 13, 0.16); font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.6); white-space: nowrap;
+}
+.fd-slab {
+  height: 30px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; background: var(--hi); white-space: nowrap;
+}
+.fd-slab em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.16em; color: rgba(255, 246, 236, 0.75);
+}
+.fd-slab b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+  color: #fff6ec;
+}
+
+.fd-side {
+  flex: 0 0 350px; display: flex; flex-direction: column; gap: 9px; padding-bottom: 12px;
+  /* opaque for the reason above the deck's cards: this one is 262 tall and over the lanterns too */
+  background: #0a0906; transform: skewX(-8deg);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.44), inset 0 0 0 1px rgba(242, 234, 216, 0.22);
+}
+.fd-sh {
+  padding: 6px 14px 7px; background: rgba(242, 234, 216, 0.14); font-family: var(--lat-ui);
+  font-weight: 700; font-size: 9px; letter-spacing: 0.17em; color: var(--gold-hi);
+  white-space: nowrap;
+}
+.fd-steps { display: flex; gap: 6px; padding: 0 14px; }
+.fd-step {
+  flex: 1; min-width: 0; border: 0; cursor: pointer; padding: 8px 0 9px;
+  background: rgba(242, 234, 216, 0.1); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.24);
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; line-height: 1;
+  color: rgba(242, 234, 216, 0.7);
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+/* SET and FOCUSED are different things and must look it: one is what the learner has chosen, the
+   other is where the cursor happens to be, and collapsing them makes arrowing past a step look
+   like changing it. */
+.fd-step.set { background: var(--gold); color: var(--ink); box-shadow: none; }
+.fd-step.on { box-shadow: inset 0 0 0 2px var(--hi); }
+.fd-step:focus-visible { outline: 3px solid var(--hi); outline-offset: 3px; }
+.fd-step:disabled { cursor: default; opacity: 0.65; }
+.fd-note {
+  padding: 0 14px; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.13em; color: rgba(242, 234, 216, 0.6); line-height: 1.4;
+}
+.fd-denom {
+  margin: auto 14px 0; padding-top: 10px; border-top: 1px solid rgba(242, 234, 216, 0.22);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.fd-denom > span { display: flex; flex-direction: column; gap: 3px; position: relative; }
+.fd-denom b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px; line-height: 1;
+  color: var(--gold-hi);
+}
+.fd-denom i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.15em; color: rgba(242, 234, 216, 0.55);
+}
+.fd-denom u {
+  display: block; height: 4px; background: var(--gold); text-decoration: none;
+  box-shadow: 0 0 0 1px rgba(242, 234, 216, 0.2);
+}
+
+.fd-rail { position: absolute; left: 166px; top: 502px; width: 948px; }
+.fd-segrow { display: flex; gap: 3px; height: 15px; transform: skewX(-8deg); }
+.fd-segrow i {
+  flex: 1; min-width: 3px; display: block; background: rgba(242, 234, 216, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(8, 11, 18, 0.5);
+}
+.fd-segrow i.here { background: var(--hi); }
+.fd-none {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
+}
+.fd-railcap {
+  display: flex; justify-content: space-between; gap: 12px; margin-top: 7px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
+}

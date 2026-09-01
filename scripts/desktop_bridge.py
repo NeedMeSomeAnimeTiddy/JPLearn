@@ -1550,11 +1550,19 @@ def build_vocab_feed(slug: str, budget: int | None = None) -> dict[str, object]:
 
 
 def build_block_progress(slug: str) -> dict[str, object]:
-    """Return block definitions with unlock status and per-block mastery."""
+    """Return block definitions with unlock status and per-block mastery.
+
+    ``unlock_threshold`` is reported because it is the only thing that says what a
+    block's mastery figure is FOR: 62% is not a score, it is a key that turns at 70.
+    The renderer had to guess it — one of the two values is already copied into
+    ``constants.tsx`` as ``CATEGORY_UNLOCK_THRESHOLD`` and the kana one was nowhere —
+    and a gate the learner is shown has to come from the same call that applied it.
+    """
     init_study_db()
+    threshold = unlock_threshold_for_slug(slug)
     blocks = blocks_for_slug(slug)
     if not blocks:
-        return {"slug": slug, "blocks": []}
+        return {"slug": slug, "blocks": [], "unlock_threshold": threshold}
 
     factory = ALL_DECKS.get(slug)
     if factory is None:
@@ -1567,7 +1575,7 @@ def build_block_progress(slug: str) -> dict[str, object]:
         cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
     }
 
-    unlocked_count = compute_unlocked_count(blocks, repetitions_map, unlock_threshold_for_slug(slug))
+    unlocked_count = compute_unlocked_count(blocks, repetitions_map, threshold)
     char_map: dict[int, str] = {card.id: card.character for card in deck.cards}
     meaning_map: dict[int, str] = {card.id: card.meaning for card in deck.cards}
     romaji_map: dict[int, str] = {card.id: card.romaji for card in deck.cards}
@@ -1589,7 +1597,7 @@ def build_block_progress(slug: str) -> dict[str, object]:
             }
         )
 
-    return {"slug": slug, "blocks": result}
+    return {"slug": slug, "blocks": result, "unlock_threshold": threshold}
 
 
 def build_overview_character_mastery() -> dict[str, object]:
