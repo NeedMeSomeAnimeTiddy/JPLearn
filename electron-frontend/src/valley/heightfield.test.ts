@@ -21,15 +21,26 @@ function world(...meshes: Object3D[]): Object3D {
 }
 
 describe('what counts as ground', () => {
-  it('takes the terrain, the ranges and the mountain', () => {
+  it('takes the terrain, the ranges and the mountain, under their real names', () => {
     for (const n of ['Landscape_Terrain_Terrain_001', 'Onsen_Surfaces_TownGround_001',
-      'Fuji_Cone', 'inst:Landscape_Props_Range_004']) {
+      'Landscape_Props_Fuji_001', 'inst:Landscape_Props_Range_004',
+      'Landscape_Props_FarRange_007']) {
       expect(TERRAIN.test(n)).toBe(true)
     }
   })
 
   it('leaves the things standing on it alone', () => {
     for (const n of ['PROP_inn_1', 'Nature_Wildlife_Chochin_001', 'SkyDome']) {
+      expect(TERRAIN.test(n)).toBe(false)
+    }
+  })
+
+  it('is not the forest, which is the bug this test did not catch the first time', () => {
+    /* the first version of this regexp was the atmosphere's landform test, and `fuji` unanchored
+       and case-insensitive matches every tree on the mountain. 9,049 nodes, mostly cedar, so the
+       "ground" it baked was the canopy -- and nothing consumed the field, so it shipped. */
+    for (const n of ['Fuji_Forest_Sugi0_004', 'Fuji_Forest_Grass1_112', 'Fuji_Props_Rock3_009',
+      'inst:Fuji_Forest_Hinoki0_001']) {
       expect(TERRAIN.test(n)).toBe(false)
     }
   })

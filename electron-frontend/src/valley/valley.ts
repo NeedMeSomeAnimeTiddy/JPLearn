@@ -43,6 +43,7 @@ import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
 import { buildCrowd, type CrowdField } from './crowd'
+import { buildWalkers, type WalkField } from './walk'
 import { buildLake, type Lake } from './lake'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
@@ -106,6 +107,7 @@ let lanterns: LanternField | null = null
 let nightMap: NightMap | null = null
 let windows: WindowField | null = null
 let crowd: CrowdField | null = null
+let walkers: WalkField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -144,6 +146,9 @@ const water = new URLSearchParams(window.location.search).get('water') !== 'off'
 /* `?crowd=off` -- a thousand figures on a patched material, and the only honest way to price the
    patch is to boot the same build without it */
 const people = new URLSearchParams(window.location.search).get('crowd') !== 'off'
+/* `?walk=off` -- the footing grid is the one structure in this valley that is built out of raw
+   triangles, so what it costs at boot has to be priceable without it */
+const walking = new URLSearchParams(window.location.search).get('walk') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -529,8 +534,26 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       crowd = buildCrowd(root)
       console.info(
         `[valley] crowd: ${crowd.figures} figures on ${crowd.meshes.length} meshes, `
-        + `${crowd.geometries.length} models`,
+        + `${crowd.models.length} models`,
       )
+      /* AND SOME OF THEM WALK. They borrow the crowd's geometries, so this has to come after it --
+         and it is still inside the one window before the first render, because the footing grid it
+         builds reads the same position arrays the bake does. */
+      if (walking) {
+        const tWalk = performance.now()
+        walkers = buildWalkers(scene, root, crowd, ground)
+        if (walkers) {
+          console.info(
+            `[valley] walkers: ${walkers.people} on ${walkers.loops.length} loops `
+            + `(${walkers.loops.map((L) => `${L.spec.n} ${Math.round(L.len)}u`).join(', ')}); `
+            + `footing ${walkers.footing.ground.tris} ground + ${walkers.footing.deck.tris} deck `
+            + `triangles in ${walkers.footing.ground.cells} cells `
+            + `(${walkers.footing.ground.walls + walkers.footing.deck.walls} walls dropped, `
+            + `${(((walkers.footing.ground.tris + walkers.footing.deck.tris) * 36) / 1048576).toFixed(1)} MB), `
+            + `${Math.round(performance.now() - tWalk)} ms`,
+          )
+        }
+      }
     }
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
@@ -648,6 +671,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     windows?.tick(dt / 1000)
     lake?.tick(dt / 1000)
     crowd?.tick(dt / 1000)
+    walkers?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -708,6 +732,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       nightMap = null
       windows = null
       crowd = null
+      walkers?.dispose()
+      walkers = null
       ground = null
       lake?.dispose()
       lake = null

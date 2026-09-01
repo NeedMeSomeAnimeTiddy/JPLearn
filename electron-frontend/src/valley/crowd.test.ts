@@ -58,16 +58,19 @@ describe('how far up its own figure a vertex is', () => {
        dividing the raw local y by the height clamps the entire lower body to zero */
     const g = figure(69, 0.5)
     crowdBake(g)
-    const a = g.getAttribute('aUp')
+    const a = g.getAttribute('aFig')
     expect(a.getX(0)).toBeCloseTo(0, 5)
     expect(a.getX(1)).toBeCloseTo(0.5, 5)
     expect(a.getX(2)).toBeCloseTo(1, 5)
+    /* and the second channel is the figure's own height, so a displacement can be a fraction of
+       it -- the whole point, in a world that ships quantized */
+    expect(a.getY(0)).toBeCloseTo(69, 5)
   })
 
   it('gives the same answer for a figure modelled about its feet', () => {
     const g = figure(69, 0)
     crowdBake(g)
-    const a = g.getAttribute('aUp')
+    const a = g.getAttribute('aFig')
     expect(a.getX(0)).toBeCloseTo(0, 5)
     expect(a.getX(2)).toBeCloseTo(1, 5)
   })
@@ -82,9 +85,10 @@ describe('how far up its own figure a vertex is', () => {
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(new Float32Array([0, 4, 0, 1, 4, 0]), 3))
     crowdBake(g)
-    const a = g.getAttribute('aUp')
+    const a = g.getAttribute('aFig')
     expect(Number.isNaN(a.getX(0))).toBe(false)
     expect(a.getX(0)).toBe(0)
+    expect(a.getY(0)).toBe(0)
   })
 })
 
@@ -130,7 +134,7 @@ describe('building the crowd', () => {
     ))
     expect(c.meshes.length).toBe(2)
     expect(c.figures).toBe(4)
-    expect(c.geometries.length).toBe(2)
+    expect(c.models.length).toBe(2)
   })
 
   it('leaves the animals standing still', () => {
@@ -170,6 +174,20 @@ describe('building the crowd', () => {
     expect(c.material?.userData.atmos).toBe(true)
     /* re-applied, which is only observable as the hook actually being there */
     expect(c.material?.onBeforeCompile).toBeTypeOf('function')
+  })
+
+  it('records what it takes to stand a new copy of a model up', () => {
+    /* THE ONE THING THAT MADE THE WALKERS INVISIBLE. The world ships quantized, so a person's
+       geometry is about two units tall and its real height is in the placement matrix; and the
+       origin is at the navel, so a figure placed with its origin on the road is buried to the
+       waist. A walker composed at scale 1 with no lift is both of those at once. */
+    const c = buildCrowd(world(placed('Festival_People_Person0_001', figure(2, 0.5), 32.771)))
+    const m = c.models[0]
+    expect(m.scale).toBeCloseTo(32.771, 3)
+    expect(m.height).toBeCloseTo(65.5, 1)
+    expect(m.foot).toBeCloseTo(-32.8, 1)
+    /* and the lift the walkers apply is exactly half a figure */
+    expect(-m.foot).toBeCloseTo(m.height / 2, 3)
   })
 
   it('shares one material across every model', () => {

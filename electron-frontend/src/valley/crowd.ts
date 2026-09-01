@@ -1,5 +1,5 @@
 import {
-  BufferAttribute, BufferGeometry, InstancedMesh, Material, Object3D,
+  BufferAttribute, BufferGeometry, InstancedMesh, Material, Matrix4, Object3D, Quaternion, Vector3,
 } from 'three'
 import { breathe } from './atmosphere'
 
@@ -14,15 +14,23 @@ import { breathe } from './atmosphere'
    `instanceMatrix[3]` — the instance's own position — hashed into a phase, so every figure is on
    its own clock with no per-instance attribute to author, store or export.
 
-   THEIR ORIGINS ARE AT THEIR MIDDLE, NOT AT THEIR FEET, WHICH IS THE TRAP. The mockup's note says
-   "measured: minY 0, height 51.5" and divides the raw local y by that to get how far up the figure
-   a vertex is. Measured HERE, `PROP_person_kasa` runs local y −34.5 to +34.5: 69 units tall about
-   its own middle. Through the mockup's arithmetic the whole lower body clamps to zero and the head
-   reaches 0.5, so half the figure is rigid, the other half moves half as far as intended, and there
-   is a crease at the waist where the clamp releases. Exactly what the vegetation sway found about
-   plant origins in this same export, one system later.
-   So how far up its own figure a vertex is, is BAKED — one float per vertex against the geometry's
-   own bounding box, and where the origin sits stops being a question anyone has to answer.
+   TWO THINGS ABOUT THESE FIGURES THAT THE MOCKUP'S ARITHMETIC ASSUMES AND THIS EXPORT DENIES, and
+   both are in `aFig`, one vec2 per vertex baked once against the geometry's own bounding box.
+
+   THEIR ORIGINS ARE AT THEIR MIDDLE, NOT AT THEIR FEET. The mockup's note says "measured: minY 0,
+   height 51.5" and divides the raw local y by that to get how far up the figure a vertex is.
+   Measured here, every person model runs local y −h/2 to +h/2. Through that arithmetic the whole
+   lower body clamps to zero and the head reaches 0.5, so half the figure is rigid, the other half
+   moves half as far as intended, and there is a crease at the waist where the clamp releases.
+   `aFig.x` is the fraction up the figure, so where the origin sits stops being a question.
+
+   AND THE WORLD SHIPS QUANTIZED, so a figure's local box is about two units across and its real
+   65.5 units live in the placement matrix. A displacement authored in world units and applied in
+   the vertex shader is therefore multiplied by 33 on the way out: the mockup's 1.6-unit weight
+   shift becomes a body-length lurch. This was invisible until the walkers were built and turned out
+   to be two units tall — the same fact, read from the other end. So the amounts here are FRACTIONS
+   OF THE FIGURE'S OWN HEIGHT and `aFig.y` carries that height in local units, which is the same
+   answer the vegetation sway reached about plants of wildly different sizes on one material.
 
    AND A PERSON IS NOT WHOEVER LIVES IN THE `_People_` NAMESPACE. That namespace is a folder, not a
    species: this world puts `Garden_People_Koi0`, `Onsen_People_Monkey` and `Torii_People_FoxKey` in
@@ -41,14 +49,14 @@ export const PERSON_MIN_H = 40
 
 export const CROWD_U = {
   uIdleT: { value: 0 },
-  /* radians of yaw, so about nine degrees each way */
+  /* radians of yaw, so about nine degrees each way. An angle is scale-free, so this one is the
+     mockup's number unchanged. */
   uIdleTurn: { value: 0.16 },
-  /* UNITS OF SWAY AT HEAD HEIGHT, ON A 65.5-UNIT FIGURE — the mockup's 1.6 scaled by the ratio of
-     the two worlds' people (65.5 / 51.5). It is an absolute distance rather than a fraction of the
-     figure, so the 43-unit children lean proportionally further than the adults; on a child that
-     reads as fidgeting, which is why it is not worth a second vertex attribute to fix. */
-  uIdleLean: { value: 2.0 },
-  uIdleBob: { value: 1.15 },
+  /* SWAY AT HEAD HEIGHT AS A FRACTION OF THE FIGURE'S OWN HEIGHT. The mockup's 1.6 units on a
+     51.5-unit figure is 0.031, and stating it this way is what makes it survive both the
+     quantization and the 43-unit children. */
+  uIdleLean: { value: 0.031 },
+  uIdleBob: { value: 0.018 },
 }
 
 /* THE MOTION IS ONE STRING because two shaders could have to agree on where a figure is standing —
@@ -60,7 +68,9 @@ export const CROWD_U = {
    above <common>, so the macro is always expandable wherever the crowd is being drawn. */
 const IDLE_GLSL = `
   uniform float uIdleT, uIdleTurn, uIdleLean, uIdleBob;
-  attribute float aUp;
+  /* .x is how far up its own figure this vertex is, 0 at the feet and 1 at the crown; .y is how
+     tall that figure is, in the geometry's own units */
+  attribute vec2 aFig;
   #define IDLE_ORIGIN vec3( instanceMatrix[ 3 ][ 0 ], instanceMatrix[ 3 ][ 1 ], instanceMatrix[ 3 ][ 2 ] )
   void idleFigure( inout vec3 p, inout vec3 n, vec3 ip ) {
     float ph = fract( sin( dot( ip.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -75,30 +85,35 @@ const IDLE_GLSL = `
     mat2 R = mat2( ca, - sa, sa, ca );
     p.xz = R * p.xz;
     n.xz = R * n.xz;
-    /* and the weight shift, scaled by how far up the figure this is, so the shoes stay on the
-       ground however the body moves over them */
-    float hgt = clamp( aUp, 0.0, 1.0 );
+    /* and the weight shift: a fraction of the figure's own height, times how far up the figure
+       this vertex is, so the shoes stay on the ground however the body moves over them */
+    float hgt = clamp( aFig.x, 0.0, 1.0 ) * aFig.y;
     p.x += sin( t ) * uIdleLean * hgt;
     p.z += sin( t * 0.83 + 1.7 ) * uIdleLean * 0.6 * hgt;
     p.y += ( sin( t * 1.9 ) * 0.5 + 0.5 ) * uIdleBob * hgt;
   }`
 
 /**
- * How far up its own figure each vertex is, 0 at the feet and 1 at the crown.
+ * Per vertex: how far up its own figure it is, and how tall that figure is.
  *
  * Returns false when the geometry already carries it — ten models stand a thousand people, so this
  * is asked once per mesh and answered once per model.
  */
 export function crowdBake(geo: BufferGeometry): boolean {
-  if (geo.getAttribute('aUp')) return false
+  if (geo.getAttribute('aFig')) return false
   const pos = geo.getAttribute('position')
   if (!pos) return false
   if (!geo.boundingBox) geo.computeBoundingBox()
   const y0 = geo.boundingBox!.min.y
   const h = geo.boundingBox!.max.y - y0
-  const a = new Float32Array(pos.count)
-  if (h > 1e-6) for (let i = 0; i < pos.count; i++) a[i] = (pos.getY(i) - y0) / h
-  geo.setAttribute('aUp', new BufferAttribute(a, 1))
+  const a = new Float32Array(pos.count * 2)
+  if (h > 1e-6) {
+    for (let i = 0; i < pos.count; i++) {
+      a[i * 2] = (pos.getY(i) - y0) / h
+      a[i * 2 + 1] = h
+    }
+  }
+  geo.setAttribute('aFig', new BufferAttribute(a, 2))
   return true
 }
 
@@ -158,13 +173,31 @@ export function crowdIdle(mat: Material): Material {
   return mat
 }
 
+/* ONE OF THE TEN FIGURES, AND EVERYTHING NEEDED TO STAND A NEW ONE UP. Nothing else in this port
+   has had to place a copy of an authored object by hand, so nothing else has needed this — and the
+   walkers cannot be built without it, because a person's geometry on its own is two units tall and
+   has its origin at its navel. Measured across all 1,038 placements: every one is a uniform scale
+   and a pure yaw, local +Y stays world up to within a rounding error, and the scale is CONSTANT per
+   model (34.483 for the kasa, 32.771 for most, 21.558 for the children). So one instance answers
+   for the model, and the walkers need no rotation of their own beyond the way they are facing. */
+export interface CrowdModel {
+  geo: BufferGeometry
+  /** the uniform scale every placement of this model carries */
+  scale: number
+  /** how tall it stands, in world units */
+  height: number
+  /** where its feet are relative to its origin, in world units — negative, because that is the
+      navel; a figure placed with its origin on the ground is buried to the waist */
+  foot: number
+}
+
 export interface CrowdField {
   /** how many figures are breathing */
   figures: number
   /** the meshes they stand in — the walkers borrow their geometries out of these */
   meshes: InstancedMesh[]
   /** the models themselves, one entry per distinct figure */
-  geometries: BufferGeometry[]
+  models: CrowdModel[]
   /** the un-idled source, so a walker can have a material of its own with no idle in it */
   source: Material | null
   /** the idled material */
@@ -172,17 +205,25 @@ export interface CrowdField {
   tick: (seconds: number) => void
 }
 
-/* the placement's own scale -- `collapseToInstances` leaves the batch at the identity and puts the
-   real size in `instanceMatrix`, so `matrixWorld` cannot answer this. It is the same measurement
-   that found 37 windows in a town of roughly 250. */
+/* THE PLACEMENT'S OWN SCALE, AND `matrixWorld` CANNOT ANSWER IT. `collapseToInstances` parents its
+   batches to the root at the identity and puts every member's real placement in `instanceMatrix` --
+   the same measurement that found 37 windows in a town of roughly 250. Both are needed, because a
+   batch could in principle be parented under a transformed node. */
+const _m = new Matrix4()
+const _p = new Vector3()
+const _q = new Quaternion()
+const _s = new Vector3()
+
 function placedScale(mesh: InstancedMesh): number {
-  if (mesh.isInstancedMesh && mesh.count > 0) {
-    const m = mesh.instanceMatrix.array
-    return Math.hypot(m[0], m[1], m[2])
-  }
   mesh.updateWorldMatrix(true, false)
-  const e = mesh.matrixWorld.elements
-  return Math.hypot(e[0], e[1], e[2])
+  if (mesh.isInstancedMesh && mesh.count > 0) {
+    mesh.getMatrixAt(0, _m)
+    _m.premultiply(mesh.matrixWorld)
+  } else {
+    _m.copy(mesh.matrixWorld)
+  }
+  _m.decompose(_p, _q, _s)
+  return Math.max(_s.x, _s.y, _s.z)
 }
 
 /**
@@ -201,7 +242,7 @@ function placedScale(mesh: InstancedMesh): number {
  */
 export function buildCrowd(root: Object3D): CrowdField {
   const meshes: InstancedMesh[] = []
-  const geometries: BufferGeometry[] = []
+  const models: CrowdModel[] = []
   const seen = new Set<string>()
   let figures = 0
   let source: Material | null = null
@@ -213,7 +254,8 @@ export function buildCrowd(root: Object3D): CrowdField {
     const geo = mesh.geometry
     if (!geo?.getAttribute?.('position')) return
     if (!geo.boundingBox) geo.computeBoundingBox()
-    const h = (geo.boundingBox!.max.y - geo.boundingBox!.min.y) * placedScale(mesh)
+    const scale = placedScale(mesh)
+    const h = (geo.boundingBox!.max.y - geo.boundingBox!.min.y) * scale
     if (h < PERSON_MIN_H) return
 
     const src = mesh.material as Material | Material[]
@@ -229,7 +271,10 @@ export function buildCrowd(root: Object3D): CrowdField {
     }
     mesh.material = material
     crowdBake(geo)
-    if (!seen.has(geo.uuid)) { seen.add(geo.uuid); geometries.push(geo) }
+    if (!seen.has(geo.uuid)) {
+      seen.add(geo.uuid)
+      models.push({ geo, scale, height: h, foot: geo.boundingBox!.min.y * scale })
+    }
     meshes.push(mesh)
     figures += mesh.isInstancedMesh ? mesh.count : 1
   })
@@ -237,7 +282,7 @@ export function buildCrowd(root: Object3D): CrowdField {
   return {
     figures,
     meshes,
-    geometries,
+    models,
     source,
     material,
     tick: (seconds: number) => { CROWD_U.uIdleT.value += seconds },

@@ -28,8 +28,15 @@ import { Box3, InstancedMesh, Matrix4, Mesh, Object3D, Vector3 } from 'three'
    undefined -- the same trap `OUTLINE_SCALE` documents in the mockup. */
 const _mat = new Matrix4()
 
-/** what counts as ground, by name. The same landform test the atmosphere's opt-out uses. */
-export const TERRAIN = /landscape_terrain|_surfaces_|fuji|range/i
+/* WHAT COUNTS AS GROUND, BY NAME — and it is NOT the atmosphere's landform test, which this
+   borrowed and should not have. `LANDFORM` is `/fuji|landscape_terrain|_surfaces_|range/i`, and
+   `fuji` in an unanchored case-insensitive regexp matches `Fuji_Forest_Sugi0` and `Fuji_Props_Rock1`
+   as readily as it matches the mountain. Measured: it took 9,049 nodes, the overwhelming majority of
+   them TREES, so the bake was returning the height of the canopy — a 1,900-unit cedar over a valley
+   floor at −300. Harmless where it came from (misting a forest is fine) and catastrophic here, and
+   it survived a shipped commit because nothing consumed the field until the walkers did.
+   The ground is the terrain, the authored surfaces, the mountain and the ranges, named as such. */
+export const TERRAIN = /Landscape_Terrain|_Surfaces_|Landscape_Props_(Fuji|Range|FarRange)/
 
 /** the resolution of the grid; 384 is the mockup's, and the mesh has about one vertex per cell */
 export const FIELD_N = 384
