@@ -10,7 +10,6 @@ const onUp = vi.fn()
 
 function node(over: Partial<ProgressionNodeView> & { node_id: string }): ProgressionNodeView {
   return {
-    node_id: over.node_id,
     name: over.name ?? over.node_id,
     category: 'script',
     status: over.status ?? 'locked',

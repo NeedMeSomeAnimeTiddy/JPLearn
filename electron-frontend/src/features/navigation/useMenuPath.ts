@@ -26,6 +26,8 @@ import type { MenuPath, MenuPathApi } from './types'
 export const L2_READY: Partial<Record<MenuSectionKey, true>> = {
   /* phase 4: the journey, sixteen milestones, built from the live curriculum */
   STUDY: true,
+  /* phase 4: three lanes — review, drills, the daily puzzles */
+  DRILLS: true,
 }
 
 export const ROOT: MenuPath = { level: 1 }

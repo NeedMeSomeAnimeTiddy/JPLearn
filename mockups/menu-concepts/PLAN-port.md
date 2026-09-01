@@ -656,10 +656,41 @@ application. It now saves and restores, and every test states the registry it wa
 | section | L2 | state |
 | --- | --- | --- |
 | The Path | the journey, 16 milestones | **built** |
-| Practice | three lanes | passthrough → `daily_games` |
-| The World | two lanes | passthrough → `passage_hub` |
+| Practice | three lanes | **built** |
+| The World | two lanes | passthrough → `passage_hub` (the lane card is ready for it) |
 | The Exam | the ascent | passthrough → `jlpt_prep` |
 | You | the ledger | passthrough → the overview panel |
 
 **880 tests pass across 84 files**, 8 a11y, lint clean, and driven live: THE PATH stops at L2,
 the arrows walk it, Escape goes up one level rather than out, and PRACTICE still passes through.
+
+## Practice, level two — three lanes
+
+The second registration, and the card it is built from is deliberately **shared with THE WORLD**,
+which is two lanes of the same thing. The mockup made that call and the reason holds in code: both
+screens answer *which of these do you want to do*, nothing on either is ordered or gated against
+its neighbour, and a learner who has learned one should not have to learn the other. So `Lanes`
+takes N lanes and the screens differ only in what fills them — The World is now mostly data.
+
+Live, on this account: **REVIEW 2 cards due · DRILLS 17 modes, 5 skill groups · DAILY GAMES 4
+puzzles**, all counted from `summary.decks`, `MINIGAMES` and `DAILY_GAME_TILES` rather than stated.
+
+**One obligation wears the vermilion.** Reviews are the only thing in this menu that is *owed*
+rather than chosen, so the review lane's action slab is the single red thing on the screen — and
+it stops being red when nothing is due, because then it is not an obligation either. A clear day
+draws as an em dash and `NOTHING DUE`, never as `0 CARDS DUE`.
+
+Three lanes, three genuinely different destinations: `jumpToScriptHub`, `jumpToScriptHubMinigame`
+and `openDailyGames`.
+
+### The comment that nearly proved its own point
+
+`lanes.ts` carries a rule — *figures are counted, not copied* — and the first draft of its comment
+said the app had **21** drills against the mockup's seventeen. 21 is how many entries the
+`MinigameKey` *union* has; `MINIGAMES`, the array the drill picker actually renders, has **17**,
+and the design was right all along. The running app is what caught it. The rule stands and the
+anecdote is now the comment: a number transcribed into a comment goes stale exactly as silently as
+one transcribed into a screen.
+
+**892 tests pass across 85 files**, 8 a11y, lint clean. Driven live: PRACTICE stops at L2, the
+arrows walk the three cards, Enter opens each one's own destination, and Escape returns to L1.

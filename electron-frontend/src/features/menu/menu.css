@@ -317,3 +317,100 @@
 
 /* the screen container is focusable so its arrow keys work; it must not draw a ring for that */
 .mn-open:focus { outline: none; }
+
+/* ==================================================================================================
+   LANES — PRACTICE's three and, later, THE WORLD's two. One card; the count changes the width and
+   nothing else, because both screens answer the same question.
+
+   THE MIDDLE CARD LEANS THE OTHER WAY, which is the mockup's own trick: three identical leans read
+   as a stack that slipped, and one counter-lean makes them read as three laid-out cards. It is also
+   the reason the row is authored at 180 rather than 166 — a `rotate(1deg)` ADDS to the skew bleed
+   (0.0790h per side against 0.0598h), so the middle card paints further left than its neighbours.
+   ================================================================================================== */
+.lanes {
+  position: absolute; left: 180px; top: 214px; width: 920px; height: 268px;
+  display: flex; gap: 23px;
+}
+.lanes.two { left: 190px; width: 900px; }
+
+.pr-lane {
+  flex: 1; min-width: 0; border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transition: transform 0.24s cubic-bezier(0.2, 0.92, 0.24, 1), background 0.24s ease,
+              box-shadow 0.22s ease;
+}
+.pr-lane:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+.pr-lane.on {
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px);
+  box-shadow: 9px 12px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+}
+.pr-lane.on:nth-child(2) { transform: skewX(-8deg) rotate(1deg) translateY(-6px); }
+.pr-lane:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
+
+.pr-cap {
+  flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 7px 15px 8px; background: var(--ink); white-space: nowrap;
+}
+.pr-cap b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+  color: var(--gold-hi);
+}
+.pr-cap i {
+  font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 11px;
+  color: rgba(232, 196, 124, 0.62);
+}
+
+.pr-glyph {
+  padding: 10px 15px 0; font-family: var(--jp); font-weight: 400; font-size: 34px; line-height: 1;
+  color: rgba(20, 17, 13, 0.2);
+}
+.pr-fig { display: flex; align-items: baseline; gap: 9px; padding: 4px 15px 0; }
+.pr-fig b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 34px; line-height: 0.95;
+  color: var(--ink);
+}
+.pr-fig i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5);
+}
+/* a figure that is an absence is set as one, never as a zero */
+.pr-fig.none b { color: rgba(20, 17, 13, 0.32); }
+.pr-fig.none i { color: rgba(20, 17, 13, 0.4); font-style: italic; }
+
+.pr-d {
+  padding: 9px 15px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px;
+  line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.68);
+}
+.pr-foot {
+  margin-top: auto; padding: 0 15px 10px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.14em; line-height: 1.4; color: rgba(20, 17, 13, 0.45);
+}
+/* THE SLAB IS ALWAYS THERE, and only the selected one says ENTER — a strip that appears on
+   selection makes the card change height, and three cards of different heights read as three
+   kinds of thing rather than three lanes. */
+.pr-slab {
+  flex: none; height: 28px; display: grid; place-items: center;
+  background: rgba(20, 17, 13, 0.13); font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6); white-space: nowrap;
+  transition: background 0.24s ease, color 0.24s ease;
+}
+.pr-lane.on .pr-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
+/* REVIEWS ARE THE OBLIGATION, so they carry the one vermilion on the screen and the other two do
+   not — the same law the action slab obeys everywhere else in this menu. */
+.pr-lane.duty.on .pr-slab { background: var(--hi); color: #ffd9a1; }
+
+.pr-lane.shut { background: linear-gradient(178deg, #ded8c8 0%, #c9c3b1 100%); cursor: default; }
+.pr-lane.shut .pr-glyph { color: rgba(20, 17, 13, 0.12); }
+.pr-lane.shut .pr-fig b { color: rgba(20, 17, 13, 0.42); }
+.pr-lane.shut.on .pr-slab { background: rgba(20, 17, 13, 0.4); color: rgba(242, 234, 216, 0.6); }
+
+.pr-note {
+  position: absolute; left: 180px; top: 500px; width: 920px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
+}

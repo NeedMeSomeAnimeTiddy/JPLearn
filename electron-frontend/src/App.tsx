@@ -54,7 +54,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
-import { useMenuL1, MenuL1, PathL2, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
+import { useMenuL1, MenuL1, PathL2, Lanes, practiceLanes, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { useAppNavigation, useMenuPath, VIEW_PARENT } from './features/navigation'
@@ -2157,6 +2157,21 @@ function App() {
             /* the progression map's own pair, so soft-gating and its confirmation come free */
             const node = progression.requestOpen(nodeId)
             if (node) openProgressionNode(node)
+          }}
+          onUp={menuPath.up}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'DRILLS' ? (
+        <Lanes
+          jp="練習" en="PRACTICE"
+          note="練習 · NOTHING NEW IS TAUGHT HERE — THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU"
+          lanes={practiceLanes(summary)}
+          onPick={(key) => {
+            /* three genuinely different destinations, all of them places the app already has */
+            if (key === 'games') { openDailyGames(); return }
+            if (key === 'drills') { jumpToScriptHubMinigame(activeScript, activeGame); return }
+            jumpToScriptHub(activeScript)
           }}
           onUp={menuPath.up}
         />
