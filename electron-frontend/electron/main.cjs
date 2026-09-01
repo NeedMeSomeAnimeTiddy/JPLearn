@@ -2016,9 +2016,20 @@ function loadMainWindow(win) {
   // JPLEARN_VALLEY=off suppresses the 3D menu backdrop. It travels as a query rather than an env
   // read in the renderer because the flag has to be visible to the very first script that runs,
   // which is what makes an honest with/without boot comparison possible from one build.
+  //
+  // JPLEARN_VALLEY_QUERY carries the rest of them. Every subsystem in the valley has a switch of
+  // its own -- `rays=off`, `water=off`, `crowd=off`, `hour=21:30` -- and until now none of them
+  // could be reached in a packaged build, which meant the with/without measurement each one exists
+  // for could only be taken by editing source and rebuilding. Given as a plain query string
+  // ("crowd=off&hour=7.5") and merged under the flag above.
+  const valleyQuery = {}
+  for (const [k, v] of new URLSearchParams((process.env.JPLEARN_VALLEY_QUERY || '').trim())) {
+    valleyQuery[k] = v
+  }
+  if ((process.env.JPLEARN_VALLEY || '').trim() === 'off') valleyQuery.valley = 'off'
   win.loadFile(
     path.join(__dirname, '..', 'dist', 'index.html'),
-    (process.env.JPLEARN_VALLEY || '').trim() === 'off' ? { query: { valley: 'off' } } : undefined,
+    Object.keys(valleyQuery).length ? { query: valleyQuery } : undefined,
   )
 
   // Inject locally downloaded fonts from the assets store if available.

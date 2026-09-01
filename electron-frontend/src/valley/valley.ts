@@ -42,6 +42,7 @@ import { buildLanterns, type LanternField } from './lanterns'
 import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
+import { buildCrowd, type CrowdField } from './crowd'
 import { buildLake, type Lake } from './lake'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
@@ -104,6 +105,7 @@ let clouds: CloudField | null = null
 let lanterns: LanternField | null = null
 let nightMap: NightMap | null = null
 let windows: WindowField | null = null
+let crowd: CrowdField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -139,6 +141,9 @@ let shadowDirty = false
    whole valley does, and the same reason: the only honest way to price a thing is to boot without it */
 const shafts = new URLSearchParams(window.location.search).get('rays') !== 'off'
 const water = new URLSearchParams(window.location.search).get('water') !== 'off'
+/* `?crowd=off` -- a thousand figures on a patched material, and the only honest way to price the
+   patch is to boot the same build without it */
+const people = new URLSearchParams(window.location.search).get('crowd') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -517,6 +522,16 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        `breathe`'s. Run first, it would be overwritten and the town would keep one bedtime. */
     windows = buildWindows(root)
     console.info(`[valley] windows: ${windows.spots} on ${windows.meshes} meshes`)
+
+    /* AND THE PEOPLE, on the same side of `breathe` and for the same reason: the idle chains onto
+       that hook rather than replacing it. */
+    if (people) {
+      crowd = buildCrowd(root)
+      console.info(
+        `[valley] crowd: ${crowd.figures} figures on ${crowd.meshes.length} meshes, `
+        + `${crowd.geometries.length} models`,
+      )
+    }
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
@@ -632,6 +647,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     driftCover(dt / 1000)
     windows?.tick(dt / 1000)
     lake?.tick(dt / 1000)
+    crowd?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -691,6 +707,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       nightMap?.dispose()
       nightMap = null
       windows = null
+      crowd = null
       ground = null
       lake?.dispose()
       lake = null
