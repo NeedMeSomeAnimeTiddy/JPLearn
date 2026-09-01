@@ -202,3 +202,118 @@
 @media (prefers-reduced-motion: reduce) {
   .mn-open * { animation: none !important; transition: none !important; }
 }
+
+/* ==================================================================================================
+   THE PATH, LEVEL TWO — the journey. A column of milestones on the same left-hand stage the rows
+   stand on, so arriving here reads as going deeper rather than as going somewhere else.
+   ================================================================================================== */
+.pj-cap {
+  position: absolute; left: 166px; top: 168px; width: 800px;
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 7px 18px 8px; background: var(--ink); white-space: nowrap;
+  transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
+}
+.pj-cap b { font-family: var(--jp); font-weight: 700; font-size: 14px; color: var(--gold-hi); }
+.pj-cap i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.2em; color: var(--gold-hi);
+}
+.pj-cap s {
+  margin-left: auto; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.15em; color: rgba(242, 234, 216, 0.5);
+}
+
+.pj-empty {
+  position: absolute; left: 166px; top: 232px; width: 800px; padding: 14px 18px;
+  background: var(--washi); transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.5);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+
+.pj-list { position: absolute; left: 166px; top: 224px; width: 800px; }
+
+/* THE FOLD SAYS HOW MANY, because a count is a fact and a cut-off row is an accident */
+.pj-fold {
+  height: 20px; display: flex; align-items: center; padding: 0 18px;
+  transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.16em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
+}
+
+.pj-row {
+  position: relative; display: flex; align-items: center; gap: 14px;
+  width: 100%; height: 52px; margin-bottom: 6px; padding: 0 18px;
+  border: 0; text-align: left; font: inherit; cursor: pointer;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.44), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
+  transition: background 0.22s ease, transform 0.16s ease, box-shadow 0.2s ease;
+}
+.pj-row.on {
+  background: var(--washi); transform: skewX(-8deg) rotate(-1.2deg) translate(12px, -4px);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+}
+.pj-row:focus-visible { outline: 3px solid var(--hi); outline-offset: 5px; }
+
+.pj-no {
+  flex: none; width: 26px; font-family: var(--lat); font-style: italic; font-weight: 900;
+  font-size: 13px; color: rgba(20, 17, 13, 0.45);
+}
+.pj-name { flex: none; width: 210px; display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+.pj-en {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; line-height: 1;
+  color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pj-jp {
+  flex: none; font-family: var(--jp); font-weight: 400; font-size: 12px; line-height: 1;
+  color: rgba(20, 17, 13, 0.6); white-space: nowrap;
+}
+.pj-want {
+  flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 9.5px;
+  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pj-bar {
+  flex: none; width: 92px; height: 5px; background: rgba(20, 17, 13, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.pj-bar i { display: block; height: 100%; background: var(--ink); }
+.pj-figs {
+  flex: none; width: 96px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.pj-figs b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px; line-height: 1;
+  color: var(--ink);
+}
+.pj-figs em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 7.5px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.45); white-space: nowrap;
+}
+
+/* the three states, and the one vermilion. DONE is quiet, HERE is the only thing wearing the
+   accent, and AHEAD keeps its paper so it still reads as a step rather than as a gap. */
+.pj-row.is-done { background: linear-gradient(178deg, #ded8c8 0%, #c9c3b1 100%); }
+.pj-row.is-done .pj-en, .pj-row.is-done .pj-figs b { color: rgba(20, 17, 13, 0.55); }
+.pj-row.is-done .pj-bar i { background: rgba(20, 17, 13, 0.42); }
+.pj-row.is-here .pj-bar i { background: var(--hi); }
+.pj-row.is-here .pj-no { color: var(--hi); }
+.pj-row.is-ahead .pj-en { color: rgba(20, 17, 13, 0.42); }
+.pj-row.is-ahead .pj-jp, .pj-row.is-ahead .pj-want { color: rgba(20, 17, 13, 0.32); }
+.pj-row.is-ahead .pj-figs b { color: rgba(20, 17, 13, 0.4); }
+/* a step the curriculum still gates says so by staying flat, not by disappearing */
+.pj-row.shut { cursor: default; }
+.pj-row.shut .pj-want { font-style: italic; }
+
+.pj-back {
+  position: absolute; left: 166px; top: 130px; padding: 5px 14px 6px;
+  border: 0; background: rgba(8, 11, 18, 0.62); cursor: pointer;
+  transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  color: var(--gold-hi);
+}
+.pj-back:focus-visible { outline: 2px solid var(--hi); outline-offset: 3px; }
+
+/* the screen container is focusable so its arrow keys work; it must not draw a ring for that */
+.mn-open:focus { outline: none; }

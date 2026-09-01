@@ -17,16 +17,26 @@ function mount() {
   render(<Harness />)
 }
 
+/* SAVE AND RESTORE, DO NOT EMPTY. `L2_READY` is a real registry with real entries in it now —
+   a test that clears it would quietly un-register the screens the app ships and leave whatever
+   ran next testing a different application. */
+const REGISTERED = { ...L2_READY }
+
+function only(...sections: MenuSectionKey[]) {
+  for (const key of Object.keys(L2_READY)) delete L2_READY[key as MenuSectionKey]
+  for (const key of sections) L2_READY[key] = true
+}
+
 afterEach(() => {
   cleanup()
   passthrough.mockReset()
-  for (const key of Object.keys(L2_READY)) {
-    delete L2_READY[key as MenuSectionKey]
-  }
+  for (const key of Object.keys(L2_READY)) delete L2_READY[key as MenuSectionKey]
+  Object.assign(L2_READY, REGISTERED)
 })
 
 describe('the menu tree', () => {
   it('starts at the root, with nothing selected', () => {
+    only()
     mount()
     expect(api.level).toBe(1)
     expect(api.section).toBeNull()
@@ -34,6 +44,7 @@ describe('the menu tree', () => {
   })
 
   it('passes a section with no L2 screen straight through to the flat view', () => {
+    only()
     mount()
     act(() => api.enterSection('JLPT'))
 
@@ -44,7 +55,7 @@ describe('the menu tree', () => {
   })
 
   it('stops at L2 once that section has a screen', () => {
-    L2_READY.JLPT = true
+    only('JLPT')
     mount()
     act(() => api.enterSection('JLPT'))
 
@@ -54,7 +65,7 @@ describe('the menu tree', () => {
   })
 
   it('goes down to L3 and back up one level at a time', () => {
-    L2_READY.STUDY = true
+    only('STUDY')
     mount()
     act(() => api.enterSection('STUDY'))
     act(() => api.enterScreen('deck'))
@@ -73,6 +84,7 @@ describe('the menu tree', () => {
   })
 
   it('says so when there is nowhere above to go', () => {
+    only()
     mount()
     /* the boolean is what lets Escape fall through to the app's own parent chain instead of
        silently doing nothing at the root */
@@ -83,13 +95,14 @@ describe('the menu tree', () => {
   })
 
   it('cannot enter a screen from the root, because there is nothing to be inside of', () => {
+    only()
     mount()
     act(() => api.enterScreen('deck'))
     expect(api.level).toBe(1)
   })
 
   it('reset comes home from anywhere', () => {
-    L2_READY.READING = true
+    only('READING')
     mount()
     act(() => api.enterSection('READING'))
     act(() => api.enterScreen('library'))
@@ -101,6 +114,7 @@ describe('the menu tree', () => {
   })
 
   it('registering a screen converts a passthrough into a stop, and nothing else changes', () => {
+    only()
     mount()
     act(() => api.enterSection('DRILLS'))
     expect(passthrough).toHaveBeenCalledTimes(1)

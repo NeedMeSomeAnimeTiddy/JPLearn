@@ -599,3 +599,67 @@ solves is real.
 reset, and the phase-4 registration flip. **865 passing overall**, 8 a11y, lint clean, and driven
 live in Electron: the rows still navigate, a locked row still does not, and the toggle still
 returns the classic home.
+
+---
+
+# Phase 4 — in progress. The Path, 2026-09-01
+
+Phase 4 is five L2 screens and the plan says "one section at a time". **One is done: The Path.**
+The other four still pass straight through to their flat views, which is exactly what the phase-3
+passthrough was built for — and the flip cost one line.
+
+## The Path, level two — the journey
+
+`L2_READY.STUDY = true`, and that single registration turned a passthrough into a real stop.
+Nothing that calls `enterSection` changed.
+
+**The list is not declared anywhere in the menu.** `domain/progression_curriculum.py` already owns
+those sixteen nodes, in that order, and the bridge reports each one's real status — so the rows are
+built from `progression.nodes` and a small table supplies only what the backend does not carry: the
+Japanese name, and the one line saying what the step asks of you. Live, on this account:
+
+- **TUTORIAL** done · **HIRAGANA** 103/104, the step you are on · fourteen ahead
+- `1 OF 16 MILESTONES BEHIND YOU` in the caption, counted rather than stated
+- the **one vermilion** is the current step's progress bar, and nothing else on the screen wears it
+
+A node the design has never heard of still renders, with its backend name and no Japanese. A
+missing label is a small wrong thing; a silently dropped milestone is a large one, and there is a
+test for it.
+
+**Nothing scrolls; overflow folds.** Sixteen rows do not fit the stage and the frame contract
+forbids a scrollbar, so a six-row window moves with the cursor and the ends say `▼ 10 AHEAD`. A
+count is a fact; a cut-off row is an accident.
+
+Enter reuses `progression.requestOpen` + `openProgressionNode` — the progression map's own pair —
+so soft-gating and its confirmation dialog come for free rather than being reimplemented.
+
+## The bug the screenshot could not show
+
+The arrow keys did nothing. The listener is bound to the screen's own subtree rather than to the
+window — deliberately, so the menu never eats the arrows a study session needs — but **a subtree
+only receives keydown when focus is inside it**, and after a click on the level above, focus is on
+`<body>`. Measured live: two ArrowDowns moved the cursor nowhere.
+
+This had been true of **L1 since phase 2** and nobody noticed, because the unit tests dispatch
+keydown straight at the root and the live probes only ever clicked. Both screens now take focus on
+arrival (`tabIndex={-1}`, the same thing a dialog does).
+
+## And one in the test suite
+
+`useMenuPath.test.tsx` emptied `L2_READY` in its cleanup, which was harmless while the registry was
+empty and became a real hazard the moment it had an entry: a test that clears a live registry
+un-registers the screens the app ships and leaves whatever runs next testing a different
+application. It now saves and restores, and every test states the registry it wants.
+
+## Still to do in phase 4
+
+| section | L2 | state |
+| --- | --- | --- |
+| The Path | the journey, 16 milestones | **built** |
+| Practice | three lanes | passthrough → `daily_games` |
+| The World | two lanes | passthrough → `passage_hub` |
+| The Exam | the ascent | passthrough → `jlpt_prep` |
+| You | the ledger | passthrough → the overview panel |
+
+**880 tests pass across 84 files**, 8 a11y, lint clean, and driven live: THE PATH stops at L2,
+the arrows walk it, Escape goes up one level rather than out, and PRACTICE still passes through.

@@ -18,12 +18,15 @@ import type { MenuPath, MenuPathApi } from './types'
    PASSTHROUGH IS THE WHOLE TRICK. A section with no L2 screen yet does not stop at L2 — it goes
    straight through to the flat view that does its job today. Phase 4 registers screens one at a
    time, and each registration silently converts a passthrough into a real stop without touching
-   anything that calls this. Today `L2_READY` is empty, so every section passes through, which is
-   precisely the behaviour phase 2 shipped.
+   anything that calls this. STUDY is the first one registered (phase 4); the other four still
+   pass straight through to the flat views, exactly as they did in phase 2.
    ================================================================================================== */
 
-/** sections that have a real L2 screen. Empty until phase 4 starts filling it. */
-export const L2_READY: Partial<Record<MenuSectionKey, true>> = {}
+/** sections that have a real L2 screen. Phase 4 fills this one entry at a time. */
+export const L2_READY: Partial<Record<MenuSectionKey, true>> = {
+  /* phase 4: the journey, sixteen milestones, built from the live curriculum */
+  STUDY: true,
+}
 
 export const ROOT: MenuPath = { level: 1 }
 

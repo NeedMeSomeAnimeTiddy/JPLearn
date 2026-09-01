@@ -34,9 +34,16 @@ export function MenuL1({ controller, hero, crown, onOpenSection, onRunHero }: Me
   /* THE ARROWS BELONG TO THE MENU WHILE THE MENU IS THE SCREEN. Bound on the root rather than the
      window so the keys stop at this subtree -- the app has its own arrow handling inside a study
      session, and a menu that quietly ate those would be worse than one with no keyboard at all. */
+  /* THE SCREEN TAKES FOCUS WHEN IT ARRIVES, or its own arrow keys do nothing. The listener below
+     is on this subtree rather than on the window — deliberately, so the menu never eats the arrows
+     a study session needs — but a subtree only receives keydown when focus is inside it, and after
+     a click on the level above, focus is on <body>. Measured live: two ArrowDowns moved the cursor
+     nowhere at all. `tabIndex={-1}` makes the container focusable without putting it in the tab
+     order, which is the same thing a dialog does. */
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
+    node.focus({ preventScroll: true })
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown') { event.preventDefault(); step(1) }
       else if (event.key === 'ArrowUp') { event.preventDefault(); step(-1) }
@@ -48,7 +55,7 @@ export function MenuL1({ controller, hero, crown, onOpenSection, onRunHero }: Me
   const ordered = [...MENU_SECTIONS].sort((a, b) => a.ord - b.ord)
 
   return (
-    <div className="mn-open" ref={rootRef}>
+    <div className="mn-open" ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
         <div className="mn-crown">
           {crown.streakDays != null && crown.streakDays > 0

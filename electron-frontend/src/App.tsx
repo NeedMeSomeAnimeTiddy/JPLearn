@@ -54,7 +54,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
-import { useMenuL1, MenuL1, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
+import { useMenuL1, MenuL1, PathL2, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { useAppNavigation, useMenuPath, VIEW_PARENT } from './features/navigation'
@@ -2147,7 +2147,22 @@ function App() {
   const renderView = () => (
     <>
       {/* Home is the main landing surface; keep it mounted only for home view. */}
-      {view === 'home' && menuFrontDoor ? (
+      {/* L2 — one section at a time. A section with no screen here never reaches level two:
+          `useMenuPath` passes it straight through to the flat view instead. */}
+      {view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'STUDY' ? (
+        <PathL2
+          nodes={progression.nodes}
+          loading={progression.loading}
+          onOpenNode={(nodeId) => {
+            /* the progression map's own pair, so soft-gating and its confirmation come free */
+            const node = progression.requestOpen(nodeId)
+            if (node) openProgressionNode(node)
+          }}
+          onUp={menuPath.up}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 1 ? (
         <MenuL1
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
