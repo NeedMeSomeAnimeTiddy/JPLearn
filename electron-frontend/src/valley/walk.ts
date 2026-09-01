@@ -95,8 +95,15 @@ export const WALK_LOOPS: readonly LoopSpec[] = [
 /* A FIGURE IS 65.5 UNITS AND A PERSON IS 1.75 m, SO THE WORLD IS 37 UNITS TO THE METRE — which is
    the only reason any of these can be argued about rather than dialled. 1.4 m/s is 52 units/s. A
    pace is 0.75 m, so the two-pace gait cycle a bob belongs to is 56 units.
-   THE MOCKUP'S FIGURES WERE 51.5 UNITS and its numbers (41 u/s, a 44-unit stride) follow from that
-   scale, not from this one. Carried across by the ratio rather than copied. */
+
+   THE MOCKUP SAYS 41 u/s AND A 44-UNIT STRIDE, and those follow from "a figure is 51.5 units and a
+   person is 1.75 m, so the world is 29 units to the metre" — which is the mockup contradicting
+   itself rather than describing a different world. It is the same `world.glb`, and forty lines
+   further down its own crowd filter says "a figure is 65.5 units, the tallest of the strays is a
+   26-unit monkey" and picks 40 to separate them. Measured here, every adult model is 65.5 and the
+   children are 43.1; nothing in this export is 51.5. So its walkers were 27% too slow for the
+   valley they were walking, and the numbers here are what its own arithmetic gives with the height
+   it measured rather than the one it wrote down. */
 export const WALK = {
   /** units a second */
   speed: 52,
@@ -223,6 +230,8 @@ export interface WalkField {
   loops: Loop[]
   people: number
   meshes: InstancedMesh[]
+  /** the un-idled material -- the boats' passengers need one for exactly the same reason */
+  material: Material
   footing: Footing
   tick: (seconds: number) => void
   dispose: () => void
@@ -370,6 +379,7 @@ export function buildWalkers(
     loops,
     people: people.length,
     meshes,
+    material: mat,
     footing,
     tick,
     dispose: () => {

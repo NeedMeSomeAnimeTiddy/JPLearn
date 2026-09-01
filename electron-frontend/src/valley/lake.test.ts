@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Color, FogExp2, PerspectiveCamera, Scene, Vector3 } from 'three'
-import { AXIS, EYE_XZ, GROUND_Y, LAKE, LAKE_U, LAKE_Y, SIDE, buildLake, lakeCentre } from './lake'
+import {
+  AXIS, EYE_XZ, GROUND_Y, LAKE, LAKE_HALF, LAKE_U, LAKE_Y, SIDE, buildLake, lakeCentre, lakeShore,
+} from './lake'
 import { REFLECT_CLIP_LIFT, REFLECT_H, REFLECT_W } from './reflection'
 import { DESTINATIONS } from './destinations'
 import { HOME_EYE } from './flight'
@@ -101,6 +103,38 @@ describe('the water material', () => {
     expect(scene.children).toContain(lake.mesh)
     lake.dispose()
     expect(scene.children).not.toContain(lake.mesh)
+  })
+})
+
+describe('where the water ends', () => {
+  it('is measured off the landscape, because nothing here draws a shoreline', () => {
+    /* the mockup has a `lakeRadiusAt` -- three sines, the same curve that generates its shore mesh.
+       This port's water is one flat square and its visible edge is wherever the terrain rises
+       through it, so the shore is a fact about the ground and the heightfield already knows it. */
+    const shore = lakeShore((x, z) => {
+      const c = lakeCentre()
+      /* a bowl 2,000 units across, sitting in ground well above the water */
+      return Math.hypot(x - c.x, z - c.z) < 2000 ? LAKE_Y - 300 : LAKE_Y + 300
+    })
+    expect(shore.min).toBeGreaterThan(1900)
+    expect(shore.max).toBeLessThan(2120)
+    expect(shore.at(0)).toBeCloseTo(shore.at(Math.PI), -1)
+  })
+
+  it('never reaches past the plane that is drawn', () => {
+    /* on about two fifths of this lake's bearings the terrain does not rise before the water simply
+       stops, and a boat beyond the plane is a boat on grass with a reflection under it */
+    const shore = lakeShore(() => LAKE_Y - 1000)
+    expect(shore.max).toBeLessThanOrEqual(LAKE_HALF)
+    expect(shore.min).toBeCloseTo(LAKE_HALF, 0)
+  })
+
+  it('wraps, so a boat crossing the seam does not jump', () => {
+    let n = 0
+    const shore = lakeShore(() => (n++ % 7 === 0 ? LAKE_Y + 1 : LAKE_Y - 1))
+    const a = shore.at(-1e-4)
+    const b = shore.at(Math.PI * 2 - 1e-4)
+    expect(a).toBeCloseTo(b, 6)
   })
 })
 

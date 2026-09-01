@@ -64,6 +64,73 @@ export function lakeCentre(): { x: number; z: number } {
   }
 }
 
+/** how far the plane reaches from its own centre, along either of its axes */
+export const LAKE_HALF = LAKE.r * 1.3
+
+/** how many bearings the shore is sampled on */
+export const SHORE_N = 48
+
+/* ==================================================================================================
+   WHERE THE WATER ENDS — measured, because in this port it is not drawn anywhere.
+
+   The mockup has a `lakeRadiusAt`: three sines on the angle, which is what generates its shoreline
+   mesh, so asking that function where the shore is gives an exact answer. This port has no such
+   curve. The water is one flat square and its visible edge is wherever the terrain rises through it
+   — which means the shore is a fact about the LANDSCAPE, and the heightfield already knows it.
+
+   So: walk outward from the centre on each of 48 bearings until the ground comes up through the
+   surface. Measured that way this lake runs 2,240 units across its narrowest bearing and past 3,510
+   on its widest, which is the one thing the boats could not have been given by a single radius —
+   two of the six are moored further out than the narrow shore, so a plain concentric circle beaches
+   them within a quarter of a lap.
+
+   SMOOTHED OVER FIVE SAMPLES, because a heightfield cell is 183 units and the raw profile steps by
+   as much as 700 between neighbouring bearings. A boat following that would surge in and out; what
+   it is meant to follow is the shape of the coast, not the quantisation of the field.
+
+   AND CAPPED AT THE PLANE'S OWN EDGE, which is the honest bit: on about two fifths of the bearings
+   the terrain does not rise before the water plane simply stops, so what is drawn there is a
+   straight cut rather than a coast. It reads as haze from the menu's standing point, eight thousand
+   units out, and it is the reason nothing here may sail past `LAKE_HALF` — a boat beyond the plane
+   is a boat on grass with a reflection under it.
+   ================================================================================================== */
+export interface Shore {
+  /** the radius, in units from the lake's centre, at a bearing in radians */
+  at: (angle: number) => number
+  /** the narrowest bearing, which is what anything sailing a full lap has to fit inside */
+  min: number
+  max: number
+}
+
+export function lakeShore(groundAt: (x: number, z: number) => number): Shore {
+  const c = lakeCentre()
+  const raw: number[] = []
+  for (let i = 0; i < SHORE_N; i++) {
+    const th = (i / SHORE_N) * Math.PI * 2
+    const cx = Math.cos(th)
+    const cz = Math.sin(th)
+    let r = LAKE_HALF
+    for (let d = 100; d < LAKE_HALF; d += 20) {
+      if (groundAt(c.x + cx * d, c.z + cz * d) > LAKE_Y) { r = d; break }
+    }
+    raw.push(r)
+  }
+  const smooth = raw.map((_, i) => {
+    let s = 0
+    for (let k = -2; k <= 2; k++) s += raw[(i + k + SHORE_N) % SHORE_N]
+    return s / 5
+  })
+  const at = (angle: number): number => {
+    const f = (angle / (Math.PI * 2)) * SHORE_N
+    const i = Math.floor(f)
+    const t = f - i
+    const a = smooth[((i % SHORE_N) + SHORE_N) % SHORE_N]
+    const b = smooth[((i + 1) % SHORE_N + SHORE_N) % SHORE_N]
+    return a + (b - a) * t
+  }
+  return { at, min: Math.min(...smooth), max: Math.max(...smooth) }
+}
+
 export const LAKE_U = {
   tReflect: { value: null as Texture | null },
   texMatrix: { value: new Matrix4() },
@@ -149,7 +216,7 @@ export interface Lake {
 }
 
 export function buildLake(scene: Scene): Lake {
-  const geo = new PlaneGeometry(LAKE.r * 2.6, LAKE.r * 2.6, 1, 1)
+  const geo = new PlaneGeometry(LAKE_HALF * 2, LAKE_HALF * 2, 1, 1)
   geo.rotateX(-Math.PI / 2)
   const material = new ShaderMaterial({
     uniforms: LAKE_U,

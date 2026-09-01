@@ -114,9 +114,10 @@ describe('the gait', () => {
     expect(WALK.stride).toBeCloseTo(56, 0)
   })
 
-  it('is scaled to this world rather than to the mockup', () => {
-    /* a figure here is 65.5 units and one there was 51.5, so every length carried across had to be
-       multiplied by 1.27 -- 41 u/s became 52, a 44-unit stride became 56 */
+  it('is scaled to the height the figures actually are', () => {
+    /* the mockup's 41 u/s and 44-unit stride come from "a figure is 51.5 units", and nothing in
+       this export is 51.5 -- its own crowd filter says 65.5 forty lines further down. Same world,
+       same file: its walkers were 27% too slow for the valley they were walking. */
     expect(WALK.speed / 41).toBeCloseTo(65.5 / 51.5, 1)
     expect(WALK.stride / 44).toBeCloseTo(65.5 / 51.5, 1)
   })

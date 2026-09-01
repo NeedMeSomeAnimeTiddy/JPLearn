@@ -44,7 +44,8 @@ import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
 import { buildCrowd, type CrowdField } from './crowd'
 import { buildWalkers, type WalkField } from './walk'
-import { buildLake, type Lake } from './lake'
+import { buildLake, lakeShore, type Lake } from './lake'
+import { buildLife, type LifeField } from './life'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
@@ -108,6 +109,7 @@ let nightMap: NightMap | null = null
 let windows: WindowField | null = null
 let crowd: CrowdField | null = null
 let walkers: WalkField | null = null
+let life: LifeField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -149,6 +151,9 @@ const people = new URLSearchParams(window.location.search).get('crowd') !== 'off
 /* `?walk=off` -- the footing grid is the one structure in this valley that is built out of raw
    triangles, so what it costs at boot has to be priceable without it */
 const walking = new URLSearchParams(window.location.search).get('walk') !== 'off'
+/* `?life=off` -- the boats, the ducks, the koi, the steam and the banners are one table and one
+   tick, so they get one switch */
+const alive = new URLSearchParams(window.location.search).get('life') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -555,6 +560,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
         }
       }
     }
+
+    /* AND EVERYTHING ELSE THAT WAS STILL: the boats, the ducks, the koi, the monkeys, the steam and
+       the banners. LAST, because the boats sail a coast measured off the heightfield and their
+       passengers wear the walkers' un-idled material -- both of which have to exist first. */
+    if (alive) {
+      const shore = ground && lake ? lakeShore(ground.at) : null
+      life = buildLife(scene, root, crowd, shore, walkers?.material ?? null)
+      console.info(
+        `[valley] life: ${life.items} props moving, ${life.boats} boats with ${life.riders} `
+        + `aboard, ${life.wakes} wakes, ${life.moored} moored`
+        + (shore ? `; shore ${Math.round(shore.min)}..${Math.round(shore.max)} units out` : ''),
+      )
+    }
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
@@ -672,6 +690,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     lake?.tick(dt / 1000)
     crowd?.tick(dt / 1000)
     walkers?.tick(dt / 1000)
+    life?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -734,6 +753,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       crowd = null
       walkers?.dispose()
       walkers = null
+      life?.dispose()
+      life = null
       ground = null
       lake?.dispose()
       lake = null
