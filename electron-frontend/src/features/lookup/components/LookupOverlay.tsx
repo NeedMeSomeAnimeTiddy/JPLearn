@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ANSWERABLE_ROUTES, LOOKUP_ROUTES, LOOKUP_WORD_LIMIT } from '../constants'
 import type { LookupController, LookupRouteKey, LookupStatus } from '../types'
 import { kanjiIn } from '../utils'
+import '../../../styles/stage.css'
 import '../lookup.css'
 
 export interface LookupOverlayProps {

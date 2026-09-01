@@ -443,3 +443,83 @@ screen that can stand on it alone — **phase 2 needs it anyway**. The tokens (`
 clean. Driven live in Electron against the real bridge: `/` opens from the home screen, `語`
 returns N5 and 言 口 五 from `kanji-detail`, the absent fields read as absent, `,` opens settings,
 Escape closes both, and a comma typed into the field goes into the field.
+
+---
+
+# Phase 2 — done, 2026-09-01
+
+**The valley menu is the app's front door.** Five section rows and a hero card standing on the
+stage, over the world phase 0 put behind them, with the old `HomeView` one titlebar click away.
+
+## What shipped
+
+`src/features/menu/` — 6 files, 12 tests — plus `src/styles/stage.css`, which is the frame
+contract extracted from the lookup overlay so there is **one** definition of the board rather than
+two. The lookup was refactored onto it in the same change and its tests still pass.
+
+- **Five rows in curriculum order**: THE PATH 道, PRACTICE 練習, THE WORLD 実践, THE EXAM 検定,
+  YOU 記録. Six became five — DAILY is a lane inside PRACTICE, which is what the navigation plan
+  decided.
+- **Each row dispatches to the view that does that job today**: `script_hub`, `daily_games`,
+  `passage_hub`, `jlpt_prep`, and the overview panel for YOU. Phase 2 changes the door, not what
+  is behind it; phase 4 replaces those one at a time.
+- **The hero is derived, never authored.** Everything on it comes from `recommendations` — the
+  same `StudyBlockPayload` the old home screen's "Up next" block read — so the menu cannot drift
+  from what the app actually thinks you should do. With no recommendation it says *nothing due*
+  rather than inventing a number.
+- **The crown** carries streak, level and XP from `summary` and `getXpProgress`.
+
+## The locks are real, and that is the point
+
+The mockup's locks were authored demo state so its finished screens stayed reachable. These are
+read from `getFeatureState` — the same command `useAchievements` already used for badges — so the
+progression game the app has always had finally gates something. On this account, THE WORLD and
+THE EXAM draw shut, each naming the milestone that opens it.
+
+Two rules made it honest rather than annoying:
+
+- **Locked is visible and dimmed, never hidden.** You can see the whole game from day one.
+- **Nothing is locked until the catalog answers.** A menu that draws five locked rows for a
+  moment and then opens four reads as a bug, so the loading state is *not yet known*, drawn open.
+
+**THE WORLD's gate is conversation, not reading**, and the catalog is what says so:
+`conversation_mode` opens at `grammar_n5` (step five) where `reading_mode` waits for `reading`
+(step eleven). A section opens when its first lane does.
+
+## Making the app transparent
+
+`.app-shell` paints an opaque gradient and sets `isolation: isolate`. While the menu is the front
+door it gets `mn-showing` and goes transparent, which is the only reason the valley is visible
+at all — phase 0 rendered it, but the app had been painting straight over it ever since.
+
+## The test suite told the truth, and it took four goes to hear it
+
+Changing what `home` renders broke **92 tests across 8 files** — every suite that starts by
+reaching for a deck cassette, the "Up next" heading, or the Daily Games button. None of them were
+wrong: what they test is the flow *behind* the door.
+
+Making the classic surface explicit took three attempts, and the failures were the useful part:
+
+1. Setting the flag once in `test-setup.ts` fixed **4 of 92** — ten suites call
+   `localStorage.clear()` in their own `afterEach`, so it survived exactly the first test per file.
+2. Moving it into a global `beforeEach` fixed **41 more** — setup-file hooks run before file-level
+   ones, so it now beat the `afterEach` clears.
+3. Five suites clear in their *own* `beforeEach`, which runs after the setup file's. Those five
+   now say so themselves, one line each — which is better than a global anyway: a suite that
+   depends on a particular front door should state it.
+4. One test clears storage **mid-test** and re-renders `<App />`. It needed the same line again.
+
+**857 tests pass, 82 files**, 8 a11y, lint clean.
+
+## The toggle
+
+`AppTitlebar` gained one button — a mountain — that swaps between the valley menu and the classic
+home, persisted in `localStorage`. It is the phase-2-to-5 scaffolding the third decision asked
+for, and it comes out at phase 6.
+
+## What phase 3 inherits
+
+The rows already know their own keys (`STUDY`, `DRILLS`, `READING`, `JLPT`, `RECORDS`) — the same
+keys the mockup's `SECTION_ACCENT`, `SUBTILES` and `L2_PLANES` are keyed by — so the L2 work lands
+on names that already match. What is still flat is the *model*: `openMenuSection` dispatches
+straight to a view, and phase 3 is where that becomes a tree with a real back stack.

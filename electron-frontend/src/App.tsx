@@ -54,6 +54,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
+import { useMenuL1, MenuL1, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { useAppNavigation, VIEW_PARENT } from './features/navigation'
@@ -304,6 +305,19 @@ function App() {
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
   const lookup = useLookup()
+  /* PHASE 2: the valley menu is the front door, and the old home screen is one click away.
+     Persisted so the choice survives a restart; the toggle comes out at phase 6. */
+  const [menuFrontDoor, setMenuFrontDoor] = useState<boolean>(() => {
+    try { return window.localStorage.getItem('jplearn.menu.frontDoor') !== 'off' } catch { return true }
+  })
+  const toggleMenuFrontDoor = useCallback(() => {
+    setMenuFrontDoor((previous) => {
+      const next = !previous
+      try { window.localStorage.setItem('jplearn.menu.frontDoor', next ? 'on' : 'off') } catch { /* private mode */ }
+      return next
+    })
+  }, [])
+  const menu = useMenuL1(menuFrontDoor)
 
   function openDailyGames(): void {
     closeKanjiDetail()
@@ -1859,6 +1873,29 @@ function App() {
   }, [getDeckCardsDeduped, refreshDeckProgressAfterSeedChange])
 
 
+  /* THE FIVE ROWS DISPATCH TO THE VIEWS THAT ALREADY EXIST. Phase 2 changes the front door, not
+     what is behind it — each section lands on the flat view that does that job today, and phase 4
+     replaces them one at a time with the L2 screens. YOU has no view of its own; it is the
+     overview panel, which is what RECORDS always was. */
+  const openMenuSection = useCallback((key: MenuSectionKey) => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    if (key === 'STUDY') { navigate('script_hub', 'forward'); return }
+    if (key === 'DRILLS') { openDailyGames(); return }
+    if (key === 'READING') { navigate('passage_hub', 'forward'); return }
+    if (key === 'JLPT') { navigate('jlpt_prep', 'forward'); return }
+    setShowOverview(true)
+  }, [navigate, openDailyGames, tutor])
+
+  /* the hero runs the thing rather than opening a section — except where the thing IS a place,
+     in which case it hands off to the section it named, so you end up where the card said */
+  const runMenuHero = useCallback(() => {
+    const hero = heroFromStudyBlock(studyBlock)
+    openMenuSection(hero.section ?? 'STUDY')
+  }, [openMenuSection, studyBlock])
+
   // Titlebar callbacks: named here rather than inlined in the titlebar JSX so the
   // titlebar component receives bare handlers instead of raw state setters.
   const toggleShortcutMenu = useCallback(() => {
@@ -2096,7 +2133,17 @@ function App() {
   const renderView = () => (
     <>
       {/* Home is the main landing surface; keep it mounted only for home view. */}
-      {view === 'home' ? (
+      {view === 'home' && menuFrontDoor ? (
+        <MenuL1
+          controller={menu}
+          hero={heroFromStudyBlock(studyBlock)}
+          crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress)}
+          onOpenSection={openMenuSection}
+          onRunHero={runMenuHero}
+        />
+      ) : null}
+
+      {view === 'home' && !menuFrontDoor ? (
         <HomeView
           navDirection={navDirection}
           studyPlan={studyPlan}
@@ -2472,7 +2519,7 @@ function App() {
   )
 
   return (
-    <main className="app-shell">
+    <main className={view === 'home' && menuFrontDoor ? 'app-shell mn-showing' : 'app-shell'}>
       <AppTitlebar
         windowDrag={windowDrag}
         shortcutMenuRef={shortcutMenuRef}
@@ -2502,6 +2549,8 @@ function App() {
         canTitlebarForward={nav.canHistoryForward}
         titlebarHistoryBack={nav.historyBack}
         titlebarHistoryForward={nav.historyForward}
+        menuFrontDoor={menuFrontDoor}
+        onToggleMenuFrontDoor={toggleMenuFrontDoor}
         settings={settings}
         pomodoro={pomodoro}
         tutor={tutor}

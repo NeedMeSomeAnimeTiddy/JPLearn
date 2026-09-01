@@ -1,0 +1,204 @@
+/* ==================================================================================================
+   L1 — THE VALLEY MENU. The front door, standing on the shared stage in `src/styles/stage.css`.
+
+   IT IS A LEFT COLUMN, AND THAT IS THE ONE DEVIATION FROM THE CONTRACT. The frame contract
+   balances its stage about x640; this menu is a column of rows on the left with the mountain
+   showing on the right, and that composition is the reason the rest of the interface looks the
+   way it does. It obeys the moat and the bands; it does not obey the balance.
+
+   166 RATHER THAN 160, WHICH IS THE MOAT. The rows are skewed about their left-middle, so a
+   40-tall row paints ~2.8px left of where it is authored and a taller one further still. Authored
+   at 160 the column would start inside the bare-valley band; 166 keeps the paint on the stage.
+   ================================================================================================== */
+.mn-open {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mn-open .mn-frame { pointer-events: none; }
+.mn-open .mn-frame > * { pointer-events: auto; }
+
+/* ---- the crown: what the account is, above the stage ---- */
+.mn-crown {
+  position: absolute;
+  left: 166px;
+  top: 96px;
+  width: 660px;
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transform-origin: 0 50%;
+  white-space: nowrap;
+}
+.mn-crown b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px; line-height: 1;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.78);
+}
+.mn-crown span {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em;
+  color: rgba(242, 234, 216, 0.72); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.78);
+}
+/* an absence is drawn as an absence: a streak nobody has yet is an em dash, never a zero */
+.mn-crown span.none { color: rgba(242, 234, 216, 0.4); font-style: italic; }
+
+/* ---- the hero: the app's opinion of what to do now ---- */
+.mn-hero {
+  position: absolute;
+  left: 856px;
+  top: 192px;
+  width: 264px;
+  min-height: 232px;
+  display: flex;
+  flex-direction: column;
+  border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transform-origin: 0 50%;
+  transition: transform 0.24s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.24s ease;
+}
+.mn-hero.on {
+  box-shadow: 10px 13px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transform: skewX(-8deg) rotate(-1.2deg) translate(6px, -5px);
+}
+.mn-hero:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
+
+.sh-cap {
+  flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 7px 15px 8px; background: var(--ink); white-space: nowrap;
+}
+.sh-cap b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+  color: var(--gold-hi);
+}
+.sh-cap i {
+  font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.1em; color: rgba(232, 196, 124, 0.6);
+}
+.sh-body { padding: 12px 16px 0; flex: 1; }
+.sh-fig { display: flex; align-items: baseline; gap: 11px; }
+.sh-fig b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 44px; line-height: 0.9;
+  color: var(--ink);
+}
+.sh-fig span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sh-fig em {
+  font-style: italic; font-family: var(--lat); font-weight: 900; font-size: 16px; line-height: 1.05;
+  color: #b23320;
+}
+.sh-fig i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap;
+}
+/* the one line that says WHY this and not something else -- without it the card is an
+   instruction, and an instruction a learner cannot audit is one they stop trusting */
+.sh-why {
+  margin-top: 9px; font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px;
+  line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.66);
+}
+.sh-meta {
+  margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 10px 16px 9px; white-space: nowrap; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.5);
+}
+.sh-meta s { text-decoration: none; color: rgba(20, 17, 13, 0.34); }
+.sh-slab {
+  flex: none; height: 32px; display: grid; place-items: center; background: var(--hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
+  color: #ffd9a1; white-space: nowrap;
+}
+
+/* ---- the rows ---- */
+.mn-rows { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+
+.mn-row {
+  position: absolute;
+  left: 166px;
+  width: 660px;
+  height: 62px;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transform-origin: 0 50%;
+  transition: transform 0.24s cubic-bezier(0.2, 0.92, 0.24, 1);
+}
+
+.mn-card {
+  position: absolute; left: 0; top: 0; width: 330px; height: 100%;
+  display: flex; align-items: stretch; overflow: hidden;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit;
+  transition: width 0.32s cubic-bezier(0.18, 0.9, 0.24, 1), background 0.26s ease,
+              box-shadow 0.2s ease, transform 0.14s ease;
+}
+.mn-row.on .mn-card {
+  width: 396px; background: var(--washi);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: translate(12px, -5px);
+}
+.mn-card:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
+
+/* the mark column: the accent, the glyph, the number */
+.mn-mark {
+  flex: none; width: 42px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; background: var(--acc);
+  box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.2);
+}
+.mn-glyph { font-family: var(--jp); font-weight: 400; font-size: 20px; line-height: 1; color: var(--ink); }
+.mn-no {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 10px; line-height: 1;
+  color: rgba(20, 17, 13, 0.6);
+}
+
+.mn-body {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
+  padding: 0 13px; gap: 3px;
+}
+.mn-head { display: flex; align-items: baseline; gap: 10px; }
+.mn-en {
+  flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px;
+  line-height: 1; color: var(--ink); white-space: nowrap;
+}
+.mn-jp {
+  flex: none; font-family: var(--jp); font-weight: 400; font-size: 14px; line-height: 1;
+  letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.66); white-space: nowrap;
+}
+.mn-desc {
+  font-family: var(--lat-ui); font-weight: 600; font-size: 10px; line-height: 1.35;
+  color: rgba(20, 17, 13, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* LOCKED IS VISIBLE AND DIMMED, NOT HIDDEN — you can see the whole game from day one, and each
+   locked row says what opens it. The card keeps its paper so the row still reads as a row; what
+   goes is the colour and the action. */
+.mn-row.locked .mn-card {
+  background: linear-gradient(178deg, #ded8c8 0%, #c9c3b1 100%);
+  cursor: default;
+}
+.mn-row.locked .mn-mark { filter: saturate(0.15); }
+.mn-row.locked .mn-en { color: rgba(20, 17, 13, 0.5); }
+.mn-row.locked .mn-jp { color: rgba(20, 17, 13, 0.34); }
+.mn-row.locked .mn-desc { color: rgba(20, 17, 13, 0.4); font-style: italic; }
+.mn-lock {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
+  color: #8a5a2a; white-space: nowrap;
+}
+
+.mn-hint {
+  position: absolute; left: 166px; top: 612px; width: 660px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
+}
+
+/* the app's own gradient would paint straight over the valley, so the shell goes transparent
+   while the menu is the front door -- and only then */
+.app-shell.mn-showing { background: transparent; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-open * { animation: none !important; transition: none !important; }
+}

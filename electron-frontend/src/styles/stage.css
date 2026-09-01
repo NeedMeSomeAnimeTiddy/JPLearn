@@ -1,0 +1,42 @@
+/* ==================================================================================================
+   THE STAGE — the frame contract, and the one coordinate system the menu is authored in.
+
+   Every position in the menu mockup is a coordinate on a 1280×720 board: the stage runs x160–1120
+   and y192–576, with 160px of bare valley either side as a moat, a crown above and a foot band
+   below. `zoom` scales the whole board to whatever window it lands in, which is what makes
+   `left: 250px` mean the same place at any size. `transform: scale` would not do — zoom scales
+   layout, so the coordinates stay honest and children can still be positioned in board pixels.
+
+   THE TOKENS LIVE HERE AND GO NO FURTHER. They are set on the stage roots, never on `:root`: this
+   app has 348 `border-radius` declarations and none of these variables, and defining them globally
+   would be the first step of an accidental re-skin. The seam is supposed to be deliberate — the
+   menu is the chrome, the app is what happens inside a session.
+   ================================================================================================== */
+.lk-open,
+.mn-open {
+  --washi: #f2ead8;
+  --ink: #14110d;
+  --hi: #e34a33;
+  --gold-hi: #e8c47c;
+  --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+  --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+  --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", "Arial", sans-serif;
+}
+
+/* the board itself. `--u` is set from JS to min(vw/1280, vh/720). */
+.lk-frame,
+.mn-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1280px;
+  height: 720px;
+  margin: -360px 0 0 -640px;
+  zoom: var(--lk-u, 1);
+  pointer-events: none;
+}
+
+.lk-frame > *,
+.mn-frame > * {
+  pointer-events: auto;
+}

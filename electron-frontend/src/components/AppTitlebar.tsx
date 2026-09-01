@@ -4,8 +4,7 @@ import type { CSSProperties, Dispatch, RefObject, SetStateAction } from 'react'
 import {
   Activity, ArrowLeft, ArrowRight, BarChart3, BookText, Bug, Clock, Code2, Copy, Flame, Gamepad2,
   House, Languages, ListChecks, Menu, Minus, PlayCircle, RotateCcw, Search,
-  Settings, Snowflake, Square, Trash2, X,
-} from 'lucide-react'
+  Settings, Snowflake, Square, Trash2, X, Mountain } from 'lucide-react'
 import type {
   AppSettings, MinigameKey, ScriptKey, ShortcutSubmenuKey, StudySummaryPayload, XPProgress,
 } from '../types'
@@ -44,6 +43,11 @@ export interface AppTitlebarProps {
   openDictionaryForCurrentRound: () => void
   canTitlebarBack: boolean
   canTitlebarForward: boolean
+  /* PHASE 2 SCAFFOLDING, AND IT COMES OUT AT PHASE 6. The valley menu and the old home screen
+     coexist while the tree is ported, so every phase can ship on its own and a regression is a
+     switch away rather than a blocked release. */
+  menuFrontDoor?: boolean
+  onToggleMenuFrontDoor?: () => void
   titlebarHistoryBack: () => void
   titlebarHistoryForward: () => void
   settings: AppSettings
@@ -95,6 +99,8 @@ export function AppTitlebar({
   openDictionaryForCurrentRound,
   canTitlebarBack,
   canTitlebarForward,
+  menuFrontDoor,
+  onToggleMenuFrontDoor,
   titlebarHistoryBack,
   titlebarHistoryForward,
   settings,
@@ -387,6 +393,18 @@ export function AppTitlebar({
           >
             <ArrowRight className="window-nav-icon" strokeWidth={2.2} />
           </button>
+          {onToggleMenuFrontDoor ? (
+            <button
+              type="button"
+              className="window-nav-button"
+              onClick={onToggleMenuFrontDoor}
+              aria-label={menuFrontDoor ? 'Use the classic home screen' : 'Use the valley menu'}
+              title={menuFrontDoor ? 'Classic home screen' : 'Valley menu'}
+              aria-pressed={!!menuFrontDoor}
+            >
+              <Mountain className="window-nav-icon" strokeWidth={2.2} />
+            </button>
+          ) : null}
           <button
             type="button"
             className="window-nav-button"

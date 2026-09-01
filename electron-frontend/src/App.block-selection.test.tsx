@@ -103,6 +103,10 @@ function makeApi() {
 
 beforeEach(() => {
   window.localStorage.clear()
+    /* this suite clears storage in its own beforeEach, which runs after the setup file's --
+       so the classic front door is re-stated here. These tests are about the flow behind
+       the door, not the door. */
+  window.localStorage.setItem('jplearn.menu.frontDoor', 'off')
   window.jplearnDesktop = makeApi()
 })
 

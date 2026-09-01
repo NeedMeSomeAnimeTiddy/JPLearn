@@ -1109,6 +1109,8 @@ describe('Minigame menu', () => {
 
     cleanup()
     window.localStorage.clear()
+    /* this test re-renders App mid-way, and the clear above took the front-door flag with it */
+    window.localStorage.setItem('jplearn.menu.frontDoor', 'off')
 
     window.jplearnDesktop = baseDesktopApi
     render(<App />)
