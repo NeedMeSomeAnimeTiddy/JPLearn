@@ -106,13 +106,17 @@ it. Last because it needs the path (phase 4) to fire from.
 - **`three` + `gsap`** — new, and not optional. The world and the flights are the design. GSAP
   specifically because the camera work is authored against its easing and rewriting those tweens
   would be re-authoring the flights.
-- **`zustand`** — yes, at phase 3. Problem 3 is the reason: navigation state a dozen screens read,
-  in a file already past the size warning. ~1 KB, no provider, and it works outside React, which
-  the keyboard layer wants.
-- **`@tanstack/react-query`** — yes, at phase 2. Not a convenience: the bridge is strictly serial
-  and a timed-out request rejects *every* other in-flight one. L1 alone wants `summary`,
-  `recommendations`, `daily-goal` and `feature-unlocks` on every paint. Dedupe is a mitigation for
-  a documented failure mode.
+- **`zustand`** — ~~yes, at phase 3~~ **not taken at phase 3, and the reason is worth keeping.**
+  The justification was "navigation state a dozen screens read" — but at phase 3 the tree is read
+  by two places, and the dozen screens are phases 4 and 5. The keyboard layer turned out to be
+  inside React already. A plain hook does it in 75 lines with no dependency. **Revisit when the
+  L2 screens actually arrive**, which is the point at which the claim becomes true rather than
+  anticipated.
+- **`@tanstack/react-query`** — ~~yes, at phase 2~~ **not taken.** The dedupe argument is real but
+  it was already solved: `App.tsx` hand-rolls an in-flight map and a cache for `study-queue`, the
+  expensive one, and L1 reuses `summary`, `recommendations` and `xpProgress` that App had already
+  loaded. The menu added exactly one new call (`getFeatureState`), once, on mount. A data layer
+  for one call is a data layer for its own sake.
 - **`motion`** — already installed, still unused for navigation. The HUD's enter/leave transitions
   are the one place it beats GSAP, because they are component lifecycle rather than a timeline.
 - **`@tanstack/react-router`** — still no. Electron, no URL bar, and phase 3 replaces the router
@@ -523,3 +527,75 @@ The rows already know their own keys (`STUDY`, `DRILLS`, `READING`, `JLPT`, `REC
 keys the mockup's `SECTION_ACCENT`, `SUBTILES` and `L2_PLANES` are keyed by — so the L2 work lands
 on names that already match. What is still flat is the *model*: `openMenuSection` dispatches
 straight to a view, and phase 3 is where that becomes a tree with a real back stack.
+
+---
+
+# Phase 3 — done, 2026-09-01
+
+**The navigation model, and nothing visible.** This is the phase the plan called "the one that
+touches everything", and the honest report is that it touches everything *structurally* and
+changes nothing a user can see. That is the design, not a shortfall — see the passthrough below.
+
+## Two models, on purpose
+
+The app's own navigation is a flat `AppView` plus an order-of-visit history: six screens, all
+siblings, and a `VIEW_PARENT` map so Escape has somewhere to go. That is the right model for six
+destinations and the wrong one for a menu three levels deep, because **"up" and "back" stop being
+the same question** the moment you can reach one screen two ways.
+
+So `useMenuPath` is a *second, smaller* model sitting above the old one rather than replacing it.
+It owns L1 → L2 → L3; the flat views stay exactly as they are at L4. `useAppNavigation` was not
+rewritten and not touched — the two coexist, which is what the third decision asked for.
+
+## The passthrough is the whole trick
+
+A section with **no L2 screen yet does not stop at L2** — it goes straight through to the flat
+view that does its job today, and the path stays at the root. `L2_READY` is empty, so every one
+of the five rows behaves exactly as it did in phase 2.
+
+Phase 4 registers screens one at a time. Each registration silently converts a passthrough into a
+real stop **without touching anything that calls this** — there is a test that does exactly that
+and asserts nothing else changed.
+
+It matters that a passthrough leaves the path at L1 rather than parking it at a level with nothing
+to draw: a level you cannot see is a level Escape would appear to ignore, once, for no reason.
+
+## Escape asks the tree first
+
+Inside the menu, Escape means *up one level*, and only falls through to the flat `VIEW_PARENT`
+chain when the tree says it is already at the root. `up()` returns a boolean for exactly that
+reason — a silent no-op would make Escape a key that sometimes does nothing.
+
+Two things that had to be right:
+
+- **`up()` reads the current path, not a flag set inside a state updater.** React may call an
+  updater more than once, and does in StrictMode, so anything it writes to a closure is not a
+  reliable answer to hand back to a caller.
+- **The keydown effect's dependency array now carries the tree.** Without it the handler closes
+  over a stale path and walks the wrong level — the kind of bug that only shows up on the second
+  Escape.
+
+Wiring it meant moving `openMenuSection` and `useMenuPath` above the keydown effect that uses
+them; every dependency they need (`navigate`, `tutor`, `openDailyGames`) was already defined
+earlier, so it was a move rather than a rewrite.
+
+## The libraries, revisited
+
+Both of this plan's library verdicts were written before the code existed, and **neither survived
+contact with it**. The entries above are corrected in place rather than quietly dropped:
+
+- **`react-query` (phase 2) — not taken.** The dedupe it was for already exists by hand for the
+  expensive call, and the menu added exactly one new bridge call.
+- **`zustand` (phase 3) — not taken.** "State a dozen screens read" is a phase 4–5 claim; at
+  phase 3 the tree has two readers and the keyboard layer is inside React already. 75 lines, no
+  dependency. Revisit when the screens that justify it exist.
+
+Neither is a rejection of the library. Both are a rejection of adding it *before* the thing it
+solves is real.
+
+## Verified
+
+8 new tests for the tree — passthrough, stop, down, up, up-at-the-root, screen-from-the-root,
+reset, and the phase-4 registration flip. **865 passing overall**, 8 a11y, lint clean, and driven
+live in Electron: the rows still navigate, a locked row still does not, and the toggle still
+returns the classic home.

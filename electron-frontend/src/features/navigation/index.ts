@@ -8,4 +8,5 @@
 
 export { useAppNavigation } from './useAppNavigation'
 export { VIEW_PARENT } from './constants'
-export type { AppNavigationApi } from './types'
+export { useMenuPath, L2_READY, ROOT } from './useMenuPath'
+export type { AppNavigationApi, MenuPath, MenuPathApi } from './types'

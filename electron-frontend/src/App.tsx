@@ -57,7 +57,7 @@ import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { useMenuL1, MenuL1, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
-import { useAppNavigation, VIEW_PARENT } from './features/navigation'
+import { useAppNavigation, useMenuPath, VIEW_PARENT } from './features/navigation'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import {
@@ -1239,6 +1239,28 @@ function App() {
     [overviewKanjiDeck, cardScores.kanji_n5],
   )
 
+  /* THE FIVE ROWS DISPATCH TO THE VIEWS THAT ALREADY EXIST. Phase 2 changes the front door, not
+     what is behind it — each section lands on the flat view that does that job today, and phase 4
+     replaces them one at a time with the L2 screens. YOU has no view of its own; it is the
+     overview panel, which is what RECORDS always was. */
+  const openMenuSection = useCallback((key: MenuSectionKey) => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    if (key === 'STUDY') { navigate('script_hub', 'forward'); return }
+    if (key === 'DRILLS') { openDailyGames(); return }
+    if (key === 'READING') { navigate('passage_hub', 'forward'); return }
+    if (key === 'JLPT') { navigate('jlpt_prep', 'forward'); return }
+    setShowOverview(true)
+  }, [navigate, openDailyGames, tutor])
+
+  /* THE TREE, WITH THE OLD BEHAVIOUR AS ITS PASSTHROUGH. `enterSection` stops at L2 for any
+     section that has an L2 screen, and goes straight to the flat view for any that does not.
+     `L2_READY` is empty today, so every row behaves exactly as it did in phase 2 — phase 4
+     converts them one at a time by registering a screen, and nothing here changes. */
+  const menuPath = useMenuPath(openMenuSection)
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       const target = event.target as HTMLElement
@@ -1353,6 +1375,13 @@ function App() {
           return
         }
 
+        /* THE TREE FIRST, THEN THE FLAT MAP. Inside the menu, Escape means "up one level"; the
+           `up()` boolean is what stops it becoming a key that silently does nothing at the root,
+           where it must fall through to the app's own parent chain instead. */
+        if (view === 'home' && menuFrontDoor && menuPath.up()) {
+          return
+        }
+
         const parentView = VIEW_PARENT[view]
         if (parentView) {
           navigate(parentView, 'back')
@@ -1408,7 +1437,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view])
+  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view, menuFrontDoor, menuPath])
 
   const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
@@ -1873,21 +1902,6 @@ function App() {
   }, [getDeckCardsDeduped, refreshDeckProgressAfterSeedChange])
 
 
-  /* THE FIVE ROWS DISPATCH TO THE VIEWS THAT ALREADY EXIST. Phase 2 changes the front door, not
-     what is behind it — each section lands on the flat view that does that job today, and phase 4
-     replaces them one at a time with the L2 screens. YOU has no view of its own; it is the
-     overview panel, which is what RECORDS always was. */
-  const openMenuSection = useCallback((key: MenuSectionKey) => {
-    setDictionaryOpen(false)
-    setShowOverview(false)
-    setShowSettings(false)
-    tutor.closeTutorPanel()
-    if (key === 'STUDY') { navigate('script_hub', 'forward'); return }
-    if (key === 'DRILLS') { openDailyGames(); return }
-    if (key === 'READING') { navigate('passage_hub', 'forward'); return }
-    if (key === 'JLPT') { navigate('jlpt_prep', 'forward'); return }
-    setShowOverview(true)
-  }, [navigate, openDailyGames, tutor])
 
   /* the hero runs the thing rather than opening a section — except where the thing IS a place,
      in which case it hands off to the section it named, so you end up where the card said */
@@ -2138,7 +2152,7 @@ function App() {
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
           crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress)}
-          onOpenSection={openMenuSection}
+          onOpenSection={menuPath.enterSection}
           onRunHero={runMenuHero}
         />
       ) : null}
