@@ -492,3 +492,165 @@
 .pr-lane.shut .wd-item b { color: rgba(20, 17, 13, 0.45); }
 /* the slab carries the unlock sentence, which is authored as prose so the aria-label can use it */
 .pr-lane.shut .pr-slab { text-transform: uppercase; }
+
+/* ==================================================================================================
+   THE ASCENT — THE EXAM'S LEVEL TWO. Five columns, two rules across them, one cursor.
+
+   IN STAGE COORDINATES, NOT THE MOCKUP'S. There the ladder broke out of a panel with a negative
+   margin and a `100vw` width to get the room it needed; here the frame IS the stage, so the run is
+   laid straight onto it. The columns occupy 270–1092 with 50 between, which leaves the measure
+   x160–270 on the left and the moat clear on the right.
+
+   A 300-TALL COLUMN SKEWED -8deg PAINTS 21.1px WIDER EACH SIDE than it is authored, so the run
+   lands at 249–1113 against a stage of 160–1120 — and it lands there whichever level is wide,
+   because the wide column is 32px wider than a narrow one and the run's length does not change.
+   The widths follow the target; the ends do not move.
+   ================================================================================================== */
+.ascent { position: absolute; inset: 0; }
+
+/* ---- the measure ---- */
+.as-tick {
+  position: absolute; left: 176px; transform: translateY(-50%); padding: 2px 6px;
+  background: rgba(10, 9, 6, 0.82); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+  color: rgba(242, 234, 216, 0.6);
+}
+/* THE GATE IS DASHED AND THE READY LINE IS SOLID — the one piece of styling on this screen that
+   carries a distinction rather than a mood. AND EACH HAS TO READ ON BOTH GROUNDS: a rule spanning
+   the ladder crosses gold fill and near-black track in the same 830px, so one flat colour vanishes
+   for half its length. The gate alternates gold and ink dash for dash; the ready line is washi with
+   an ink keyline above and below. */
+.as-rule { position: absolute; left: 265px; width: 832px; height: 2px; z-index: 6; pointer-events: none; }
+.as-rule.gate {
+  background: repeating-linear-gradient(90deg, var(--gold-hi) 0 9px, rgba(20, 17, 13, 0.8) 9px 18px);
+}
+.as-rule.ready {
+  background: var(--washi);
+  box-shadow: 0 -1px 0 rgba(20, 17, 13, 0.55), 0 1px 0 rgba(20, 17, 13, 0.55);
+}
+.as-chip {
+  position: absolute; left: 172px; width: 66px; z-index: 7;
+  transform: translateY(-50%) skewX(-8deg); padding: 5px 0 6px; text-align: center;
+  background: rgba(10, 9, 6, 0.9); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+}
+.as-chip.gate { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(232, 196, 124, 0.55); }
+.as-chip.ready { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.7); }
+.as-chip b {
+  display: block; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
+  line-height: 1;
+}
+.as-chip.gate b { color: var(--gold-hi); }
+.as-chip.ready b { color: var(--washi); }
+.as-chip i {
+  display: block; margin-top: 3px; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8px; letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.72);
+}
+
+/* ---- a level ---- */
+/* AN EMPTY TRACK IS THE PART OF THE COLUMN THAT IS NOT THE DRAWING, and on a real account there is
+   a great deal of it — so it is hatched and kept light. The same alpha over this much area reads as
+   a wall rather than as a chart. */
+.as-col {
+  position: absolute; transform: skewX(-8deg); border: 0; padding: 0; cursor: pointer;
+  background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.05) 0 7px,
+    rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.72);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
+}
+.as-col.here {
+  background: rgba(10, 9, 6, 0.7);
+  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.4);
+}
+.as-col.locked {
+  cursor: default;
+  background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.06) 0 7px,
+    rgba(0, 0, 0, 0) 7px 14px), linear-gradient(rgba(17, 19, 28, 0.9), rgba(11, 13, 20, 0.94));
+  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16);
+}
+.as-col:focus-visible { outline: 3px solid var(--hi); outline-offset: 5px; }
+.as-fill {
+  position: absolute; left: 0; right: 0; bottom: 0; background: var(--gold);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.as-col.here .as-fill { background: var(--gold-hi); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+/* SET FOR THE COLUMN IT STANDS IN — the number is the drawing here, so it tracks the width */
+.as-pct {
+  position: absolute; left: 0; right: 0; text-align: center; font-family: var(--lat);
+  font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; color: var(--ink);
+}
+.as-col.here .as-pct { font-size: 46px; }
+/* above the fill it stands on the dark track, so it takes the washi rather than the ink */
+.as-pct.above { color: var(--washi); }
+.as-col.locked .as-pct { color: rgba(242, 234, 216, 0.5); font-size: 22px; }
+.as-mark {
+  position: absolute; left: 0; right: 0; top: 22px; text-align: center; font-family: var(--jp);
+  font-size: 40px; line-height: 1; color: var(--washi);
+}
+.as-lockbox { position: absolute; left: 7px; right: 7px; top: 96px; text-align: center; }
+.as-lockbox b {
+  display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.5);
+}
+.as-lockbox i {
+  display: block; margin-top: 5px; font-style: normal; font-family: var(--lat); font-weight: 900;
+  font-size: 15px; color: rgba(242, 234, 216, 0.46);
+}
+.as-lockbox u {
+  display: block; margin-top: 9px; padding: 4px 0 5px; text-decoration: none;
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); font-family: var(--lat-ui);
+  font-weight: 700; font-size: 8px; letter-spacing: 0.1em; color: rgba(242, 234, 216, 0.44);
+}
+
+/* TWO LINES, NOT THREE FACTS IN A ROW — level and state on the first, the count on the second,
+   which is what lets a column be 118 wide instead of the 150 that one row of all three demanded.
+   The gaps between the columns are worth more than the row. */
+.as-plinth {
+  position: absolute; top: 532px; height: 40px; transform: skewX(-8deg);
+  display: flex; flex-wrap: wrap; align-items: baseline; align-content: center; gap: 0 8px;
+  padding: 0 11px; background: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34);
+}
+.as-plinth.here { background: var(--gold); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
+.as-plinth.locked {
+  background: rgba(12, 10, 8, 0.6);
+  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16);
+}
+.as-plinth b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; color: var(--gold-hi);
+}
+.as-plinth.here b { font-size: 17px; color: var(--ink); }
+.as-plinth.locked b { color: rgba(242, 234, 216, 0.5); }
+.as-plinth i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.1em; line-height: 1.35; color: rgba(242, 234, 216, 0.58);
+}
+.as-plinth.here i { color: rgba(20, 17, 13, 0.7); }
+.as-plinth u {
+  flex-basis: 100%; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.08em; line-height: 1.3; white-space: nowrap;
+  color: rgba(242, 234, 216, 0.5);
+}
+.as-plinth.here u { color: rgba(20, 17, 13, 0.62); }
+.as-plinth.locked u { color: rgba(242, 234, 216, 0.3); }
+
+/* THE READY BADGE IS GOLD BECAUSE GOLD IS EARNED — it is the only thing on this screen that says a
+   level is finished rather than in progress. The target's badge is not gold for the same reason:
+   it is an instruction, not an award. */
+.as-ready, .as-you {
+  position: absolute; top: 200px; height: 22px; transform: skewX(-8deg); display: grid;
+  place-items: center; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.2em;
+}
+.as-ready { background: var(--gold-hi); color: var(--ink); box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42); }
+.as-you { background: #5b86c4; color: var(--washi); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
+
+.as-cur {
+  position: absolute; top: 222px; height: 356px; pointer-events: none; transform: skewX(-8deg);
+  box-shadow: inset 0 0 0 2px var(--washi);
+  transition: left 0.3s cubic-bezier(0.2, 0.92, 0.24, 1), width 0.3s cubic-bezier(0.2, 0.92, 0.24, 1);
+}
+
+.as-note {
+  position: absolute; left: 160px; top: 588px; width: 960px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
+}

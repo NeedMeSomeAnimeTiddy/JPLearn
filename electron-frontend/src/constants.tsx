@@ -366,6 +366,19 @@ export const FEEDBACK_COPY = {
 
 export const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 
+/* THE TWO THRESHOLDS THE LADDER IS DRAWN AGAINST, and they do not come from the same place.
+
+   `JLPT_READY_PCT` is `domain/jlpt_readiness.READINESS_THRESHOLD_PCT`. The backend already
+   decides the fact with it and reports the answer as `is_ready` per level, so nothing here
+   judges readiness — this copy only positions a line on a chart, and a drift would move the
+   line without ever mislabelling a level.
+
+   `JLPT_UNLOCK_PCT` has no backend at all: locking a level behind 30% of the one below is a
+   renderer rule, and it lived as a private constant inside `JLPTPrepView` until the ascent
+   needed to draw the same gate. One copy, so the two screens cannot disagree about it. */
+export const JLPT_READY_PCT = 80
+export const JLPT_UNLOCK_PCT = 30
+
 export const JLPT_LEVEL_LABELS: Record<JlptLevel, string> = {
   n5: 'JLPT N5',
   n4: 'JLPT N4',

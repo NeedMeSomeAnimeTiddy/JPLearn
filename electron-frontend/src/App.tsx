@@ -55,8 +55,8 @@ import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import {
-  useMenuL1, useWorldData, MenuL1, PathL2, Lanes, practiceLanes, worldLanes,
-  heroFromStudyBlock, crownFrom, type MenuSectionKey,
+  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent,
+  practiceLanes, worldLanes, ascentRungs, heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
@@ -1277,6 +1277,12 @@ function App() {
     [world.passages, world.sessions, menu.unlocked, progression.nodes],
   )
 
+  /* THE ASCENT'S ONE CALL, on the same terms: asked when the ladder is up, memoised because the
+     screen watches the array it is given. */
+  const examOpen = view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'JLPT'
+  const exam = useReadiness(examOpen)
+  const examRungs = useMemo(() => ascentRungs(exam.readiness), [exam.readiness])
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       const target = event.target as HTMLElement
@@ -2203,6 +2209,19 @@ function App() {
                opened straight onto its scenario picker rather than its menu */
             if (key === 'read') { navigate('passage_hub', 'forward'); return }
             tutor.openTutorPanel('scenarios')
+          }}
+          onUp={menuPath.up}
+        />
+      ) : null}
+
+      {examOpen ? (
+        <Ascent
+          rungs={examRungs}
+          loading={exam.loading}
+          onOpen={() => {
+            /* the level's own screen is level three (phase 5); until then a rung opens the flat
+               prep view that does that job today -- the same passthrough every section began as */
+            navigate('jlpt_prep', 'forward')
           }}
           onUp={menuPath.up}
         />

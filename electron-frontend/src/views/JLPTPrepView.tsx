@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, CheckCircle, Clock, Lock, Target, XCircle } from 'lucide-react'
+import { JLPT_UNLOCK_PCT } from '../constants'
 
 type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
@@ -18,7 +19,9 @@ const MODE_META: Record<JLPTExamMode, { label: string; description: string }> = 
 }
 
 const MOCK_EXAM_SECONDS = 30 * 60   // 30 minutes for mock exam
-const JLPT_UNLOCK_THRESHOLD = 30    // % readiness on previous level required to unlock the next
+// % readiness on the previous level required to unlock the next. Shared with the menu's ascent,
+// which draws this same gate as a line across all five levels — see the note in constants.tsx.
+const JLPT_UNLOCK_THRESHOLD = JLPT_UNLOCK_PCT
 
 interface JLPTPrepViewProps {
   onBack: () => void
