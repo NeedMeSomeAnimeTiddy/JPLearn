@@ -36,6 +36,7 @@ import {
 } from './lighting'
 import { ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, sizeShafts, updateSunUv } from './shafts'
 import { buildClouds, type CloudField } from './clouds'
+import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { registerFlights } from './flights'
 import type { MenuSectionKey } from '../features/menu'
 
@@ -91,6 +92,7 @@ let rig: Rig | null = null
 let sunDisc: Mesh | null = null
 let sunAt: Vector3 | null = null
 let clouds: CloudField | null = null
+let coverTex: ReturnType<typeof makeCoverTexture> | null = null
 /* NEVER SET `shadowMap.needsUpdate` DIRECTLY. In the mockup that flag was consumed by whichever
    render came next, which was the lake reflection -- a pass that clips at the waterline -- so the
    one shadow build in the world was drawn against a clipped scene, and the valley had no shadows
@@ -432,6 +434,20 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        one step further out. Centred on the world, a flight across 11,000 units genuinely slides
        them against the mountains, which is the whole reason to make them geometry. */
     clouds = buildClouds(scene, new Vector3(0, 0, 0))
+
+    /* THE AIR GOES ON AFTER THE SUN IS PLACED, because the cover's projection is the sun's own
+       direction -- patch first and the shadows fall from wherever the uniform happened to start.
+       The sky dome is skipped for the same reason it is skipped by the shafts: it is not a surface
+       in the valley, it is the backdrop, and misting it would fog the fog. */
+    ATMOS_U.uCoverMap.value = coverTex = makeCoverTexture()
+    aimCover(sunAt)
+    root.traverse((o) => {
+      const mesh = o as Mesh
+      if (!mesh.isMesh || /skydome/i.test(o.name)) return
+      const land = LANDFORM.test(o.name)
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      mats.forEach((m) => breathe(m, land))
+    })
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* ONE SHADOW BUILD. `autoUpdate` is off below: redrawing 4096 squared of a five-million
        triangle valley every frame is worth double digits of fps, and nothing in the world moves. */
@@ -535,6 +551,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* the sky drifts on the same capped clock as everything else, so a dropped frame slows the
        weather rather than teleporting it */
     if (clouds) clouds.drift(dt / 1000)
+    /* and the cover creeps with them, on the same clock */
+    driftCover(dt / 1000)
 
     camera.position.set(cam.px, cam.py, cam.pz)
     if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix() }
@@ -576,6 +594,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       sunAt = null
       clouds?.dispose()
       clouds = null
+      coverTex?.dispose()
+      coverTex = null
       disposeShafts()
       renderer.dispose()
       canvas.remove()
