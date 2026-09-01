@@ -54,7 +54,10 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
-import { useMenuL1, MenuL1, PathL2, Lanes, practiceLanes, heroFromStudyBlock, crownFrom, type MenuSectionKey } from './features/menu'
+import {
+  useMenuL1, useWorldData, MenuL1, PathL2, Lanes, practiceLanes, worldLanes,
+  heroFromStudyBlock, crownFrom, type MenuSectionKey,
+} from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { useAppNavigation, useMenuPath, VIEW_PARENT } from './features/navigation'
@@ -1261,6 +1264,19 @@ function App() {
      converts them one at a time by registering a screen, and nothing here changes. */
   const menuPath = useMenuPath(openMenuSection)
 
+  /* THE WORLD'S TWO FIGURES, fetched only once the screen asking for them is up — see the note in
+     `useWorldData`. `worldLanes` is memoised because `Lanes` watches the array it is given, and a
+     fresh one on every render would re-subscribe its keydown listener for nothing. */
+  const worldOpen = view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'READING'
+  const world = useWorldData(worldOpen)
+  const worldCards = useMemo(
+    () => worldLanes({
+      passages: world.passages, sessions: world.sessions,
+      unlocked: menu.unlocked, nodes: progression.nodes,
+    }),
+    [world.passages, world.sessions, menu.unlocked, progression.nodes],
+  )
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       const target = event.target as HTMLElement
@@ -2172,6 +2188,21 @@ function App() {
             if (key === 'games') { openDailyGames(); return }
             if (key === 'drills') { jumpToScriptHubMinigame(activeScript, activeGame); return }
             jumpToScriptHub(activeScript)
+          }}
+          onUp={menuPath.up}
+        />
+      ) : null}
+
+      {worldOpen ? (
+        <Lanes
+          jp="実践" en="THE WORLD"
+          note="実践 · REAL JAPANESE, NOT EXERCISES — NOTHING IN HERE IS EVER DUE"
+          lanes={worldCards}
+          onPick={(key) => {
+            /* two lanes, two doors the app already has: the passage hub, and the tutor popup
+               opened straight onto its scenario picker rather than its menu */
+            if (key === 'read') { navigate('passage_hub', 'forward'); return }
+            tutor.openTutorPanel('scenarios')
           }}
           onUp={menuPath.up}
         />

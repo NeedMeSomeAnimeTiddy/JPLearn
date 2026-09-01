@@ -15,7 +15,8 @@ export interface LanesProps {
 }
 
 /* ONE CARD, TWO SCREENS. Three lanes across the stage or two — the card does not change, only how
-   many there are and how wide each gets. See the note in `lanes.ts`. */
+   many there are and what fills them. THE WORLD passes two parts PRACTICE does not: the milestone
+   that opened each lane, and the three things inside it. See the note in `lanes.ts`. */
 export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -31,11 +32,17 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
     return () => window.removeEventListener('resize', fit)
   }, [])
 
-  /* the screen takes focus on arrival, or its own arrow keys do nothing — see the note in MenuL1 */
+  /* ON ARRIVAL, ONCE. The screen takes focus or its own arrow keys do nothing (see the note in
+     MenuL1) — but taking it on every render is a different bug: THE WORLD's figures arrive from
+     the bridge after the screen is up, and a focus call in the keydown effect would have snatched
+     focus back out of wherever the reader had put it the moment they landed. */
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true })
+  }, [])
+
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
-    node.focus({ preventScroll: true })
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight') { event.preventDefault(); setAt((i) => Math.min(i + 1, lanes.length - 1)) }
       else if (event.key === 'ArrowLeft') { event.preventDefault(); setAt((i) => Math.max(i - 1, 0)) }
@@ -54,7 +61,7 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
       <div className="mn-frame" ref={frameRef}>
         <div className="pj-cap">
           <b>{jp}</b><i>{en}</i>
-          <s>{lanes.length} {lanes.length === 2 ? 'LANES' : 'LANES'}</s>
+          <s>{lanes.length} LANES</s>
         </div>
 
         <div className={lanes.length === 2 ? 'lanes two' : 'lanes'}>
@@ -81,9 +88,29 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
                   <b>{lane.fig}</b><i>{lane.figLab}</i>
                 </span>
                 <span className="pr-d">{lane.desc}</span>
-                <span className="pr-foot">{lane.shut ? `LOCKED · ${lane.opens ?? ''}` : lane.foot}</span>
+                {lane.gate ? (
+                  <span className="wd-gate"><i aria-hidden="true">{lane.gate.jp}</i>{lane.gate.en}</span>
+                ) : null}
+                {lane.items?.length ? (
+                  <span className="wd-list">
+                    {lane.items.map((item) => (
+                      <span
+                        key={item.jp}
+                        className={`wd-item${item.hollow ? ' hollow' : ''}${item.enJp ? ' en-jp' : ''}`}
+                      >
+                        <b>{item.jp}</b><em>{item.en}</em><u>{item.tag}</u>
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+                <span className="pr-foot">{lane.foot}</span>
+                {/* A SHUT LANE'S SLAB SAYS WHAT OPENS IT, and it is the only place that does —
+                    the foot stays the foot, because a locked lane is still a lane and the whole
+                    point of drawing one is that you can see what is in there. */}
                 <span className="pr-slab">
-                  {lane.shut ? 'NOT YET' : index === at ? `${lane.act} · ENTER ▸` : lane.act}
+                  {lane.shut
+                    ? (lane.opens ?? 'not open yet')
+                    : index === at ? `${lane.act} · ENTER ▸` : lane.act}
                 </span>
               </button>
             )

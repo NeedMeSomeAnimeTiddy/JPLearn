@@ -14,7 +14,27 @@ import type { StudySummaryPayload } from '../../types'
    ONE OBLIGATION WEARS THE VERMILION. Reviews are the only thing in this menu that is owed rather
    than chosen, so `duty` is what turns the action slab red — the same law the hero's slab obeys.
    Nothing in THE WORLD is an obligation, so nothing there will carry it.
+
+   THE WORLD SPENDS ITS EXTRA WIDTH ON THE INSIDE. Two cards across the stage are 441 wide against
+   PRACTICE's 291, and a card that just got 150px bigger without saying anything more is a door
+   with a bigger label on it. So the card grew two optional parts — `gate` and `items` — which
+   PRACTICE simply does not pass: the milestone that opened the lane, and the three things inside
+   it you would actually pick. Optional, not forked: one card still, with two more rows in it.
    ================================================================================================== */
+
+/** one row inside a lane: the material's own name, a gloss under it, and one figure about it */
+export interface LaneItem {
+  /** the material's own name, in its own script */
+  jp: string
+  /** the gloss beneath it — English where the material has one, the author where it does not */
+  en: string
+  /** set when `en` is Japanese, so the row is set in the right face rather than a Latin one */
+  enJp?: boolean
+  tag: string
+  /** the one that is not authored material with a start and an end — drawn hollow */
+  hollow?: boolean
+}
+
 export interface Lane {
   key: string
   en: string
@@ -33,8 +53,17 @@ export interface Lane {
   absent?: boolean
   /** a lane the curriculum has not opened yet */
   shut?: boolean
-  /** what opens it, when shut */
+  /** what opens it, when shut — the slab says this, in place of the invitation */
   opens?: string
+  /* ---- the two parts only THE WORLD passes ---- */
+  /** THE MILESTONE THAT OPENED THIS LANE. One element with two states — and the words are one of
+      them: a quiet credit while the lane is open, and the lock, in vermilion and in the other
+      tense, while it is not. Two elements for one fact would be two places to disagree about
+      whether the lane is open. */
+  gate?: { en: string; jp: string }
+  /** the three things inside the lane you would actually pick, which also makes level three a
+      zoom rather than a surprise */
+  items?: readonly LaneItem[]
 }
 
 /** total cards the scheduler says are due, across every deck */

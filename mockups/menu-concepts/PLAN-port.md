@@ -657,7 +657,7 @@ application. It now saves and restores, and every test states the registry it wa
 | --- | --- | --- |
 | The Path | the journey, 16 milestones | **built** |
 | Practice | three lanes | **built** |
-| The World | two lanes | passthrough → `passage_hub` (the lane card is ready for it) |
+| The World | two lanes | **built** |
 | The Exam | the ascent | passthrough → `jlpt_prep` |
 | You | the ledger | passthrough → the overview panel |
 
@@ -694,3 +694,77 @@ one transcribed into a screen.
 
 **892 tests pass across 85 files**, 8 a11y, lint clean. Driven live: PRACTICE stops at L2, the
 arrows walk the three cards, Enter opens each one's own destination, and Escape returns to L1.
+
+## The World, level two — two lanes on Practice's card
+
+The third registration, and the one that tested whether the shared card was a real decision or a
+nice sentence. It was real: no component came with this screen. `Lanes` grew two OPTIONAL parts
+— the milestone chip and the list of what is inside the lane — which PRACTICE simply does not
+pass, and the rest of THE WORLD is `worldLanes.ts`, which is data.
+
+Live, on a seeded account: **READ 30 texts · TALK 2 scenes, 2 played**. Both doors driven — READ
+lands on the Passages hub, TALK on Scenario Practice — arrows walk the two, Escape returns to L1.
+
+### Three of the mockup's figures were wrong for the app, and the data said so
+
+- **"4 BANDS BY DIFFICULTY" is one band.** All thirty passages report
+  `difficulty_label: 'beginner'`; the hub sorts on `(label, score)` and draws one chip. The foot
+  says what is true instead.
+- **"NEW" and "38%" cannot be said at all.** `usePassages` holds its progress map in `useState`
+  and nothing persists it, so between visits the app knows nothing about what you have read. The
+  mockup's tags were derived from a library that remembered. Ours tag the one figure the data does
+  carry — the length — and the foot states the absence outright rather than printing a zero.
+- **The gloss under a text cannot be English.** The mockup's rows were Japanese title over English
+  gloss; thirty Aozora Bunko texts carry no English anywhere. The author takes that slot, and
+  `enJp` puts it in the Japanese face — a Japanese name set in a Latin UI face is how you get tofu.
+
+What the app could do that the mockup could not: **count the conversations actually played.**
+`scenario_sessions` is a real table behind `listScenarioSessions`, so TALK's foot counts where
+READ's cannot — which is the whole difference between the two lanes' feet.
+
+### The three texts are the first three through the door
+
+Not "the easiest three" by some rule of this screen's own — `sortByDifficulty` is the hub's own
+comparator, so the card shows literally the top of the list it opens onto. Four texts tie at
+difficulty 0.0 and the sort is stable, so the tie falls out in payload order on both screens. Any
+other rule would have let the card and the screen behind it disagree about which text is easiest.
+
+### The lock is the only red, so the hollow row gave its up
+
+Free talk sits in TALK's list because it is a third thing you can enter, and it is hollow because
+it is not authored content with a start and an end. The mockup marked its tag vermilion; on screen,
+next to a shut READ lane, that was two reds — and `ANY TOPIC` pulled harder than the action slab
+did. THE WORLD owes you nothing, so the only red it is allowed is a lane the curriculum has not
+opened. The tag is italic now, which is how an absence is set everywhere else in this menu.
+
+**And the chip changes tense, not just colour.** "OPENED BY READING" in red, on a door that has
+never opened, is a sentence arguing with its own styling. Shut, it reads OPENS AT READING.
+
+### The gate could not be faked, so the account was seeded
+
+`contextBridge` exposes `window.jplearnDesktop` frozen and non-configurable — measured, after the
+first probe silently did nothing — so no renderer-side stub can move a feature state. This account
+is at step three, where THE WORLD's L1 row is locked and unenterable. Each run instead got its own
+copy of the real progress DB with the `user_feature_unlocks` rows the app itself writes: one with
+`reading_mode`, one without. Every figure on both screenshots, the lock included, is read from a
+real backend.
+
+That second account is the **six-step window** — GRAMMAR has opened the section and TALK with it,
+READING has not arrived — and it is where most early accounts will sit. Both the chip and the
+unlock sentence name the milestone with `milestone()`, which reads the curriculum's own node name,
+so THE WORLD says GRAMMAR N5 exactly as the path screen does. (L1's own row still says "reach
+GRAMMAR", authored in `constants.ts` — the one place left that transcribes a milestone.)
+
+### Two fixes it turned up on the way
+
+- **The card row's bleed had to be re-derived for two-up.** 190/900 sat 10px inside the stage on
+  one side and 6 on the other, because the frame contract's half-extent rule is written for
+  `rotate(-1.2deg)`, where the lean partly cancels the skew — the second card in every lane row is
+  `rotate(1deg)`, where it adds. At h=312 that is 18.6px of bleed against 24.6. Laid at 184/906 the
+  row measures 165.5–1114.1 against a stage of 160–1120, centred within 0.2px.
+- **`Lanes` refocused itself on every render.** The focus call lived in the keydown effect, whose
+  deps include the lanes array — fine for PRACTICE, which builds its lanes synchronously, and not
+  fine for THE WORLD, whose two figures arrive from the bridge after the screen is up. It would
+  have snatched focus back out of wherever the reader had just put it. It is a mount effect now.
+
+**909 tests pass across 86 files**, 8 a11y, lint clean.

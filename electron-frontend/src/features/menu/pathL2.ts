@@ -34,6 +34,21 @@ const PATH_COPY: Record<string, PathCopy> = {
   jlpt_n1: { jp: 'N1 検定', want: '90% of it' },
 }
 
+/* THE MILESTONE, IN THE PATH'S OWN WORDS. THE WORLD's two lanes each name the step that opened
+   them, and a second screen naming the same milestone is a second place for it to drift — the
+   L1 row already says "reach GRAMMAR on the path" where the path itself draws GRAMMAR N5. So the
+   name comes from the curriculum's own node and the Japanese from the table above, and every
+   screen that names a step gets it from here. */
+export function milestone(
+  nodes: readonly ProgressionNodeView[], nodeId: string,
+): { en: string; jp: string } {
+  const node = nodes.find((candidate) => candidate.node_id === nodeId)
+  return {
+    en: (node?.name ?? nodeId.replace(/_/g, ' ')).toUpperCase(),
+    jp: PATH_COPY[nodeId]?.jp ?? '',
+  }
+}
+
 /** where a milestone hands off to, in the menu's own words */
 const GOES_TO: Record<string, string> = {
   jlpt: 'THE EXAM',
