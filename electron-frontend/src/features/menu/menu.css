@@ -877,3 +877,123 @@
   font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
   letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.62); white-space: nowrap;
 }
+
+/* ==================================================================================================
+   PICKING A SCENE — THE WORLD's level three, through TALK.
+
+   TWO CARDS AND A STRIP, on the same two-up row THE WORLD's lanes stand on, so moving down a level
+   is a zoom rather than a new place. 184/908 is the two-up geometry the lane row worked out and the
+   reason is written there: the second card in every row leans the other way and bleeds a third more.
+   ================================================================================================== */
+.scenes { position: absolute; left: 184px; top: 214px; width: 908px; height: 272px; display: flex; gap: 26px; }
+.sc-card {
+  flex: 1; min-width: 0; border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transition: transform 0.26s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.26s ease,
+    background 0.26s ease;
+}
+.sc-card:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+.sc-card.on {
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+  transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px);
+}
+.sc-card.on:nth-child(2) { transform: skewX(-8deg) rotate(1deg) translateY(-6px); }
+.sc-card:focus-visible { outline: 3px solid var(--hi); outline-offset: 6px; }
+
+/* THE NPC IS THE CAP, because who you are talking to is the first thing you want to know about a
+   conversation, and it is the fact the scenario data leads with. */
+.sc-who {
+  flex: none; display: flex; align-items: baseline; gap: 9px; padding: 8px 15px 9px;
+  background: var(--ink); white-space: nowrap;
+}
+.sc-who b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+  color: var(--gold-hi);
+}
+.sc-who i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 600; font-size: 9px;
+  letter-spacing: 0.13em; color: rgba(232, 196, 124, 0.55); overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-title { padding: 12px 15px 0; display: flex; flex-direction: column; gap: 3px; }
+.sc-title b { font-family: var(--jp); font-weight: 700; font-size: 21px; line-height: 1.15; color: var(--ink); }
+.sc-title i {
+  font-style: italic; font-family: var(--lat); font-weight: 900; font-size: 14px;
+  letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.62);
+}
+.sc-d {
+  padding: 8px 15px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px;
+  line-height: 1.5; color: rgba(20, 17, 13, 0.62);
+}
+/* THE OBJECTIVES ARE THE SCENARIO'S OWN, required ones solid and optional ones hollow — which is
+   the difference `required: false` makes when the tutor marks you at the end. */
+.sc-obj { display: flex; flex-direction: column; gap: 3px; padding: 9px 15px 0; }
+.sc-obj span {
+  display: flex; align-items: baseline; gap: 8px; font-family: var(--lat-ui); font-weight: 600;
+  font-size: 9.5px; letter-spacing: 0.04em; color: rgba(20, 17, 13, 0.6);
+}
+.sc-obj span s {
+  flex: none; width: 6px; height: 6px; text-decoration: none; background: rgba(20, 17, 13, 0.55);
+  transform: translateY(-1px);
+}
+.sc-obj span.opt { color: rgba(20, 17, 13, 0.4); }
+.sc-obj span.opt s { background: none; box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.4); }
+.sc-foot {
+  margin-top: auto; padding: 0 15px 10px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.45);
+}
+.sc-slab {
+  flex: none; height: 28px; display: grid; place-items: center; background: rgba(20, 17, 13, 0.13);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.6); white-space: nowrap;
+  transition: background 0.24s ease, color 0.24s ease;
+}
+.sc-card.on .sc-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
+
+/* SKEW WITHOUT LEAN. The strip is 908 wide and 54 tall, and a rotation on a box that wide grows it
+   9.6px vertically at each end — which would put its bottom edge through the foot band. */
+/* RELATIVE TO THE ROW, NOT TO THE STAGE, and that distinction cost a run. The strip is a child of
+   `.scenes`, which is itself absolutely positioned -- so it is `.scenes` that is its containing
+   block, and stage coordinates written here are measured from the row's own top. Given the row's
+   214 that put the strip at 722, which is off the bottom of a 720 stage: it rendered as a sliver
+   at the very edge of the window. 294 is the row's height plus the gap, which is what the mockup
+   uses and why.
+   `left: 0; right: 0` rather than a width, so the strip cannot fall out of step with the row above
+   it the next time that row is re-laid. */
+.sc-free {
+  position: absolute; left: 0; right: 0; top: 294px; height: 54px;
+  border: 0; padding: 0 16px; font: inherit; cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg);
+}
+.sc-free.on {
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 8px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+}
+.sc-free:focus-visible { outline: 3px solid var(--hi); outline-offset: 5px; }
+.sc-free .g {
+  flex: none; font-family: var(--jp); font-weight: 400; font-size: 30px; line-height: 1;
+  color: rgba(20, 17, 13, 0.26);
+}
+.sc-free .n { flex: none; display: flex; flex-direction: column; gap: 3px; }
+.sc-free .n b { font-family: var(--jp); font-weight: 700; font-size: 15px; line-height: 1; color: var(--ink); }
+.sc-free .n i {
+  font-style: italic; font-family: var(--lat); font-weight: 900; font-size: 11px;
+  letter-spacing: 0.04em; line-height: 1; color: rgba(20, 17, 13, 0.55);
+}
+.sc-free .d {
+  flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 10px;
+  line-height: 1.45; color: rgba(20, 17, 13, 0.55);
+}
+.sc-free .k {
+  flex: none; padding: 5px 11px; background: rgba(20, 17, 13, 0.13); font-family: var(--lat-ui);
+  font-weight: 700; font-size: 9px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6);
+  white-space: nowrap; transition: background 0.24s ease, color 0.24s ease;
+}
+.sc-free.on .k { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }

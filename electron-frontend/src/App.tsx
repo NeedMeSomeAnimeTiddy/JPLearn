@@ -56,8 +56,9 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger,
-  practiceLanes, worldLanes, ascentRungs, heroFromStudyBlock, crownFrom, type MenuSectionKey,
+  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes,
+  practiceLanes, worldLanes, ascentRungs, scenes as buildScenes,
+  heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
@@ -2232,7 +2233,27 @@ function App() {
             /* two lanes, two doors the app already has: the passage hub, and the tutor popup
                opened straight onto its scenario picker rather than its menu */
             if (key === 'read') { navigate('passage_hub', 'forward'); return }
-            tutor.openTutorPanel('scenarios')
+            /* TALK has a level three now -- picking the scene is a menu screen rather than the
+               tutor's own picker, and it hands the CHOSEN scenario over rather than the list */
+            menuPath.enterScreen('scenes')
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'scenes' ? (
+        <Scenes
+          scenes={buildScenes(world.sessions)}
+          onPick={(scenarioId) => {
+            if (scenarioId) {
+              /* the SCENE, not the picker: `selectScenario` is the scenario tutor's own call and
+                 the panel opens already standing on it */
+              scenarioTutor.selectScenario(scenarioId)
+              tutor.openTutorPanel('scenarios')
+              return
+            }
+            /* free talk is not a scene and never was -- it is the tutor's own chat */
+            tutor.openTutorPanel('chat')
           }}
           onUp={leaveMenuLevel}
         />
