@@ -315,6 +315,27 @@
 }
 .pj-back:focus-visible { outline: 2px solid var(--hi); outline-offset: 3px; }
 
+/* ==================================================================================================
+   THE FOOT BAND, which is the whole of the frame contract's global scrim and is deliberately small.
+
+   The old version dimmed three quarters of the picture to protect type that mostly had its own
+   paper to sit on anyway — which turns a valley into a backdrop rather than a place. So: nothing at
+   all across the top three quarters, and one band from 0% at y560 to 28% at y720, to hold the
+   tallies and rails that sit at the stage's foot.
+
+   EVERYTHING ABOVE y560 BRINGS ITS OWN GROUND — opaque paper, an ink wash, or a keyline. A screen
+   that needs this to be legible was never legible; it was being carried. That is the standard the
+   lit valley now holds these screens to, and the ascent's translucent columns were tuned against a
+   world that was accidentally black.
+   ================================================================================================== */
+.mn-open::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(14, 17, 26, 0) 0%,
+    rgba(14, 17, 26, 0) 77.8%,
+    rgba(14, 17, 26, 0.28) 100%);
+}
+
 /* the screen container is focusable so its arrow keys work; it must not draw a ring for that */
 .mn-open:focus { outline: none; }
 

@@ -19,8 +19,8 @@
    flights were.
    ================================================================================================ */
 import {
-  ACESFilmicToneMapping, AmbientLight, BackSide, Color, DirectionalLight, Fog, InstancedMesh, Mesh,
-  PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, SRGBColorSpace, WebGLRenderer, MathUtils,
+  ACESFilmicToneMapping, Color, FogExp2, InstancedMesh, Mesh, PCFShadowMap, PerspectiveCamera, Scene,
+  SRGBColorSpace, WebGLRenderer, MathUtils,
   type Material, type BufferGeometry, type Object3D,
 } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -30,6 +30,10 @@ import {
   aimAt, easeInOutSine, makeFlight, type CamState, type Flight,
 } from './flight'
 import { DESTINATIONS } from './destinations'
+import {
+  FOG_COLOUR, FOG_DENSITY, faceSun, gradeSky, installRig, makeSunDisc, placeSun, updateSkyDir,
+  type Rig,
+} from './lighting'
 import { registerFlights } from './flights'
 import type { MenuSectionKey } from '../features/menu'
 
@@ -79,6 +83,18 @@ let live: Live | null = null
 /* which section the camera is standing at, or null for the menu -- the way home retraces the way
    out, so it has to know which arc it came in on */
 let flownTo: MenuSectionKey | null = null
+
+/* the rig, and the one point in the world everything in it is aimed at */
+let rig: Rig | null = null
+let sunDisc: Mesh | null = null
+let sunAt: Vector3 | null = null
+/* NEVER SET `shadowMap.needsUpdate` DIRECTLY. In the mockup that flag was consumed by whichever
+   render came next, which was the lake reflection -- a pass that clips at the waterline -- so the
+   one shadow build in the world was drawn against a clipped scene, and the valley had no shadows
+   in it for weeks. This port has a single render per frame so the trap cannot bite yet; the flag
+   is kept anyway, so the day a second pass appears the rule is already here. */
+let shadowDirty = false
+const _eye = new Vector3()
 
 let handle: Handle | null = null
 
@@ -135,6 +151,26 @@ function collapseToInstances(root: Object3D): { before: number; after: number } 
     after++
   }
   return { before, after }
+}
+
+/* WHO CASTS AND WHO CATCHES, and the one thing that must not do either.
+
+   THE SKY IS NOT A CASTER, and forgetting that is a trap this exact sweep fell into in the mockup:
+   the dome is `isMesh` like everything else, so a blanket `castShadow = true` hands it to the one
+   shadow build in the world and freezes a dome-shaped shadow over the valley permanently. It is
+   skipped by name, and it is the reason this walks the tree rather than being a line inside the
+   instancing pass. */
+function letLightThrough(root: Object3D): { casters: number } {
+  let casters = 0
+  root.traverse((o) => {
+    const m = o as Mesh
+    if (!m.isMesh) return
+    if (/skydome/i.test(o.name)) { m.castShadow = false; m.receiveShadow = false; return }
+    m.castShadow = true
+    m.receiveShadow = true
+    casters++
+  })
+  return { casters }
 }
 
 /* GIVE THE VERTICES BACK ONCE THE GPU HAS THEM. three keeps the CPU-side typed array of every
@@ -282,53 +318,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   renderer.setSize(window.innerWidth, window.innerHeight, false)
   renderer.outputColorSpace = SRGBColorSpace
   renderer.toneMapping = ACESFilmicToneMapping
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = PCFShadowMap
+  /* the world does not move, so the map is drawn once -- see `shadowDirty` */
+  renderer.shadowMap.autoUpdate = false
 
   const scene = new Scene()
-  scene.background = new Color(0x1a1712)
-  /* THE FOG WAS SET FOR A CAMERA THAT NEVER MOVED, and the flights are what exposed it. 6,000 to
-     26,000 was picked in phase 0 against one static shot from the menu; the valley is about 26,000
-     units across -- the lookout alone is 25,527 from the standing point -- so everything past the
-     near ground was already fading, and the middle of every flight, where the camera is looking
-     across the valley rather than at something in front of it, came out solid black. Measured on
-     the way to the pagoda: a frame 1.25 s in with nothing in it but petals.
-     Pushed out to the world's own scale, so fog is the far mountains going soft rather than the
-     valley being deleted. It is still a placeholder for the sunset rig -- see the note below. */
-  scene.fog = new Fog(0x1a1712, 18000, 62000)
-
-  /* A SKY, BECAUSE A FLAT COLOUR IS NOT ONE AND THE FLIGHTS MADE THAT VISIBLE. Standing still at
-     the menu you never look above the ridge line, so `scene.background` being one dark colour cost
-     nothing for four phases. A camera that MOVES does look up: measured over the ten legs, most
-     stay between -13 and +19 degrees of pitch, and the route to the pagoda -- which you arrive
-     looking 17 degrees up at -- peaks at 31 on the way out and 38 on the way back. Those frames
-     came back as solid black with nothing in them but petals, which reads as a broken renderer.
-
-     THIS IS A PLACEHOLDER AND IT IS DELIBERATELY A DULL ONE. Two stops between the fog's own
-     colour at the horizon and a little less of it overhead, so the sky is a sky and nothing more.
-     The valley's real rig -- a sun with a composed position in frame, god rays, a shadow map and a
-     day cycle -- is Robbie's to author, and inventing a look here would be a worse thing to undo
-     later than a void is. */
-  {
-    const sky = new Mesh(
-      new SphereGeometry(70000, 24, 16),
-      new ShaderMaterial({
-        side: BackSide, depthWrite: false, fog: false,
-        uniforms: {
-          low: { value: new Color(0x1a1712) },
-          high: { value: new Color(0x0c0e15) },
-        },
-        vertexShader: `varying float vY;
-          void main() {
-            vY = normalize(position).y;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }`,
-        fragmentShader: `uniform vec3 low; uniform vec3 high; varying float vY;
-          void main() { gl_FragColor = vec4(mix(low, high, clamp(vY * 1.6, 0.0, 1.0)), 1.0); }`,
-      }),
-    )
-    sky.frustumCulled = false
-    sky.renderOrder = -1
-    scene.add(sky)
-  }
+  scene.background = new Color(FOG_COLOUR)
+  /* EXPONENTIAL, NOT A NEAR/FAR RAMP. A linear fog carries two distances that have to be chosen
+     against a particular shot, and this camera flies; an exponential has one density and behaves
+     the same everywhere. Phase 0's ramp was 6,000 to 26,000 -- tuned for one static shot in a
+     valley 26,000 units across -- so the middle of every flight came out black. See FOG_DENSITY
+     for how this number was found, which was by minimising rather than by eye. */
+  scene.fog = new FogExp2(FOG_COLOUR, FOG_DENSITY)
 
   const tFetch0 = performance.now()
   const response = await fetch(url)
@@ -356,14 +358,34 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
      silently fell back to having no valley to fly at all. */
   const fujiPeak = findFujiPeak(root) ?? new Vector3(...FUJI_PEAK_HINT)
 
+  /* THE SKY DOME IS THE AUTHORED ONE, GRADED. `Landscape_Props_SkyDome_001` carries Robbie's own
+     painted gradient, and a painted band is the same all the way round the horizon -- a sunset is
+     a sky with a DIRECTION in it. So the dome keeps the image and takes a per-fragment grade on
+     top; see `gradeSky`. Graded BEFORE instancing, because that is while the dome still has a
+     name to find it by. */
+  {
+    let dome: Mesh | null = null
+    root.traverse((o: Object3D) => {
+      const mesh = o as Mesh
+      if (dome || !mesh.isMesh || !/skydome/i.test(o.name)) return
+      dome = mesh
+    })
+    if (dome) {
+      const m = dome as Mesh
+      m.castShadow = false
+      m.receiveShadow = false
+      const mats = Array.isArray(m.material) ? m.material : [m.material]
+      mats.forEach(gradeSky)
+    } else {
+      console.warn('[valley] no SkyDome found in the world; the sky will be flat')
+    }
+  }
+
   const tInst0 = performance.now()
   const { before, after } = collapseToInstances(root)
   const instanceMs = performance.now() - tInst0
 
-  scene.add(new AmbientLight(0xffd9a1, 0.9))
-  const sun = new DirectionalLight(0xffc98a, 1.6)
-  sun.position.set(-6000, 5000, 3000)
-  scene.add(sun)
+  letLightThrough(root)
 
   const camera: PerspectiveCamera = pickCamera(root, window.innerWidth / Math.max(1, window.innerHeight))
 
@@ -384,6 +406,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     camera.fov = cam.fov
     camera.updateProjectionMatrix()
     camera.lookAt(homeTgt)
+
+    /* THE SUN GOES WHERE THE COMPOSITION PUTS IT -- middle of the frame, 30% down from the top,
+       50,000 out so it stands behind Fuji rather than inside it -- and then everything else takes
+       its bearing from that one point: the key light, the sky's two scattering lobes, and the disc
+       you can actually see. A sun placed by coordinate is a sun nobody composed. */
+    sunAt = placeSun(HOME_EYE, homeTgt, HOME_FOV, aspect)
+    rig = installRig(scene, sunAt)
+    sunDisc = makeSunDisc()
+    sunDisc.position.copy(sunAt)
+    scene.add(sunDisc)
+    /* ONE SHADOW BUILD. `autoUpdate` is off below: redrawing 4096 squared of a five-million
+       triangle valley every frame is worth double digits of fps, and nothing in the world moves. */
+    shadowDirty = true
   }
 
   /* registered before the first render, because the callbacks fire during the upload that render
@@ -471,11 +506,29 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       if (p >= 1) { const land = live.onLand; live = null; land?.() }
     }
 
+    /* THE SUN AS THE SKY SEES IT is a direction FROM THE EYE, so the scattering lobes stay put
+       when the camera flies and swing when it turns. */
+    if (sunAt) {
+      _eye.set(cam.px, cam.py, cam.pz)
+      updateSkyDir(sunAt, _eye)
+      if (sunDisc) faceSun(sunDisc, _eye)
+    }
+
+    /* THE SUN AS THE SKY SEES IT is a direction FROM THE EYE, so the scattering lobes hold still
+       while the camera flies and swing when it turns. */
+    if (sunAt) {
+      _eye.set(cam.px, cam.py, cam.pz)
+      updateSkyDir(sunAt, _eye)
+      if (sunDisc) faceSun(sunDisc, _eye)
+    }
+
     camera.position.set(cam.px, cam.py, cam.pz)
     if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix() }
     _aim.set(cam.tx, cam.ty, cam.tz)
     camera.lookAt(_aim)
     if (cam.roll) camera.rotateZ(MathUtils.degToRad(cam.roll))
+    /* and the shadow build goes HERE, in the last gap before the render -- see `shadowDirty` */
+    if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false }
     renderer.render(scene, camera)
   }
   frame()
@@ -490,6 +543,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       cancelAnimationFrame(raf)
       registerFlights(null)
       live = null
+      if (rig) { scene.remove(rig.key, rig.key.target, rig.fill, rig.fill.target, rig.hemi); rig = null }
+      if (sunDisc) { scene.remove(sunDisc); sunDisc = null }
+      sunAt = null
       renderer.dispose()
       canvas.remove()
       handle = null
