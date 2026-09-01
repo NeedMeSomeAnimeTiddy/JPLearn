@@ -38,6 +38,8 @@ import {
   ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, setGlow, sizeShafts, updateSunUv,
 } from './shafts'
 import { buildClouds, type CloudField } from './clouds'
+import { buildLanterns, type LanternField } from './lanterns'
+import { buildNightMap, type NightMap } from './nightmap'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
 import { registerFlights } from './flights'
@@ -95,6 +97,8 @@ let rig: Rig | null = null
 let sunDisc: Mesh | null = null
 let sunAt: Vector3 | null = null
 let clouds: CloudField | null = null
+let lanterns: LanternField | null = null
+let nightMap: NightMap | null = null
 let coverTex: ReturnType<typeof makeCoverTexture> | null = null
 /* WHERE THE VIEWER IS, ASKED ONCE. `Intl` is cheap but not free and the answer cannot change
    inside a session; the sun's altitude is what moves. */
@@ -467,6 +471,13 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        direction -- patch first and the shadows fall from wherever the uniform happened to start.
        The sky dome is skipped for the same reason it is skipped by the shafts: it is not a surface
        in the valley, it is the backdrop, and misting it would fog the fog. */
+    /* BEFORE THE AIR, and the ordering is not a preference -- see `buildLanterns`. Cloning a
+       material after `breathe` has patched it copies the flag and not the patch, which would give
+       every lantern a hole in the mist around it. */
+    lanterns = buildLanterns(root)
+    /* the bake is a NIGHT layer and comes up exactly as the lanterns do */
+    nightMap = buildNightMap(root)
+
     ATMOS_U.uCoverMap.value = coverTex = makeCoverTexture()
     aimCover(sunAt)
     root.traverse((o) => {
@@ -638,6 +649,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       sunAt = null
       clouds?.dispose()
       clouds = null
+      lanterns = null
+      nightMap?.dispose()
+      nightMap = null
       coverTex?.dispose()
       coverTex = null
       disposeShafts()
@@ -710,6 +724,11 @@ function applyDay(
     aimCover(sunAt)
   }
   if (clouds) clouds.material.emissive.copy(c.cloudEmis)
+  /* THE VALLEY LIGHTS ITSELF AS THE SUN GOES. `lampOn` is 1 below the horizon, 0.85
+     through civil twilight, 0.45 at sunrise and out by mid-morning -- lanterns are lit
+     before it is properly dark and left on a while after, which is what a town does. */
+  lanterns?.setOn(n.lampOn)
+  nightMap?.setOn(n.lampOn)
 
   /* GUARDED ON A REAL CHANGE. Writing a custom property on :root invalidates style for the whole
      document, and doing that sixty times a second to move a number by 0.0004 is a recalculation of
