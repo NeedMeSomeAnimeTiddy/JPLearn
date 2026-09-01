@@ -103,9 +103,12 @@ it. Last because it needs the path (phase 4) to fire from.
 
 ## The libraries, with a verdict
 
-- **`three` + `gsap`** — new, and not optional. The world and the flights are the design. GSAP
-  specifically because the camera work is authored against its easing and rewriting those tweens
-  would be re-authoring the flights.
+- **`three`** — new, and not optional. The world and the flights are the design.
+- **~~`gsap`~~ — NOT NEEDED, and this premise was wrong.** The claim was that the camera work is
+  authored against GSAP's easing. It is not: `turnTo` runs `ease: 'none'` on a linear 0→1 drive
+  and applies `easeInOutSine` by hand inside its own `onUpdate`. GSAP was the clock and nothing
+  else. Its one real contribution, `ticker.lagSmoothing(34, 16)`, is three lines of capped `dt`.
+  The flights ship with no new dependency.
 - **`zustand`** — ~~yes, at phase 3~~ **not taken at phase 3, and the reason is worth keeping.**
   The justification was "navigation state a dozen screens read" — but at phase 3 the tree is read
   by two places, and the dozen screens are phases 4 and 5. The keyboard layer turned out to be
@@ -768,3 +771,76 @@ GRAMMAR", authored in `constants.ts` — the one place left that transcribes a m
   have snatched focus back out of wherever the reader had just put it. It is a mount effect now.
 
 **909 tests pass across 86 files**, 8 a11y, lint clean.
+
+## The flights — and the four phases of camera that were quietly wrong
+
+Robbie stopped the port to ask why the camera was spinning and where the transitions were. Both
+answers were bad, and neither was a regression: they had been true since phase 0.
+
+**The spin was a measuring instrument.** `valley.ts` turned the camera 0.02 degrees a frame so that
+the frame cost phase 0 was pricing came off a MOVING frame rather than a still one. It had no
+business surviving the phase; it survived three more, and what it turned the valley into was a
+photograph revolving behind the menu. Two frames 1.6 s apart are now pixel-identical at rest.
+
+**The flights had never been ported at all.** Four levels of HUD had been built over a world the
+camera could not travel in. They exist now: `flight.ts` (the move), `destinations.ts` (the five
+shots), and two calls the menu makes through a shim that imports no three, so the lazy 600 KB
+chunk stays lazy.
+
+### The menu had been standing in the wrong place since phase 0
+
+Phase 0 looked through world.glb for a camera named MainMenu, found `Camera_MainMenu` at
+(-500, 460, 1900), and stood there. The mockup does not use that camera: `composeWorldHome` puts
+the eye at **(0, 2000, 6000)** and SOLVES the aim so Fuji's measured summit lands at frame
+(0.76, 0.24) at a 43-degree lens. Those two points are 4,100 apart in z and 1,540 in height.
+
+It was invisible while the camera never moved — it just looked like a murky shot. It stopped being
+invisible the moment there were routes, because **every `mid` in `flights.json` was flown and
+saved from the composed point**: solved through their middles from the authored camera, the route
+to the pagoda swung 2,400 units BACKWARDS over the menu before turning round, and the middle of
+the move came back as a black frame with nothing in it but petals. That was diagnosed as fog first,
+and it was not fog. From the right standing point the menu is the composed valley shot — Fuji
+right of centre, the shrine approach, the lake and its bridge — which is a different screen from
+the one this port has been drawing on for four phases.
+
+### A kink at u = 0.90, on every route, out and back
+
+The mockup aims the lean at a point `FLIGHT_LEAD` (0.10) further along the arc:
+`getPointAt(Math.min(1, u + FLIGHT_LEAD))`. That `Math.min` pins the lead point to the endpoint for
+the last tenth of every move while the eye keeps closing on it, so the tangent's rate of change
+steps. Measured on the way home from THE PATH at 60fps, the aim turns 0.26, 0.36, 0.46, 0.63, 0.88,
+1.02 degrees a frame as u climbs to 0.9006 — and 0.13 on the very next frame. An eightfold collapse
+in the rate of turn, nine tenths of the way through. Asking the curve for its own tangent
+(`getTangentAt`) removes the constant and the clamp together; the rate now runs 0.165, 0.162,
+0.160, 0.158 straight through the same stretch.
+
+### Three of the tests were asking the wrong question, and the flight was right
+
+- **"flies through its mid at halfway"** — every route missed by 70 to 780 units. `sample` walks by
+  ARC LENGTH and half the arc length of an asymmetric curve is not t = 0.5. The clearance work only
+  needed the path to GO through the gap; closest approach is under 5 units, which is the sampling
+  step.
+- **"turns no faster than 2 degrees a frame"** — a number nobody measured. Medians run 0.14 to 0.73
+  across the ten legs, in line with the mockup's own 0.15–0.47; peaks reach 2.58 on THE EXAM's way
+  home, which reverses 151 degrees over the shortest arc on the board and is perfectly smooth. A
+  snap is one frame far outside ITS OWN NEIGHBOURS, so that is what is asked now.
+- **"leans less going back than out"** — failed on THE WORLD by a degree, because both legs run into
+  the 15-degree cap and the achieved deviation is set by the cap rather than the fraction. What the
+  smaller fraction is FOR is pitch: every return stays between -13 and +19 degrees except THE EXAM,
+  a pagoda you arrive looking 17 degrees up at.
+
+**45 flight tests**, and they sample exactly what the render loop samples.
+
+### What the flights then exposed, which is not the flights
+
+The **lighting is still phase 0**: one ambient, one directional, a flat colour for sky. The fog was
+6,000 to 26,000 — tuned for a static shot in a valley 26,000 units across — so a camera crossing it
+looked into black; that is pushed out to 18,000–62,000. The sky is a two-stop gradient now instead
+of a single colour, deliberately dull, because the real rig (a sun composed in frame, god rays, a
+shadow map, a day cycle) is Robbie's to author and inventing a look here would be worse to undo
+than a void. Looking up still reads as night over a lit valley. **That is the next thing the valley
+owes, and it is bigger than the flights were.**
+
+**954 tests across 87 files**, 8 a11y, lint clean. Driven live: still at rest, the screen arriving
+at 82% of the move rather than over a camera still crossing the valley, Escape taking the board off
+at once and the camera following it home — landing on pixels identical to the frame it left from.

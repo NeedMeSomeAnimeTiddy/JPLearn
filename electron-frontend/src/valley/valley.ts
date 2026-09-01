@@ -8,16 +8,30 @@
    the canvas is created once, parented under the app, and never torn down. React draws over it
    and will later talk to it by calling functions; it never owns it.
 
-   PHASE 0 DOES NOT DRAW THE MENU. No HUD, no navigation, no flights. It loads the authored world,
-   stands at the camera Blender calls Camera_MainMenu, and renders. The deliverable is a number:
-   what the valley costs a cold boot of the packaged app.
+   IT LOADS THE AUTHORED WORLD, STANDS AT Camera_MainMenu, AND FLIES. Entering a section is a move
+   to that place's own composed shot; Escape is the same arc read backwards. See `flight.ts` for
+   the move itself and `destinations.ts` for the five shots.
+
+   THE LIGHTING IS STILL PHASE 0 AND IT LOOKS IT. One ambient, one directional, a flat dark
+   background for sky and a distance fog. The mockup's valley has a sun with a composed position, a
+   sky, god rays, a shadow rig and a day cycle, and none of that is here -- so this reads as dusk
+   whatever the time. That is the next thing this file owes, and it is a bigger piece than the
+   flights were.
    ================================================================================================ */
 import {
-  ACESFilmicToneMapping, AmbientLight, Color, DirectionalLight, Fog, InstancedMesh, Mesh,
-  PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer, MathUtils,
-  type Camera, type Material, type BufferGeometry, type Object3D,
+  ACESFilmicToneMapping, AmbientLight, BackSide, Color, DirectionalLight, Fog, InstancedMesh, Mesh,
+  PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, SRGBColorSpace, WebGLRenderer, MathUtils,
+  type Material, type BufferGeometry, type Object3D,
 } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { Vector3 } from 'three'
+import {
+  AIM_LEAN_BACK, FUJI_FRAME_U, FUJI_FRAME_V, FUJI_PEAK_HINT, HOME_EYE, HOME_FOV, MAX_STEP_MS,
+  aimAt, easeInOutSine, makeFlight, type CamState, type Flight,
+} from './flight'
+import { DESTINATIONS } from './destinations'
+import { registerFlights } from './flights'
+import type { MenuSectionKey } from '../features/menu'
 
 export type ValleyMarks = {
   fetchMs: number
@@ -38,10 +52,33 @@ type Handle = {
   canvas: HTMLCanvasElement
   renderer: WebGLRenderer
   scene: Scene
-  camera: Camera
+  camera: PerspectiveCamera
   marks: ValleyMarks
   dispose: () => void
 }
+
+/* THE LIVE CAMERA STATE, AND THE ONE THING THAT WRITES IT. Every frame reads `cam` and nothing
+   else; a flight writes it and so does the initial stand. Keeping the pose as plain numbers rather
+   than on the three camera is what lets a flight be sampled without a renderer -- which is how the
+   maths in `flight.ts` stays testable. */
+const cam: CamState = { px: 0, py: 0, pz: 0, tx: 0, ty: 0, tz: 0, fov: 42, roll: 0 }
+/* where the menu stands, taken from the authored camera once and never recomputed */
+const home: CamState = { ...cam }
+
+/* the flight currently running, so a second request can take the camera off it mid-move rather
+   than two moves fighting over the same three numbers */
+type Live = {
+  flight: Flight
+  elapsed: number
+  /** the fraction of the move at which the destination's screen is asked for */
+  openAt: number
+  onOpen: (() => void) | null
+  onLand: (() => void) | null
+}
+let live: Live | null = null
+/* which section the camera is standing at, or null for the menu -- the way home retraces the way
+   out, so it has to know which arc it came in on */
+let flownTo: MenuSectionKey | null = null
 
 let handle: Handle | null = null
 
@@ -164,6 +201,26 @@ function freeCpuCopiesAfterUpload(root: Object3D): { attributes: number; bytes: 
   return stats
 }
 
+/* THE HIGHEST POINT OF THE MOUNTAIN, found in the model rather than written down, so it survives a
+   re-export that moves it. Walked BEFORE the first render, which is the only window there is: the
+   upload callbacks null every position array (see `freeCpuCopiesAfterUpload`), so a later pass
+   would find nothing to measure. */
+function findFujiPeak(root: Object3D): Vector3 | null {
+  let peak: Vector3 | null = null
+  const v = new Vector3()
+  root.traverse((o) => {
+    const mesh = o as Mesh
+    if (!mesh.isMesh || !/fuji/i.test(o.name) || /outline/i.test(o.name)) return
+    const pos = mesh.geometry?.attributes?.position
+    if (!pos) return
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos as never, i).applyMatrix4(mesh.matrixWorld)
+      if (!peak || v.y > peak.y) peak = v.clone()
+    }
+  })
+  return peak
+}
+
 function countTriangles(root: Object3D): number {
   let tris = 0
   root.traverse((o) => {
@@ -177,7 +234,11 @@ function countTriangles(root: Object3D): number {
 }
 
 /* stand where Blender's Camera_MainMenu stands; fall back to a sane overlook if it is missing,
-   because a port that silently renders from the origin looks like a load failure */
+   because a port that silently renders from the origin looks like a load failure.
+
+   IT IS NOT WHERE THE MENU STANDS, though, and phase 0 believed it was. This only supplies a
+   camera OBJECT -- its near and far planes and a sane starting lens. Every frame's pose is written
+   from `cam`, and `cam` starts at the composed home; see the note by HOME_EYE in `flight.ts`. */
 function pickCamera(root: Object3D, aspect: number): PerspectiveCamera {
   let found: PerspectiveCamera | null = null
   root.traverse((o) => {
@@ -224,7 +285,50 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
 
   const scene = new Scene()
   scene.background = new Color(0x1a1712)
-  scene.fog = new Fog(0x1a1712, 6000, 26000)
+  /* THE FOG WAS SET FOR A CAMERA THAT NEVER MOVED, and the flights are what exposed it. 6,000 to
+     26,000 was picked in phase 0 against one static shot from the menu; the valley is about 26,000
+     units across -- the lookout alone is 25,527 from the standing point -- so everything past the
+     near ground was already fading, and the middle of every flight, where the camera is looking
+     across the valley rather than at something in front of it, came out solid black. Measured on
+     the way to the pagoda: a frame 1.25 s in with nothing in it but petals.
+     Pushed out to the world's own scale, so fog is the far mountains going soft rather than the
+     valley being deleted. It is still a placeholder for the sunset rig -- see the note below. */
+  scene.fog = new Fog(0x1a1712, 18000, 62000)
+
+  /* A SKY, BECAUSE A FLAT COLOUR IS NOT ONE AND THE FLIGHTS MADE THAT VISIBLE. Standing still at
+     the menu you never look above the ridge line, so `scene.background` being one dark colour cost
+     nothing for four phases. A camera that MOVES does look up: measured over the ten legs, most
+     stay between -13 and +19 degrees of pitch, and the route to the pagoda -- which you arrive
+     looking 17 degrees up at -- peaks at 31 on the way out and 38 on the way back. Those frames
+     came back as solid black with nothing in them but petals, which reads as a broken renderer.
+
+     THIS IS A PLACEHOLDER AND IT IS DELIBERATELY A DULL ONE. Two stops between the fog's own
+     colour at the horizon and a little less of it overhead, so the sky is a sky and nothing more.
+     The valley's real rig -- a sun with a composed position in frame, god rays, a shadow map and a
+     day cycle -- is Robbie's to author, and inventing a look here would be a worse thing to undo
+     later than a void is. */
+  {
+    const sky = new Mesh(
+      new SphereGeometry(70000, 24, 16),
+      new ShaderMaterial({
+        side: BackSide, depthWrite: false, fog: false,
+        uniforms: {
+          low: { value: new Color(0x1a1712) },
+          high: { value: new Color(0x0c0e15) },
+        },
+        vertexShader: `varying float vY;
+          void main() {
+            vY = normalize(position).y;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: `uniform vec3 low; uniform vec3 high; varying float vY;
+          void main() { gl_FragColor = vec4(mix(low, high, clamp(vY * 1.6, 0.0, 1.0)), 1.0); }`,
+      }),
+    )
+    sky.frustumCulled = false
+    sky.renderOrder = -1
+    scene.add(sky)
+  }
 
   const tFetch0 = performance.now()
   const response = await fetch(url)
@@ -245,6 +349,13 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   const root = gltf.scene
   scene.add(root)
 
+  /* THE SUMMIT IS MEASURED HERE AND NOWHERE ELSE, and this is the only window for it. Instancing
+     rebuilds the meshes and drops the names that identify Fuji, and the first render's upload
+     callbacks null every position array -- so a walk after either finds nothing. It cost a run to
+     learn: placed after the render it threw on a null array, `mountValley` rejected, and the menu
+     silently fell back to having no valley to fly at all. */
+  const fujiPeak = findFujiPeak(root) ?? new Vector3(...FUJI_PEAK_HINT)
+
   const tInst0 = performance.now()
   const { before, after } = collapseToInstances(root)
   const instanceMs = performance.now() - tInst0
@@ -254,7 +365,26 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   sun.position.set(-6000, 5000, 3000)
   scene.add(sun)
 
-  const camera = pickCamera(root, window.innerWidth / Math.max(1, window.innerHeight))
+  const camera: PerspectiveCamera = pickCamera(root, window.innerWidth / Math.max(1, window.innerHeight))
+
+  /* COMPOSE THE STANDING POINT; DO NOT LOOK IT UP. See the note by HOME_EYE in `flight.ts` for why
+     the authored `Camera_MainMenu` is the wrong answer even though it is the obvious one -- in
+     short, every route in `flights.json` was flown from the composed point, so standing anywhere
+     else makes the curve solved through each route's middle meaningless. */
+  {
+    const aspect = window.innerWidth / Math.max(1, window.innerHeight)
+    const homeTgt = aimAt(fujiPeak, HOME_EYE, HOME_FOV, aspect, FUJI_FRAME_U, FUJI_FRAME_V)
+    Object.assign(home, {
+      px: HOME_EYE[0], py: HOME_EYE[1], pz: HOME_EYE[2],
+      tx: homeTgt.x, ty: homeTgt.y, tz: homeTgt.z,
+      fov: HOME_FOV, roll: 0,
+    })
+    Object.assign(cam, home)
+    camera.position.set(cam.px, cam.py, cam.pz)
+    camera.fov = cam.fov
+    camera.updateProjectionMatrix()
+    camera.lookAt(homeTgt)
+  }
 
   /* registered before the first render, because the callbacks fire during the upload that render
      performs; `freed` is empty until then */
@@ -311,14 +441,44 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     camera.updateProjectionMatrix()
   })
 
-  /* a slow turn, so a frame cost measured later is a MOVING frame rather than a still one */
+
+  /* ONE LOOP, ONE CLOCK, AND THE SPIN IS GONE.
+
+     Phase 0 turned the camera 0.02 degrees a frame so that the frame cost it was measuring came
+     off a MOVING frame rather than a still one -- a measuring instrument, and it had no business
+     surviving the phase. It did, for three more, and what it turned the valley into was a
+     photograph revolving behind the menu.
+
+     The step is capped rather than taken raw: a stalled frame that covers eight frames' worth of
+     path in one go is indistinguishable from a snap, so a stall costs a little wall-clock instead.
+     See MAX_STEP_MS. */
   let raf = 0
-  const spin = () => {
-    raf = requestAnimationFrame(spin)
-    camera.rotation.y += MathUtils.degToRad(0.02)
+  let last = performance.now()
+  const _aim = new Vector3()
+  const frame = () => {
+    raf = requestAnimationFrame(frame)
+    const now = performance.now()
+    const dt = Math.min(now - last, MAX_STEP_MS)
+    last = now
+
+    if (live) {
+      live.elapsed += dt / 1000
+      const p = Math.min(1, live.elapsed / live.flight.dur)
+      live.flight.sample(easeInOutSine(p), cam)
+      /* THE DESTINATION ASSEMBLES AS A FRACTION OF THE MOVE, not at a fixed time, so the pacing
+         holds whether the flight is 1.6 seconds or 4.6. */
+      if (live.onOpen && p >= live.openAt) { const open = live.onOpen; live.onOpen = null; open() }
+      if (p >= 1) { const land = live.onLand; live = null; land?.() }
+    }
+
+    camera.position.set(cam.px, cam.py, cam.pz)
+    if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix() }
+    _aim.set(cam.tx, cam.ty, cam.tz)
+    camera.lookAt(_aim)
+    if (cam.roll) camera.rotateZ(MathUtils.degToRad(cam.roll))
     renderer.render(scene, camera)
   }
-  spin()
+  frame()
 
   handle = {
     canvas,
@@ -328,15 +488,73 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     marks,
     dispose: () => {
       cancelAnimationFrame(raf)
+      registerFlights(null)
+      live = null
       renderer.dispose()
       canvas.remove()
       handle = null
     },
   }
+  /* the menu can fly from here on. Registered AFTER `handle`, because both calls check it. */
+  registerFlights({ flyToSection: flyToSectionImpl, flyHome: flyHomeImpl, isFlying: isFlyingImpl })
+
   ;(window as unknown as { __VALLEY__?: ValleyMarks }).__VALLEY__ = marks
   return marks
 }
 
 export function valleyHandle() {
   return handle
+}
+
+/* ==================================================================================================
+   THE TWO CALLS REACT MAKES. Neither returns anything and both are safe when the valley is off --
+   the app must work with `?valley=off`, and a menu whose navigation depended on a canvas being
+   there would not.
+
+   THE SCREEN ARRIVES WITH THE CAMERA, NOT BEFORE IT. `onOpen` fires at 82% of the move, so the
+   section's board is assembling as the flight settles rather than appearing over a camera still
+   crossing the valley. If there is no valley the caller is told immediately, which is exactly what
+   the menu did for the three phases before this.
+   ================================================================================================== */
+const OPEN_AT = 0.82
+
+function flyToSectionImpl(section: MenuSectionKey, onOpen: () => void): void {
+  const dest = DESTINATIONS[section]
+  if (!handle || !dest) { onOpen(); return }
+  const flight = makeFlight({
+    startEye: new Vector3(cam.px, cam.py, cam.pz),
+    startTgt: new Vector3(cam.tx, cam.ty, cam.tz),
+    endEye: new Vector3(dest.eye[0], dest.eye[1], dest.eye[2]),
+    endTgt: new Vector3(dest.focus[0], dest.focus[1], dest.focus[2]),
+    mid: dest.mid, lean: dest.lean, pace: dest.pace,
+    startFov: cam.fov, endFov: dest.fov, startRoll: cam.roll, endRoll: 0,
+  })
+  flownTo = section
+  live = { flight, elapsed: 0, openAt: OPEN_AT, onOpen, onLand: null }
+}
+
+/* THE WAY HOME RETRACES THE WAY OUT -- same middle, because a flight that came in through a gate
+   would otherwise leave by lifting off through its roof, and the trees the arrival was routed
+   around are back in the way. With a single middle there is nothing to reverse: the same arc read
+   backwards is the same arc. It leans a great deal less (see AIM_LEAN_BACK) and it unwinds
+   whatever roll the arrival had, because the menu is never tilted. */
+function flyHomeImpl(): void {
+  if (!handle) return
+  const dest = flownTo ? DESTINATIONS[flownTo] : null
+  flownTo = null
+  live = {
+    flight: makeFlight({
+      startEye: new Vector3(cam.px, cam.py, cam.pz),
+      startTgt: new Vector3(cam.tx, cam.ty, cam.tz),
+      endEye: new Vector3(home.px, home.py, home.pz),
+      endTgt: new Vector3(home.tx, home.ty, home.tz),
+      mid: dest?.mid ?? null, lean: AIM_LEAN_BACK, pace: dest?.pace ?? null,
+      startFov: cam.fov, endFov: home.fov, startRoll: cam.roll, endRoll: 0,
+    }),
+    elapsed: 0, openAt: 1, onOpen: null, onLand: null,
+  }
+}
+
+function isFlyingImpl(): boolean {
+  return live !== null
 }

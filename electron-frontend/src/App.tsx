@@ -54,6 +54,7 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
+import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent,
   practiceLanes, worldLanes, ascentRungs, heroFromStudyBlock, crownFrom, type MenuSectionKey,
@@ -1264,6 +1265,29 @@ function App() {
      converts them one at a time by registering a screen, and nothing here changes. */
   const menuPath = useMenuPath(openMenuSection)
 
+  /* THE CAMERA CARRIES THE NAVIGATION, and this is the pair of calls that make it do so.
+
+     ENTERING FLIES FIRST AND CHANGES THE SCREEN AT 82% OF THE MOVE, so the section's board is
+     assembling as the flight settles rather than appearing over a camera still crossing the
+     valley. `flyToSection` calls straight back when there is no valley -- `?valley=off` is a
+     supported boot and a menu whose navigation needed a canvas would not survive it.
+
+     LEAVING IS THE OTHER WAY ROUND: the screen goes at once and the camera follows it home. You
+     have already decided to leave, and watching the board you are done with ride two seconds of
+     egress is the wrong half of the move to spend on it. */
+  const enterMenuSection = useCallback((section: MenuSectionKey) => {
+    if (valleyIsFlying()) return
+    flyToSection(section, () => menuPath.enterSection(section))
+  }, [menuPath])
+
+  const leaveMenuLevel = useCallback((): boolean => {
+    const wasInSection = menuPath.level === 2
+    if (!menuPath.up()) return false
+    /* only a departure from a section is a journey home; L3 to L2 is a move within one place */
+    if (wasInSection) flyHome()
+    return true
+  }, [menuPath])
+
   /* THE WORLD'S TWO FIGURES, fetched only once the screen asking for them is up — see the note in
      `useWorldData`. `worldLanes` is memoised because `Lanes` watches the array it is given, and a
      fresh one on every render would re-subscribe its keydown listener for nothing. */
@@ -1400,7 +1424,7 @@ function App() {
         /* THE TREE FIRST, THEN THE FLAT MAP. Inside the menu, Escape means "up one level"; the
            `up()` boolean is what stops it becoming a key that silently does nothing at the root,
            where it must fall through to the app's own parent chain instead. */
-        if (view === 'home' && menuFrontDoor && menuPath.up()) {
+        if (view === 'home' && menuFrontDoor && leaveMenuLevel()) {
           return
         }
 
@@ -2180,7 +2204,7 @@ function App() {
             const node = progression.requestOpen(nodeId)
             if (node) openProgressionNode(node)
           }}
-          onUp={menuPath.up}
+          onUp={leaveMenuLevel}
         />
       ) : null}
 
@@ -2195,7 +2219,7 @@ function App() {
             if (key === 'drills') { jumpToScriptHubMinigame(activeScript, activeGame); return }
             jumpToScriptHub(activeScript)
           }}
-          onUp={menuPath.up}
+          onUp={leaveMenuLevel}
         />
       ) : null}
 
@@ -2210,7 +2234,7 @@ function App() {
             if (key === 'read') { navigate('passage_hub', 'forward'); return }
             tutor.openTutorPanel('scenarios')
           }}
-          onUp={menuPath.up}
+          onUp={leaveMenuLevel}
         />
       ) : null}
 
@@ -2223,7 +2247,7 @@ function App() {
                prep view that does that job today -- the same passthrough every section began as */
             navigate('jlpt_prep', 'forward')
           }}
-          onUp={menuPath.up}
+          onUp={leaveMenuLevel}
         />
       ) : null}
 
@@ -2232,7 +2256,7 @@ function App() {
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
           crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress)}
-          onOpenSection={menuPath.enterSection}
+          onOpenSection={enterMenuSection}
           onRunHero={runMenuHero}
         />
       ) : null}
