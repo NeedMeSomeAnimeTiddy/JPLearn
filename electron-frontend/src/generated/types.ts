@@ -20,6 +20,25 @@ export interface StudyStreak {
   freezes_available: number
 }
 
+export interface VocabFeedWord {
+  card_id: number
+  word: string
+  reading: string
+  meaning: string
+  theme: string
+  unknown_kanji: number
+}
+
+export interface VocabFeedPayload {
+  slug: string
+  budget: number
+  total: number
+  readable: number
+  known_kanji: number
+  started: number
+  words: VocabFeedWord[]
+}
+
 export interface CardNotePayload {
   note_key: string
   note_text: string

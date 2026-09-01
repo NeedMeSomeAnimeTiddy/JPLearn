@@ -318,7 +318,11 @@ export const MINIGAME_SKILL_GROUP: Record<MinigameKey, MinigameSkillGroupKey> = 
   handwriting: 'recall',
   typed_recall: 'recall',
   speech_recall: 'recall',
-  sentence_assembly: 'listening',
+  // Sentence Assembly arranges shuffled chunks into natural order — there is no audio in it,
+  // so it never belonged under a group whose helper reads "audio-first understanding and
+  // spoken recall". It is a hard, sentence-level contextual round, which is exactly what the
+  // other four challenge modes are.
+  sentence_assembly: 'challenge',
   particle_cloze: 'challenge',
   vibe_check: 'challenge',
   imposter: 'challenge',

@@ -58,6 +58,11 @@ from data.study_pipeline import (  # noqa: E402
     track_assistant_event_interaction,
 )
 from data.database import save_state  # noqa: E402
+from domain.vocab_order import (  # noqa: E402
+    clamp_budget,
+    next_words,
+    unknown_count,
+)
 from data.card_notes_repository import (  # noqa: E402
     CardNoteRecord,
     CardNotesRepository,
@@ -78,6 +83,7 @@ from data.scenario_repository import (  # noqa: E402
 )
 from domain.blocks import (  # noqa: E402
     blocks_for_slug,
+    themes_for_slug,
     compute_block_mastery,
     compute_unlocked_count,
     unlock_threshold_for_slug,
@@ -435,6 +441,42 @@ class StudyStreak:
     current_days: int
     best_days: int
     freezes_available: int
+
+
+@dataclass(frozen=True)
+class VocabFeedWord:
+    """One word the feed is offering today.
+
+    ``unknown_kanji`` is what the ordering sorted on and is worth sending: a zero means
+    the learner can read this today, and a renderer that wants to say why a word is here
+    should not have to recompute it.
+    """
+
+    card_id: int
+    word: str
+    reading: str
+    meaning: str
+    theme: str
+    unknown_kanji: int
+
+
+@dataclass(frozen=True)
+class VocabFeedPayload:
+    """What a vocabulary level offers, now that it is not chunked into blocks.
+
+    The three counts are the honest denominator for ``words``. Without them "here are ten
+    words" is a card trick — ``total`` is the level, ``readable`` is how much of it the
+    learner's kanji already unlocks, and ``known_kanji`` is the number the whole ordering
+    turns on, so a learner can see that clearing a kanji block moved it.
+    """
+
+    slug: str
+    budget: int
+    total: int
+    readable: int
+    known_kanji: int
+    started: int
+    words: list[VocabFeedWord]
 
 
 @dataclass(frozen=True)
@@ -1422,6 +1464,89 @@ def build_deck_cards(slug: str) -> dict[str, object]:
         "name": deck.name,
         "cards": [asdict(card) for card in cards],
     }
+
+
+VOCAB_BUDGET_SETTING = "vocab_new_per_day"
+_KANJI_LEVEL_SLUGS: tuple[str, ...] = (
+    "kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2", "kanji_n1",
+)
+
+
+def _known_kanji() -> set[str]:
+    """Every kanji the learner has answered at least once, across all five levels.
+
+    ``repetitions >= 1`` is the same test block unlocking uses, deliberately. If a kanji
+    counts toward opening the next block it counts toward reading a word — one definition
+    of "met", so the two halves of the curriculum cannot disagree about what the learner
+    knows.
+    """
+    known: set[str] = set()
+    for slug in _KANJI_LEVEL_SLUGS:
+        factory = ALL_DECKS.get(slug)
+        if factory is None:
+            continue
+        deck = factory()
+        card_ids = [card.id for card in deck.cards]
+        states = load_review_states(deck.name, card_ids)
+        for card in deck.cards:
+            if getattr(states.get(card.id), "repetitions", 0) >= 1:
+                known.add(card.character)
+    return known
+
+
+def build_vocab_feed(slug: str, budget: int | None = None) -> dict[str, object]:
+    """Return today's words for a vocabulary level, in teaching order.
+
+    The replacement for ``block-progress`` on the decks that stopped having blocks. It
+    answers a different question — not "which chunk may I open" but "what am I being
+    given today" — so it is a separate command rather than a mode of that one.
+    """
+    init_study_db()
+    factory = ALL_DECKS.get(slug)
+    if factory is None:
+        raise ValueError(f"Unknown deck slug: {slug}")
+    if blocks_for_slug(slug):
+        raise ValueError(f"'{slug}' is studied in blocks, not fed; use block-progress")
+
+    deck = factory()
+    card_ids = [card.id for card in deck.cards]
+    states = load_review_states(deck.name, card_ids)
+    started = {cid for cid in card_ids if getattr(states.get(cid), "repetitions", 0) >= 1}
+    known = _known_kanji()
+
+    # the theme survives the blocks going, and it is the one label a word still carries
+    theme_of: dict[int, str] = {}
+    for theme in themes_for_slug(slug):
+        for cid in theme.card_ids:
+            theme_of[cid] = theme.name
+
+    if budget is None:
+        budget = clamp_budget(get_setting(VOCAB_BUDGET_SETTING))
+    entries = [(card.id, card.character) for card in deck.cards]
+    by_id = {card.id: card for card in deck.cards}
+    chosen = next_words(entries, known, started, budget)
+
+    return asdict(
+        VocabFeedPayload(
+            slug=slug,
+            budget=budget,
+            total=len(card_ids),
+            readable=sum(1 for _, text in entries if not unknown_count(text, known)),
+            known_kanji=len(known),
+            started=len(started),
+            words=[
+                VocabFeedWord(
+                    card_id=cid,
+                    word=by_id[cid].character,
+                    reading=by_id[cid].romaji,
+                    meaning=by_id[cid].meaning,
+                    theme=theme_of.get(cid, ""),
+                    unknown_kanji=unknown_count(by_id[cid].character, known),
+                )
+                for cid in chosen
+            ],
+        )
+    )
 
 
 def build_block_progress(slug: str) -> dict[str, object]:
@@ -3114,6 +3239,44 @@ def _cmd_deck_cards(argv: list[str]) -> tuple[int, dict[str, object]]:
         return 2, {"error": str(exc)}
 
 
+def _cmd_vocab_feed(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """``vocab-feed <slug> [count]`` -- today's words, in teaching order.
+
+    The optional count overrides the stored budget without writing it, which is what a
+    preview or a "show me twenty" control wants; `vocab-feed-set` is how it is changed.
+    """
+    if len(argv) < 2:
+        return 2, {"error": "Usage: vocab-feed <slug> [count]"}
+    override: int | None = None
+    if len(argv) > 2:
+        try:
+            override = clamp_budget(argv[2])
+        except ValueError as exc:
+            return 2, {"error": f"Invalid count: {exc}"}
+    try:
+        return 0, build_vocab_feed(argv[1], override)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_vocab_feed_set(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """``vocab-feed-set <count> [slug]`` -- change how many new words a day.
+
+    Stores the CLAMPED value rather than what was typed, so the table never holds a number
+    the feed would refuse; and answers with the feed itself, so a caller sees the effect
+    rather than an acknowledgement.
+    """
+    if len(argv) < 2:
+        return 2, {"error": "Usage: vocab-feed-set <count> [slug]"}
+    budget = clamp_budget(argv[1])
+    set_setting(VOCAB_BUDGET_SETTING, str(budget))
+    slug = argv[2] if len(argv) > 2 else "vocab_n5"
+    try:
+        return 0, build_vocab_feed(slug)
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+
+
 def _cmd_block_progress(argv: list[str]) -> tuple[int, dict[str, object]]:
     if len(argv) < 2:
         return 2, {"error": "Missing deck slug"}
@@ -3811,6 +3974,8 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "daily-activity": _cmd_daily_activity,
     "deck-cards": _cmd_deck_cards,
     "block-progress": _cmd_block_progress,
+    "vocab-feed": _cmd_vocab_feed,
+    "vocab-feed-set": _cmd_vocab_feed_set,
     "overview-character-mastery": _cmd_overview_character_mastery,
     "reset-db": _cmd_reset_db,
     "record-result": _cmd_record_result,
