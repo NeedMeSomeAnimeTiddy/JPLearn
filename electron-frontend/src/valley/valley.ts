@@ -46,6 +46,7 @@ import { buildCrowd, type CrowdField } from './crowd'
 import { buildWalkers, type WalkField } from './walk'
 import { buildLake, lakeShore, type Lake } from './lake'
 import { buildLife, type LifeField } from './life'
+import { buildOutfits } from './outfit'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
@@ -154,6 +155,8 @@ const walking = new URLSearchParams(window.location.search).get('walk') !== 'off
 /* `?life=off` -- the boats, the ducks, the koi, the steam and the banners are one table and one
    tick, so they get one switch */
 const alive = new URLSearchParams(window.location.search).get('life') !== 'off'
+/* `?outfits=off` -- 0 puts every authored robe back, which is the A/B this exists for */
+const dressed = new URLSearchParams(window.location.search).get('outfits') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -539,7 +542,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       crowd = buildCrowd(root)
       console.info(
         `[valley] crowd: ${crowd.figures} figures on ${crowd.meshes.length} meshes, `
-        + `${crowd.models.length} models`,
+        + `${crowd.models.length} models, ${crowd.lifted} lifted out of the ground`,
       )
       /* AND SOME OF THEM WALK. They borrow the crowd's geometries, so this has to come after it --
          and it is still inside the one window before the first render, because the footing grid it
@@ -571,6 +574,21 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
         `[valley] life: ${life.items} props moving, ${life.boats} boats with ${life.riders} `
         + `aboard, ${life.wakes} wakes, ${life.moored} moored`
         + (shore ? `; shore ${Math.round(shore.min)}..${Math.round(shore.max)} units out` : ''),
+      )
+    }
+
+    /* AND THEY ARE NOT ALL WEARING THE SAME THING. Last of everything, because it dresses the
+       walkers and the boats' passengers as well as the standing crowd -- those are crowd geometries
+       on meshes of their own, and a passenger in the authored slate next to a walker in twenty-two
+       colours is worse than either alone. */
+    if (crowd && dressed) {
+      const wardrobe = buildOutfits([
+        ...crowd.meshes, ...(walkers?.meshes ?? []), ...(life?.riderMeshes ?? []),
+      ])
+      console.info(
+        `[valley] wardrobe: ${wardrobe.figures} dressed across ${wardrobe.models} models `
+        + `(skin and hair off ${wardrobe.from}; matched in ${wardrobe.found.skin} and `
+        + `${wardrobe.found.hair})`,
       )
     }
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))

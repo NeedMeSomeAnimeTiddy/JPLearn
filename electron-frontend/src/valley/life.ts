@@ -191,6 +191,8 @@ interface Rider {
 }
 
 export interface LifeField {
+  /** the meshes the boat passengers were re-seated into, so the wardrobe can dress them too */
+  riderMeshes: InstancedMesh[]
   items: number
   boats: number
   riders: number
@@ -469,6 +471,7 @@ export function buildLife(
   tick(0)
 
   return {
+    riderMeshes: meshes.filter((m) => /^boat-riders-/.test(m.name)),
     items: items.length,
     boats: sails.length,
     riders: riders.length,

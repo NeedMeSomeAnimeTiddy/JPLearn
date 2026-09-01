@@ -177,7 +177,7 @@ describe('whoever is in the boat', () => {
     crowdMesh.setMatrixAt(0, new Matrix4().makeTranslation(at.x + 20, at.y, at.z))
     crowdMesh.setMatrixAt(1, new Matrix4().makeTranslation(90000, 0, 90000))
     const crowd = {
-      figures: 2, meshes: [crowdMesh], models: [], source: new MeshStandardMaterial(),
+      figures: 2, lifted: 0, meshes: [crowdMesh], models: [], source: new MeshStandardMaterial(),
       material: null, tick: () => {},
     }
     const f = buildLife(scene, world(boat, crowdMesh), crowd, round(3000), null)

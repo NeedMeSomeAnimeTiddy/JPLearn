@@ -44,6 +44,18 @@ import { breathe } from './atmosphere'
 
 /** every human node in the export carries this; no koi, monkey or fox does */
 export const PERSON_RE = /_Person\d/i
+
+/* SIX UNITS UP, AND THE MODELS ARE NOT WHAT IS WRONG. Measured here against a triangle-exact
+   ground -- every ground triangle in the world, highest near-horizontal wins -- over the 974
+   figures standing on it: the feet sit a MEDIAN of 6.1 below it, 808 of them are buried at all,
+   and the tail runs to −32 on slopes. Every model has its feet at the bottom of its own box and
+   the walkers, placed by this port's own ground query rather than by the authored matrices, sit
+   exactly on it — so it is the placement that is low, not the origin.
+   It was always true and it was always invisible: a 65-unit figure with an 8.6-unit hem hides six
+   units of burial, and it only became findable once there was a ground query to measure against.
+   The mockup reached the same number (`CROWD_WEAR.lift = 6`) from its own ground.
+   LIFTED HERE RATHER THAN BY MOVING THE MESH ORIGIN, which would float every walker. */
+export const CROWD_LIFT = 6
 /** and nothing under 40 units is a person — the second guard, not the only one */
 export const PERSON_MIN_H = 40
 
@@ -194,6 +206,8 @@ export interface CrowdModel {
 export interface CrowdField {
   /** how many figures are breathing */
   figures: number
+  /** how many were lifted out of the ground -- see CROWD_LIFT */
+  lifted: number
   /** the meshes they stand in — the walkers borrow their geometries out of these */
   meshes: InstancedMesh[]
   /** the models themselves, one entry per distinct figure */
@@ -245,6 +259,7 @@ export function buildCrowd(root: Object3D): CrowdField {
   const models: CrowdModel[] = []
   const seen = new Set<string>()
   let figures = 0
+  let lifted = 0
   let source: Material | null = null
   let material: Material | null = null
 
@@ -270,7 +285,30 @@ export function buildCrowd(root: Object3D): CrowdField {
       crowdIdle(material)
     }
     mesh.material = material
+    /* ITS OWN STEP, AND IT HAS TO BE. In the mockup this was applied while re-seating a figure onto
+       a new model, so the moment the world started carrying those models and the swap was skipped,
+       the lift went with it and the whole crowd sank back into the ground. The two facts are
+       unrelated: what a figure wears is one question and the placements being six low is another.
+       This export has already had the swap done in Blender, so only the lift is left. */
+    if (mesh.isInstancedMesh) {
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, _m)
+        _m.elements[13] += CROWD_LIFT
+        mesh.setMatrixAt(i, _m)
+        lifted++
+      }
+      mesh.instanceMatrix.needsUpdate = true
+    } else {
+      mesh.position.y += CROWD_LIFT
+      mesh.updateMatrix()
+      lifted++
+    }
     crowdBake(geo)
+    /* GLTFLoader names the OBJECT, not the geometry, so everything out of `world.glb` arrives with
+       `geometry.name` empty -- which is what made the mockup's own model-recognition test compare
+       undefined against a set of names and silently never match. Nothing here depends on it, but
+       the wardrobe's log says which model it read the skin and hair off and "unnamed" is no use. */
+    if (!geo.name) geo.name = o.name.replace(/^inst:/, '')
     if (!seen.has(geo.uuid)) {
       seen.add(geo.uuid)
       models.push({ geo, scale, height: h, foot: geo.boundingBox!.min.y * scale })
@@ -281,6 +319,7 @@ export function buildCrowd(root: Object3D): CrowdField {
 
   return {
     figures,
+    lifted,
     meshes,
     models,
     source,
