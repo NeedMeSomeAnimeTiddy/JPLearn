@@ -994,3 +994,66 @@ The passthrough mechanism stays, because level three is the next thing to fill i
 
 **975 tests across 89 files**, 8 a11y, lint clean.
 
+## Phase 5, part one — four of the seven level threes
+
+| screen | parent | state |
+| --- | --- | --- |
+| scenes | THE WORLD · TALK | **built** |
+| the wall | YOU | **built** |
+| the library | THE WORLD · READ | **built** |
+| one rung | THE EXAM | **built** |
+| modes | PRACTICE · DRILLS | a deck rail, a scrolling strip, a centred hero and a mini-chart |
+| deck · feed | THE PATH · a milestone | block progress, and the 186-block vocabulary feed |
+
+### The wall, and the second time the same rule caught me
+
+Twenty-five seals in the catalog's own three categories, walked on two axes — left and right run the
+whole set so every seal is reachable by holding one key, up and down jump a group. **The description
+IS the requirement**: every string in `BADGE_METADATA` says what earns the badge, so an unearned
+seal has something to say without a second field being invented for it.
+
+A seal wears the badge's own icon rather than a glyph. The mockup gave each of its badges a Japanese
+one, authored for the mockup and existing nowhere in this app — inventing twenty-five kanji to keep
+the all-type vocabulary would be inventing exactly what this port refuses to. That icon map moved
+out of `AchievementsPanel`, where it was module-private, so both screens read one copy.
+
+**And the unearned seals were drawn translucent**, which over the lit valley made them ghosts with
+invisible marks in them — the identical failure the ascent's locked plinths had, for the identical
+reason: it read perfectly while the world behind it was accidentally black. Same fix, same solved
+ground.
+
+### The library, and the progress column that is not there
+
+Thirty texts, six on the stage, the ends saying how many are folded away — this menu's overflow law,
+not this screen's. Live: **30 TEXTS · ALL BEGINNER · 10 HOURS OF READING ALOUD**, all counted.
+Forty words a minute is a beginner reading aloud and is the one assumption on the screen, so it is
+named rather than buried in an expression.
+
+The mockup drew a "HOW FAR YOU GOT" track on every row. There is none here, for the reason the lane
+above already found: `usePassages` keeps its progress map in component state and nothing persists
+it. Thirty empty tracks would be thirty claims that you have read none of them, which is a different
+statement from the app not keeping the answer. The note says which, once.
+
+### One rung, which carries the fact nothing in the app states
+
+The JLPT does not add your papers up: **the vocabulary-and-grammar section is a separate gate**, and
+a total above the mark with that section below 38 — or 19 at N3 upward — is still a fail. Both
+numbers have been on `JLPT_LEVEL_SPECS` and reported to the renderer all along, and no screen has
+ever drawn what they are for.
+
+**And what the app cannot project is hatched, not zeroed.** `domain/jlpt_readiness` says it in its
+own docstring: listening is not assessed in this system, and at N1–N3 reading is its own paper too.
+So the app can speak for one section and never for the total out of 180 — 60 points of it at N4/N5
+and 120 at N3 upward simply have no source. A zero there would be a prediction that you fail; an em
+dash is the truth, which is that nobody asked. Live on the seeded account: **N4, YOUR TARGET, 84%,
+PAST THE LINE**, both tracks hatched, and *60 POINTS OF IT ARE LISTENING, WHICH THIS APP HAS NO
+CONTENT FOR*.
+
+The projection is not recomputed: `project_mock_score` already runs in `domain/jlpt_sessions` and
+its answer is stored on the result. And the four ways in each carry what they are FOR — two move the
+readiness figure, one measures it, one finds your level — which the app's own descriptions, being
+about mechanics, never say. `MODE_META` moved to `constants.tsx` so the view and the menu share one
+copy, the same lesson `--gold` taught.
+
+**1,007 tests across 91 files**, 8 a11y, lint clean.
+

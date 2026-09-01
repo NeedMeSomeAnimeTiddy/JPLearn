@@ -997,3 +997,278 @@
   white-space: nowrap; transition: background 0.24s ease, color 0.24s ease;
 }
 .sc-free.on .k { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
+
+/* ==================================================================================================
+   THE WALL — YOU's level three. Twenty-five seals in three rows, and one reading beneath them.
+
+   A ROW PER GROUP, AND THE ROWS ARE NOT THE SAME LENGTH, because the catalog's three categories are
+   not the same size. Laying them on a grid would have made the short rows look unfinished; laying
+   them as rows makes the difference read as what it is — there are simply more milestones than
+   there are modes to unlock.
+   ================================================================================================== */
+.bw-rows {
+  position: absolute; left: 166px; top: 214px; width: 948px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.bw-row { display: flex; align-items: center; gap: 18px; }
+.bw-lab {
+  flex: none; width: 212px; display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 14px 8px; background: var(--ink); transform: skewX(-8deg);
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45);
+}
+.bw-lab b { font-family: var(--jp); font-weight: 700; font-size: 15px; line-height: 1; color: var(--gold-hi); }
+.bw-lab i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.18em; color: rgba(232, 196, 124, 0.6); white-space: nowrap;
+}
+.bw-lab u {
+  text-decoration: none; font-family: var(--lat); font-style: italic; font-weight: 900;
+  font-size: 13px; color: rgba(242, 234, 216, 0.5);
+}
+.bw-seals { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* A SEAL IS A SEAL WHETHER OR NOT YOU HAVE IT. An unearned one keeps its size and its mark and
+   loses only its ink — the point of showing the whole set from day one is that you can see what
+   there is, which a row of blanks does not give you. */
+/* OPAQUE, AND THIS IS THE SECOND TIME THE SAME RULE CAUGHT ME. Drawn at 0.5 over the lit valley an
+   unearned seal is a ghost with an invisible mark in it -- the identical failure the ascent's locked
+   plinths had, and for the identical reason: it read perfectly while the world behind it was
+   accidentally black. Everything above y560 brings its own ground. The ground is the same lifted ink
+   the locked plinth settled on, and the mark sits at 0.55 washi over it, which measures 5.0. */
+.bw-seal {
+  width: 38px; height: 38px; border: 0; padding: 0; cursor: pointer; display: grid;
+  place-items: center; transform: skewX(-8deg);
+  background: #231f19; color: rgba(242, 234, 216, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22);
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.bw-seal.got { background: var(--gold); color: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.4); }
+.bw-seal.on { box-shadow: inset 0 0 0 2px var(--washi), 3px 4px 0 rgba(0, 0, 0, 0.45); }
+.bw-seal.got.on { box-shadow: inset 0 0 0 2px var(--ink), 3px 4px 0 rgba(0, 0, 0, 0.45); }
+.bw-seal:focus-visible { outline: 3px solid var(--hi); outline-offset: 4px; }
+
+/* ---- what the one under the cursor takes ---- */
+.bw-detail {
+  position: absolute; left: 166px; top: 448px; width: 948px; height: 96px;
+  display: flex; align-items: center; gap: 20px; padding: 0 22px;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+  transform: skewX(-8deg) rotate(-1.2deg);
+}
+.bw-big {
+  flex: none; width: 62px; height: 62px; display: grid; place-items: center;
+  background: rgba(20, 17, 13, 0.1); color: rgba(20, 17, 13, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.bw-big.got { background: var(--gold); color: var(--ink); box-shadow: none; }
+.bw-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.bw-txt b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px; line-height: 1;
+  color: var(--ink);
+}
+.bw-txt i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 600; font-size: 11px;
+  line-height: 1.45; color: rgba(20, 17, 13, 0.62);
+}
+.bw-state {
+  flex: none; padding: 6px 13px 7px; background: rgba(20, 17, 13, 0.12);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.5); white-space: nowrap;
+}
+/* THE ONE GOLD ON THE SCREEN IS AN EARNED THING, which is the same law the ladder's badge obeys:
+   gold is what has been earned, never what is merely selected. */
+.bw-state.got { background: var(--gold); color: var(--ink); }
+
+/* ==================================================================================================
+   THE LIBRARY — THE WORLD's level three, through READ. Six rows on the stage of a shelf of thirty.
+   ================================================================================================== */
+.lb-rail {
+  position: absolute; left: 166px; top: 232px; width: 948px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.lb-row {
+  display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 16px 0 0;
+  border: 0; font: inherit; text-align: left; cursor: pointer;
+  background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg);
+  transition: transform 0.2s cubic-bezier(0.2, 0.92, 0.24, 1), background 0.2s ease,
+    box-shadow 0.2s ease, height 0.2s ease;
+}
+.lb-row.on {
+  height: 66px;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+}
+.lb-row:focus-visible { outline: 3px solid var(--hi); outline-offset: 4px; }
+
+/* THE TIME IS THE FIRST THING, because it is the question a learner picking something to read is
+   actually asking. Forty words a minute is a beginner reading aloud -- see READING_PACE. */
+.lb-mark {
+  flex: none; width: 62px; align-self: stretch; display: flex; align-items: center;
+  justify-content: center; gap: 4px; background: var(--ink);
+}
+.lb-mark b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px; line-height: 1;
+  color: var(--gold-hi);
+}
+.lb-mark em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.16em; color: rgba(232, 196, 124, 0.6);
+}
+.lb-body { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.lb-jp {
+  flex: none; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--jp); font-weight: 700; font-size: 17px; line-height: 1.2; color: var(--ink);
+}
+/* THE AUTHOR IS THE GLOSS, and it is Japanese, so it takes the Japanese face -- these thirty are
+   Aozora Bunko texts and they carry no English anywhere. */
+.lb-by {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-style: normal; font-family: var(--jp); font-weight: 600; font-size: 12px;
+  color: rgba(20, 17, 13, 0.55);
+}
+.lb-words {
+  flex: none; font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.5); white-space: nowrap;
+}
+.lb-slab {
+  flex: none; padding: 6px 12px 7px; background: rgba(20, 17, 13, 0.13);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.55); white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.lb-row.on .lb-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
+
+/* the ends of the window say what is folded away, which is this menu's overflow law */
+.lb-fold {
+  position: absolute; left: 166px; width: 948px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.22em rgba(8, 11, 18, 0.8);
+}
+.lb-fold.up { top: 212px; }
+.lb-fold.down { top: 566px; }
+
+.lb-note {
+  position: absolute; left: 160px; top: 592px; width: 960px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  color: var(--gold-hi); paint-order: stroke fill;
+  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
+}
+
+/* ==================================================================================================
+   ONE RUNG — THE EXAM's level three. A dashboard with an action set at its foot, which is two
+   shapes and deliberately so: the reading is figures you look at, and the four ways in are peers
+   you pick between. They are drawn as different objects because they are.
+   ================================================================================================== */
+.lv-head {
+  position: absolute; left: 166px; top: 210px; width: 948px; height: 62px;
+  display: flex; align-items: center; gap: 16px; padding: 0 20px;
+  background: rgba(10, 9, 6, 0.88); transform: skewX(-8deg);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
+}
+.lv-head > b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 34px; line-height: 1;
+  color: var(--gold-hi);
+}
+.lv-state {
+  padding: 5px 12px 6px; background: rgba(242, 234, 216, 0.14); font-family: var(--lat-ui);
+  font-weight: 700; font-size: 9px; letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.75);
+  white-space: nowrap;
+}
+.lv-state.ready { background: var(--gold-hi); color: var(--ink); }
+.lv-state.shut { background: var(--hi); color: #ffd9a1; }
+.lv-figs { margin-left: auto; display: flex; align-items: baseline; gap: 14px; }
+.lv-figs em {
+  font-style: italic; font-family: var(--lat); font-weight: 900; font-size: 40px; line-height: 1;
+  color: var(--washi);
+}
+.lv-figs s {
+  display: flex; flex-direction: column; gap: 2px; text-decoration: none; text-align: right;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  color: rgba(242, 234, 216, 0.55); white-space: nowrap;
+}
+.lv-figs s b { color: var(--gold-hi); }
+
+.lv-pair { position: absolute; left: 166px; top: 288px; width: 948px; display: flex; gap: 20px; }
+.lv-panel {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 0 0 14px;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
+  transform: skewX(-8deg);
+}
+.lv-ph {
+  padding: 6px 16px 7px; background: var(--ink); color: var(--gold-hi); font-family: var(--lat-ui);
+  font-weight: 700; font-size: 9px; letter-spacing: 0.18em; white-space: nowrap;
+}
+.lv-srow { display: flex; flex-direction: column; gap: 5px; padding: 0 16px; }
+.lv-shead { display: flex; align-items: baseline; gap: 9px; }
+.lv-shead span {
+  font-family: var(--jp); font-weight: 700; font-size: 14px; letter-spacing: 0.06em; color: var(--ink);
+}
+.lv-shead em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55);
+}
+.lv-shead b {
+  margin-left: auto; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
+  color: var(--ink);
+}
+.lv-track {
+  position: relative; display: block; height: 12px; background: rgba(20, 17, 13, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.lv-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
+/* A NEGATIVE PERCENTAGE IS THE HATCH, NOT A NUMBER. There is no figure for a thing the app cannot
+   measure, so the head is an em dash and the track is hatched rather than empty -- an empty track
+   reads as "you scored nothing", which is a prediction, and this is the absence of one. */
+.lv-track.none {
+  background: repeating-linear-gradient(135deg, rgba(20, 17, 13, 0.16) 0 5px,
+    rgba(20, 17, 13, 0.05) 5px 10px);
+}
+/* the section's own pass mark, standing on its own bar */
+.lv-track u.mark {
+  position: absolute; top: -4px; bottom: -4px; width: 2px; text-decoration: none;
+  background: #b23320;
+}
+.lv-count {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.1em;
+  line-height: 1.45; color: rgba(20, 17, 13, 0.55);
+}
+.lv-gate {
+  margin-top: auto; padding: 8px 16px 0; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 8.5px; letter-spacing: 0.1em; line-height: 1.45; color: #b23320;
+}
+
+/* ---- the four ways in ---- */
+.lv-modes { position: absolute; left: 166px; top: 512px; width: 948px; display: flex; gap: 12px; }
+.lv-mode {
+  flex: 1; min-width: 0; border: 0; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 13px 12px;
+  background: rgba(10, 9, 6, 0.88); transform: skewX(-8deg);
+  box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(242, 234, 216, 0.22);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.lv-mode.on {
+  background: var(--gold); box-shadow: 8px 9px 0 rgba(0, 0, 0, 0.5);
+  transform: skewX(-8deg) translateY(-4px);
+}
+.lv-mode:focus-visible { outline: 3px solid var(--hi); outline-offset: 4px; }
+.lv-mode b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: var(--gold-hi); white-space: nowrap;
+}
+.lv-mode.on b { color: var(--ink); }
+/* WHAT THE MODE IS FOR, which is the difference a learner deciding what to press actually needs --
+   two of the four move the readiness figure, one measures it, one finds which level to aim at. */
+.lv-mode i {
+  font-style: normal; font-family: var(--lat); font-weight: 900; font-size: 11px;
+  letter-spacing: 0.04em; color: var(--washi); white-space: nowrap;
+}
+.lv-mode.on i { color: var(--ink); }
+.lv-mode em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 600; font-size: 9px;
+  line-height: 1.4; color: rgba(242, 234, 216, 0.55);
+}
+.lv-mode.on em { color: rgba(20, 17, 13, 0.7); }

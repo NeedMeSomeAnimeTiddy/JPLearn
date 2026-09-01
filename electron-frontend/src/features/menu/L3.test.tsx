@@ -1,0 +1,205 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render } from '@testing-library/react'
+import axe from 'axe-core'
+import type { Passage } from '../passages'
+import type { BadgeEntry } from '../achievements/types'
+import { BADGE_METADATA } from '../achievements'
+import { Library } from './components/Library'
+import { Wall } from './components/Wall'
+import { LIBRARY_WINDOW, libraryNote, libraryRows, libraryWindow } from './library'
+import { flatSeals, sealGroups, wallStep } from './wall'
+import { EXAM_MODES, levelDetail, sectionLine, unscored } from './examLevel'
+import type { LevelReadiness, Rung } from './ascent'
+
+const passage = (id: string, words: number, difficulty: number) => ({
+  id, title: id, title_reading: id, author: '作者',
+  source: '', source_url: '', original_publication: '',
+  difficulty, difficulty_label: 'beginner', word_count: words,
+  text_jp: '', raw_text: '', vocabulary: [],
+} as unknown as Passage)
+
+const shelf = Array.from({ length: 30 }, (_, i) => passage(`t${i}`, (i + 1) * 40, i / 100))
+
+afterEach(cleanup)
+
+describe('the library', () => {
+  it('counts the shelf rather than stating it', () => {
+    const rows = libraryRows(shelf)
+    expect(rows).toHaveLength(30)
+    expect(libraryNote(rows)).toMatch(/^30 TEXTS · ALL BEGINNER/)
+  })
+
+  it('says not-counted-yet rather than an empty shelf', () => {
+    expect(libraryRows(null)).toEqual([])
+    expect(libraryNote([])).toBe('NOT COUNTED YET')
+  })
+
+  it('turns a word count into minutes at a stated pace', () => {
+    /* forty words a minute is a beginner reading aloud, and is the one assumption on the screen */
+    expect(libraryRows([passage('a', 400, 0)])[0].minutes).toBe(10)
+    /* and nothing is ever zero minutes long */
+    expect(libraryRows([passage('b', 3, 0)])[0].minutes).toBe(1)
+  })
+
+  it('opens on the easiest, in the order the hub itself uses', () => {
+    const rows = libraryRows([passage('hard', 100, 0.9), passage('easy', 100, 0.1)])
+    expect(rows.map((r) => r.id)).toEqual(['easy', 'hard'])
+  })
+
+  describe('the window, which is how this menu handles overflow', () => {
+    it('shows six of thirty and says how many are folded away', () => {
+      const rows = libraryRows(shelf)
+      const view = libraryWindow(rows, 0)
+      expect(view.rows).toHaveLength(LIBRARY_WINDOW)
+      expect(view.above).toBe(0)
+      expect(view.above + view.rows.length + view.below).toBe(30)
+    })
+
+    it('clamps at both ends so the first and last are reachable', () => {
+      const rows = libraryRows(shelf)
+      expect(libraryWindow(rows, 0).above).toBe(0)
+      const end = libraryWindow(rows, rows.length - 1)
+      expect(end.below).toBe(0)
+      expect(end.rows.at(-1)?.id).toBe(rows.at(-1)?.id)
+    })
+
+    it('does not fold at all when everything fits', () => {
+      const view = libraryWindow(libraryRows(shelf.slice(0, 4)), 0)
+      expect(view.above).toBe(0)
+      expect(view.below).toBe(0)
+    })
+  })
+
+  it('walks down and opens the one under the cursor', () => {
+    const onOpen = vi.fn()
+    render(<Library rows={libraryRows(shelf)} loading={false} onOpen={onOpen} onUp={vi.fn()} />)
+    const root = document.querySelector('.mn-open') as HTMLElement
+    fireEvent.keyDown(root, { key: 'ArrowDown' })
+    fireEvent.keyDown(root, { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledWith(libraryRows(shelf)[1].id)
+  })
+
+  it('has no accessibility violations', async () => {
+    render(<Library rows={libraryRows(shelf)} loading={false} onOpen={vi.fn()} onUp={vi.fn()} />)
+    const results = await (axe as {
+      run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
+    }).run(document.querySelector('.mn-open') as Element)
+    expect(results.violations).toEqual([])
+  })
+})
+
+describe('the wall', () => {
+  const all = Object.keys(BADGE_METADATA)
+  const earned = (...ids: string[]): BadgeEntry[] =>
+    all.map((d) => ({ descriptor: d, earned: ids.includes(d) }))
+
+  it('shows every badge the catalog has, not only the ones the backend mentioned', () => {
+    /* a wall shows what there is to earn, so a badge nobody has heard of still gets a seal */
+    const groups = sealGroups([])
+    expect(flatSeals(groups)).toHaveLength(all.length)
+    expect(flatSeals(groups).every((s) => !s.earned)).toBe(true)
+  })
+
+  it('groups by the catalog\'s own category and counts each group', () => {
+    const groups = sealGroups(earned(all[0]))
+    expect(groups.length).toBeGreaterThan(1)
+    expect(groups.reduce((a, g) => a + g.seals.length, 0)).toBe(all.length)
+    expect(groups.reduce((a, g) => a + g.earned, 0)).toBe(1)
+  })
+
+  it('carries the catalog\'s sentence as what the badge takes', () => {
+    /* the description IS the requirement, so an unearned seal has something to say without a
+       second field being invented for it */
+    const first = flatSeals(sealGroups([]))[0]
+    expect(first.takes).toBe(BADGE_METADATA[first.descriptor].description)
+    expect(first.takes.length).toBeGreaterThan(0)
+  })
+
+  describe('walking it, which is two axes', () => {
+    const groups = sealGroups([])
+
+    it('runs left and right across the whole set in order', () => {
+      expect(wallStep(groups, 0, 1, 0)).toBe(1)
+      expect(wallStep(groups, 0, -1, 0)).toBe(0)
+      const last = flatSeals(groups).length - 1
+      expect(wallStep(groups, last, 1, 0)).toBe(last)
+    })
+
+    it('jumps a whole group up and down', () => {
+      const firstRow = groups[0].seals.length
+      /* from the head of the first group, down lands at the head of the second */
+      expect(wallStep(groups, 0, 0, 1)).toBe(firstRow)
+      expect(wallStep(groups, firstRow, 0, -1)).toBe(0)
+    })
+
+    it('keeps the column where it can when the next row is shorter', () => {
+      /* moving between rows of different lengths has to land somewhere, and the nearest seat in
+         the shorter row is the least surprising one */
+      const longest = groups.reduce((a, g) => (g.seals.length > a.seals.length ? g : a))
+      const start = flatSeals(groups).indexOf(longest.seals[longest.seals.length - 1])
+      const moved = wallStep(groups, start, 0, -1)
+      expect(moved).toBeGreaterThanOrEqual(0)
+      expect(moved).toBeLessThan(flatSeals(groups).length)
+    })
+  })
+
+  it('has no accessibility violations', async () => {
+    render(<Wall onUp={vi.fn()} />)
+    const results = await (axe as {
+      run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
+    }).run(document.querySelector('.mn-open') as Element)
+    expect(results.violations).toEqual([])
+  })
+})
+
+describe('one rung of the ascent', () => {
+  const data = (over: Partial<LevelReadiness> = {}): LevelReadiness => ({
+    level: 'n4', mastered_vocab: 561, total_vocab: 666, mastered_kanji: 148, total_kanji: 177,
+    readiness_pct: 84, is_ready: true, pass_mark: 90,
+    vocab_grammar_section_max: 120, vocab_grammar_pass_mark: 38, ...over,
+  })
+  const rung = (over: Partial<Rung> = {}): Rung => ({
+    level: 'n4', id: 'N4', pct: 84, state: 'target', done: 709, total: 843,
+    opensAt: null, isTarget: true, isReady: true, passMark: 90, x: 0, w: 118, ...over,
+  })
+
+  it('reads the headline as what is LEFT, not what is done', () => {
+    /* "18 points short" is something a learner can act on and "62%" on its own is not */
+    expect(levelDetail(rung({ pct: 62 }), data(), null).shortBy).toBe(18)
+    expect(levelDetail(rung(), data(), null).shortBy).toBe(0)
+  })
+
+  it('knows which papers this app has no content for, and it differs by level', () => {
+    /* N4/N5 score vocabulary, grammar AND reading as one 120 paper, so only listening is missing;
+       N1-N3 score the section alone out of 60 and neither reading nor listening has a source */
+    expect(unscored(120)).toEqual({ points: 60, papers: 'LISTENING' })
+    expect(unscored(60)).toEqual({ points: 120, papers: 'READING AND LISTENING' })
+  })
+
+  it('never projects a section it has no mock for', () => {
+    const d = levelDetail(rung(), data(), null)
+    expect(d.section.projected).toBeNull()
+    expect(sectionLine(d)).toBe('NO MOCK SAT · PASS MARK 38 OF 120')
+  })
+
+  it(`uses the backend's own projection when a mock has been sat`, () => {
+    /* `project_mock_score` already ran in `domain/jlpt_sessions` and its answer is stored on the
+       result, so nothing here recomputes it */
+    const d = levelDetail(rung(), data(), { correct: 19, asked: 30, projected: 76 })
+    expect(d.section.projected).toBe(76)
+    expect(sectionLine(d)).toMatch(/LAST MOCK 19 \/ 30 → 76 OF 120 · PASS MARK 38/)
+  })
+
+  it('says a locked level cannot be sat rather than showing it a mark', () => {
+    const d = levelDetail(rung({ state: 'locked', isTarget: false, isReady: false }), data(), null)
+    expect(d.locked).toBe(true)
+    expect(sectionLine(d)).toMatch(/LOCKED/)
+  })
+
+  it('gives each of the four ways in a purpose the app never states', () => {
+    expect(EXAM_MODES).toHaveLength(4)
+    expect(EXAM_MODES.every((m) => m.purpose && m.label && m.description)).toBe(true)
+    /* two of the four move the readiness figure, one measures it, one finds your level */
+    expect(EXAM_MODES.filter((m) => m.purpose === 'MOVES THE NUMBER')).toHaveLength(2)
+  })
+})

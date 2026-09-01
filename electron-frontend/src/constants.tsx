@@ -42,6 +42,7 @@ import type {
   VocabCategory,
   VocabCategorySlug,
   VocabDeckSlug,
+  JlptExamMode,
 } from './types'
 
 // ── Script metadata ──────────────────────────────────────────────────────────
@@ -376,6 +377,16 @@ export const JLPT_LEVEL_ORDER: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
    `JLPT_UNLOCK_PCT` has no backend at all: locking a level behind 30% of the one below is a
    renderer rule, and it lived as a private constant inside `JLPTPrepView` until the ascent
    needed to draw the same gate. One copy, so the two screens cannot disagree about it. */
+/* THE FOUR WAYS AT A LEVEL, and they lived module-private inside `JLPTPrepView` until the menu's
+   level-three screen needed the same four. One copy, for the same reason `--gold` now has a test:
+   a label that exists twice is a label that drifts once. */
+export const JLPT_MODE_META: Record<JlptExamMode, { label: string; description: string }> = {
+  diagnostic: { label: 'Diagnostic', description: 'Identifies your target level (20 questions across all levels)' },
+  mock_exam: { label: 'Mock Exam', description: 'Timed single-level exam with projected score' },
+  adaptive_review: { label: 'Adaptive Review', description: 'SRS-due cards for this level' },
+  weak_area_drill: { label: 'Weak Areas', description: 'Leeches and lowest-accuracy cards first' },
+}
+
 export const JLPT_READY_PCT = 80
 export const JLPT_UNLOCK_PCT = 30
 

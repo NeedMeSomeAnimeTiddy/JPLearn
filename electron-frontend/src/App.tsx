@@ -56,8 +56,8 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes,
-  practiceLanes, worldLanes, ascentRungs, scenes as buildScenes,
+  useMenuL1, useWorldData, useReadiness, MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel,
+  practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail,
   heroFromStudyBlock, crownFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
@@ -1307,6 +1307,16 @@ function App() {
   const examOpen = view === 'home' && menuFrontDoor && menuPath.level === 2 && menuPath.section === 'JLPT'
   const exam = useReadiness(examOpen)
   const examRungs = useMemo(() => ascentRungs(exam.readiness), [exam.readiness])
+  /* WHICH RUNG LEVEL THREE IS ABOUT. The ascent's cursor is the ascent's own state -- it is not in
+     the path, because a cursor is not a place -- so the rung is carried across when it is opened. */
+  const [examRung, setExamRung] = useState<string | null>(null)
+  const examDetail = useMemo(() => {
+    const rung = examRungs.find((r) => r.level === examRung)
+    const data = rung && exam.readiness ? exam.readiness.levels[rung.level] : null
+    if (!rung || !data) return null
+    /* the projection is the BACKEND's, stored on the result -- `project_mock_score` already ran */
+    return levelDetail(rung, data, null)
+  }, [examRungs, examRung, exam.readiness])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
@@ -2232,13 +2242,41 @@ function App() {
           onPick={(key) => {
             /* two lanes, two doors the app already has: the passage hub, and the tutor popup
                opened straight onto its scenario picker rather than its menu */
-            if (key === 'read') { navigate('passage_hub', 'forward'); return }
+            if (key === 'read') { menuPath.enterScreen('library'); return }
             /* TALK has a level three now -- picking the scene is a menu screen rather than the
                tutor's own picker, and it hands the CHOSEN scenario over rather than the list */
             menuPath.enterScreen('scenes')
           }}
           onUp={leaveMenuLevel}
         />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'level' && examDetail ? (
+        <ExamLevel
+          level={examDetail}
+          onStart={() => {
+            /* the exam itself is the flat prep view, which is where it has always run */
+            navigate('jlpt_prep', 'forward')
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'library' ? (
+        <Library
+          rows={libraryRows(world.passages)}
+          loading={!world.passages}
+          onOpen={() => {
+            /* the reader itself is the app's own view and stays at L4 -- the plan leaves open
+               whether a page of prose should live inside the stage at all */
+            navigate('passage_hub', 'forward')
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'wall' ? (
+        <Wall onUp={leaveMenuLevel} />
       ) : null}
 
       {view === 'home' && menuFrontDoor && menuPath.level === 3 && menuPath.screen === 'scenes' ? (
@@ -2263,11 +2301,8 @@ function App() {
         <Ledger
           summary={summary}
           xp={xpProgress}
-          onOpenAchievements={() => {
-            /* the wall is level three (phase 5); until then the door opens the panel that shows
-               the badges today, which is what YOU passed straight through to before this screen */
-            setShowOverview(true)
-          }}
+          /* the wall is a real level three now, so the door opens it rather than the flat panel */
+          onOpenAchievements={() => menuPath.enterScreen('wall')}
           onUp={leaveMenuLevel}
         />
       ) : null}
@@ -2276,11 +2311,7 @@ function App() {
         <Ascent
           rungs={examRungs}
           loading={exam.loading}
-          onOpen={() => {
-            /* the level's own screen is level three (phase 5); until then a rung opens the flat
-               prep view that does that job today -- the same passthrough every section began as */
-            navigate('jlpt_prep', 'forward')
-          }}
+          onOpen={(level) => { setExamRung(level); menuPath.enterScreen('level') }}
           onUp={leaveMenuLevel}
         />
       ) : null}

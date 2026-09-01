@@ -1,17 +1,7 @@
-import { Headphones, MessageCircle, PenTool, BookOpen, Target, Bot, Flame } from 'lucide-react'
 import { clsx } from 'clsx'
 import { BADGE_METADATA } from '../constants'
+import { BADGE_ICONS, BADGE_ICON_FALLBACK } from '../icons'
 import type { BadgeEntry } from '../types'
-
-const ICON_MAP: Record<string, typeof Headphones> = {
-  headphones: Headphones,
-  messageCircle: MessageCircle,
-  penTool: PenTool,
-  bookOpen: BookOpen,
-  target: Target,
-  bot: Bot,
-  flame: Flame,
-}
 
 interface BadgeCardProps {
   entry: BadgeEntry
@@ -20,7 +10,7 @@ interface BadgeCardProps {
 function BadgeCard({ entry }: BadgeCardProps) {
   const meta = BADGE_METADATA[entry.descriptor]
   if (!meta) return null
-  const IconComponent = ICON_MAP[meta.icon] || Target
+  const IconComponent = BADGE_ICONS[meta.icon] || BADGE_ICON_FALLBACK
 
   return (
     <div

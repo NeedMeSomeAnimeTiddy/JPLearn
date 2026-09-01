@@ -32,6 +32,9 @@ export type ScriptKey =
   | 'sentence_examples'
 
 export type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
+/* the four ways at a level. `electron.d.ts` has this union too, but it is module-local there and
+   the shared constants need a name they can import. */
+export type JlptExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
 
 export type KanjiDeckSlug = 'kanji_n5' | 'kanji_n4' | 'kanji_n3' | 'kanji_n2' | 'kanji_n1'
 export type VocabDeckSlug = 'vocab_n5' | 'vocab_n4' | 'vocab_n3' | 'vocab_n2' | 'vocab_n1'

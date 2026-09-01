@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, CheckCircle, Clock, Lock, Target, XCircle } from 'lucide-react'
-import { JLPT_UNLOCK_PCT } from '../constants'
+import { JLPT_MODE_META, JLPT_UNLOCK_PCT } from '../constants'
 
 type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
@@ -11,12 +11,8 @@ const LEVEL_LABELS: Record<JLPTLevel, string> = {
 }
 const LEVEL_ORDER: JLPTLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 
-const MODE_META: Record<JLPTExamMode, { label: string; description: string }> = {
-  diagnostic:      { label: 'Diagnostic',     description: 'Identifies your target level (20 questions across all levels)' },
-  mock_exam:       { label: 'Mock Exam',       description: 'Timed single-level exam with projected score' },
-  adaptive_review: { label: 'Adaptive Review', description: 'SRS-due cards for this level' },
-  weak_area_drill: { label: 'Weak Areas',      description: 'Leeches and lowest-accuracy cards first' },
-}
+// the menu's level-three screen shows the same four; see the note in constants.tsx
+const MODE_META = JLPT_MODE_META
 
 const MOCK_EXAM_SECONDS = 30 * 60   // 30 minutes for mock exam
 // % readiness on the previous level required to unlock the next. Shared with the menu's ascent,

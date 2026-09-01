@@ -1,4 +1,5 @@
 export { useAchievements } from './useAchievements'
 export { AchievementsPanel } from './components/AchievementsPanel'
 export { BADGE_METADATA, EARNED_BADGE_ORDER } from './constants'
+export { BADGE_ICONS, BADGE_ICON_FALLBACK } from './icons'
 export type { BadgeEntry, BadgeMeta } from './types'
