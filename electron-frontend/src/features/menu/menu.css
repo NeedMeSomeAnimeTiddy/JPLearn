@@ -3769,3 +3769,104 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 /* the third caption is the longest of them and is the one that wraps; at 8.5/1.25 both of its
    lines land inside the panel instead of the second sitting on its bottom edge */
 .fd-denom.three i { font-size: 8.5px; line-height: 1.25; letter-spacing: 0.13em; }
+
+/* ==================================================================================================
+   GOLD PAPER OFF THE ROW YOU PICKED — see `petalBurst.ts` for why this is a frame child rather than
+   a fixed overlay, and for where the numbers come from.
+
+   SQUARE, BECAUSE EVERYTHING HERE IS. A rounded petal would be the one curve in an interface whose
+   single standing rule is square corners; these are small enough that the shape reads as a scrap of
+   paper turning rather than as a rectangle. The rotation in the animation is what sells it.
+   ================================================================================================== */
+.mn-frame .pt-burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  /* ABOVE THE SLABS, AND THE NUMBER IS NOT ARBITRARY. `.st-row` is 14 and the open one is 18, so
+     the first version at 6 put every petal BEHIND the card it was supposed to be coming off --
+     fourteen elements animating correctly and none of them on screen. */
+  z-index: 24;
+  pointer-events: none;
+}
+
+.mn-frame .pt-burst .pt {
+  position: absolute;
+  display: block;
+  /* the mockup's own gold: rgb(232, 196, 124), which is the washi warmed rather than a new colour */
+  background: rgb(232 196 124);
+  /* AND A KEYLINE, WHICH THE MOCKUP DOES NOT NEED AND THIS DOES. Its petals are sprites in a
+     near-field scene and they fly over the VALLEY -- dark trees, water, sky -- so warm gold at
+     half opacity reads immediately. These come off a washi slab and cross two more on the way
+     down: gold on cream at 0.55 through the fade is a difference of a few levels, and frozen
+     mid-flight over the card you cannot pick one out at all. A one-pixel ink edge is what the rest
+     of this interface uses to sit a light shape on a light ground, and it costs no second colour. */
+  box-shadow:
+    inset 0 0 0 1px rgba(58, 44, 34, 0.55),
+    0 1px 0 rgba(90, 60, 20, 0.35);
+}
+
+/* ==================================================================================================
+   AND THE TWO SCREENS THAT SCRUB SAY SO. A surface that answers a drag has to look like one, or the
+   only people who find it are the ones who read the source. See `useTraversal.ts` for why the rail
+   is absolute and the road is relative.
+   ================================================================================================== */
+.dk-rail { cursor: ew-resize; }
+.cs-rail { cursor: grab; }
+body.is-dragging .cs-rail { cursor: grabbing; }
+/* AND NOTHING GETS SELECTED WHILE A GESTURE IS RUNNING. Dragging across a row of type otherwise
+   highlights it, so the reel leaves a blue smear behind wherever it has been pushed. */
+body.is-dragging { user-select: none; }
+
+/* ==================================================================================================
+   WHAT IS BEHIND EACH CHIP — the mockup's own panel, lifted. Washi and ink rather than the
+   interface's dark glass, because the chips themselves are washi: the panel is the chip continuing
+   downward, not a new surface arriving over the world. See `statPanels.ts` for where every figure
+   in it comes from, and for why the time chip has none.
+   ================================================================================================== */
+/* ABOVE THE COLUMN, AND THAT IS A FIX RATHER THAN A PREFERENCE. `.mn-standing` is `inset: 0` --
+   it covers the whole board, including the corner the chips sit in -- so with the chips as spans
+   nobody noticed and the moment they became buttons every click on one was swallowed by the row
+   list underneath. Playwright named it exactly: "<div class=\"mn-standing\"> intercepts pointer
+   events". The bar is chrome; chrome sits over the screen it describes. */
+.stats { position: absolute; z-index: 30; }
+.stat-panel {
+  position: absolute; top: calc(100% + 11px);
+  min-width: 236px; max-width: 330px;
+  background: var(--washi); color: var(--ink);
+  padding: 13px 16px 14px;
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45);
+  pointer-events: auto; transform-origin: top right; z-index: 2;
+  animation: sp-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes sp-in {
+  from { opacity: 0; transform: translateY(-9px) scaleY(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .stat-panel { animation: none; } }
+.sp-h {
+  display: flex; align-items: baseline; gap: 10px;
+  padding-bottom: 8px; margin-bottom: 4px;
+  border-bottom: 2px solid rgba(20, 17, 13, 0.2);
+}
+.sp-h b { font-family: var(--jp); font-weight: 700; font-size: 18px; letter-spacing: 0.1em; }
+.sp-h i {
+  font-family: var(--lat-ui); font-weight: 700; font-style: normal; font-size: 9px;
+  letter-spacing: 0.3em; color: rgba(20, 17, 13, 0.5);
+}
+.sp-r { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; margin-top: 7px; }
+.sp-r span {
+  font-family: var(--lat-ui); font-weight: 600; font-size: 9.5px; letter-spacing: 0.2em;
+  color: rgba(20, 17, 13, 0.58);
+}
+.sp-r b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+  color: var(--ink); letter-spacing: 0;
+}
+.sp-r.hi b { color: var(--hi-deep); }
+.sp-n {
+  margin-top: 11px; padding-top: 8px; border-top: 1px solid rgba(20, 17, 13, 0.16);
+  font-family: var(--jp-go); font-size: 10.5px; line-height: 1.5; letter-spacing: 0.04em;
+  color: rgba(20, 17, 13, 0.56);
+}
+/* the chip you pressed keeps its pressed look while its panel is down */
+.stat-chip.is-open { box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5); transform: translateY(1px); }

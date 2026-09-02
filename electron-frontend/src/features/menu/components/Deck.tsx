@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useTraversal } from '../useTraversal'
 import type { BlockInfo } from '../../../types'
 import { deckChain, deckSheet, gateLine, railLine } from '../deck'
 import '../../../styles/stage.css'
@@ -37,6 +38,24 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
   const [cell, setCell] = useState(0)
 
   const shown = pick >= 0 ? pick : chain.here
+
+  /* THE RAIL IS A MAP: the block under the pointer is the block you get. See `useTraversal`.
+     CLAMPED AT `here`, WHERE THE CLICK IS ALSO REFUSED -- scrubbing past the open block would let
+     the pointer reach blocks neither the keyboard nor the mouse will open. */
+  const railRef = useRef<HTMLElement | null>(null)
+  const scrub = (i: number) => {
+    const want = Math.max(0, Math.min(i, chain.here))
+    setPick(want === chain.here ? -1 : want)
+    setSheet(false)
+    setAt(0)
+  }
+  const rail = useTraversal('rail', {
+    enabled: !sheet,
+    step: (d) => scrub(shown + d),
+    bands: () => Array.from(railRef.current?.children ?? [])
+      .map((c) => c.getBoundingClientRect().left),
+    pick: scrub,
+  })
   const here = chain.blocks[shown]
   const next = chain.blocks[chain.here + 1]
   const view = deckSheet(chain.cleared, page)
@@ -189,8 +208,16 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
 
             {/* THE RAIL IS A MAP — every block at once, at a scale that fits six or forty-four
                 by construction. It is not focusable: it says where you are, it is not a way to go. */}
-            <div className="dk-rail">
-              <span className="dk-segrow" aria-hidden="true">
+            <div
+              className="dk-rail"
+              ref={rail.ref}
+              onPointerDown={rail.onPointerDown}
+            >
+              <span
+                className="dk-segrow"
+                aria-hidden="true"
+                ref={(n) => { railRef.current = n }}
+              >
                 {chain.blocks.map((block) => (
                   <i
                     key={block.index}

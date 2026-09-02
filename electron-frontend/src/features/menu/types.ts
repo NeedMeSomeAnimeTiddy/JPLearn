@@ -47,6 +47,24 @@ export interface MenuCrown {
   level: number | null
   xpInLevel: number | null
   xpForLevel: number | null
+  /* AND WHAT IS BEHIND THE CHIPS. Four figures on the bar and nothing underneath them was the
+     mockup's own complaint about its first version; these are the fields its panels open onto,
+     every one already carried by `summary` or `XPProgressPayload`. See `statPanels.ts`. */
+  streakBest: number | null
+  freezes: number | null
+  lastStudied: string | null
+  totalXp: number | null
+  week: MenuWeek | null
+}
+
+/** the last seven days, as `summary.activity.week` already reports them */
+export interface MenuWeek {
+  reviewed: number
+  correct: number
+  /** 0..1 */
+  accuracy: number
+  activeDays: number
+  points: number
 }
 
 export interface MenuController {

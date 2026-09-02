@@ -171,9 +171,25 @@ describe('what the crown and the hero are derived from', () => {
     }
     /* `xp_for_current_level` is the SIZE of the level and `xp_to_next_level` what remains of it.
        Read as two absolute thresholds this showed "0 / 1 XP" on a real account. */
-    expect(crownFrom(4, xp)).toEqual({
+    expect(crownFrom(4, xp)).toMatchObject({
       streakDays: 4, level: 2, xpInLevel: 100, xpForLevel: 150,
     })
+  })
+
+  it('carries the fields the chips open onto, and null for the ones nobody passed', () => {
+    /* the panels draw nothing rather than a zero when the data has not arrived -- a menu that
+       states a fabricated best streak is worse than one that states nothing */
+    const bare = crownFrom(4, null)
+    expect(bare.streakBest).toBeNull()
+    expect(bare.week).toBeNull()
+    const full = crownFrom(4, { level: 2, total_xp: 300, xp_to_next_level: 50, xp_for_current_level: 150 }, {
+      streakBest: 11,
+      freezes: 2,
+      week: { reviewed: 120, correct: 96, accuracy: 0.8, activeDays: 5, points: 340 },
+    })
+    expect(full.streakBest).toBe(11)
+    expect(full.totalXp).toBe(300)
+    expect(full.week?.activeDays).toBe(5)
   })
 
   it('draws a streak nobody has as an absence, not a zero', () => {

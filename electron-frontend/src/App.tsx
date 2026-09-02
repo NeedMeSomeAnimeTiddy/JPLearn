@@ -2465,7 +2465,21 @@ function App() {
         <MenuL1
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
-          crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress)}
+          crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress, {
+            /* WHAT THE CHIPS OPEN ONTO, and every field is one `summary` already carries -- see
+               `statPanels.ts` for why nothing here is invented and why the clock has no panel. */
+            streakBest: summary?.streak?.best_days ?? null,
+            freezes: summary?.streak?.freezes_available ?? null,
+            week: summary?.activity?.week
+              ? {
+                reviewed: activity.week.reviewed,
+                correct: activity.week.correct,
+                accuracy: activity.week.accuracy,
+                activeDays: activity.week.active_days,
+                points: activity.week.points_earned,
+              }
+              : null,
+          })}
           rows={rowsFrom({
             nodes: progression.nodes,
             block: studyBlock,

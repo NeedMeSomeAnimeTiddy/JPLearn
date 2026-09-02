@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HERO_INDEX, MENU_SECTIONS } from '../constants'
 import { useHoverPick } from '../useHoverPick'
+import { burstPetals } from '../petalBurst'
+import { type StatKey, statPanelsFrom } from '../statPanels'
 import type {
   MenuController, MenuCrown, MenuHero, MenuRow, MenuSection, MenuSectionKey,
 } from '../types'
@@ -88,6 +90,17 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
+  /* ONE DOOR FOR BOTH WAYS IN. The mouse and the keyboard both arrive here, so the paper comes off
+     the row whichever one you used -- and the section opens either way if the burst throws, since
+     `burstPetals` swallows its own failure and the flight is the part that matters. */
+  const enter = (key: MenuSectionKey, index: number) => {
+    burstPetals({
+      target: rootRef.current?.querySelector<HTMLElement>(`.st-row[data-i="${index}"]`) ?? null,
+      frame: frameRef.current,
+    })
+    onOpenSection(key)
+  }
+
   useLayoutEffect(() => {
     const fit = () => {
       const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
@@ -107,6 +120,17 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
      a click on the level above, focus is on <body>. Measured live: two ArrowDowns moved the cursor
      nowhere at all. `tabIndex={-1}` makes the container focusable without putting it in the tab
      order, which is the same thing a dialog does. */
+  /* THROUGH A REF, SO THE LISTENER IS BOUND ONCE. The effect below deliberately does not depend on
+     the selection -- re-subscribing a keydown handler every time the cursor moves is churn, and the
+     existing arrow keys avoid it by calling `step`, which is stable. Confirming needs to know WHICH
+     row is under the cursor, so the current answer is kept where a stable listener can read it. */
+  const confirmRef = useRef<() => void>(() => {})
+  confirmRef.current = () => {
+    if (active === HERO_INDEX) { onRunHero(); return }
+    const section = ordered[active]
+    if (section && !isLocked(section)) enter(section.key, active)
+  }
+
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
@@ -114,6 +138,15 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'ArrowDown') { event.preventDefault(); hover.keyed(); step(1) }
       else if (event.key === 'ArrowUp') { event.preventDefault(); hover.keyed(); step(-1) }
+      /* THE KEY THE HUD HAS BEEN PROMISING SINCE THIS SCREEN LANDED. The bar bottom-right reads
+         "ENTER Confirm", the arrows have always worked, and Enter did nothing at all -- measured
+         live: ArrowDown selects THE PATH, Enter leaves you looking at THE PATH. Focus is on this
+         container rather than on a row's <button>, so the native activation a button would give
+         never had anything to fire on. The menu was mouse-only to enter a section. */
+      else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        confirmRef.current()
+      }
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
@@ -135,6 +168,54 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
 
   const heroOn = active === HERO_INDEX
   const xpPct = crown.xpForLevel ? Math.round(((crown.xpInLevel ?? 0) / crown.xpForLevel) * 100) : 0
+
+  /* ---- what is behind the chips; see `statPanels.ts` ---- */
+  const panels = useMemo(() => statPanelsFrom(crown), [crown])
+  const [openStat, setOpenStat] = useState<StatKey | null>(null)
+  /* WHERE THE PANEL HANGS, which is under the chip you pressed rather than under the bar. Measured
+     off the chip's own offsets at the moment of the press: `.stats` is the positioned parent and
+     is inside the zoomed frame, so these are design pixels and need no scale factor. */
+  const [statRight, setStatRight] = useState(0)
+  const statsRef = useRef<HTMLDivElement | null>(null)
+  const toggleStat = (key: StatKey, el: HTMLElement) => {
+    const bar = statsRef.current
+    if (bar) setStatRight(Math.max(0, bar.clientWidth - el.offsetLeft - el.offsetWidth))
+    setOpenStat((k) => (k === key ? null : key))
+  }
+  const openPanel = openStat ? panels[openStat] : null
+  useEffect(() => {
+    if (!openStat) return
+    const away = () => setOpenStat(null)
+    /* CAPTURE, because Escape here is already spoken for by the level above -- a panel that is
+       open has to eat the key before the navigation sees it, or opening a chip and pressing
+       Escape leaves the screen instead of closing the chip. */
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setOpenStat(null); e.stopPropagation() }
+    }
+    window.addEventListener('click', away)
+    window.addEventListener('keydown', key, true)
+    return () => {
+      window.removeEventListener('click', away)
+      window.removeEventListener('keydown', key, true)
+    }
+  }, [openStat])
+
+  /* a chip with nothing behind it stays a chip: no button, no cursor, no empty panel */
+  const chip = (key: StatKey, label: string, body: React.ReactNode) => {
+    const panel = panels[key]
+    if (!panel) return <span className="stat-chip">{body}</span>
+    return (
+      <button
+        type="button"
+        className={openStat === key ? 'stat-chip is-open' : 'stat-chip'}
+        aria-expanded={openStat === key}
+        aria-label={label}
+        onClick={(e) => { e.stopPropagation(); toggleStat(key, e.currentTarget) }}
+      >
+        {body}
+      </button>
+    )
+  }
 
   return (
     <div className="mn-open" ref={rootRef} tabIndex={-1}>
@@ -159,21 +240,49 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
         </header>
 
         {/* ---- the four claims, top right ---- */}
-        <div className="stats">
+        <div className="stats" ref={statsRef}>
           <span className="stat-chip">{time}</span>
-          <span className="stat-chip">{date}</span>
+          {chip('week', 'This week', date)}
           {crown.streakDays != null && crown.streakDays > 0 ? (
-            <span className="stat-chip shu">
+            <button
+              type="button"
+              className={openStat === 'streak' ? 'stat-chip shu is-open' : 'stat-chip shu'}
+              aria-expanded={openStat === 'streak'}
+              aria-label={`Streak — ${crown.streakDays} days`}
+              onClick={(e) => { e.stopPropagation(); toggleStat('streak', e.currentTarget) }}
+            >
               <b>{crown.streakDays}</b> DAY STREAK <span className="jp">連続</span>
-            </span>
+            </button>
           ) : (
             <span className="stat-chip"><span className="mut">NO STREAK YET</span></span>
           )}
           {crown.level != null ? (
-            <span className="stat-chip">
+            <button
+              type="button"
+              className={openStat === 'level' ? 'stat-chip is-open' : 'stat-chip'}
+              aria-expanded={openStat === 'level'}
+              aria-label={`Level ${crown.level}`}
+              onClick={(e) => { e.stopPropagation(); toggleStat('level', e.currentTarget) }}
+            >
               <span>Lv</span> <b>{crown.level}</b>
               <span className="xp-track"><i style={{ width: `${xpPct}%` }} /></span>
-            </span>
+            </button>
+          ) : null}
+
+          {openPanel ? (
+            <div
+              className="stat-panel"
+              style={{ right: `${statRight}px` }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sp-h"><b>{openPanel.jp}</b><i>{openPanel.en}</i></div>
+              {openPanel.rows.map((r) => (
+                <div key={r.label} className={r.lead ? 'sp-r hi' : 'sp-r'}>
+                  <span>{r.label}</span><b>{r.value}</b>
+                </div>
+              ))}
+              <div className="sp-n">{openPanel.note}</div>
+            </div>
           ) : null}
         </div>
 
@@ -212,6 +321,7 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
             return (
               <div
                 key={section.key}
+                data-i={index}
                 className={classes.join(' ')}
                 style={{
                   ['--top' as string]: `${top}px`,
@@ -231,7 +341,7 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
                        mouse never enters a section it only crossed. */
                     onClick={() => {
                       if (active !== index) { setActive(index); return }
-                      if (!locked) onOpenSection(section.key)
+                      if (!locked) enter(section.key, index)
                     }}
                     aria-disabled={locked}
                     aria-label={locked

@@ -8,6 +8,7 @@ import {
 import type { PathRow } from '../pathL2'
 import { MENU_SECTIONS } from '../constants'
 import { useHoverPick } from '../useHoverPick'
+import { useTraversal } from '../useTraversal'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -60,6 +61,13 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
   /* walking the road translates the rail, so a tablet slides under a stationary pointer whose
      `mouseenter` would drag the selection back. See `useHoverPick`. */
   const hover = useHoverPick(setCursor)
+  /* THE ROAD IS A REEL: you push it and it travels under a fixed centre. See `useTraversal`. */
+  const reel = useTraversal('reel', {
+    step: (d) => {
+      hover.keyed()
+      setCursor((c) => Math.max(0, Math.min((c ?? hereIndex(rows)) + d, rows.length - 1)))
+    },
+  })
 
   useEffect(() => {
     if (cursor === null && rows.length) setCursor(hereIndex(rows))
@@ -154,7 +162,15 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
               </span>
             </div>
 
-            <div className="cs-strip">
+            {/* THE GESTURE BELONGS TO THE WINDOW, NOT TO WHAT SLIDES THROUGH IT. `.cs-rail` is the
+                reel itself -- 5,200 pixels wide and mostly outside the frame -- so a listener on it
+                is a listener on a surface the pointer is never over. Measured: every wheel and drag
+                aimed at its centre landed 2,600 pixels off-screen and did nothing at all. */}
+            <div
+              className="cs-strip"
+              ref={reel.ref}
+              onPointerDown={reel.onPointerDown}
+            >
               <div
                 className="cs-rail"
                 style={{ transform: `translateX(${Math.round(CS_FOCUS - centers[at])}px)` }}
@@ -213,7 +229,13 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
                       style={style}
                       onMouseEnter={() => hover.pick(i)}
                       onFocus={() => hover.pick(i)}
-                      onClick={() => (i === at ? onOpenNode(row.id) : setCursor(i))}
+                      /* a drag that travelled is not a click -- otherwise letting go over a step
+                         enters it, which on the road means a flight you did not ask for */
+                      onClick={() => {
+                        if (reel.dragged()) return
+                        if (i === at) onOpenNode(row.id)
+                        else setCursor(i)
+                      }}
                       aria-label={`${row.no} ${row.en}${row.isOpen ? '' : ' — not open yet'}`}
                     >
                       <span className="cs-dest" style={destStyle}>

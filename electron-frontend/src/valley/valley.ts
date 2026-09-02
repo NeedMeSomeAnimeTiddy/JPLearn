@@ -48,6 +48,7 @@ import { LAMP_U, MOVE_LAMPS, buildLampGrid, type LampGrid } from './lampgrid'
 import { celWorld } from './cel'
 import { disposeInk, inkTrackCrowd, renderInk, renderND, sizeInk } from './ink'
 import { type BoatLamps, buildBoatLamps } from './boatlamp'
+import { type LandformStats, buildLandform } from './landform'
 import { type Ponds, buildPonds } from './pond'
 import { SWAY_LAYER, type SwayField, buildSway, swayTick } from './sway'
 import { type WindField, buildWind } from './wind'
@@ -142,6 +143,7 @@ let steam: SteamField | null = null
 let fireflies: FireflyField | null = null
 let sway: SwayField | null = null
 let ponds: Ponds | null = null
+let landformStats: LandformStats | null = null
 let boatLamps: BoatLamps | null = null
 let wind: WindField | null = null
 let ground: Heightfield | null = null
@@ -224,6 +226,9 @@ const swaying = new URLSearchParams(window.location.search).get('sway') !== 'off
 /* `?wind=off` -- 44 transparent strokes and 160 matrices a frame, and the only thing in the valley
    that is the air rather than a thing in it */
 const blowing = new URLSearchParams(window.location.search).get('wind') !== 'off'
+/* `?landform=off` -- the crags and the welded mountain, which are geometry rather than a pass, so
+   this is the one switch here whose cost is paid at boot and never again */
+const landform = new URLSearchParams(window.location.search).get('landform') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -605,6 +610,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     console.info(
       `[valley] cel: ${st.materials} materials over ${st.meshes} meshes `
       + `(${st.landform} on the smooth landform ramp, ${st.emissive} carrying an emission)`,
+    )
+  }
+
+  /* THE SKYLINE, BEFORE ANYTHING READS THE GROUND OR THE MOUNTAIN. `bakeHeightfield` walks these
+     same triangles and `findFujiPeak` walks Fuji's, so cragging afterwards would leave the walkers
+     standing on the shape the ranges used to be. And `freeCpuCopiesAfterUpload` nulls every
+     position array once the GPU has them, which is the window this whole block lives in. */
+  if (landform) {
+    const st = buildLandform(root)
+    landformStats = st
+    console.info(
+      `[valley] landform: ${st.ranges} ranges ${st.trisBefore} -> ${st.trisAfter} triangles, `
+      + `${st.fuji} mountain welded, ${st.welded} vertices, ${st.ms} ms`,
     )
   }
 
@@ -1166,6 +1184,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       wind: wind && { pool: wind.pool, shown: wind.shown, visible: wind.mesh.visible },
       ponds: ponds && { garden: ponds.garden.length, pools: ponds.pools.length },
       boatLamps: boatLamps && { lamps: boatLamps.lamps, live: LAMP_U.uMoveN.value },
+      landform: landformStats,
     }),
     /* AND THE DAY, which is what everything else is a function of. The sky's brightness, the
        lanterns, the stars, the fog and the moon are all keyed on one number -- the sun's altitude

@@ -1,7 +1,7 @@
 import { MINIGAMES } from '../../constants'
 import type { StudyBlockPayload, XPProgressPayload } from '../../generated/types'
 import type { ProgressionNodeView } from '../progression'
-import type { MenuCrown, MenuHero, MenuRow, MenuSectionKey } from './types'
+import type { MenuCrown, MenuHero, MenuRow, MenuSectionKey, MenuWeek } from './types'
 
 /* THE HERO IS DERIVED, NEVER AUTHORED. Everything on the card comes from `recommendations` —
    the same `StudyBlockPayload` the old home screen's "Up next" block read — so the menu cannot
@@ -78,11 +78,24 @@ export function heroFromStudyBlock(block: StudyBlockPayload | null | undefined):
   }
 }
 
+export interface CrownExtras {
+  streakBest?: number | null
+  freezes?: number | null
+  lastStudied?: string | null
+  week?: MenuWeek | null
+}
+
 export function crownFrom(
   streakDays: number | null | undefined,
   xp: XPProgressPayload | null | undefined,
+  extra: CrownExtras = {},
 ): MenuCrown {
   return {
+    streakBest: extra.streakBest ?? null,
+    freezes: extra.freezes ?? null,
+    lastStudied: extra.lastStudied ?? null,
+    totalXp: xp?.total_xp ?? null,
+    week: extra.week ?? null,
     streakDays: typeof streakDays === 'number' ? streakDays : null,
     level: xp?.level ?? null,
     /* `xp_for_current_level` is the SIZE of this level and `xp_to_next_level` is what remains of
