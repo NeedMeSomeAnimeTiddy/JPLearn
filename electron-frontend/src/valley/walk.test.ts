@@ -22,7 +22,7 @@ describe('the loops', () => {
     const len = Object.fromEntries(
       WALK_LOOPS.map((s) => [s.n, Math.round(walkLoop(s, flat).len)]),
     )
-    expect(len.Valley).toBeCloseTo(48345, -2)
+    expect(len.Valley).toBeCloseTo(52225, -2)
     expect(len.Town).toBeCloseTo(12408, -2)
     expect(len.Festival).toBeCloseTo(4045, -2)
   })
@@ -42,7 +42,13 @@ describe('how close a walker gets to a camera', () => {
   /* A ROUTE THAT ENDS ON A DESTINATION CAMERA'S NOSE is the fault the closed loops were invented to
      fix, and four of the five framings here are clear of them. DRILLS is not, and it is the
      mockup's own arrangement rather than a porting slip -- see the note in walk.ts. Pinned so that
-     an edit to either table has to say what it did to these numbers. */
+     an edit to either table has to say what it did to these numbers.
+
+     THESE MOVED WHEN THE LOOPS BECAME `loops.json`'S RATHER THAN THE SOURCE TABLE'S: DRILLS from 202
+     units to 100 and READING from 240 to 606. That is the authored road, drawn by Robbie in the loop
+     editor, and adopting it is the point -- but it is a real regression at DRILLS and it is pinned
+     here so that it stays a decision. 100 units is most of that frame's height for a 65.5-unit
+     figure, and there are now 600 people on the circuit rather than 40. */
   const nearest = (key: keyof typeof DESTINATIONS) => {
     const d = DESTINATIONS[key]
     const fx = d.focus[0] - d.eye[0]
@@ -74,11 +80,16 @@ describe('how close a walker gets to a camera', () => {
     expect(n.ahead).toBeGreaterThan(4000)
   })
 
-  it('crosses the DRILLS approach at 202 units, which is the one that is not clear', () => {
+  it('crosses the DRILLS approach at 100 units, which is the one that is not clear', () => {
+    /* 66 units in front of the eye and 75 to the side of the view axis. At fov 37.3 that frame is
+       45 units tall and 79 wide where the road crosses it, so a 65.5-unit figure standing there is
+       half again the height of the shot -- but it is at the very edge of it rather than the middle,
+       which is the one mercy in these numbers and the reason the old path's 202/18 was arguably
+       worse to look at despite being twice as far away. */
     const n = nearest('DRILLS')
-    expect(Math.round(n.best)).toBe(202)
+    expect(Math.round(n.best)).toBe(100)
     expect(n.ahead).toBeGreaterThan(0)
-    expect(Math.round(n.off)).toBeLessThan(30)
+    expect(Math.round(n.off)).toBe(75)
   })
 })
 

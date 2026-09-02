@@ -67,7 +67,11 @@ export const INK = {
    outlines -- a silhouette against a surface 46,000 units away still reads as a depth jump -- but
    fatal for the shafts, which mask on "is there anything in front of the sky here", and a sky that
    IS something is a frame with no sky in it. Matched on the word. */
-export const INK_SKIP = /^(sky-|sun-)|sky-?dome/i
+/* AND THE CRANE, which is not sky but is exempt for a related reason: it is 400 units from the eye
+   in a scene whose nearest world geometry is thousands, so a depth-jump outline round it would be a
+   heavy line drawn against everything at once. The mockup gets the exemption for free by drawing it
+   in a scene of its own; here there is one scene, so the name carries it -- see `CRANE_NAME`. */
+export const INK_SKIP = /^(sky-|sun-|crane-)|sky-?dome/i
 
 const rtND = new WebGLRenderTarget(1, 1, { type: FloatType, depthBuffer: true })
 rtND.texture.minFilter = NearestFilter

@@ -80,6 +80,46 @@ export const LAMP_COLOUR = 0xffa94e
 export const GAIN_PAPER = 1.35
 export const GAIN_STONE = 0.5
 
+/* ==================================================================================================
+   AND WHAT A LAMP CASTS IS NOT WHAT IT SHOWS.
+
+   `GAIN_PAPER` and `GAIN_STONE` above are what a lantern SHOWS -- its emissive, the thing that makes
+   it read as lit from six thousand units up the valley. These two are what it CASTS into the grid,
+   and they are a different ratio for a real reason: 灯籠 is a candle behind a slab of granite and a
+   chochin is an open flame in paper.
+
+   THE MOCKUP SWEPT IT IN THE ZEN COURT, where every lamp in the pool is stone, at 0.55 / 0.38 / 0.26
+   of a chochin. The first two light the whole garden evenly, which is a garden with the lights on;
+   0.26 is the one that gives each lantern its own pool of warm gravel falling off into the dark.
+   That is what a stone lantern does, and it is why a court of them was coming out brighter than the
+   festival street it was tuned against -- six overlapping pools in a small garden against six strung
+   down a long avenue. */
+export const CAST_PAPER = 1
+export const CAST_STONE = 0.26
+
+/* ==================================================================================================
+   ONE LIGHT PER LANTERN, NOT ONE PER ROW OF THEM.
+
+   The festival's chochin arrive as SPANS: a single instance 401 units long carrying a whole strung
+   row. Its bounding-box centre gave that row ONE light in the middle with a 300-unit reach, so a row
+   of eight lanterns lit the ground under the middle two and nothing else. That is exactly the "some
+   lights aren't bright enough" report, and it was never about brightness.
+
+   SINCE EMIT IS AUTHORITATIVE THE GEOMETRY HERE IS THE EMISSIVE PART, so its face centres ARE the
+   flames. Clustering them at 130 units gives one spot for a compact lantern -- a gas lamp is 16
+   units across, a kasuga 22, so every face falls inside one cluster -- and one spot per lantern along
+   a span.
+
+   AND THE MOCKUP'S HEIGHT RULE IS NOT PORTED, BECAUSE IT DOES NOT RUN. Immediately above the same
+   block it computes a bounding-box centre and lifts it to 0.86 of the height for a post and 0.55 for
+   a hanging lantern, with a long note about `Onsen_Props_GasLamp` glowing out of its own shaft at
+   knee height. Then it never reads the variable: `emitSpots` superseded it and the older answer was
+   left in place. Porting it would be porting a comment. The flame's own face centres solve the same
+   problem better -- they are where the fire is, rather than a guess at where the fire is from the
+   shape of the object around it.
+   ================================================================================================== */
+export const LAMP_CLUSTER = 130
+
 /** a material that has been made into a lantern, and what it needs to be turned up */
 export interface LampMat {
   mat: Emissive
@@ -89,10 +129,19 @@ export interface LampMat {
   base: Color | null
 }
 
+/* WHERE A FLAME IS AND HOW HARD IT BURNS. A plain Vector3 with the cast strength on it, because the
+   lamp grid wants both and a parallel array of gains that could fall out of step with the positions
+   is a bug waiting for the first time somebody filters one of them. */
+export type LampSpot = Vector3 & { gain: number }
+
 export interface LanternField {
   mats: LampMat[]
   /** how many meshes were caught, for the boot line */
   meshes: number
+  /** whether the .blend marked its own flames, which is what made every name rule stand down */
+  authored: boolean
+  /** how long the flame walk took, since it now reads geometry rather than bounding boxes */
+  ms: number
   /* AND WHICH ONES, because the bloom pass draws exactly these and nothing else. Collected on the
      same walk that lights them, so the two can never disagree about what a lamp is -- a second
      traverse with a second copy of the predicate is how they would. */
@@ -102,7 +151,7 @@ export interface LanternField {
      so siting one means asking how far the nearest lit thing is, and this walk is already visiting
      all of them. The mockup keeps the same list for its lamp-cluster grid; here it is the darkness
      test and nothing else. */
-  spots: Vector3[]
+  spots: LampSpot[]
   /** and the ones that travel, kept out of it -- see `LAMP_MOVING` */
   moving: Vector3[]
   /** turn the whole valley's lanterns up or down; 0 is out, 1 is full night */
@@ -120,16 +169,45 @@ const FLAME = new Color(LAMP_COLOUR)
  * hole in the air per material. Cloning first means `breathe` simply walks the clones too.
  */
 export function buildLanterns(root: Object3D): LanternField {
+  const t0 = performance.now()
   const mats: LampMat[] = []
   /* KEYED ON THE MATERIAL AND ON WHAT IT IS MADE OF. One source material is shared across both
      kinds here, and a paper lantern and a stone one must not end up sharing a clone. */
   const swap = new Map<string, Emissive>()
-  const spots: Vector3[] = []
+  const spots: LampSpot[] = []
   const moving: Vector3[] = []
   const lit: Object3D[] = []
   const _m = new Matrix4()
   const _p = new Vector3()
   let meshes = 0
+
+  /* ==================================================================================================
+     EMIT WINS OUTRIGHT, AND EVERY NAME RULE ABOVE STANDS DOWN WHEN IT IS PRESENT.
+
+     The name patterns exist to GUESS which objects are lamps in an export that says nothing. Once
+     the .blend marks the actual faces, guessing is not a fallback -- it is a second, worse answer
+     arriving at the same time. The mockup measured what that costs: its first export with EMIT
+     materials collected 686 lamps instead of 362, because every lantern was counted twice, once for
+     its glowing fire box and once for the whole stone body whose name matched. And the body then
+     took a stone lantern's emissive over its ENTIRE SURFACE, which is the lava look the fire-box
+     split was done to avoid.
+
+     THIS PORT HAD THE OR AND NOT THE PRE-SCAN, which is the same bug: 879 flames found here against
+     the mockup's 588, and `LAMP_I` was dropped from 1.8 to 0.7 to make the resulting glare match on
+     screen. That was a real measurement of an unreal world -- half the extra light was lantern
+     bodies, and turning the whole valley down to hide them dimmed the streets that were right.
+
+     So: if the file contains any EMIT material at all, EMIT is the whole definition of a lamp. One
+     extra traverse to find out, before any of it can matter.
+     ================================================================================================== */
+  let authored = false
+  root.traverse((o) => {
+    const mesh = o as Mesh
+    if (!mesh.isMesh || authored) return
+    const src = mesh.material as Emissive | Emissive[]
+    if (Array.isArray(src) || !src) return
+    if (LAMP_EMIT_MAT.test(src.name ?? '')) authored = true
+  })
 
   root.traverse((o) => {
     const mesh = o as Mesh
@@ -140,6 +218,7 @@ export function buildLanterns(root: Object3D): LanternField {
     if (Array.isArray(src) || !isEmissive(src)) return
     /* the material's own name wins: an EMIT slot is a light wherever it has been put */
     const emit = LAMP_EMIT_MAT.test(src.name ?? '')
+    if (authored && !emit) return
     if (!emit && (!LAMP_RE.test(o.name) || LAMP_NOT.test(o.name))) return
 
     const paper = emit || LAMP_PAPER.test(o.name)
@@ -147,30 +226,48 @@ export function buildLanterns(root: Object3D): LanternField {
     let clone = swap.get(key)
     if (!clone) {
       clone = src.clone()
-      const authored = clone.emissive
+      const lit0 = clone.emissive
         && (clone.emissive.r + clone.emissive.g + clone.emissive.b) > 0.004
       mats.push({
         mat: clone,
         gain: paper ? GAIN_PAPER : GAIN_STONE,
-        base: authored ? clone.emissive.clone() : null,
+        base: lit0 ? clone.emissive.clone() : null,
       })
       swap.set(key, clone)
     }
     mesh.material = clone
     meshes++
     lit.push(mesh)
+
+    const gain = paper ? CAST_PAPER : CAST_STONE
+    const travels = LAMP_MOVING.test(o.name)
     /* the placement, not the batch -- `collapseToInstances` leaves the group at the identity and
        puts every member's real position in `instanceMatrix` */
     const inst = mesh as unknown as InstancedMesh
     mesh.updateWorldMatrix(true, false)
-    const into = LAMP_MOVING.test(o.name) ? moving : spots
+    const faces = faceCentres(mesh.geometry)
+
+    const place = (world: Matrix4) => {
+      if (travels) {
+        /* a boat's lantern is one light wherever it hangs: it goes through `uMoveL`, which has eight
+           slots for the whole lake, so a strung row would eat them all */
+        moving.push(_p.set(0, 0, 0).applyMatrix4(world).clone())
+        return
+      }
+      if (!faces.length) {
+        spots.push(Object.assign(_p.set(0, 0, 0).applyMatrix4(world).clone(), { gain }))
+        return
+      }
+      clusterInto(faces, world, spots, gain)
+    }
+
     if (inst.isInstancedMesh) {
       for (let i = 0; i < inst.count; i++) {
         inst.getMatrixAt(i, _m)
         _m.premultiply(mesh.matrixWorld)
-        into.push(_p.setFromMatrixPosition(_m).clone())
+        place(_m)
       }
-    } else into.push(_p.setFromMatrixPosition(mesh.matrixWorld).clone())
+    } else place(mesh.matrixWorld)
   })
 
   const setOn = (on: number) => {
@@ -179,7 +276,71 @@ export function buildLanterns(root: Object3D): LanternField {
   /* out at build time: the day cycle turns them up, and it runs before the first frame */
   setOn(0)
 
-  return { mats, meshes, spots, moving, lit, setOn }
+  return {
+    mats, meshes, spots, moving, lit, setOn, authored,
+    ms: Math.round(performance.now() - t0),
+  }
+}
+
+/* ==================================================================================================
+   THE FACE CENTRES, CACHED ON THE GEOMETRY, AND THE CLUSTERING DONE IN WORLD SPACE PER INSTANCE.
+
+   The mockup does both in local space and caches the result, which is correct THERE because its
+   export is in world units: geometry and world are the same scale, so 130 means 130 either way.
+
+   THIS WORLD IS QUANTIZED. `KHR_mesh_quantization` normalises every primitive's positions to about
+   plus or minus one and puts the real size in the node transform -- `Landscape_Props_FarRange_001`
+   spans 12,289 units in the mockup's file and 2 units with a scale of 9,410 in ours. A 130-unit
+   clustering radius read as local units on that geometry swallows the whole object, so every strung
+   row of chochin would collapse back to the single light this exists to stop.
+
+   So the expensive half -- reading the position attribute -- is cached per geometry, and the cheap
+   half is done per instance with the world matrix applied. It is the third time this file has had to
+   be told the difference (see `landform.ts` and `sway.ts` for the other two).
+   ================================================================================================== */
+const _fc = new Vector3()
+
+/** every triangle's centre, in the geometry's own space, computed once per geometry */
+function faceCentres(geo: Mesh['geometry']): Vector3[] {
+  const cached = (geo.userData as { lampFaces?: Vector3[] }).lampFaces
+  if (cached) return cached
+  const out: Vector3[] = []
+  const pos = geo.attributes.position
+  const ix = geo.index
+  /* an attribute whose array has already been handed back to the GPU -- see
+     `freeCpuCopiesAfterUpload`. This walk runs before the first render, so it should not happen; if
+     the order ever changes, an empty list falls back to the object's origin rather than throwing. */
+  if (pos && pos.array) {
+    const n = ix ? ix.count : pos.count
+    for (let t = 0; t + 2 < n; t += 3) {
+      const a = ix ? ix.getX(t) : t
+      const b = ix ? ix.getX(t + 1) : t + 1
+      const c = ix ? ix.getX(t + 2) : t + 2
+      out.push(new Vector3(
+        (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3,
+        (pos.getY(a) + pos.getY(b) + pos.getY(c)) / 3,
+        (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3,
+      ))
+    }
+  }
+  ;(geo.userData as { lampFaces?: Vector3[] }).lampFaces = out
+  return out
+}
+
+/** put one spot per lantern into `out`, clustering this instance's flames at `LAMP_CLUSTER` */
+function clusterInto(
+  faces: readonly Vector3[], world: Matrix4, out: LampSpot[], gain: number,
+): void {
+  const min2 = LAMP_CLUSTER * LAMP_CLUSTER
+  const first = out.length
+  for (const f of faces) {
+    _fc.copy(f).applyMatrix4(world)
+    let near = false
+    for (let k = first; k < out.length; k++) {
+      if (out[k].distanceToSquared(_fc) < min2) { near = true; break }
+    }
+    if (!near) out.push(Object.assign(_fc.clone(), { gain }))
+  }
 }
 
 /* ==================================================================================================

@@ -99,8 +99,12 @@ export const PROP_STEAM_RE = /Onsen_Props_Steam/i
 
 export const STEAM_U = {
   uTime: { value: 0 },
-  /** peak alpha of a puff at the middle of its life */
-  uAmt: { value: 0.52 },
+  /* PEAK ALPHA OF A PUFF AT THE MIDDLE OF ITS LIFE, AND IT IS `steam.json`'S 0.7 RATHER THAN THE
+     0.52 DECLARED IN THE MOCKUP'S SOURCE. Same trap as the walkers and the sway: the mockup fetches
+     an overlay Robbie has tuned and lays it over its own constants, so reading the constants ports
+     a setting nobody has looked at since it was first typed. A third of the way up on the town's
+     whole steam field is not a subtle difference. */
+  uAmt: { value: 0.7 },
   /** how much of that the air is showing — set by the day cycle */
   uCold: { value: 1 },
   /** units a second, and deliberately slow */

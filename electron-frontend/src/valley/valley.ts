@@ -55,7 +55,10 @@ import { SWAY_LAYER, type SwayField, buildSway, swayTick } from './sway'
 import { type WindField, buildWind } from './wind'
 import { buildCrowd, type CrowdField } from './crowd'
 import { buildWalkers, type WalkField } from './walk'
-import { buildLake, lakeShore, type Lake } from './lake'
+import { buildLake, lakeCentre, lakeShore, type Lake } from './lake'
+import { buildForest, type ForestStats } from './forest'
+import { buildCrane, type Crane } from './crane'
+import { createViewpoint, fittedFov, type Viewpoint } from './viewpoint'
 import { buildLife, type LifeField } from './life'
 import { buildOutfits } from './outfit'
 import { buildBirds, type BirdField } from './birds'
@@ -150,6 +153,13 @@ let wind: WindField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
+let forest: ForestStats | null = null
+let crane: Crane | null = null
+let viewpoint: Viewpoint | null = null
+/* THE WINDOW'S SHAPE, HELD RATHER THAN ASKED FOR. `innerWidth` forces a layout flush, and the frame
+   loop needs the aspect on every tick to fit the lens -- see `fittedFov`. It changes on resize and
+   nowhere else, so that is where it is written. */
+let aspect = 16 / 9
 let coverTex: ReturnType<typeof makeCoverTexture> | null = null
 /* WHERE THE VIEWER IS, ASKED ONCE. `Intl` is cheap but not free and the answer cannot change
    inside a session; the sun's altitude is what moves. */
@@ -170,6 +180,8 @@ let lastDayAt = -1e9
 let fogBase = 0
 let homeAim: Vector3 | null = null
 let homeAspect = 16 / 9
+/* the FITTED home lens, captured with the aspect it was fitted at -- see the note where it is set */
+let homeFovFit = HOME_FOV
 /** how often the sun is asked where it is */
 const DAY_BEAT_MS = 2000
 /* NEVER SET `shadowMap.needsUpdate` DIRECTLY. In the mockup that flag was consumed by whichever
@@ -230,6 +242,13 @@ const blowing = new URLSearchParams(window.location.search).get('wind') !== 'off
 /* `?landform=off` -- the crags and the welded mountain, which are geometry rather than a pass, so
    this is the one switch here whose cost is paid at boot and never again */
 const landform = new URLSearchParams(window.location.search).get('landform') !== 'off'
+/* `?crane=off` -- fourteen triangles and a pool of sprites, which is nothing, and the only thing in
+   the frame that is not six thousand units away. Its own switch because it is the one object here
+   that can be judged entirely on whether you want it. */
+const craneOn = new URLSearchParams(window.location.search).get('crane') !== 'off'
+/* `?breath=off` -- the held camera and the pointer lean. Off, this is the photograph it used to be,
+   which is the comparison the effect exists to lose. */
+const breathing = new URLSearchParams(window.location.search).get('breath') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -287,6 +306,48 @@ function collapseToInstances(root: Object3D): { before: number; after: number } 
     after++
   }
   return { before, after }
+}
+
+/* ==================================================================================================
+   THE AUTHORING AIDS, AND THIS IS THE ONE EXCEPTION TO "THE AUTHORED WORLD IS INVIOLABLE".
+
+   Seven nodes — `Marker_Drills` through `Marker_Study` — share one 174-vertex mesh called
+   `PROP_cam_block`, parked where the seven authored cameras were originally set from. They are a
+   modelling aid: something to see and select in Blender, where otherwise there is only a camera
+   gizmo. In this port they were seven blocks floating in the valley, and several of them land inside
+   the menu's own frame — measured live, `inst:Marker_Drills` is an instanced set of seven, visible,
+   toon-shaded, with members projecting at 11.3, 14.8, 6.4 and 4.8 pixels across.
+
+   `ZEN_L3` / `ZEN_L4` join them: 30-unit cubes marking where the level-three and level-four cameras
+   stand, whose local +X is the aim. They have polygons, so the exporter has no reason to skip them,
+   and they arrive as two boxes sitting in the Zen court at head height.
+
+   `Zen_Curve` joins them for a different reason: it is a Bezier the stepping-stone path was laid
+   along. A curve with no bevel exports as a node that draws nothing — until somebody gives it a
+   bevel to see it in Blender, at which point a black ribbon appears through the Zen court and nobody
+   remembers why. Dropped by name now rather than discovered later.
+
+   ANCHORED, DELIBERATELY, against the house style everywhere else in this file. The Meadow is a
+   memorial row and this world can perfectly well come to hold a `Meadow_Props_Marker_001` that is a
+   real stone; an unanchored match on "marker" would take it away and the loss would look like a
+   modelling mistake rather than a rule. Only a top-level `Marker_` is the aid.
+
+   AND REMOVED RATHER THAN HIDDEN, because `visible` is a frame property: hidden, they would still be
+   seven obstacles in every bounding box, every heightfield sample and every reflection cull.
+
+   BEFORE INSTANCING, which is the only window: `collapseToInstances` renames what it batches to
+   `inst:<first member>`, so `^Marker_` stops matching the moment it has run. */
+export const AUTHORING_AID = /^(Marker_|ZEN_L\d|Zen_Curve(\.|$))/
+
+function dropAuthoringAids(root: Object3D): number {
+  const bin: Object3D[] = []
+  root.traverse((o) => { if (AUTHORING_AID.test(o.name)) bin.push(o) })
+  for (const o of bin) {
+    const mesh = o as Mesh
+    if (mesh.isMesh && mesh.geometry) mesh.geometry.dispose()
+    o.parent?.remove(o)
+  }
+  return bin.length
 }
 
 /* WHO CASTS AND WHO CATCHES, and the one thing that must not do either.
@@ -533,6 +594,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   const root = gltf.scene
   scene.add(root)
 
+  /* filled once every system is built -- see the note where it is assembled */
+  const noReflect: Object3D[] = []
+
   /* THE SUMMIT IS MEASURED HERE AND NOWHERE ELSE, and this is the only window for it. Instancing
      rebuilds the meshes and drops the names that identify Fuji, and the first render's upload
      callbacks null every position array -- so a walk after either finds nothing. It cost a run to
@@ -588,6 +652,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     }
   }
 
+  /* BEFORE INSTANCING, because instancing renames what it batches — see `dropAuthoringAids` */
+  const aids = dropAuthoringAids(root)
+  if (aids) console.info(`[valley] dropped ${aids} authoring aids (camera blocks, level markers)`)
+
   const tInst0 = performance.now()
   const { before, after } = collapseToInstances(root)
   const instanceMs = performance.now() - tInst0
@@ -636,8 +704,22 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
      short, every route in `flights.json` was flown from the composed point, so standing anywhere
      else makes the curve solved through each route's middle meaningless. */
   {
-    const aspect = window.innerWidth / Math.max(1, window.innerHeight)
-    const homeTgt = aimAt(fujiPeak, HOME_EYE, HOME_FOV, aspect, FUJI_FRAME_U, FUJI_FRAME_V)
+    aspect = window.innerWidth / Math.max(1, window.innerHeight)
+    /* ==================================================================================================
+       SOLVED THROUGH THE LENS THAT WILL BE DRAWN, NOT THE ONE THAT WAS AUTHORED.
+
+       `aimAt` composes the standing shot by working out where the camera has to look for Fuji to land
+       at a stated place in the frame, and below 16:9 the frame it lands in is not the frame the
+       authored fov describes — see `fittedFov`. At 16:9 these are the same number, which is why this
+       has never shown up on a maximised window and would have shown up on every other one.
+
+       THE SUN GOES THROUGH THE SAME NUMBER, for the same reason and one more: it is placed by frame
+       composition too, and a sun composed through a different lens than the mountain is a sun that
+       drifts off the peak the moment the window is not 16:9. `homeFov` is captured once here and used
+       for every re-placement on the day beat, so the two can never come apart.
+       ================================================================================================== */
+    const homeFov = fittedFov(HOME_FOV, aspect)
+    const homeTgt = aimAt(fujiPeak, HOME_EYE, homeFov, aspect, FUJI_FRAME_U, FUJI_FRAME_V)
     Object.assign(home, {
       px: HOME_EYE[0], py: HOME_EYE[1], pz: HOME_EYE[2],
       tx: homeTgt.x, ty: homeTgt.y, tz: homeTgt.z,
@@ -645,7 +727,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     })
     Object.assign(cam, home)
     camera.position.set(cam.px, cam.py, cam.pz)
-    camera.fov = cam.fov
+    camera.aspect = aspect
+    camera.fov = homeFov
     camera.updateProjectionMatrix()
     camera.lookAt(homeTgt)
 
@@ -657,7 +740,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        wherever the camera has flown to -- see SUN_ARC */
     homeAim = homeTgt.clone()
     homeAspect = aspect
-    sunAt = placeSun(HOME_EYE, homeTgt, HOME_FOV, aspect)
+    homeFovFit = homeFov
+    sunAt = placeSun(HOME_EYE, homeTgt, homeFovFit, aspect)
     rig = installRig(scene, sunAt)
     sunDisc = makeSunDisc()
     sunDisc.position.copy(sunAt)
@@ -698,6 +782,17 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       + `${Math.round(performance.now() - tGround)} ms`,
     )
 
+    /* THE TREELINE, THE FRUSTUM AND THE MIRROR'S CULL, in one walk over every instance matrix in
+       the world -- see `forest.ts`. AFTER `buildLandform`, which rebuilds the ranges' geometry, so
+       the bounding spheres it computes are of the shape that will actually be drawn; and inside the
+       same window as everything else here, because it reads positions. */
+    forest = buildForest(root, lakeCentre())
+    console.info(
+      `[valley] forest: ${forest.tinted} sets given a treeline, ${forest.culled} sets now `
+      + `frustum-culled; the mirror skips ${forest.farCut} far stands and ${forest.smallCut} `
+      + `small things (${(forest.savedTris / 1000).toFixed(0)}k triangles a pass), ${forest.ms} ms`,
+    )
+
     lanterns = buildLanterns(root)
     /* A BOOT LINE, BECAUSE ITS ABSENCE IS WHAT HID A DEAD SYSTEM. Every other build here reports
        what it found and this one never did -- so when `cel.ts` changed the material class out from
@@ -707,7 +802,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     console.info(
       `[valley] lanterns: ${lanterns.mats.length} materials over ${lanterns.meshes} meshes, `
       + `${lanterns.spots.length} flames`
-      + (lanterns.moving.length ? ` and ${lanterns.moving.length} that travel` : ''),
+      + (lanterns.moving.length ? ` and ${lanterns.moving.length} that travel` : '')
+      + (lanterns.authored
+        ? ', all of them from EMIT materials — the .blend is authoritative'
+        : ' — no EMIT materials in this file, so the name rules are doing the guessing')
+      + `, ${lanterns.ms} ms`,
     )
     /* and the same meshes are what bleeds -- see `bloom.ts` */
     if (bloom) bloomTrack(lanterns.lit)
@@ -884,6 +983,36 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
         + `${wardrobe.found.hair})`,
       )
     }
+    /* THE NEAR FIELD, AND IT IS THE ONLY THING HERE THAT IS NOT IN THE VALLEY -- see `crane.ts`.
+       Added to the one scene rather than to a second one: the port has a single render per frame,
+       and at four hundred units from an eye whose near plane is twenty, the depth buffer sorts it
+       correctly against a world that starts thousands of units further out. */
+    if (craneOn) crane = buildCrane(scene, reduced)
+
+    /* AND THE EYE ITSELF MOVES. Built last because it owns a pointer listener and nothing before
+       this point could have used it. */
+    viewpoint = createViewpoint(reduced || !breathing)
+
+    /* ==================================================================================================
+       EVERYTHING THE MIRROR IS NOT ASKED TO DRAW, GATHERED IN ONE PLACE.
+
+       Three unrelated reasons end up in the same list, which is why it is assembled here rather than
+       owned by any of them:
+         - the far forest and the ground clutter, because they cannot read at 832 by 468 (`forest.ts`)
+         - anything wearing the lake's own material, because a surface that samples `tReflect` drawn
+           INTO `tReflect` is a feedback loop (`pond.ts`)
+         - the crane, because it is four hundred units from the eye (`crane.ts`)
+
+       AND THE PASS PUTS BACK WHAT WAS THERE RATHER THAN `true`, which is `reflection.ts`'s own
+       hardest-won line: a per-frame writer of a shared flag has to be a stack, or the loader's
+       "hide what this replaces" lasts exactly one frame.
+       ================================================================================================== */
+    noReflect.push(
+      ...(forest?.noReflect ?? []),
+      ...(ponds?.hideFromMirror ?? []),
+      ...(crane?.hide ?? []),
+    )
+
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     sizeInk(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     sizeBloom(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
@@ -947,7 +1076,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
 
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight, false)
-    camera.aspect = window.innerWidth / Math.max(1, window.innerHeight)
+    /* THE ONE PLACE THE WINDOW'S SHAPE IS READ. The frame loop needs it every tick to fit the lens
+       and `innerWidth` forces a layout flush, so it is held rather than asked for -- see `aspect`. */
+    aspect = window.innerWidth / Math.max(1, window.innerHeight)
+    camera.aspect = aspect
+    camera.fov = fittedFov(cam.fov, aspect)
     camera.updateProjectionMatrix()
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     sizeInk(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
@@ -971,6 +1104,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
      See MAX_STEP_MS. */
   let raf = 0
   let last = performance.now()
+  /* the loop's own clock in seconds, capped the same way every step is, so a stall slows the world
+     rather than teleporting it. Kept apart from `performance.now()` for exactly that reason. */
+  let clock = 0
+  /* the mirror runs on every other frame -- see the note where it is rendered */
+  let mirrorTick = 0
   const _aim = new Vector3()
   const frame = () => {
     raf = requestAnimationFrame(frame)
@@ -979,17 +1117,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     last = now
     /* the twinkle's own clock. Seconds, and it simply accumulates -- a star's phase is its cell's
        hash, so nothing here has to survive a reload. */
+    clock += dt / 1000
     SKY_U.uTime.value += dt / 1000
     /* the flames' own clock. `lampOn` is written on the day beat; this is what makes them move
-       between beats. */
-    flickerTick(dt / 1000, lampNow)
+       between beats. Stopped under reduced motion with the rest of the moving things -- see the
+       note further down this loop. */
+    if (!reduced) flickerTick(dt / 1000, lampNow)
     /* the same clock and the same two sines, written into the lamps' own strengths -- see
        `lampgrid.ts`. One source, so the flame and the pool it casts can never disagree. */
     lampGrid?.flicker(FLICKER.t.value * FLICKER.rate.value, FLICKER.amt.value, lampNow)
     /* AFTER `life.tick` HAS MOVED THE HULLS, which is further down this same loop -- so a boat lamp
        is one frame behind its boat. At 16 ms and the speed a boat sails that is under a unit, and
        the alternative is splitting the life tick in two to put the weld before the light. */
-    boatLamps?.tick(FLICKER.t.value * FLICKER.rate.value, FLICKER.amt.value, lampNow)
+    if (!reduced) boatLamps?.tick(FLICKER.t.value * FLICKER.rate.value, FLICKER.amt.value, lampNow)
 
     if (live) {
       live.elapsed += dt / 1000
@@ -998,7 +1138,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       /* THE DESTINATION ASSEMBLES AS A FRACTION OF THE MOVE, not at a fixed time, so the pacing
          holds whether the flight is 1.6 seconds or 4.6. */
       if (live.onOpen && p >= live.openAt) { const open = live.onOpen; live.onOpen = null; open() }
-      if (p >= 1) { const land = live.onLand; live = null; land?.() }
+      /* AND IT COMES BACK ON ARRIVAL, not when the screen opens. `onOpen` fires at 82% -- the board
+         is assembling while the eye is still moving -- so clearing the class there would bring the
+         chrome back into a frame that is still travelling. */
+      if (p >= 1) { const land = live.onLand; live = null; inFlight(false); land?.() }
     }
 
     /* THE SUN AS THE SKY SEES IT is a direction FROM THE EYE, so the scattering lobes stay put
@@ -1010,25 +1153,44 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       if (moonDisc?.visible) faceSun(moonDisc, _eye)
     }
 
+    /* ==================================================================================================
+       WHAT STOPS FOR `prefers-reduced-motion`, AND WHAT DOES NOT.
+
+       This was two lines — the sway and the wind — while the crowd, the walkers, the boats, the
+       birds, the petals, the fireflies, the flames and the boat lanterns all went on moving. That is
+       not a partial implementation of the setting, it is the setting not being implemented: someone
+       who asks for reduced motion and gets a valley full of walking people has been told no.
+
+       The list is the mockup's own, and the split in it is worth stating because it is not "turn
+       everything off". What stops is anything that TRAVELS — a figure crossing the frame, a boat, a
+       bird, a falling petal, a drifting cloud. What continues is anything that is a SURFACE changing
+       in place: the water's ripple, the town's steam, a window's bedtime, and the day itself. Those
+       carry no motion vector across the frame and stopping them would make the valley a photograph
+       for no benefit to anybody.
+
+       THE FLAMES STOP TOO, which is the least obvious member of the list and is the mockup's call:
+       879 flickering points is a lot of small motion, and a lantern that is simply lit reads as lit.
+       ================================================================================================== */
+    const still = reduced
     /* the sky drifts on the same capped clock as everything else, so a dropped frame slows the
        weather rather than teleporting it */
-    if (clouds) clouds.drift(dt / 1000)
+    if (clouds && !still) clouds.drift(dt / 1000)
     /* and the cover creeps with them, on the same clock */
     driftCover(dt / 1000)
     windows?.tick(dt / 1000)
     lake?.tick(dt / 1000)
-    crowd?.tick(dt / 1000)
-    walkers?.tick(dt / 1000)
-    life?.tick(dt / 1000)
-    birds?.tick(dt / 1000)
-    petals?.tick(dt / 1000)
+    if (!still) crowd?.tick(dt / 1000)
+    if (!still) walkers?.tick(dt / 1000)
+    if (!still) life?.tick(dt / 1000)
+    if (!still) birds?.tick(dt / 1000)
+    if (!still) petals?.tick(dt / 1000)
     steam?.tick(dt / 1000)
-    fireflies?.tick(dt / 1000)
+    if (!still) fireflies?.tick(dt / 1000)
     /* THE WIND'S OWN CLOCK, and one line rather than a walk: every plant's phase comes off its
        own position in the shader, so seventeen thousand of them move on a single float. */
-    if (!reduced) swayTick(dt / 1000)
+    if (!still) swayTick(dt / 1000)
     ponds?.tick(dt / 1000)
-    if (!reduced) wind?.tick(dt / 1000)
+    if (!still) wind?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -1038,11 +1200,32 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       applyDay(scene, renderer, rig, sunNow(), fogBase)
     }
 
-    camera.position.set(cam.px, cam.py, cam.pz)
-    if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix() }
-    _aim.set(cam.tx, cam.ty, cam.tz)
+    /* ==================================================================================================
+       THE CAMERA IS COMPOSED FROM THREE THINGS, NOT ONE.
+
+       `cam` is the authored pose — where the menu stands, or where a flight has got to. On top of it
+       go the eye's own small movements: the held breath, the pointer lean, and the knock a refused
+       press gives the frame. All three are one offset, written by `viewpoint.ts`, so nothing here has
+       to know which of them is currently non-zero.
+
+       AND THE LENS IS FITTED RATHER THAN AUTHORED — see `fittedFov`. Below 16:9 the authored vertical
+       field crops the sides of a composition that was made against 16:9; the fitted one opens the
+       vertical instead and holds every edge the interface is placed against.
+       ================================================================================================== */
+    viewpoint?.tick(dt / 1000)
+    const vpe = viewpoint?.eye
+    const vpa = viewpoint?.aim
+    camera.position.set(cam.px + (vpe?.x ?? 0), cam.py + (vpe?.y ?? 0), cam.pz)
+    const fov = fittedFov(cam.fov, aspect)
+    if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix() }
+    _aim.set(cam.tx + (vpa?.x ?? 0), cam.ty + (vpa?.y ?? 0), cam.tz)
     camera.lookAt(_aim)
     if (cam.roll) camera.rotateZ(MathUtils.degToRad(cam.roll))
+
+    /* AFTER the camera is where it is going to be, because the crane's whole placement is solved by
+       unprojecting a point in the frame — a tick before this composes it against last frame's eye,
+       which at rest is a few units out and mid-flight is hundreds. */
+    crane?.tick(dt / 1000, clock, camera, flownTo !== null)
     /* WHERE THE SUN IS ON SCREEN IS ASKED ONCE, HERE, because both the mask pass and the overlay
        need it and the mask pass is skipped outright when the answer is "nowhere". */
     if (glowBody && shafts) {
@@ -1061,11 +1244,27 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
         sway?.meshes ?? [], !reduced)
     }
 
-    /* THE MIRROR IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather than
-       after it -- a pending build would otherwise land in the reflection instead of the real one,
-       which is exactly how the mockup lost every shadow in the valley. Same reason as the sky
-       mask above, and the two now sit together. */
-    if (lake && mirror) mirror.render(renderer, scene, camera, lake.mesh, ponds?.hideFromMirror)
+    /* ==================================================================================================
+       THE MIRROR IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather than after
+       it -- a pending build would otherwise land in the reflection instead of the real one, which is
+       exactly how the mockup lost every shadow in the valley. Same reason as the sky mask above, and
+       the two now sit together.
+
+       AND IT HAS TWO GATES THIS PORT LOST, both of which are the mockup's:
+
+         - EVERY OTHER FRAME. A reflection is read through two scrolling normal maps at 832 by 468; a
+           frame of latency in it is not observable, and the pass is about a third of the frame's cost.
+           It is the single cheapest thing in this file that nobody can see.
+         - AT THE MENU OR MID-FLIGHT, AND NOT WHILE STANDING AT A DESTINATION. Every arrival in this
+           valley composes a shot of a place, and the lake is in none of them at a size where a
+           reflection reads -- but it is in FRAME, so the pass's own early-out (is there water on
+           screen) fired exactly zero times in 1,620 measured frames and never will. The question the
+           early-out asks is the wrong one; this is the right one.
+       ================================================================================================== */
+    const mirrorWanted = flownTo === null || live !== null
+    if (lake && mirror && mirrorWanted && (mirrorTick++ & 1) === 0) {
+      mirror.render(renderer, scene, camera, lake.mesh, noReflect)
+    }
 
     /* and the shadow build goes HERE, in the last gap before the render -- see `shadowDirty` */
     if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false }
@@ -1097,6 +1296,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       cancelAnimationFrame(raf)
       registerFlights(null)
       live = null
+      /* a torn-down valley must not leave the interface hidden -- see `inFlight` */
+      inFlight(false)
       if (rig) { scene.remove(rig.key, rig.key.target, rig.fill, rig.fill.target, rig.hemi); rig = null }
       if (sunDisc) { scene.remove(sunDisc); sunDisc = null }
       if (moonDisc) { scene.remove(moonDisc); moonDisc = null }
@@ -1130,6 +1331,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       mirror = null
       wind?.dispose()
       wind = null
+      crane?.dispose()
+      crane = null
+      viewpoint?.dispose()
+      viewpoint = null
+      forest = null
       /* the world's own meshes go with `root`; these are the three that hold state OUTSIDE it --
          a material of their own, or a list of the world's meshes that must not outlive it */
       ponds?.material?.dispose()
@@ -1187,11 +1393,24 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       ponds: ponds && { garden: ponds.garden.length, pools: ponds.pools.length },
       boatLamps: boatLamps && { lamps: boatLamps.lamps, live: LAMP_U.uMoveN.value },
       landform: landformStats,
+      forest: forest && {
+        tinted: forest.tinted, culled: forest.culled,
+        noReflect: noReflect.length, savedTris: forest.savedTris,
+      },
+      lanterns: lanterns && {
+        flames: lanterns.spots.length, meshes: lanterns.meshes, authored: lanterns.authored,
+      },
+      crane: crane ? { at: crane.group.position.toArray().map(Math.round) } : null,
+      view: viewpoint && { eye: viewpoint.eye.toArray(), fov: fittedFov(cam.fov, aspect) },
     }),
     /* AND THE DAY, which is what everything else is a function of. The sky's brightness, the
        lanterns, the stars, the fog and the moon are all keyed on one number -- the sun's altitude
        -- and until this was reachable the only way to ask what it was was to infer it backwards
        from a pixel. */
+    /* THE REFUSAL, REACHABLE. The menu calls this when it declines a press -- see `refuse` there --
+       and it is on the debug handle for the same reason everything else here is: it can be fired at
+       a running build and watched, rather than argued about from the source. */
+    punch: (s = 1) => viewpoint?.punch(s),
     day: () => {
       const sun = sunNow()
       return {
@@ -1262,7 +1481,7 @@ function applyDay(
      pointed at 7.5 degrees -- a night lit from the west by a sun that set hours ago. */
   if (homeAim && sunAt) {
     const { u, v } = arcPlace(alt, sun.p)
-    sunAt.copy(placeSun(HOME_EYE, homeAim, HOME_FOV, homeAspect, u, v))
+    sunAt.copy(placeSun(HOME_EYE, homeAim, homeFovFit, homeAspect, u, v))
     sunDisc?.position.copy(sunAt)
     aimKey(rig.key, sunAt)
     /* the cover's blobs fall along the light, so they swing with it */
@@ -1293,7 +1512,7 @@ function applyDay(
     const place = arcPlace(moonAlt, mp)
     moonDisc.visible = moonAlt > -1.5
     if (moonDisc.visible) {
-      _moonAt.copy(placeSun(HOME_EYE, homeAim, HOME_FOV, homeAspect, place.u, place.v))
+      _moonAt.copy(placeSun(HOME_EYE, homeAim, homeFovFit, homeAspect, place.u, place.v))
       moonDisc.position.copy(_moonAt)
       gradeMoon(moonDisc, moonAlt)
     }
@@ -1360,6 +1579,18 @@ export function valleyHandle() {
   return handle
 }
 
+/**
+ * Knock the frame, because a press was heard and declined.
+ *
+ * The interface's half of a refusal is a flash; this is the other half, and it lives here because
+ * there is one camera and three things asking to move it -- see `viewpoint.ts`. Safe when the valley
+ * is off, which it must be: the app has to work with `?valley=off` and a menu whose feedback
+ * depended on a canvas being there would not.
+ */
+export function punchCamera(s = 1): void {
+  viewpoint?.punch(s)
+}
+
 /* ==================================================================================================
    THE TWO CALLS REACT MAKES. Neither returns anything and both are safe when the valley is off --
    the app must work with `?valley=off`, and a menu whose navigation depended on a canvas being
@@ -1372,9 +1603,26 @@ export function valleyHandle() {
    ================================================================================================== */
 const OPEN_AT = 0.82
 
+/* ==================================================================================================
+   THE CHROME LEAVES WITH THE CAMERA, AND THIS IS THE ONE LINE THAT TELLS IT TO.
+
+   Four fixed corners held at full opacity while the world tears past behind them is the arrangement
+   that makes a 3D background read as wallpaper: the flight becomes something happening in a window
+   rather than something happening to you. The mockup takes all of it off as the camera goes -- see
+   `body.in-flight` in `menu.css` -- so the whole composition leaves together.
+
+   A CLASS RATHER THAN REACT STATE, deliberately, and it is the same argument as `--sky`: a flight is
+   the valley's own state, it lasts a second and a half, and routing it through a store so that a
+   component could re-render twice would be a worse version of a class name. The valley already
+   writes one custom property on the document for the same reason. */
+const inFlight = (on: boolean): void => {
+  document.body.classList.toggle('in-flight', on)
+}
+
 function flyToSectionImpl(section: MenuSectionKey, onOpen: () => void): void {
   const dest = DESTINATIONS[section]
   if (!handle || !dest) { onOpen(); return }
+  inFlight(true)
   const flight = makeFlight({
     startEye: new Vector3(cam.px, cam.py, cam.pz),
     startTgt: new Vector3(cam.tx, cam.ty, cam.tz),
@@ -1396,6 +1644,7 @@ function flyHomeImpl(): void {
   if (!handle) return
   const dest = flownTo ? DESTINATIONS[flownTo] : null
   flownTo = null
+  inFlight(true)
   live = {
     flight: makeFlight({
       startEye: new Vector3(cam.px, cam.py, cam.pz),

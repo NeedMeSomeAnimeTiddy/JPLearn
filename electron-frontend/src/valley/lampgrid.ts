@@ -34,13 +34,29 @@ import {
 export const LAMP_GRID_N = 192
 /** how far a lamp reaches before the falloff has taken it; dark by 2.6x this */
 export const LAMP_REACH = 300
-/* HOW HARD THE POOL IS, AND IT IS NOT THE MOCKUP'S 1.8 -- because this walk finds more flames than
-   its does. `NAV.lamps()` reports 588 there; `buildLanterns` finds 879 here, and every one of them
-   is a light in the grid, so the same per-lamp figure delivers half again as much light to the same
-   streets. Matched on the frame instead of on the constant: measured at the same camera and hour,
-   1.8 put 29,998 warm-lit pixels on screen against the mockup's 8,439, and 0.7 puts about 8,100.
-   If the lamp walk ever changes what it counts, this is the number that moves with it. */
-export const LAMP_I = 0.7
+/* ==================================================================================================
+   HOW HARD THE POOL IS, AND IT IS THE MOCKUP'S 1.8 AGAIN.
+
+   This was 0.7, and the note here said why: `NAV.lamps()` reports 588 flames in the mockup and
+   `buildLanterns` found 879 in this port, so the same per-lamp figure delivered half again as much
+   light to the same streets. It was matched on the frame rather than on the constant -- 1.8 put
+   29,998 warm-lit pixels on screen against the mockup's 8,439, and 0.7 put about 8,100.
+
+   THE MEASUREMENT WAS RIGHT AND THE CONCLUSION WAS WRONG. The extra 291 flames were not a difference
+   between the two worlds; they were the same lanterns counted twice, because this port had the
+   mockup's name rules and not the rule that stands them down -- see the note by `authored` in
+   `buildLanterns`. Half the surplus light was stone lantern BODIES glowing, and turning the whole
+   valley down to 0.7 to hide them dimmed every street that was already right.
+
+   With the double-count gone and the stone lanterns casting at 0.26 of a chochin rather than at
+   parity, the per-lamp figure goes back to what it was tuned to be. MEASURED AT 21:30, both builds
+   at 1600 by 1028 and the same hour: the port lights 54,772 warm pixels against the mockup's 51,492,
+   6.4% over, at a mean red of 185.5 against 193.4. Under 0.7 the same frame was a third short.
+
+   If the lamp walk ever changes what it counts again, this is the number that moves with it -- and
+   the thing to check first is whether the COUNT is honest.
+   ================================================================================================== */
+export const LAMP_I = 1.8
 export const LAMP_LIGHT_COLOUR = 0xffa64a
 
 /* ==================================================================================================
@@ -150,7 +166,12 @@ export interface LampGrid {
  * tens of milliseconds. The boot line reports it, because a cost nobody prints is a cost nobody
  * notices growing.
  */
-export function buildLampGrid(spots: readonly Vector3[]): LampGrid | null {
+/* THE GAIN IS OPTIONAL HERE AND REQUIRED IN `LampSpot`, deliberately: this takes a bag of places
+   with strengths, and a caller that has only places -- a test, or a future system that lights
+   something other than lanterns -- gets the old behaviour of one apiece rather than a type error. */
+export function buildLampGrid(
+  spots: readonly (Vector3 & { gain?: number })[],
+): LampGrid | null {
   if (!spots.length) return null
   const t0 = performance.now()
 
@@ -177,7 +198,10 @@ export function buildLampGrid(spots: readonly Vector3[]): LampGrid | null {
     data[i * 4] = s.x
     data[i * 4 + 1] = s.y
     data[i * 4 + 2] = s.z
-    data[i * 4 + 3] = 1
+    /* AND HOW HARD IT BURNS, WHICH USED TO BE 1 FOR EVERY LAMP IN THE VALLEY. A stone lantern is a
+       candle behind granite and a chochin is an open flame in paper; at parity a court of 250 stone
+       ones outshone the festival street the whole system was tuned against. See `CAST_STONE`. */
+    data[i * 4 + 3] = s.gain ?? 1
   }
   const dataTex = new DataTexture(data, W, H, RGBAFormat, FloatType)
   dataTex.minFilter = NearestFilter
@@ -250,7 +274,10 @@ export function buildLampGrid(spots: readonly Vector3[]): LampGrid | null {
       /* two sines at incommensurable rates with a per-lamp phase: no two lanterns share a beat,
          and none of them repeats inside a minute */
       const p = i * 1.7
-      data[i * 4 + 3] = 1 + a * (Math.sin(t + p) * 0.6 + Math.sin(t * 2.37 + p * 3.1) * 0.4)
+      /* AROUND ITS OWN STRENGTH, not around 1: a flicker written flat would quietly promote every
+         stone lantern in the valley to chochin brightness on the first frame after dark. */
+      data[i * 4 + 3] = (spots[i].gain ?? 1)
+        * (1 + a * (Math.sin(t + p) * 0.6 + Math.sin(t * 2.37 + p * 3.1) * 0.4))
     }
     dataTex.needsUpdate = true
   }

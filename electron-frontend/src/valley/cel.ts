@@ -79,13 +79,40 @@ export function toonRamp(
    Sixteen steps instead of four moves the bands; it never removes them. */
 export const RAMP = toonRamp(4, NearestFilter)
 
-/* AND THE DISTANT LANDFORM IS SMOOTH, deliberately. A toon ramp's lowest step is a large invisible
+/* ==================================================================================================
+   AND THE DISTANT LANDFORM IS SMOOTH, deliberately. A toon ramp's lowest step is a large invisible
    fill -- at four steps a face turned completely away from the key still returns 37% of full
-   diffuse -- which is right for a lantern post and wrong for a mountain, where it flattens the
-   whole form. Sixty-four steps under a linear filter is a smooth ramp in everything but name, with
-   a floor that keeps the shadow flank from going to nothing. Distant terrain rendered smooth
-   against a cel-shaded foreground is the normal arrangement in stylised games, not a compromise. */
-export const RAMP_MTN = toonRamp(64, LinearFilter, 1.8, 0.26)
+   diffuse -- which is right for a lantern post and wrong for a mountain, where it flattens the whole
+   form. Sixty-four steps under a linear filter is a smooth ramp in everything but name, with a floor
+   that keeps the shadow flank from going to nothing. Distant terrain rendered smooth against a
+   cel-shaded foreground is the normal arrangement in stylised games, not a compromise.
+
+   1.6 AND 0.22, WHICH ARE THE MOCKUP'S AND NOT THE 1.8 / 0.26 THIS PORT INVENTED. The pair was
+   found there by sweeping the two visible STEPS -- the band across the meadow, and Fuji's lit flank
+   against its shadow flank, both as a percentage so that surfaces at different brightnesses can be
+   compared at all:
+
+       exp / floor      ground step    Fuji lit vs shadow
+       2.2 / 0.10          22.2%            24.2%
+       1.6 / 0.10          25.2%            23.5%
+       1.2 / 0.10          24.3%            21.4%
+       1.6 / 0.22          17.7%            18.1%
+       1.2 / 0.28          14.8%            15.3%
+
+   Dropping the exponent alone makes the ground WORSE -- it steepens the curve exactly where a low
+   sun puts these two surfaces, around 0.55 to 0.75 of the ramp. The FLOOR is what compresses the
+   range, and it takes both numbers down together. 1.6 / 0.22 is as far as it goes before Fuji stops
+   reading as a cone.
+   ================================================================================================== */
+export const RAMP_MTN = toonRamp(64, LinearFilter, 1.6, 0.22)
+
+/* WHAT THE SOFTER RAMP COSTS, GIVEN BACK -- and this port had the ramp and never had this.
+   Raising the floor lifts every landform about 24%: Fuji's lit flank from 77.8 to 96.1, the meadow
+   from 79.7 to 102.9. Brightness is the one thing this scene has been asked about most, so the pair
+   is meant to be brightness-NEUTRAL: scaling the material colour scales the albedo uniformly, which
+   holds the whole set at the value that was signed off while the ramp does the softening. Take the
+   ramp without this and the mountains simply come out a quarter brighter than they were composed. */
+export const LANDFORM_LEVEL = 0.81
 
 /** the landforms, which take the smooth ramp rather than the four-step one */
 const LANDFORM = /Landscape_Props_(Fuji|Range|FarRange)|_Terrain/i
@@ -152,6 +179,9 @@ export function celWorld(root: Object3D): CelStats {
         /* a painted mesh with no texture wants the paint, not the source's base tint on top of it */
         if (!m.map) m.color.setHex(0xffffff)
       }
+      /* AFTER the vertex-colour branch, or the line above throws it away. On a painted landform the
+         base colour IS the multiplier the paint is scaled by, so this has to be the last write. */
+      if (land) m.color.multiplyScalar(LANDFORM_LEVEL)
       cache.set(key, m)
       stats.materials++
       if (land) stats.landform++

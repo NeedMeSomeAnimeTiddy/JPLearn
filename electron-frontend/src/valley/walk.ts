@@ -70,15 +70,41 @@ export interface LoopSpec {
 /* CONTROL POINTS, AND FEW OF THEM ON PURPOSE. Each loop is a CLOSED Catmull-Rom through the x,z
    pairs; y is not here because every sample is dropped onto whatever ground is under it at build
    time, so moving a point sideways is safe and the curve follows the hills by itself. */
+/* ==================================================================================================
+   THESE ARE `loops.json`, NOT THE MOCKUP'S SOURCE CONSTANTS, AND THE DIFFERENCE WAS 560 PEOPLE.
+
+   The mockup declares a WALK_LOOPS table in the file and then FETCHES `loops.json` over the top of
+   it at boot: the file is the authored default and the JSON is what Robbie has since drawn in the
+   loop editor. This port read the table. The table says the valley is walked by 40 people; the
+   overlay says 600 — and with Town and Festival that is 630 walking the mockup's world against 70
+   walking this one. Nine times the population is not a settings difference, it is a different place:
+   an empty road with a few figures on it against a valley with people all over it.
+
+   AND THE ROAD ITSELF MOVED. The overlay's valley circuit is 24 control points and 52,240 units
+   around, against the 20 and 48,353 here, and it comes back across the southeast on a completely
+   different line. What stood here was a hand-tuned variant of the SOURCE path, re-solved in this
+   port to clear the DRILLS camera — which was solving the right problem against the wrong road.
+
+   WHAT THAT COSTS, MEASURED, so it is a decision rather than a surprise: the overlay's circuit
+   passes 101 units from the DRILLS eye where the re-tuned one passed 201, and 606 from the READ eye
+   where the re-tuned one passed 240. So DRILLS gets worse and READ gets better, and at 101 units a
+   65.5-unit figure is most of that frame's height. The mockup has exactly this and always has --
+   `walkTick` runs unconditionally there, on this path, with 600 people on it.
+
+   IT IS STILL THE RIGHT ANSWER. Which road the valley's people walk is a decision about Robbie's
+   world, made in Robbie's editor, and a port that quietly substitutes its own is a port that has
+   stopped being one. If the DRILLS approach wants clearing, the place to clear it is the editor, and
+   the number to beat is 101.
+   ================================================================================================== */
 export const WALK_LOOPS: readonly LoopSpec[] = [
   /* the valley circuit, laid roughly along the road the world already makes — Torii, Zen, the
      onsen, the garden, the pagoda, the festival — closing across the open southeast, where there is
      no road but there is nothing in the way either */
-  { n: 'Valley', w: 40, lane: 150, p: [
-    12900, -1893, 11500, -3200, 8700, -4011, 3400, -5830, 0, -6570, -3695, -6577,
-    -5450, -5700, -5545, -4200, -5531, -1288, -4400, -700, -3370, -140, -2400, 360,
-    -1900, 1920, -1284, 2425, -891, 3088, 160, 4360, 1600, 5300, 5500, 4000,
-    9000, 1800, 11800, 0] },
+  { n: 'Valley', w: 600, lane: 100, p: [
+    13120, -1268, 11500, -3200, 8700, -4011, 3400, -5830, 84, -6345, -3695, -6577,
+    -5450, -5700, -5580, -3872, -5531, -1288, -4321, -618, -3344, 33, -2216, 727,
+    -567, 3461, 778, 5283, 2166, 3548, 2817, 2463, 3728, 2333, 3859, 1725,
+    3381, 944, 2534, 554, 5180, 250, 6872, -10, 11341, -618] },
   /* the onsen's two streets, which are already a circuit: up one spine and down the other. The
      south join passes NORTH of the bathhouse, whose footprint runs z −6100 to −6300 right across
      the obvious line. */
