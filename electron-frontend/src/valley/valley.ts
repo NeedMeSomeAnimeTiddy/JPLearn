@@ -39,11 +39,12 @@ import {
   ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, setGlow, sizeShafts, updateSunUv,
 } from './shafts'
 import { buildClouds, type CloudField } from './clouds'
-import { buildLanterns, type LanternField } from './lanterns'
+import { FLICKER, buildLanterns, flameFlicker, flickerTick, type LanternField } from './lanterns'
 import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
 import { bloomTrack, disposeBloom, renderBloom, setBloomNight, sizeBloom } from './bloom'
+import { buildLampGrid, type LampGrid } from './lampgrid'
 import { celWorld } from './cel'
 import { disposeInk, inkTrackCrowd, renderInk, renderND, sizeInk } from './ink'
 import { buildCrowd, type CrowdField } from './crowd'
@@ -116,6 +117,8 @@ let moonDisc: Mesh | null = null
    follows the SUN, even well below the horizon, because that is what twilight IS -- but a shaft is
    light coming past something, and at three in the morning the thing it comes past is the moon. */
 let glowBody: Mesh | null = null
+/** how lit the valley is, held between day beats so the flames can flicker every frame */
+let lampNow = 0
 /* scratch, module-level, because the day beat runs every couple of seconds and neither of these
    should be an allocation */
 const _moonAt = new Vector3()
@@ -123,6 +126,7 @@ const _keyAt = new Vector3()
 let sunAt: Vector3 | null = null
 let clouds: CloudField | null = null
 let lanterns: LanternField | null = null
+let lampGrid: LampGrid | null = null
 let nightMap: NightMap | null = null
 let windows: WindowField | null = null
 let crowd: CrowdField | null = null
@@ -174,6 +178,9 @@ const ink = new URLSearchParams(window.location.search).get('ink') !== 'off'
 /* `?bloom=off` -- a quarter-res scene pass plus two blurs, and the only thing that makes a lantern
    read as a source rather than as a bright polygon. Its own switch for the same reason as the rest. */
 const bloom = new URLSearchParams(window.location.search).get('bloom') !== 'off'
+/* `?lamplight=off` -- two texture reads on every lit fragment in the valley, and the difference
+   between a lantern that glows and one that lights the street it stands in. */
+const lampLight = new URLSearchParams(window.location.search).get('lamplight') !== 'off'
 /* `?cel=off` -- the same switch for the other half of the drawing, so the two can be priced and
    judged apart. Off, the world renders as the PBR materials GLTFLoader handed over. */
 const cel = new URLSearchParams(window.location.search).get('cel') !== 'off'
@@ -384,6 +391,34 @@ function countTriangles(root: Object3D): number {
    IT IS NOT WHERE THE MENU STANDS, though, and phase 0 believed it was. This only supplies a
    camera OBJECT -- its near and far planes and a sane starting lens. Every frame's pose is written
    from `cam`, and `cam` starts at the composed home; see the note by HOME_EYE in `flight.ts`. */
+/* ==================================================================================================
+   THE NEAR PLANE IS THE DEPTH BUFFER'S PRECISION KNOB, AND THE AUTHORED ONE WAS THROWING IT AWAY.
+
+   `Camera_MainMenu` comes out of Blender with near 5 and far 140,000, and this port used them as
+   found. A 24-bit depth buffer resolves about z^2 / (near * 2^24) at distance z, so near 5 leaves
+   1.19 units of slop at 10,000 out -- and the mockup, at near 20, leaves 0.30. Four times the slop,
+   in a world whose roofs sit a few units off their ridges and whose snow caps sit on the cone under
+   them: everything nearly-coplanar fights, and because the menu camera breathes a few units at rest
+   the fight is resolved differently every frame. THAT IS THE FLICKER.
+
+   20 is 0.8 m of clip distance at this world's 25 units to the metre -- closer than the camera ever
+   comes to a surface -- and 60,000 still clears the sky dome, which is 46,000 out from an eye that
+   never leaves 11,500 of the origin. The mockup measured the win: the share of pixels that flip
+   under a 0.4-unit camera nudge falls from 0.20% to 0.08%, and 0.08% is what a purely antialiased
+   silhouette gives, i.e. the fighting is gone rather than reduced.
+
+   NOT `logarithmicDepthBuffer`: it needs every material to include three's logdepth chunks, and the
+   ink, water and sky shaders here are hand-written and would silently stop agreeing with everything
+   else about where they are.
+   ================================================================================================== */
+export const CAM_NEAR = 20
+export const CAM_FAR = 60000
+
+function clip(cam: PerspectiveCamera): void {
+  cam.near = CAM_NEAR
+  cam.far = CAM_FAR
+}
+
 function pickCamera(root: Object3D, aspect: number): PerspectiveCamera {
   let found: PerspectiveCamera | null = null
   root.traverse((o) => {
@@ -394,10 +429,11 @@ function pickCamera(root: Object3D, aspect: number): PerspectiveCamera {
   if (found) {
     const cam: PerspectiveCamera = found
     cam.aspect = aspect
+    clip(cam)
     cam.updateProjectionMatrix()
     return cam
   }
-  const cam = new PerspectiveCamera(38, aspect, 1, 40000)
+  const cam = new PerspectiveCamera(38, aspect, CAM_NEAR, CAM_FAR)
   cam.position.set(0, 2000, 6000)
   cam.lookAt(0, 0, 0)
   return cam
@@ -641,6 +677,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     )
     /* and the same meshes are what bleeds -- see `bloom.ts` */
     if (bloom) bloomTrack(lanterns.lit)
+    /* AND THE SAME FLAMES ARE WHAT LIGHTS THE TOWN. Built from the positions the lantern walk has
+       already collected, before `breathe` goes round -- the block it adds reads these two textures,
+       and a material compiled before they exist samples nothing. */
+    if (lampLight) {
+      lampGrid = buildLampGrid(lanterns.spots)
+      if (lampGrid) {
+        console.info(
+          `[valley] lamp light: ${lampGrid.lamps} lamps in a ${lampGrid.data[0]}x${lampGrid.data[1]}`
+          + ` table, ${lampGrid.grid}x${lampGrid.grid} grid over ${lampGrid.span[0]}x${lampGrid.span[1]}`
+          + ` units, ${lampGrid.ms} ms`,
+        )
+      }
+    }
     /* the bake is a NIGHT layer and comes up exactly as the lanterns do */
     nightMap = buildNightMap(root)
 
@@ -653,6 +702,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       mats.forEach((m) => breathe(m, land))
     })
+
+    /* AND THE FLAMES BREATHE, for the same reason and in the same place as the windows: `breathe`
+       has just been round every material, so a patch that CHAINS has to come after it. */
+    if (lanterns) for (const l of lanterns.mats) flameFlicker(l.mat)
 
     /* AFTER THE AIR, and that ordering is the opposite of the lanterns' for the opposite reason:
        `windowLife` CHAINS onto whatever `onBeforeCompile` is already there, so it has to find
@@ -848,6 +901,12 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* the twinkle's own clock. Seconds, and it simply accumulates -- a star's phase is its cell's
        hash, so nothing here has to survive a reload. */
     SKY_U.uTime.value += dt / 1000
+    /* the flames' own clock. `lampOn` is written on the day beat; this is what makes them move
+       between beats. */
+    flickerTick(dt / 1000, lampNow)
+    /* the same clock and the same two sines, written into the lamps' own strengths -- see
+       `lampgrid.ts`. One source, so the flame and the pool it casts can never disagree. */
+    lampGrid?.flicker(FLICKER.t.value * FLICKER.rate.value, FLICKER.amt.value, lampNow)
 
     if (live) {
       live.elapsed += dt / 1000
@@ -957,6 +1016,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       clouds?.dispose()
       clouds = null
       lanterns = null
+      lampGrid = null
       nightMap?.dispose()
       nightMap = null
       windows = null
@@ -1141,6 +1201,7 @@ function applyDay(
      through civil twilight, 0.45 at sunrise and out by mid-morning -- lanterns are lit
      before it is properly dark and left on a while after, which is what a town does. */
   lanterns?.setOn(n.lampOn)
+  lampNow = n.lampOn
   /* the bleed is the lamps', so it comes up and goes out with them */
   setBloomNight(n.lampOn)
   petals?.setNight(n.lampOn)

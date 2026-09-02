@@ -170,3 +170,95 @@ export function buildLanterns(root: Object3D): LanternField {
 
   return { mats, meshes, spots, lit, setOn }
 }
+
+/* ==================================================================================================
+   AND A FLAME IS NOT A CONSTANT.
+
+   Every lantern here has been a fixed emissive value: 879 flames all at exactly the same brightness,
+   all holding it perfectly still. That is what makes a lit window read as a bright texture rather
+   than as something burning, and it is the difference the mockup's night has that this one did not.
+
+   TWO SINES AT INCOMMENSURABLE RATES, which is the mockup's own arrangement -- 1 and 2.37, so the
+   pair does not repeat inside a minute -- with a PER-LAMP PHASE so no two lanterns share a beat. The
+   mockup carries that phase in a data texture because it is driving a grid of real light positions;
+   here the lanterns are emissive surfaces on instanced meshes, so the phase comes off a hash of each
+   instance's own position and costs nothing. Same shape, same numbers, one fewer texture.
+
+   IN THE SHADER, NOT ON THE MATERIAL, and that is the whole reason this is not four lines of
+   JavaScript. There are 879 flames and FOUR materials between them: modulating `mat.emissive` would
+   pulse every lantern in the valley in perfect step, which is worse than not flickering at all.
+
+   CHAINED, NOT ASSIGNED -- the same rule the windows follow. By the time this runs, `breathe` has put
+   the mist, the cloud cover and the rim light on the material's `onBeforeCompile`; replacing that
+   hook would take the valley's air off every lantern in the town. The cache key is extended for the
+   same reason: three's default `customProgramCacheKey` is `onBeforeCompile.toString()`, so two
+   materials that differ only in a chained patch would otherwise share one compiled program.
+   ================================================================================================== */
+export const FLICKER = {
+  /* `?flicker=off` -- the only honest way to price a thing, and the only way to see what it buys.
+     NOT `on`: that is taken by the day gate below, which is a uniform rather than a switch. */
+  enabled: new URLSearchParams(window.location.search).get('flicker') !== 'off',
+  /** how far a flame strays from its own steady state */
+  amt: { value: 0.16 },
+  rate: { value: 2.1 },
+  /** the clock, and `uFlickerOn` folds the day in so a flame is steady before it is lit */
+  t: { value: 0 },
+  on: { value: 0 },
+}
+
+const FLICKER_U = {
+  uFlickAmt: FLICKER.amt,
+  uFlickRate: FLICKER.rate,
+  uFlickT: FLICKER.t,
+  uFlickOn: FLICKER.on,
+}
+
+/** advance the flame clock; `on` is the day cycle's `lampOn`, so nothing flickers by daylight */
+export function flickerTick(seconds: number, on: number): void {
+  if (!FLICKER.enabled) return
+  FLICKER.t.value += seconds
+  FLICKER.on.value = on
+}
+
+export function flameFlicker(mat: Material): Material {
+  const flagged = mat as Material & { userData: { flicker?: boolean } }
+  if (flagged.userData.flicker) return mat
+  flagged.userData.flicker = true
+
+  const prev = mat.onBeforeCompile
+  const prevKey = mat.customProgramCacheKey
+
+  mat.onBeforeCompile = (shader, renderer) => {
+    if (prev) prev.call(mat, shader, renderer)
+    Object.assign(shader.uniforms, FLICKER_U)
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        uniform float uFlickAmt, uFlickRate, uFlickT, uFlickOn;
+        varying float vFlick;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        {
+          /* THE PHASE IS THE LAMP'S OWN PLACE. Instanced, that is the instance matrix's
+             translation; loose, it is the model matrix's -- so a lantern that is one of two hundred
+             and a lantern that is a mesh of its own both get a phase nobody else has. */
+          #ifdef USE_INSTANCING
+            vec3 lampAt = vec3( instanceMatrix[ 3 ][ 0 ], instanceMatrix[ 3 ][ 1 ],
+                                instanceMatrix[ 3 ][ 2 ] );
+          #else
+            vec3 lampAt = ( modelMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).xyz;
+          #endif
+          float ph = fract( sin( dot( lampAt.xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) * 6.2831;
+          float t = uFlickT * uFlickRate;
+          float a = uFlickAmt * uFlickOn;
+          vFlick = 1.0 + a * ( sin( t + ph ) * 0.6 + sin( t * 2.37 + ph * 3.1 ) * 0.4 );
+        }`)
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\n        varying float vFlick;')
+      /* after three has assembled the emission, so this scales what the material actually emits
+         rather than replacing it */
+      .replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n        totalEmissiveRadiance *= vFlick;')
+  }
+  mat.customProgramCacheKey = () => (prevKey ? prevKey.call(mat) : '') + '|flicker'
+  mat.needsUpdate = true
+  return mat
+}

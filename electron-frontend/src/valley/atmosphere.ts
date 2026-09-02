@@ -1,3 +1,4 @@
+import { LAMP_GLSL, LAMP_HEAD, LAMP_U } from './lampgrid'
 import {
   Color, DataTexture, LinearFilter, Material, RGBAFormat, RepeatWrapping, Vector2, Vector3,
 } from 'three'
@@ -219,7 +220,12 @@ export function driftCover(dt: number): void {
 }
 
 const VERT_HEAD = `#include <common>
-varying vec3 vAtmosPos;`
+varying vec3 vAtmosPos;
+/* AND THE WORLD NORMAL, which the lanterns need and three does not otherwise hand out: at
+   lights_fragment_end the normal in scope is VIEW space, and a lamp's direction is a world-space
+   fact. Computing it here costs one normalize per vertex and keeps the lamp maths in one frame.
+   NO BACKTICKS IN HERE: this is inside a template literal and one ends the string. */
+varying vec3 vAtmosN;`
 
 /* AFTER `project_vertex` SO `transformed` IS FINAL, and the instancing branch matters because the
    whole world is an InstancedMesh after `collapseToInstances` — without it every tree in a batch
@@ -229,10 +235,16 @@ vec4 atmosWp = vec4( transformed, 1.0 );
 #ifdef USE_INSTANCING
   atmosWp = instanceMatrix * atmosWp;
 #endif
-vAtmosPos = ( modelMatrix * atmosWp ).xyz;`
+vAtmosPos = ( modelMatrix * atmosWp ).xyz;
+vec3 atmosN = objectNormal;
+#ifdef USE_INSTANCING
+  atmosN = mat3( instanceMatrix ) * atmosN;
+#endif
+vAtmosN = normalize( mat3( modelMatrix ) * atmosN );`
 
 const FRAG_HEAD = `#include <common>
 varying vec3 vAtmosPos;
+varying vec3 vAtmosN;
 uniform sampler2D uCoverMap;
 uniform vec2 uCoverOff;
 uniform vec2 uCoverProj;
@@ -242,6 +254,7 @@ uniform vec3 uMistColor, uRimColor;
 uniform float uMistY, uMistH, uMistAmt, uRimT, uRimAmt;`
 
 const FRAG_LIGHTS = `#include <lights_fragment_end>
+${LAMP_GLSL}
 {
   vec2 cuv = ( vAtmosPos.xz - vAtmosPos.y * uCoverProj ) * uCoverScale + uCoverOff;
   float cs = texture2D( uCoverMap, cuv ).r;
@@ -288,7 +301,7 @@ export function breathe(mat: Material, landform = false): Material {
   flagged.userData.atmos = true
 
   mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, ATMOS_U)
+    Object.assign(shader.uniforms, ATMOS_U, LAMP_U)
     /* PER-MATERIAL, AFTER THE SHARED BLOCK, so anything named here wins for this material alone --
        which is all the landform needs, and it needs it as its own uniform rather than a branch
        because the shared ones move every frame. */
@@ -300,7 +313,7 @@ export function breathe(mat: Material, landform = false): Material {
       .replace('#include <common>', VERT_HEAD)
       .replace('#include <project_vertex>', VERT_BODY)
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', FRAG_HEAD)
+      .replace('#include <common>', FRAG_HEAD + LAMP_HEAD)
       .replace('#include <lights_fragment_end>', FRAG_LIGHTS)
       .replace('#include <fog_fragment>', FRAG_FOG)
   }
