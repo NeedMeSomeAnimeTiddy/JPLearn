@@ -1,6 +1,6 @@
 import {
-  AdditiveBlending, Color, DirectionalLight, HemisphereLight, Mesh, PerspectiveCamera,
-  PlaneGeometry, ShaderMaterial, Vector3, type Material, type Object3D, type Scene,
+  AdditiveBlending, Color, DirectionalLight, HemisphereLight, MathUtils, Mesh, PerspectiveCamera,
+  PlaneGeometry, ShaderMaterial, Vector2, Vector3, type Material, type Object3D, type Scene,
 } from 'three'
 
 /* ==================================================================================================
@@ -160,6 +160,37 @@ export const SKY_U = {
   /* from the eye to the sun, refreshed every frame */
   uSunDir: { value: new Vector3(0, 0.2, -1) },
   uGrade: { value: 1.0 },
+  /* THE GRADE TURNS HUE AND CANNOT TURN THE LIGHTS OUT, which only became a problem when there was
+     a midnight to draw. Every term below is either a luminance-preserving mix or a small addition,
+     so a night sky came out as a dusk sky in a colder colour -- violet, and far too bright to be
+     three in the morning. This is the missing axis: a plain multiplier on the painted image, 1.0 by
+     day and about a twelfth of that at midnight.
+     THE PALETTE HAS CARRIED `skyGain` SINCE THE DAY CYCLE LANDED AND NOTHING READ IT. Measured
+     against the mockup at the same hour and camera, the port's sky came out at luminance 67 where
+     the mockup's was 46 -- one dead column in a table, and the night was never night. */
+  uGain: { value: 1.0 },
+  /* AND THERE IS NO STAR MAP, because the painted dome's stars are a handful of dots in an image
+     whose whole brightness has just been divided by twelve. These are procedural: a hash of the
+     view DIRECTION, so they are fixed to the sky rather than to the screen and hold still while the
+     camera flies. `stars` is the other dead column the palette has been computing all along. */
+  uStars: { value: 0.0 },
+  /* TWO POPULATIONS, WHICH IS WHAT A REAL SKY IS -- a haze of faint points with a scattering of
+     bright ones through it. Every one below is a vec2: `.x` is the BRIGHT field, `.y` the FINE one.
+     THE SIZE OF A STAR IS THE SIZE OF ITS CELL and there is no other dial for it: a cell holds at
+     most one star and its profile has to reach zero before the cell's nearest FACE -- half a cell,
+     not the 0.87 to its corner -- or the star is clipped by a straight line. So the gaussian
+     constant is per-field too (`uStarCore`, bigger is tighter), with `uStarHalo` the glow around it,
+     set so the bright core is about twice the fine one rather than four times. */
+  uStarGain: { value: 0.90 },
+  uStarFine: { value: 0.48 },
+  uStarGrid: { value: new Vector2(150, 300) },
+  /* the hash above which a cell holds a star, and the hash BELOW which that star is steady */
+  uStarCut: { value: new Vector2(0.9940, 0.9710) },
+  uStarTwinkle: { value: new Vector2(0.15, 0.72) },
+  uStarCore: { value: new Vector2(171, 40) },
+  uStarHalo: { value: new Vector2(0.34, 0.26) },
+  /** the clock the twinkle runs on */
+  uTime: { value: 0 },
   uHorizon: { value: new Color(0xff6a1e) },
   uZenith: { value: new Color(0x4a3f86) },
   uHorizAmt: { value: 0.68 },
@@ -208,9 +239,39 @@ export function gradeSky(mat: Material): Material {
         varying vec3 vSkyDir;
         uniform vec3 uSunDir, uHorizon, uZenith, uBurn, uWide, uTight;
         uniform float uGrade, uHorizAmt, uZenAmt, uBurnG, uBurnP, uWideP, uWideG, uTightP, uTightG;
+        uniform float uGain, uStars, uStarGain, uStarFine, uTime;
+        uniform vec2 uStarGrid, uStarCut, uStarTwinkle, uStarCore, uStarHalo;
         /* the tint, carried to a given luminance -- a hue rotation rather than a multiply */
         vec3 skyTint( vec3 t, float l ) {
           return t * ( l / max( dot( t, vec3( 0.2126, 0.7152, 0.0722 ) ), 1e-4 ) );
+        }
+        float starHash( vec3 c ) {
+          return fract( sin( dot( c, vec3( 12.9898, 78.233, 45.164 ) ) ) * 43758.5453 );
+        }
+        /* ONE FIELD OF STARS, called twice -- see the note on uStarGrid. Everything a star is comes
+           off the hash of the cell it sits in, so the whole sky is one function of direction and
+           holds still while the camera flies.
+           The core and the halo are both zero by r = 0.45 of a cell: the halo subtracts the value
+           its own falloff has there and the gaussian is four sigma down. Nothing may reach 0.5,
+           which is the distance to the nearest face -- past that a star is clipped by its own cell
+           and the clip is a straight line. */
+        vec3 starLayer( vec3 sdir, float grid, float cut, float gain, float steady,
+                        float coreK, float haloW ) {
+          vec3 cell = floor( sdir * grid );
+          float h = starHash( cell );
+          if ( h <= cut ) return vec3( 0.0 );
+          float r = length( normalize( ( cell + 0.5 ) / grid ) - sdir ) * grid;
+          float core = exp( - r * r * coreK );
+          float halo = max( 0.0, exp( - r * 8.0 ) - 0.0273 ) * haloW;
+          float mag = 0.30 + 0.70 * starHash( cell + 5.57 );
+          float tw = starHash( cell + 43.71 );
+          float amp = tw < steady ? 0.0 : 0.30 + 0.55 * starHash( cell + 61.93 );
+          float rate = 1.3 + 3.4 * starHash( cell + 73.17 );
+          float sc = 1.0 - amp * 0.5 * ( 1.0 + sin( uTime * rate + h * 61.0 ) );
+          /* and they are not all the same white: the blue ones are the hot ones */
+          vec3 hue = mix( vec3( 1.0, 0.87, 0.74 ), vec3( 0.80, 0.88, 1.0 ),
+                          starHash( cell + 91.7 ) );
+          return hue * ( core + halo ) * mag * sc * gain;
         }`)
       /* BEFORE the tone mapping and after the colour is assembled: opaque_fragment is where
          MeshBasicMaterial writes gl_FragColor, and tonemapping_fragment is the next chunk. */
@@ -221,7 +282,7 @@ export function gradeSky(mat: Material): Material {
           float cosT = dot( sdir, uSunDir );
           float horiz = 1.0 - smoothstep( -0.03, 0.40, h_ );
           float zen = smoothstep( 0.06, 0.62, h_ );
-          vec3 c = gl_FragColor.rgb;
+          vec3 c = gl_FragColor.rgb * uGain;
           float lum = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
           c = mix( c, skyTint( uHorizon, lum ), horiz * uGrade * uHorizAmt );
           c = mix( c, skyTint( uZenith, lum ), zen * uGrade * uZenAmt );
@@ -234,6 +295,18 @@ export function gradeSky(mat: Material): Material {
           c += uBurn * az * horiz * uBurnG * uGrade;
           c += ( uWide * pow( max( cosT, 0.0 ), uWideP ) * uWideG
                + uTight * pow( max( cosT, 0.0 ), uTightP ) * uTightG ) * above * uGrade;
+          /* ABOVE THE HORIZON ONLY -- below it the dome runs under the world and a star there is a
+             light in the ground -- AND THINNER LOW DOWN, where there is more air to look through.
+             Two smoothsteps, not one: the second was missed when this was first written from the
+             mockup and the symptom is stars sitting right down on the ridgeline. */
+          float air = smoothstep( -0.14, 0.05, sdir.y ) * smoothstep( 0.02, 0.30, sdir.y );
+          if ( uStars > 0.001 && air > 0.002 ) {
+            vec3 sky = starLayer( sdir, uStarGrid.y, uStarCut.y, uStarFine, uStarTwinkle.y,
+                                  uStarCore.y, uStarHalo.y )
+                     + starLayer( sdir, uStarGrid.x, uStarCut.x, uStarGain, uStarTwinkle.x,
+                                  uStarCore.x, uStarHalo.x );
+            c += sky * uStars * air;
+          }
           gl_FragColor.rgb = c;
         }`)
 
@@ -275,16 +348,57 @@ export const SUN_SIZE = 12000
    disc can only be seen if the sum just OUTSIDE it stays below saturation. At a corona reach of 5
    it ran out to ten degrees and everything within it clipped to white together; at 2 it hugs the
    disc and the limb survives. */
-export function makeSunDisc(): Mesh {
+export interface DiscSpec {
+  /** the disc itself, and the corona around it */
+  core: number
+  mid: number
+  /** the disc's radius across the quad, and how soft its limb is */
+  r: number
+  limb: number
+  /** how hard each part shines, and how far the corona reaches in disc radii */
+  coreG: number
+  coronaG: number
+  coronaR: number
+}
+
+export const SUN_DISC: DiscSpec = {
+  core: 0xfff4e2, mid: 0xffb066, r: 0.155, limb: 0.0119,
+  coreG: 3.6, coronaG: 0.42, coronaR: 2.0,
+}
+
+/* THE MOON IS THE SAME OBJECT WITH COLDER NUMBERS IN IT, which is the mockup's own arrangement and
+   the reason this builder is now general. There is no moon anywhere in `world.glb` and there is not
+   going to be one: this is a light and a disc, which is interface rather than modelling.
+   A little smaller than the sun and a little softer at the limb, with a corona that reaches further
+   for less -- what a bright thing looks like through night air rather than through day haze. */
+export const MOON_DISC: DiscSpec = {
+  core: 0xf4f8ff, mid: 0xc4d4f4, r: 0.150, limb: 0.0090,
+  coreG: 3.2, coronaG: 0.42, coronaR: 2.4,
+}
+
+/* how hard the moon shines, and it is NOT a row of the day palette. The palette is keyed on the
+   SUN's altitude, and the moon's own height is a different number -- low and warm through all that
+   air on the horizon, high and cold once clear of it. */
+export const MOON_GLOW = {
+  /** against the sun's 3.6 at noon -- it may clip */
+  core: 3.2,
+  corona: 0.42,
+  /** high and cold */
+  hi: new Color(0xf4f8ff),
+  /** and on the horizon, through all that air */
+  lo: new Color(0xffe0bc),
+}
+
+export function makeDisc(name: string, o: DiscSpec): Mesh {
   const mat = new ShaderMaterial({
     uniforms: {
-      uCore: { value: new Color(0xfff4e2) },
-      uMid: { value: new Color(0xffb066) },
-      uCoreR: { value: 0.155 },
-      uLimb: { value: 0.0119 },
-      uCoreG: { value: 3.6 },
-      uCoronaG: { value: 0.42 },
-      uCoronaR: { value: 2.0 },
+      uCore: { value: new Color(o.core) },
+      uMid: { value: new Color(o.mid) },
+      uCoreR: { value: o.r },
+      uLimb: { value: o.limb },
+      uCoreG: { value: o.coreG },
+      uCoronaG: { value: o.coronaG },
+      uCoronaR: { value: o.coronaR },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -310,8 +424,28 @@ export function makeSunDisc(): Mesh {
   const m = new Mesh(new PlaneGeometry(1, 1), mat)
   m.scale.set(SUN_SIZE, SUN_SIZE, 1)
   m.frustumCulled = false
-  m.name = 'sun-disc'
+  m.name = name
   return m
+}
+
+export const makeSunDisc = (): Mesh => makeDisc('sun-disc', SUN_DISC)
+/* `sky-moon`, because `INK_SKIP` matches `^sky-` -- the moon is a light in the sky and inking it
+   would put a black ring round it */
+export const makeMoonDisc = (): Mesh => makeDisc('sky-moon', MOON_DISC)
+
+/**
+ * How hard the moon shines, from its OWN altitude rather than the sun's row.
+ *
+ * Dimmer and warmer sitting on the horizon, full strength and cold once clear of the haze -- which
+ * is what atmosphere does to it.
+ */
+export function gradeMoon(disc: Object3D, alt: number): void {
+  const mat = (disc as Mesh).material as ShaderMaterial | undefined
+  if (!mat?.uniforms) return
+  const up = MathUtils.smoothstep(alt, -1.5, 14)
+  mat.uniforms.uCoreG.value = MOON_GLOW.core * (0.42 + 0.58 * up)
+  mat.uniforms.uCoronaG.value = MOON_GLOW.corona * (0.30 + 0.70 * up)
+  ;(mat.uniforms.uCore.value as Color).copy(MOON_GLOW.lo).lerp(MOON_GLOW.hi, up)
 }
 
 /** the disc always faces the camera, which for a body at 50,000 units is a rotation nobody sees */

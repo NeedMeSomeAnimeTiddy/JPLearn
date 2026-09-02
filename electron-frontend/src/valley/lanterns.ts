@@ -1,4 +1,28 @@
-import { Color, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three'
+import { Color, InstancedMesh, Matrix4, Mesh, Object3D, Vector3, type Material } from 'three'
+
+/* ==================================================================================================
+   WHAT A LANTERN NEEDS OF A MATERIAL, AND IT IS NOT A CLASS.
+
+   This used to read `!src.isMeshStandardMaterial` and return. That was true of everything GLTFLoader
+   hands back, and then `cel.ts` arrived and rebuilt the whole world as `MeshToonMaterial` -- which
+   is emphatically not a standard material. Every lantern in the valley was skipped from that moment
+   on, silently: the boot line still printed, because it counts what it found, and it found nothing.
+
+   THE SYMPTOM WAS NOT "THE LANTERNS ARE OFF". It was a per-pixel comparison against the mockup
+   showing this build BRIGHTER on the valley floor (+9.5) while visibly having far fewer lit points
+   in the town -- ambient fill making up for local light that was not there. That is two wrongs
+   reading as one milder wrong, which is why it took a measurement rather than a look.
+
+   This is the second time the same mistake has been found in this port (see `nightmap.ts`) and the
+   rule it teaches is: ask what a material must HAVE, never what it must BE. */
+type Emissive = Material & {
+  name: string
+  emissive: Color
+  emissiveIntensity: number
+  clone(): Emissive
+}
+const isEmissive = (m: unknown): m is Emissive =>
+  !!m && typeof m === 'object' && 'emissive' in m && (m as Emissive).emissive instanceof Color
 
 /* ==================================================================================================
    THE LANTERNS — what makes the mockup's night a place and this port's night an empty valley.
@@ -51,7 +75,7 @@ export const GAIN_STONE = 0.5
 
 /** a material that has been made into a lantern, and what it needs to be turned up */
 export interface LampMat {
-  mat: MeshStandardMaterial
+  mat: Emissive
   gain: number
   /* WHAT BLENDER AUTHORED, IF ANYTHING. An EMIT material or an Emission value set in the model wins
      over the built-in flame colour — the cycle then only decides how far up it is turned. */
@@ -62,6 +86,10 @@ export interface LanternField {
   mats: LampMat[]
   /** how many meshes were caught, for the boot line */
   meshes: number
+  /* AND WHICH ONES, because the bloom pass draws exactly these and nothing else. Collected on the
+     same walk that lights them, so the two can never disagree about what a lamp is -- a second
+     traverse with a second copy of the predicate is how they would. */
+  lit: Object3D[]
   /* WHERE EVERY FLAME IN THE VALLEY IS, collected on the same pass that finds them. Nothing needed
      this while the lanterns were only ever emissive -- but a firefly is only a firefly in the dark,
      so siting one means asking how far the nearest lit thing is, and this walk is already visiting
@@ -86,8 +114,9 @@ export function buildLanterns(root: Object3D): LanternField {
   const mats: LampMat[] = []
   /* KEYED ON THE MATERIAL AND ON WHAT IT IS MADE OF. One source material is shared across both
      kinds here, and a paper lantern and a stone one must not end up sharing a clone. */
-  const swap = new Map<string, MeshStandardMaterial>()
+  const swap = new Map<string, Emissive>()
   const spots: Vector3[] = []
+  const lit: Object3D[] = []
   const _m = new Matrix4()
   const _p = new Vector3()
   let meshes = 0
@@ -97,8 +126,8 @@ export function buildLanterns(root: Object3D): LanternField {
     if (!mesh.isMesh) return
     /* `collapseToInstances` renames what it batches to `inst:<first member>`, so the name test has
        to survive that prefix -- which it does, because it is unanchored. */
-    const src = mesh.material as MeshStandardMaterial | MeshStandardMaterial[]
-    if (Array.isArray(src) || !src?.isMeshStandardMaterial) return
+    const src = mesh.material as Emissive | Emissive[]
+    if (Array.isArray(src) || !isEmissive(src)) return
     /* the material's own name wins: an EMIT slot is a light wherever it has been put */
     const emit = LAMP_EMIT_MAT.test(src.name ?? '')
     if (!emit && (!LAMP_RE.test(o.name) || LAMP_NOT.test(o.name))) return
@@ -119,6 +148,7 @@ export function buildLanterns(root: Object3D): LanternField {
     }
     mesh.material = clone
     meshes++
+    lit.push(mesh)
     /* the placement, not the batch -- `collapseToInstances` leaves the group at the identity and
        puts every member's real position in `instanceMatrix` */
     const inst = mesh as unknown as InstancedMesh
@@ -138,5 +168,5 @@ export function buildLanterns(root: Object3D): LanternField {
   /* out at build time: the day cycle turns them up, and it runs before the first frame */
   setOn(0)
 
-  return { mats, meshes, spots, setOn }
+  return { mats, meshes, spots, lit, setOn }
 }

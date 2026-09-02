@@ -1,7 +1,8 @@
 import {
-  Color, IcosahedronGeometry, InstancedMesh, MathUtils, Matrix4, MeshLambertMaterial,
+  Color, IcosahedronGeometry, InstancedMesh, MathUtils, Matrix4, MeshToonMaterial,
   Quaternion, Scene, Vector3,
 } from 'three'
+import { RAMP_MTN } from './cel'
 
 /* ==================================================================================================
    CLOUDS — the top third of the frame, which has been a flat gradient since phase 0.
@@ -56,7 +57,13 @@ export const CLOUD_Y_HIGH = 10800
    range comes from. And the emissive is the floor the underside falls to -- the mockup found
    0x4a4560 too dark and got grey-blue boulders hanging in the air, so this sits above that, and the
    warm fog at 19,000 units lifts it further toward the sunset it is hanging in. */
-export const CLOUD_COLOUR = 0x8f8b93
+/* WHITE, AND THE QUARTER-ALBEDO WENT WITH LAMBERT. 0x8f8b93 was solved against a smooth diffuse
+   curve -- it put the lit side at the top of that curve instead of past it. These are toon now, on
+   the 64-step landform ramp whose floor is 0.26 and whose exponent is 1.8, which is a different
+   response entirely: the same quarter-albedo under it gives grey putty. The mockup's own clouds are
+   0xfffdfa for exactly this reason, and the pairing of colour and ramp is the thing that cannot be
+   split -- change one and the other is wrong. */
+export const CLOUD_COLOUR = 0xfffdfa
 export const CLOUD_EMISSIVE = 0x6f6a82
 
 /* A RING, NOT A DOME CAP. Anything directly overhead is out of frame at these focal lengths and
@@ -67,7 +74,7 @@ export interface CloudField {
   clusters: InstancedMesh[]
   /* THE UNDERSIDE IS A DAY CHANNEL. Held at a fixed lavender it made every cloud in the midnight
      sky glow pink, which is the one thing a cloud at midnight does not do. */
-  material: MeshLambertMaterial
+  material: MeshToonMaterial
   /** move the whole ring by `dt` seconds — see `driftClouds` */
   drift: (dt: number) => void
   dispose: () => void
@@ -83,12 +90,26 @@ export function hash01(i: number, salt: number): number {
 
 export function buildClouds(scene: Scene, centre: Vector3): CloudField {
   const blob = new IcosahedronGeometry(1, 1)
-  const material = new MeshLambertMaterial({
+  /* TOON, NOT LAMBERT, and on the LANDFORM ramp rather than the four-step one. A cloud wants the
+     same treatment a mountain gets: banded enough to belong to a cel-shaded world, smooth enough
+     that a soft mass does not come apart into four hard steps. Its floor is what stops the
+     underside going black, alongside the emissive. */
+  const material = new MeshToonMaterial({
     color: new Color(CLOUD_COLOUR),
     emissive: new Color(CLOUD_EMISSIVE),
-    flatShading: true,
+    gradientMap: RAMP_MTN,
     fog: true,
   })
+  /* AND THERE IS NO `flatShading` HERE, WHICH IS NOT AN OVERSIGHT ON EITHER SIDE. The mockup's own
+     cloud material asks for it -- `flatShading: true` sits right there in its constructor -- and
+     `MeshToonMaterial` in three 0.185 has no such property, so `setValues` warns once and drops it.
+     Its clouds have been smooth-shaded toon the whole time.
+     Faceting it through the GEOMETRY instead -- `computeVertexNormals` on this non-indexed
+     icosahedron writes a face normal to each of its three vertices -- does work, and was tried, and
+     is not what the mockup renders: measured over the top quarter of the menu frame it took the
+     band's median luminance from 65 to 82 against the mockup's 54, because a faceted blob turns
+     many more of its faces square-on to the key than a smooth one does. The mockup's clouds are
+     smooth toon and that is what these are. */
 
   const clusters: InstancedMesh[] = []
   const m = new Matrix4()

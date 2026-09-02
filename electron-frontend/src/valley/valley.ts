@@ -19,7 +19,8 @@
    flights were.
    ================================================================================================ */
 import {
-  ACESFilmicToneMapping, Color, FogExp2, InstancedMesh, Mesh, PCFShadowMap, PerspectiveCamera, Scene,
+  ACESFilmicToneMapping, BackSide, Color, FogExp2, InstancedMesh, Mesh, PCFShadowMap,
+  PerspectiveCamera, Scene,
   SRGBColorSpace, WebGLRenderer, MathUtils,
   type Material, type BufferGeometry, type Object3D,
 } from 'three'
@@ -32,7 +33,7 @@ import {
 import { DESTINATIONS } from './destinations'
 import {
   FOG_COLOUR, FOG_DENSITY, SKY_U, aimKey, faceSun, gradeDisc, gradeSky, installRig,
-  makeSunDisc, placeSun, updateSkyDir, type Rig,
+  gradeMoon, makeMoonDisc, makeSunDisc, placeSun, updateSkyDir, type Rig,
 } from './lighting'
 import {
   ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, setGlow, sizeShafts, updateSunUv,
@@ -42,6 +43,9 @@ import { buildLanterns, type LanternField } from './lanterns'
 import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
+import { bloomTrack, disposeBloom, renderBloom, setBloomNight, sizeBloom } from './bloom'
+import { celWorld } from './cel'
+import { disposeInk, inkTrackCrowd, renderInk, renderND, sizeInk } from './ink'
 import { buildCrowd, type CrowdField } from './crowd'
 import { buildWalkers, type WalkField } from './walk'
 import { buildLake, lakeShore, type Lake } from './lake'
@@ -107,6 +111,15 @@ let flownTo: MenuSectionKey | null = null
 /* the rig, and the one point in the world everything in it is aimed at */
 let rig: Rig | null = null
 let sunDisc: Mesh | null = null
+let moonDisc: Mesh | null = null
+/* WHICHEVER BODY IS ACTUALLY UP gets the shafts and the halo. The sky's own scattering always
+   follows the SUN, even well below the horizon, because that is what twilight IS -- but a shaft is
+   light coming past something, and at three in the morning the thing it comes past is the moon. */
+let glowBody: Mesh | null = null
+/* scratch, module-level, because the day beat runs every couple of seconds and neither of these
+   should be an allocation */
+const _moonAt = new Vector3()
+const _keyAt = new Vector3()
 let sunAt: Vector3 | null = null
 let clouds: CloudField | null = null
 let lanterns: LanternField | null = null
@@ -154,6 +167,20 @@ let shadowDirty = false
    whole valley does, and the same reason: the only honest way to price a thing is to boot without it */
 const shafts = new URLSearchParams(window.location.search).get('rays') !== 'off'
 const water = new URLSearchParams(window.location.search).get('water') !== 'off'
+/* `?ink=off` -- the outlines cost a whole extra scene pass into a float target, and they are the
+   single biggest thing separating this from the mockup, so they get the switch every other pass has
+   for the same reason: the only honest way to price a pass is to boot the same build without it. */
+const ink = new URLSearchParams(window.location.search).get('ink') !== 'off'
+/* `?bloom=off` -- a quarter-res scene pass plus two blurs, and the only thing that makes a lantern
+   read as a source rather than as a bright polygon. Its own switch for the same reason as the rest. */
+const bloom = new URLSearchParams(window.location.search).get('bloom') !== 'off'
+/* `?cel=off` -- the same switch for the other half of the drawing, so the two can be priced and
+   judged apart. Off, the world renders as the PBR materials GLTFLoader handed over. */
+const cel = new URLSearchParams(window.location.search).get('cel') !== 'off'
+/* AND THE OUTLINES STAND STILL WHEN THE FIGURES DO. The crowd's second prepass exists only to make
+   its outlines follow the idle sway; with motion reduced there is no sway to follow, so the pass is
+   simply not run. */
+const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 /* `?crowd=off` -- a thousand figures on a patched material, and the only honest way to price the
    patch is to boot the same build without it */
 const people = new URLSearchParams(window.location.search).get('crowd') !== 'off'
@@ -389,6 +416,23 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   canvas.style.zIndex = '0'
   canvas.style.display = 'block'
   canvas.style.pointerEvents = 'none'
+  /* ==================================================================================================
+     THE GRADE, AND IT IS A CSS FILTER ON THE CANVAS.
+
+     The world renders through toon ramps and a hemisphere fill that both pull colour toward grey,
+     and there is no post chain here to grade it in -- so the mockup puts it on the canvas element,
+     where it costs nothing and applies to the reflection and the sky as well. Contrast comes up
+     slightly with the saturation, because saturating alone flattens.
+
+     THIS IS THE LAST PIECE OF "IT DOESN'T LOOK LIKE THE MOCKUP", and it hid for a long time behind
+     a measuring mistake of mine. Reading the canvas back with `drawImage` samples the RAW framebuffer
+     and a CSS filter is applied by the COMPOSITOR afterwards, so the two disagree: measured over the
+     top of the frame, the mockup's live canvas came back at 72.1 against this build's 74.7 -- near
+     enough identical -- while the same two frames as SCREENSHOTS were 56.6 and 82.2. Everything I
+     chased before this (the day cycle, the dome's sidedness, the sky gain, the stars, the clouds,
+     the lanterns) was real and needed fixing, but none of it was the 25 levels I was chasing: that
+     was one line of CSS the port never had. */
+  canvas.style.filter = 'saturate(1.34) contrast(1.05)'
   document.body.insertBefore(canvas, document.body.firstChild)
 
   const renderer = new WebGLRenderer({
@@ -458,8 +502,31 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       m.receiveShadow = false
       /* the sky is not geometry as far as the shafts are concerned -- see ATMOS_LAYER */
       m.layers.set(ATMOS_LAYER)
+      /* ==================================================================================================
+         AND THE DOME IS DRAWN FROM THE INSIDE, which it was not. Measured live: `side` came back 0 --
+         FrontSide -- on a sphere 92,000 units across with the camera standing in the middle of it, so
+         every one of its faces was culled and the dome contributed NOTHING to the frame. What looked
+         like a sky was `scene.background`, painted flat with the fog colour, which is why it was one
+         even purple with no horizon in it and why the grade, the gain and the stars all appeared to
+         do nothing at all: they were being computed for a mesh that never reached a pixel.
+
+         The other three come with it, and each has a job:
+           `fog: false`      -- the sky is what the fog fades INTO. Fogging it fogs the fog.
+           `depthWrite: false` and `renderOrder: -1` -- it is a backdrop, so it is drawn first and
+                                writes no depth, and everything else is simply drawn over it.
+         ================================================================================================== */
       const mats = Array.isArray(m.material) ? m.material : [m.material]
-      mats.forEach(gradeSky)
+      m.renderOrder = -1
+      mats.forEach((mat) => {
+        const sky = mat as Material & {
+          side: number; fog: boolean; depthWrite: boolean; needsUpdate: boolean
+        }
+        sky.side = BackSide
+        sky.fog = false
+        sky.depthWrite = false
+        sky.needsUpdate = true
+        gradeSky(mat)
+      })
     } else {
       console.warn('[valley] no SkyDome found in the world; the sky will be flat')
     }
@@ -468,6 +535,28 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   const tInst0 = performance.now()
   const { before, after } = collapseToInstances(root)
   const instanceMs = performance.now() - tInst0
+
+  /* ==================================================================================================
+     THE WORLD BECOMES A DRAWING, AND IT HAPPENS HERE, BEFORE ANYTHING HOLDS A MATERIAL.
+
+     `celWorld` REPLACES every material on every mesh. Five systems in this file capture material
+     references and then write to them for the rest of the run -- the lanterns scale their emission
+     by `lampOn`, the windows keep their own bedtimes, the night bake sets `lightMapIntensity`, the
+     crowd patches an idle displacement in, the wardrobe recolours per instance. Every one of those
+     collected BEFORE this ran would be holding a material that is no longer on any mesh: the writes
+     land, nothing errors, and the lanterns simply never light. Measured exactly that way once --
+     the festival went dark between the frame before this call and the frame after it.
+
+     So it goes immediately after instancing, which is the last thing that touches the graph, and
+     before `letLightThrough` and every build below.
+     ================================================================================================== */
+  if (cel) {
+    const st = celWorld(root)
+    console.info(
+      `[valley] cel: ${st.materials} materials over ${st.meshes} meshes `
+      + `(${st.landform} on the smooth landform ramp, ${st.emissive} carrying an emission)`,
+    )
+  }
 
   letLightThrough(root)
 
@@ -505,6 +594,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     sunDisc.position.copy(sunAt)
     sunDisc.layers.set(ATMOS_LAYER)
     scene.add(sunDisc)
+    moonDisc = makeMoonDisc()
+    moonDisc.layers.set(ATMOS_LAYER)
+    moonDisc.visible = false
+    scene.add(moonDisc)
+    glowBody = sunDisc
     /* the main camera sees the world AND the atmosphere; the mask pass turns this one off */
     camera.layers.enable(ATMOS_LAYER)
     /* THE RING IS CENTRED ON THE VALLEY, NOT ON THE CAMERA. Anchoring it to the eye would make it a
@@ -536,6 +630,17 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     )
 
     lanterns = buildLanterns(root)
+    /* A BOOT LINE, BECAUSE ITS ABSENCE IS WHAT HID A DEAD SYSTEM. Every other build here reports
+       what it found and this one never did -- so when `cel.ts` changed the material class out from
+       under its `isMeshStandardMaterial` guard, every lantern in the valley stopped being found and
+       nothing said so. The town went dark and the only trace was a per-pixel comparison showing
+       this build BRIGHTER than the mockup while visibly having fewer lights in it. */
+    console.info(
+      `[valley] lanterns: ${lanterns.mats.length} materials over ${lanterns.meshes} meshes, `
+      + `${lanterns.spots.length} flames`,
+    )
+    /* and the same meshes are what bleeds -- see `bloom.ts` */
+    if (bloom) bloomTrack(lanterns.lit)
     /* the bake is a NIGHT layer and comes up exactly as the lanterns do */
     nightMap = buildNightMap(root)
 
@@ -559,6 +664,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        that hook rather than replacing it. */
     if (people) {
       crowd = buildCrowd(root)
+      /* the figures go on their own layer so the prepass can render just them, with the same idle
+         displacement their lit material has -- see the note in `ink.ts` */
+      if (ink) inkTrackCrowd(crowd.meshes)
       console.info(
         `[valley] crowd: ${crowd.figures} figures on ${crowd.meshes.length} meshes, `
         + `${crowd.models.length} models, ${crowd.lifted} lifted out of the ground`,
@@ -645,6 +753,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       )
     }
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
+    sizeInk(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
+    sizeBloom(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
     if (rig) applyDay(scene, renderer, rig, sunNow(), fogBase)
@@ -708,6 +818,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     camera.aspect = window.innerWidth / Math.max(1, window.innerHeight)
     camera.updateProjectionMatrix()
     sizeShafts(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
+    sizeInk(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
+    sizeBloom(window.innerWidth, window.innerHeight, Math.min(devicePixelRatio, 2))
     /* the first write, before the first frame, so nothing is ever seen at the wrong hour */
     fogBase = FOG_DENSITY
     if (rig) applyDay(scene, renderer, rig, sunNow(), fogBase)
@@ -733,6 +845,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     const now = performance.now()
     const dt = Math.min(now - last, MAX_STEP_MS)
     last = now
+    /* the twinkle's own clock. Seconds, and it simply accumulates -- a star's phase is its cell's
+       hash, so nothing here has to survive a reload. */
+    SKY_U.uTime.value += dt / 1000
 
     if (live) {
       live.elapsed += dt / 1000
@@ -750,6 +865,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       _eye.set(cam.px, cam.py, cam.pz)
       updateSkyDir(sunAt, _eye)
       if (sunDisc) faceSun(sunDisc, _eye)
+      if (moonDisc?.visible) faceSun(moonDisc, _eye)
     }
 
     /* the sky drifts on the same capped clock as everything else, so a dropped frame slows the
@@ -782,13 +898,18 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     if (cam.roll) camera.rotateZ(MathUtils.degToRad(cam.roll))
     /* WHERE THE SUN IS ON SCREEN IS ASKED ONCE, HERE, because both the mask pass and the overlay
        need it and the mask pass is skipped outright when the answer is "nowhere". */
-    if (sunDisc && shafts) {
-      updateSunUv(sunDisc, camera)
+    if (glowBody && shafts) {
+      updateSunUv(glowBody, camera)
       /* THE SKY MASK IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather
          than after it -- a pending build would otherwise land in this pass instead of the real
          one, which is exactly how the mockup lost every shadow in the valley. */
-      renderSkyMask({ renderer, scene, camera, disc: sunDisc })
+      renderSkyMask({ renderer, scene, camera, disc: glowBody })
     }
+
+    /* THE OUTLINES' PREPASS IS A WHOLE SCENE PASS TOO, and it goes in the same place and for the
+       same reason as the two below it: before the shadow flag is raised, so a pending shadow build
+       cannot land in this render instead of the real one. */
+    if (ink) renderND(renderer, scene, camera, crowd?.meshes ?? [], !reduced)
 
     /* THE MIRROR IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather than
        after it -- a pending build would otherwise land in the reflection instead of the real one,
@@ -800,9 +921,19 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false }
     renderer.render(scene, camera)
 
+    /* THE INK GOES ON OVER THE FINISHED FRAME, and before the glow: the outlines belong to the
+       world's surfaces, the glow belongs to the air in front of them, so a shaft crossing a roofline
+       should wash over the line rather than under it. */
+    if (ink) renderInk(renderer)
+
+    /* THE BLEED GOES ON AFTER THE OUTLINES AND BEFORE THE GLOW. A lantern's outline is part of the
+       lantern, so the bleed washes over it the way it washes over the paper; the sun's halo is the
+       air in front of everything and goes last. */
+    if (bloom) renderBloom(renderer, scene, camera)
+
     /* the glow goes on OVER the finished frame, so the main render still goes straight to the
        canvas and nothing about the colour path changes */
-    if (sunDisc && shafts) renderGlow({ renderer, scene, camera, disc: sunDisc })
+    if (glowBody && shafts) renderGlow({ renderer, scene, camera, disc: glowBody })
   }
   frame()
 
@@ -818,7 +949,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       live = null
       if (rig) { scene.remove(rig.key, rig.key.target, rig.fill, rig.fill.target, rig.hemi); rig = null }
       if (sunDisc) { scene.remove(sunDisc); sunDisc = null }
+      if (moonDisc) { scene.remove(moonDisc); moonDisc = null }
+      glowBody = null
       sunAt = null
+      disposeInk()
+      disposeBloom()
       clouds?.dispose()
       clouds = null
       lanterns = null
@@ -854,6 +989,44 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
   registerFlights({ flyToSection: flyToSectionImpl, flyHome: flyHomeImpl, isFlying: isFlyingImpl })
 
   ;(window as unknown as { __VALLEY__?: ValleyMarks }).__VALLEY__ = marks
+  /* ==================================================================================================
+     A HANDLE ON THE LIVE SCENE, AND IT EARNED ITS PLACE.
+
+     The sky was drawn FrontSide on a sphere the camera stands inside, so the dome contributed nothing
+     to any frame and what looked like a sky was `scene.background` painted flat with the fog colour.
+     That survived the whole port. It survived because nothing about the running world could be
+     ASKED anything: every diagnosis had to be made by reading source and guessing, and the guesses
+     were wrong three times running -- the day palette, then the sky shader, then the camera's layer
+     mask -- while the actual answer was one boolean that a single query would have printed.
+
+     So the renderer, the scene and the camera are reachable. `__VALLEY__` has always carried the
+     load marks; this carries the thing they are marks ABOUT. It costs three references. */
+  ;(window as unknown as { __VALLEY_SCENE__?: unknown }).__VALLEY_SCENE__ = {
+    scene, camera, renderer,
+    /* THE POSE THE CAMERA IS DRIVEN FROM, writable. The frame loop composes the camera out of this
+       every tick, so setting `camera.position` does nothing and setting this does -- which is what a
+       harness needs to put this build and the mockup at the SAME standing point before comparing
+       what they draw. They do not share one by default: the mockup's menu is an authored eye and
+       this composes its own so Fuji lands at a stated place in the frame, and until both were read
+       out loud nobody had noticed they were different shots of the same valley. */
+    pose: cam,
+    /* the sky's own uniforms, so any one of them can be turned over on the running build and the
+       answer read off the frame rather than argued from the source */
+    sky: SKY_U,
+    /* AND THE DAY, which is what everything else is a function of. The sky's brightness, the
+       lanterns, the stars, the fog and the moon are all keyed on one number -- the sun's altitude
+       -- and until this was reachable the only way to ask what it was was to infer it backwards
+       from a pixel. */
+    day: () => {
+      const sun = sunNow()
+      return {
+        site, alt: +sun.alt.toFixed(2), altMax: +sun.altMax.toFixed(2),
+        p: +sun.p.toFixed(3), H0: +sun.H0.toFixed(4),
+        clock: +(new Date().getHours() + new Date().getMinutes() / 60).toFixed(2),
+        skyGain: SKY_U.uGain.value, stars: SKY_U.uStars.value, expo: renderer.toneMappingExposure,
+      }
+    },
+  }
   return marks
 }
 
@@ -891,6 +1064,13 @@ function applyDay(
 
   ATMOS_U.uMistColor.value.copy(c.fogCol).lerp(_mistWhite, 0.35)
 
+  /* THE TWO COLUMNS THE PALETTE HAS COMPUTED SINCE PHASE 3 AND NOTHING EVER READ. `skyGain` is the
+     plain multiplier that makes a midnight sky dark rather than merely blue -- measured against the
+     mockup at the same hour, the port's sky sat at luminance 67 where the mockup's was 46 -- and
+     `stars` is how much of the procedural star field shows through it, 1.30 at midnight and 0 by
+     mid-morning. Both were in the table, interpolated every beat, and thrown away. */
+  SKY_U.uGain.value = n.skyGain
+  SKY_U.uStars.value = n.stars
   SKY_U.uHorizon.value.copy(c.skyHorizon)
   SKY_U.uZenith.value.copy(c.skyZenith)
   SKY_U.uHorizAmt.value = n.skyHorizAmt
@@ -913,11 +1093,56 @@ function applyDay(
     /* the cover's blobs fall along the light, so they swing with it */
     aimCover(sunAt)
   }
+  /* ==================================================================================================
+     THE MOON IS THE SUN'S OPPOSITE, WHICH IS A FULL MOON EVERY NIGHT AND IS A CHOICE.
+
+     Real lunar position is a much longer computation for a body whose whole job here is to be
+     something in the sky at three in the morning and to give the valley an edge to be lit from. A
+     moon that is always full and always opposite the sun is up all night, every night, which is
+     exactly the property this needs.
+
+     AND IT WRAPS IN ITS OWN FRAME, which is the whole of the arithmetic below. `p` is the sun's
+     hour angle rescaled, so it WRAPS -- and a moon written as `p + 0.5` inherits the wrap at the
+     sun's antimeridian instead of its own. Measured in the mockup across one night it went 1.312 at
+     01:00 to -0.291 at 01:30, a step of 1.603, and the moon jumped 17,343 units while sitting 23
+     degrees up in plain view. So: half a turn away in hour angle, then folded back into exactly the
+     window `p` occupies, which puts the wrap at the moon's OWN antimeridian -- the moment it is
+     furthest below the horizon and nobody can see it happen. One turn is pi/H0 in p units, because
+     `p` rescales an angle of 2*H0 to 1.
+     ================================================================================================== */
+  if (moonDisc && homeAim && sunAt) {
+    const per = sun.H0 > 1e-6 ? Math.PI / sun.H0 : 2
+    const pLo = 0.5 - per / 2
+    const mp = pLo + ((((sun.p + per * 0.5 - pLo) % per) + per) % per)
+    const moonAlt = -alt
+    const place = arcPlace(moonAlt, mp)
+    moonDisc.visible = moonAlt > -1.5
+    if (moonDisc.visible) {
+      _moonAt.copy(placeSun(HOME_EYE, homeAim, HOME_FOV, homeAspect, place.u, place.v))
+      moonDisc.position.copy(_moonAt)
+      gradeMoon(moonDisc, moonAlt)
+    }
+    /* whichever is up gets the shafts and the halo */
+    glowBody = alt > -2 ? sunDisc : moonDisc
+
+    /* THE KEY SWINGS FROM ONE TO THE OTHER RATHER THAN SWITCHING, and it does it across the band
+       where it is too dim to watch it happen: full sun above -3 degrees, full moon below -8, a
+       smooth blend between. A directional light that flipped direction at exactly the horizon would
+       swing every shadow in the valley through ninety degrees in one frame. */
+    const toMoon = MathUtils.smoothstep(-alt, 3, 8)
+    if (toMoon > 0.001 && moonDisc.visible) {
+      aimKey(rig.key, _keyAt.copy(sunAt).lerp(_moonAt, toMoon))
+      aimCover(_keyAt)
+    }
+  }
+
   if (clouds) clouds.material.emissive.copy(c.cloudEmis)
   /* THE VALLEY LIGHTS ITSELF AS THE SUN GOES. `lampOn` is 1 below the horizon, 0.85
      through civil twilight, 0.45 at sunrise and out by mid-morning -- lanterns are lit
      before it is properly dark and left on a while after, which is what a town does. */
   lanterns?.setOn(n.lampOn)
+  /* the bleed is the lamps', so it comes up and goes out with them */
+  setBloomNight(n.lampOn)
   petals?.setNight(n.lampOn)
   steam?.setCold(n.lampOn)
   fireflies?.setOn(n.lampOn)
