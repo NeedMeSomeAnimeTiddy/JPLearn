@@ -141,3 +141,124 @@ export function pathWindow(rows: readonly PathRow[], cursor: number): PathWindow
     cursorInWindow: cursor - start,
   }
 }
+
+/* ==================================================================================================
+   THE ROAD — the geometry the mockup's course is drawn on, and the reason it is here rather than in
+   the component.
+
+   Every slot's width, every tablet's scale, depth and opacity, the rail's translation and the
+   marker's position are all functions of DISTANCE FROM THE SELECTION, which changes on every
+   keypress. That makes them arithmetic, not markup, and arithmetic that is wrong by a few pixels
+   is exactly the kind of thing an eye passes and a test catches.
+
+   THE ROAD COMPRESSES TOWARD EACH HORIZON. A slot shrinks with distance -- `csScale` -- so sixteen
+   steps fit a 960-wide strip while the stone you are standing on stays a whole stone. The selected
+   slot is a different width again (`WSEL`), because the card rides in it.
+   ================================================================================================== */
+export const CS = {
+  /** where the first slot starts, inside the rail's own coordinate space */
+  X0: 320,
+  /** an ordinary slot, the selected slot, and the space between two of them */
+  W: 94,
+  WSEL: 290,
+  GAP: 18,
+  /** the tablets sit lower than the card; the rule the marker rides is at the card's foot */
+  TABY: 44,
+  RULE: 373,
+  /** the certification seam, and the two END/START posts */
+  SEAM_W: 18,
+  CAP_W: 26,
+} as const
+
+/* THE STRIP IS INSET TO THE STAGE, and the focus is the middle of the STRIP rather than of the
+   board. The mockup measured `clientWidth / 2` and carries a note about exactly this: measured
+   against the whole frame the selected tablet landed at board 800 instead of 640, and the road sat
+   160px right of the screen it is drawn on. The board is a fixed 1280 here, so the same number is
+   arithmetic rather than a layout read. */
+export const CS_STRIP_INSET = 160
+export const CS_FOCUS = (1280 - 2 * CS_STRIP_INSET) / 2
+
+export const csScale = (d: number): number => Math.max(0.78, 1 - Math.min(d, 5) * 0.055)
+
+/* FOUR CHAPTERS, contiguous, in the course's own order. The boundaries are real: the two scripts,
+   then words and the patterns that join them, then everything you do WITH the language, then the
+   exams -- which are a different kind of thing from a lesson. */
+export const CS_CHAPTERS = [
+  { jp: '基礎', en: 'FOUNDATIONS', from: 0, to: 2 },
+  { jp: '言葉', en: 'WORDS & GRAMMAR', from: 3, to: 5 },
+  { jp: '実践', en: 'IN PRACTICE', from: 6, to: 10 },
+  { jp: '検定', en: 'CERTIFICATION', from: 11, to: 15 },
+] as const
+export const CS_CHNUM = ['一', '二', '三', '四'] as const
+export const csChapter = (i: number): number =>
+  CS_CHAPTERS.findIndex((c) => i >= c.from && i <= c.to)
+
+export const CS_BACK = 'repeating-linear-gradient(135deg, rgba(242,234,216,0.06) 0 7px,'
+  + ' rgba(0,0,0,0) 7px 14px), linear-gradient(rgba(17,19,28,0.9), rgba(11,13,20,0.94))'
+export const CS_FACE = 'linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%)'
+
+/* A TABLET HAS ROOM FOR A TOKEN, NOT A SENTENCE. The gate is authored as plain words ("all 46
+   characters", "80% of it") because that is what the card says; ninety-four pixels wants the short
+   form of the same fact, so it is DERIVED rather than authored twice and cannot drift. */
+export function csToken(meta: string): string {
+  const m = String(meta || '').toUpperCase()
+  let x = m.match(/(\d+)\s*%/)
+  if (x) return `${x[1]}%`
+  x = m.match(/(\d+)\s+CHARACTERS/)
+  if (x) return `${x[1]} CHARS`
+  x = m.match(/(\d+)\s+WORDS/)
+  if (x) return `${x[1]} WORDS`
+  if (/ONCE/.test(m)) return 'ONCE'
+  if (/EVERY SCENE/.test(m)) return 'ALL SCENES'
+  const seg = m.split('·').map((t) => t.trim()).filter(Boolean)
+  const pick = seg.find((t) => /\d/.test(t)) || seg[seg.length - 1] || m
+  return pick.split(' ').slice(0, 3).join(' ')
+}
+
+/* the exams carry their level as a figure of its own, so the tablet reads N5 under the number
+   rather than squeezing "JLPT N5" into a vertical column */
+export interface CsBits { lv: string; en: string; vjp: string; tok: string }
+export function csBits(row: PathRow): CsBits {
+  const lv = (row.en.match(/^JLPT\s+(N[1-5])$/) || [])[1] || ''
+  return { lv, en: lv ? 'JLPT' : row.en, vjp: lv ? '検定' : row.jp, tok: csToken(row.want) }
+}
+
+export interface CourseSlots {
+  lefts: number[]
+  centers: number[]
+  /** where the certification post stands, or null when the road has no such boundary */
+  seamX: number | null
+  /** the far end of the road, where the END post goes */
+  end: number
+}
+
+/** every slot's place along the rail, given which one is selected */
+export function courseSlots(rows: readonly PathRow[], sel: number): CourseSlots {
+  const n = rows.length
+  /* the seam is DERIVED rather than counted -- the first exam is where certification starts */
+  const certAt = rows.findIndex((r) => /^jlpt/.test(r.id))
+  const lefts: number[] = []
+  const centers: number[] = []
+  let seamX: number | null = null
+  let x = CS.X0
+  for (let i = 0; i < n; i++) {
+    if (i) x += CS.GAP
+    if (i === certAt && i > 0) { seamX = x; x += CS.SEAM_W + CS.GAP }
+    const w = i === sel ? CS.WSEL : Math.round(CS.W * csScale(Math.abs(i - sel)))
+    lefts.push(x)
+    centers.push(x + w / 2)
+    x += w
+  }
+  return { lefts, centers, seamX, end: x }
+}
+
+/** how far along the road the learner actually stands, between this step and the next */
+export function courseMark(
+  rows: readonly PathRow[], centers: readonly number[],
+): { x: number; pct: number } {
+  const cur = Math.max(0, rows.findIndex((r) => r.state === 'here'))
+  const next = centers[Math.min(cur + 1, rows.length - 1)] ?? centers[cur] ?? 0
+  const here = centers[cur] ?? 0
+  const pct = Math.max(0, rows[cur]?.pct ?? 0)
+  return { x: here + (next - here) * (pct / 100), pct }
+}

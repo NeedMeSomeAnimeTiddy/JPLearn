@@ -80,15 +80,12 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
   return (
     <div className="mn-open" ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>記録</b><i>YOU</i>
-          <s>{loading ? 'READING THE YEAR' : `${L.year.active} ACTIVE DAYS`}</s>
-        </div>
+        <div className="lg-wrap">
 
         {/* THE GHOST IS THE WHOLE IDEA OF THIS DRAWING: your best run set in the same face at the
             same weight and fifteen percent ink, so the current number is read against it without a
             second scale, a second axis or a word of explanation. */}
-        <div className="lg-streak lg-plate">
+        <div className="lg-f lg-streak lg-plate">
           <span className="lg-cap">
             <b>連続 STREAK</b><i>A DAY COUNTS WHEN YOU REVIEW</i>
           </span>
@@ -128,11 +125,16 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
 
         {/* ONE BAR IS A WEEK. Height is volume and colour is accuracy, so both channels are on the
             screen at once — a contribution grid has one square per day and can carry only one. */}
-        <div className="lg-year lg-plate">
+        <div className="lg-f lg-year lg-plate">
           <span className="lg-cap">
+            {/* the caption is where "still counting" belongs now that the screen has no heading
+                of its own: a year drawn as 0 of 365 while the window is still open is a lie the
+                plate itself tells, so the plate is what corrects it */}
             <b>
-              一年 THE YEAR · {L.year.active} OF {L.year.total} DAYS
-              {L.year.reviews ? ` · ${L.year.reviews.toLocaleString()} REVIEWS` : ''}
+              {loading
+                ? '一年 THE YEAR · STILL COUNTING'
+                : `一年 THE YEAR · ${L.year.active} OF ${L.year.total} DAYS`
+                  + (L.year.reviews ? ` · ${L.year.reviews.toLocaleString()} REVIEWS` : '')}
             </b>
             <i>ONE BAR IS A WEEK · HEIGHT IS VOLUME, COLOUR IS ACCURACY</i>
           </span>
@@ -151,7 +153,7 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
         </div>
 
         {L.level ? (
-          <div className="lg-lv">
+          <div className="lg-f lg-lv">
             <span className="lg-lvn"><span>LEVEL 等級</span><b>{L.level.level}</b></span>
             <span className="lg-xp">
               <span className="lg-xprow">
@@ -170,7 +172,7 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
             that shows them today. */}
         <button
           type="button"
-          className="lg-ach"
+          className="lg-f lg-ach"
           onClick={onOpenAchievements}
           aria-label={`Achievements — ${earned} of ${total} earned`}
         >
@@ -182,8 +184,17 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
           <em>{earned} / {total} EARNED · SEE THEM ▸</em>
         </button>
 
-        <button type="button" className="pj-back" onClick={onUp}>← THE MENU</button>
-        <div className="mn-hint">ENTER OPENS THE ACHIEVEMENTS · ESC GOES BACK</div>
+        </div>
+
+        <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
+        </div>
+        <div className="hints">
+          <span><b>ENTER</b>Badges<em>賞</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

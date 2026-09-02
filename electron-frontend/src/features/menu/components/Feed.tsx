@@ -70,24 +70,27 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
   const kanji = here ? wordKanji(here) : null
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div
+      className="mn-open"
+      ref={rootRef}
+      tabIndex={-1}
+      role="group"
+      aria-label={`${title.en} ${title.jp}`}
+    >
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>{title.jp || '語彙'}</b><i>{title.en}</i>
-          <s>{feed.loading && !feed.words.length
-            ? 'READING TODAY’S WORDS…'
-            : `${feed.total.toLocaleString()} WORDS IN THIS LEVEL · NOT CUT INTO BLOCKS`}</s>
-        </div>
-
+        {/* the hero's cap and the today panel already say which level this is and how many words
+            are in it, so the heading at the top of the stage was the third statement of it */}
         {feed.error ? <div className="pj-empty">{feed.error.toUpperCase()}</div> : null}
+        {feed.loading && !feed.words.length && !feed.error
+          ? <div className="pj-empty">READING TODAY’S WORDS…</div> : null}
 
         {!feed.error ? (
           <>
-            <div className="fd-row">
+            <div className="fd-wrap">
               {/* THE WORD AT THE FRONT OF THE QUEUE */}
               <button
                 type="button"
-                className={`fd-hero${at === 0 ? ' on' : ''}`}
+                className={`fd-f fd-hero${at === 0 ? ' on' : ''}`}
                 onFocus={() => setAt(0)}
                 onClick={onStart}
                 aria-label={here
@@ -134,8 +137,20 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
               </button>
 
               {/* THE METER THAT REPLACED THE BLOCK GATE */}
-              <div className="fd-side">
-                <span className="fd-sh">今日 · HOW MANY NEW WORDS A DAY</span>
+              <div className="fd-today">
+                <span className="fd-cap"><b>今日 TODAY</b><i>NEW WORDS A DAY</i></span>
+                {/* THE PANEL'S HEADLINE FIGURE. `next_words` returns what has not been started, so
+                    this is what is queued rather than what is left of a day's ration -- the app has
+                    no "done today" to subtract. The line under it says which. */}
+                <span className="fd-count">
+                  <b>{head.queued}</b>
+                  <span>
+                    <em>{head.queued === 1 ? 'WORD QUEUED' : 'WORDS QUEUED'}</em>
+                    <i>
+                      {feed.budget === 0 ? 'NO NEW WORDS SET' : `BUDGET IS ${feed.budget} A DAY`}
+                    </i>
+                  </span>
+                </span>
                 <span className="fd-steps">
                   {VOCAB_BUDGET_STEPS.map((step, k) => (
                     <button
@@ -152,11 +167,11 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
                     </button>
                   ))}
                 </span>
-                <span className="fd-note">{feedNote(feed)}</span>
+                <span className="fd-steplab">{feedNote(feed)}</span>
 
                 {/* THE DENOMINATORS. "Here are ten words" is a card trick without them, and these
                     three are the bridge's own counts — clearing a kanji block moves the first two. */}
-                <span className="fd-denom">
+                <span className="fd-denom three">
                   <span>
                     <b>{feed.readable.toLocaleString()} / {feed.total.toLocaleString()}</b>
                     <i>READABLE WITH THE KANJI YOU KNOW</i>
@@ -200,8 +215,16 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
           </>
         ) : null}
 
-        <button type="button" className="pj-back" onClick={onUp}>← THE PATH</button>
-        <div className="mn-hint">← → THE BUDGET · ↑ ↓ READ THE QUEUE · ENTER PICKS · ESC GOES BACK</div>
+                <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
+        </div>
+        <div className="hints">
+          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>ENTER</b>Open<em>決定</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

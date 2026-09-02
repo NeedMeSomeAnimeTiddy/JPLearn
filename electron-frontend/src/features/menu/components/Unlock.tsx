@@ -96,7 +96,10 @@ export function Unlock({ moment, onContinue }: UnlockProps) {
         >
           <em>NOTHING ELSE IS WAITING</em><b>CONTINUE ▸</b>
         </button>
-        <div className="mn-hint">ENTER CONTINUES</div>
+        <div className="hints">
+          <span><b>ENTER</b>Open<em>決定</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

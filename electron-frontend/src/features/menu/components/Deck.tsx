@@ -90,22 +90,31 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
   const revisiting = pick >= 0
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    /* the deck's name is not drawn as a heading -- the open block's cap says it -- but a screen
+       reader announcing this screen has not reached that cap yet */
+    <div
+      className="mn-open"
+      ref={rootRef}
+      tabIndex={-1}
+      role="group"
+      aria-label={`${title.en} ${title.jp}`}
+    >
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>{title.jp || '教材'}</b><i>{title.en}</i>
-          <s>{loading && !chain.blocks.length ? 'READING THE DECK…' : railLine(chain)}</s>
-        </div>
-
+        {/* THE SCREEN'S OWN CAPTION IS THE HERE-CARD'S. `.dk-cap` on the open block already says
+            which deck this is and where in it you are standing, so the heading at the top of the
+            stage was the same sentence a second time -- and on this screen it landed on the cards.
+            What it uniquely carried, the deck's whole-chain line, moves to the rail cap. */}
         {/* an absence is drawn as an absence: a deck that did not answer is not an empty deck */}
         {error ? <div className="pj-empty">{error.toUpperCase()}</div> : null}
+        {loading && !chain.blocks.length && !error
+          ? <div className="pj-empty">READING THE DECK…</div> : null}
         {!error && !loading && !chain.blocks.length ? (
           <div className="pj-empty">THIS DECK IS NOT CUT INTO BLOCKS</div>
         ) : null}
 
         {chain.blocks.length && here ? (
           <>
-            <div className="dk-row">
+            <div className="dk-wrap">
               {/* BEHIND YOU — a pile with a count, not a list. The list is the sheet. */}
               <button
                 type="button"
@@ -240,11 +249,15 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
           </div>
         ) : null}
 
-        <button type="button" className="pj-back" onClick={onUp}>← THE PATH</button>
-        <div className="mn-hint">
-          {sheet
-            ? '← → MOVE · ↑ ↓ PAGE · ENTER STUDIES IT AGAIN · ESC CLOSES THE PILE'
-            : '← → THE PILE AND THE OPEN BLOCK · ENTER STARTS · ESC GOES BACK'}
+                <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
+        </div>
+        <div className="hints">
+          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>ENTER</b>Open<em>決定</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
         </div>
       </div>
     </div>

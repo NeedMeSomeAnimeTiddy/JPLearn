@@ -158,3 +158,51 @@ export function railStep(layout: RailLayout, sel: number, direction: 1 | -1): nu
   if (here < 0) return list[0]
   return list[Math.max(0, Math.min(list.length - 1, here + direction))]
 }
+
+/* ==================================================================================================
+   THE FIVE GROUPS' JAPANESE, which the app's own metadata does not carry.
+
+   `MINIGAME_SKILL_GROUP_META` has a title, a helper and an order for each group and no Japanese at
+   all -- so the chapter blocks over the road, and the glyph on the hero card, have nothing to draw
+   from. The mockup authored these for the same five keys; this is that copy, keyed by the app's own
+   group id rather than by position, so the day a sixth group is added it renders with its English
+   name and no Japanese instead of taking the wrong group's.
+
+   Same arrangement as `PATH_COPY` in `pathL2.ts`: the backend owns the list and its order, this
+   table supplies only the words the backend has no field for.
+   ================================================================================================== */
+export interface DrillGroupCopy { jp: string; glyph: string }
+
+const DRILL_GROUP_COPY: Record<string, DrillGroupCopy> = {
+  recognition: { jp: '認識', glyph: '認' },
+  recall: { jp: '想起', glyph: '想' },
+  listening: { jp: '聴解', glyph: '聴' },
+  challenge: { jp: '挑戦', glyph: '挑' },
+  mixed: { jp: '混合', glyph: '混' },
+}
+
+export const CHAPTER_NUM = ['一', '二', '三', '四', '五', '六', '七', '八'] as const
+
+export const groupCopy = (key: string): DrillGroupCopy =>
+  DRILL_GROUP_COPY[key] ?? { jp: '', glyph: '' }
+
+/* ==================================================================================================
+   WHAT IS OFF EACH END, AND THE STRIP UNDER THE ROAD.
+
+   The road shows nine stones at most -- the one you are on and four either side -- so anything past
+   that is counted rather than drawn, the same way the course's road counts what is behind and ahead.
+   ================================================================================================== */
+export const RAIL_REACH = 4
+
+export function railEnds(layout: RailLayout): { lo: number; hi: number } {
+  return {
+    lo: Math.max(0, layout.at - RAIL_REACH),
+    hi: Math.max(0, layout.list.length - 1 - layout.at - RAIL_REACH),
+  }
+}
+
+/** how far a stone is from the selection along the OFFERED list, or null when it is folded away */
+export function railDistance(layout: RailLayout, i: number): number | null {
+  if (!layout.offered[i]) return null
+  return Math.abs(layout.list.indexOf(i) - layout.at)
+}

@@ -119,25 +119,43 @@ afterEach(() => {
    anywhere else, and is the reason this file survives, is the soft gate: a locked step asks once,
    then opens. That crosses the feature hook, the shared warning modal and App's routing, so it is
    tested against the real App rather than a component. */
+/* THE PATH IS A ROAD NOW, so a step is a tablet on it rather than a row in a list -- and reaching
+   one is the mockup's two-step: the first press selects the stone, the second walks through it. */
 function step(name: string): HTMLButtonElement {
-  const rows = Array.from(document.querySelectorAll('.pj-row')) as HTMLButtonElement[]
+  const rows = Array.from(document.querySelectorAll('.cs-tab')) as HTMLButtonElement[]
   const match = rows.find((r) => (r.getAttribute('aria-label') ?? '').includes(name.toUpperCase()))
   if (!match) {
-    throw new Error(`No path row for "${name}". Have: ${rows.map((r) => r.getAttribute('aria-label')).join(' | ')}`)
+    throw new Error(`No path tablet for "${name}". Have: ${rows.map((r) => r.getAttribute('aria-label')).join(' | ')}`)
   }
   return match
+}
+
+/* SELECT THE TABLET, THEN PRESS IT -- pointing is not choosing on this road. But the road OPENS on
+   the step the learner is standing on, so that one is already selected and the first press walks
+   straight through it. Pressing blind a second time then throws, because there is no road left to
+   find a tablet on. So: press, and press again only if we are still standing on it. */
+function walkTo(name: string): void {
+  fireEvent.click(step(name))
+  if (document.querySelector('.cs-strip')) fireEvent.click(step(name))
 }
 
 async function openThePath(): Promise<void> {
   render(<App />)
   await screen.findByRole('button', { name: /open shortcuts/i })
-  fireEvent.click(await screen.findByRole('button', { name: /THE PATH —/i }))
-  await waitFor(() => expect(document.querySelector('.pj-list')).not.toBeNull())
+  /* HOVER SELECTS, A CLICK ON THE SELECTED ONE GOES -- the mockup's two-step, so a mouse never
+     enters a section it only crossed. And a hover only counts once the pointer has actually moved
+     (`useHoverPick`, which stops a moving list dragging the selection off the keyboard's choice),
+     so a synthetic `mouseEnter` with no `pointermove` behind it is correctly ignored. Two presses
+     is what a keyboard-less caller has: the first selects, the second opens. */
+  const path = await screen.findByRole('button', { name: /THE PATH —/i })
+  fireEvent.click(path)
+  fireEvent.click(path)
+  await waitFor(() => expect(document.querySelector('.cs-strip')).not.toBeNull())
 }
 
 /** the path is gone, which means the step opened something */
 async function leftThePath(): Promise<void> {
-  await waitFor(() => expect(document.querySelector('.pj-list')).toBeNull())
+  await waitFor(() => expect(document.querySelector('.cs-strip')).toBeNull())
 }
 
 describe('opening a node', () => {
@@ -153,7 +171,7 @@ describe('opening a node', () => {
 
   it('goes straight through when the step is already open', async () => {
     await openThePath()
-    fireEvent.click(step('Hiragana'))
+    walkTo('Hiragana')
 
     await leftThePath()
     expect(confirmModal()).toBeNull()
@@ -161,7 +179,7 @@ describe('opening a node', () => {
 
   it('asks for confirmation before opening a gated step', async () => {
     await openThePath()
-    fireEvent.click(step('Basic Kanji (N5)'))
+    walkTo('Basic Kanji (N5)')
 
     await waitFor(() => expect(confirmModal()).not.toBeNull())
     expect(confirmModal()?.textContent).toContain('Basic Kanji (N5)')
@@ -170,18 +188,18 @@ describe('opening a node', () => {
 
   it('stays on the path when the confirmation is declined', async () => {
     await openThePath()
-    fireEvent.click(step('Basic Kanji (N5)'))
+    walkTo('Basic Kanji (N5)')
     await waitFor(() => expect(confirmModal()).not.toBeNull())
 
     fireEvent.click(modalButton(/go back/i))
 
     await waitFor(() => expect(confirmModal()).toBeNull())
-    expect(document.querySelector('.pj-list')).not.toBeNull()
+    expect(document.querySelector('.cs-strip')).not.toBeNull()
   })
 
   it('remembers the choice so a step is only ever asked about once', async () => {
     await openThePath()
-    fireEvent.click(step('Basic Kanji (N5)'))
+    walkTo('Basic Kanji (N5)')
     await waitFor(() => expect(confirmModal()).not.toBeNull())
     fireEvent.click(modalButton(/continue anyway/i))
 
@@ -195,7 +213,7 @@ describe('opening a node', () => {
     window.localStorage.setItem(PROGRESSION_OVERRIDES_STORAGE_KEY, JSON.stringify(['kanji_n5']))
 
     await openThePath()
-    fireEvent.click(step('Basic Kanji (N5)'))
+    walkTo('Basic Kanji (N5)')
 
     await leftThePath()
     expect(confirmModal()).toBeNull()
@@ -207,19 +225,23 @@ describe('opening a node', () => {
        view -- so an OPEN milestone reached its level three and a GATED one, once confirmed, did
        not. Same row, two destinations, decided by whether a dialog happened to appear. */
     await openThePath()
-    fireEvent.click(step('Hiragana'))
+    walkTo('Hiragana')
     await leftThePath()
-    expect(document.querySelector('.pj-cap')?.textContent).toContain('HIRAGANA')
+    /* THE SCREEN'S OWN LABEL, not a caption. The deck screen names itself in the open block's cap
+       -- but a deck the fixture gives no blocks draws no cards to carry one, and this test is about
+       WHERE a step sends you rather than about what the deck holds. The label is on the screen
+       itself and is there either way. */
+    expect(document.querySelector('.mn-open')?.getAttribute('aria-label')).toContain('HIRAGANA')
 
     cleanup()
     window.localStorage.clear()
 
     await openThePath()
-    fireEvent.click(step('Basic Kanji (N5)'))
+    walkTo('Basic Kanji (N5)')
     await waitFor(() => expect(confirmModal()).not.toBeNull())
     fireEvent.click(modalButton(/continue anyway/i))
     await leftThePath()
-    expect(document.querySelector('.pj-cap')?.textContent).toContain('BASIC KANJI (N5)')
+    expect(document.querySelector('.mn-open')?.getAttribute('aria-label')).toContain('KANJI')
   })
 })
 
@@ -232,6 +254,6 @@ describe('when progression data is unavailable', () => {
 
     /* the menu still stands; the path simply has nothing to walk */
     await waitFor(() => expect(document.querySelector('.mn-frame')).not.toBeNull())
-    expect(document.querySelector('.pj-list')).toBeNull()
+    expect(document.querySelector('.cs-strip')).toBeNull()
   })
 })

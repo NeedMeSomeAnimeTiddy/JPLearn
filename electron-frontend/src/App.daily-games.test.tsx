@@ -155,7 +155,12 @@ describe('Daily Games navigation', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     await backAtTheMenu()
 
-    fireEvent.click(await screen.findByRole('button', { name: /PRACTICE —/i }))
+    /* the L1 row's two-step: the first press selects, the second opens. A synthetic `mouseEnter`
+       does not stand in for the first, because a hover only counts after a real `pointermove` --
+       see `useHoverPick`. */
+    const practice = await screen.findByRole('button', { name: /PRACTICE —/i })
+    fireEvent.click(practice)
+    fireEvent.click(practice)
     fireEvent.click(await screen.findByRole('button', { name: /DAILY GAMES —/i }))
     expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))

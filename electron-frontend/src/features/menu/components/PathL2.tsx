@@ -1,6 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { ProgressionNodeView } from '../../progression'
-import { hereIndex, pathRows, pathWindow } from '../pathL2'
+import {
+  CS, CS_BACK, CS_CHAPTERS, CS_CHNUM, CS_FACE, CS_FOCUS,
+  courseMark, courseSlots, csBits, csChapter, csScale, hereIndex, pathRows,
+} from '../pathL2'
+import type { PathRow } from '../pathL2'
+import { MENU_SECTIONS } from '../constants'
+import { useHoverPick } from '../useHoverPick'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -12,15 +19,47 @@ export interface PathL2Props {
   onUp: () => void
 }
 
+/* ==================================================================================================
+   THE PATH, LEVEL TWO — a walked road, which is what the mockup draws and what the first port did
+   not. That version was a vertical list of six rows with a fold count at each end. This is sixteen
+   standing tablets on a rail that compresses toward both horizons, the card riding the one you are
+   on, a marker showing how far between this step and the next you have got, and a minimap of the
+   whole sixteen under it.
+
+   THE LAYOUT IS INLINE STYLE ON PURPOSE. Everything here is a function of distance from the
+   selection and changes on every keypress, so it cannot live in the stylesheet -- the mockup writes
+   the same numbers into `cssText` for the same reason. What CAN rest is in `menu.css`; the
+   arithmetic is in `pathL2.ts`, where it is testable.
+   ================================================================================================== */
+
+/** how the road opens: a tablet's opacity by how far it is from the one you are on */
+const FADE = [1, 1, 0.92, 0.72, 0.45]
+const DIM = 'rgba(222,214,189,0.55)'
+
+type Status = 'done' | 'current' | 'locked'
+const statusOf = (row: PathRow): Status =>
+  row.state === 'done' ? 'done' : row.state === 'here' ? 'current' : 'locked'
+
+/** where a step hands off to, and the colour that section wears */
+function handOff(row: PathRow): { label: string; accent: string | null } | null {
+  if (!row.goesTo || row.goesTo === 'A DECK') return null
+  const section = MENU_SECTIONS.find((s) => s.label === row.goesTo)
+  return { label: row.goesTo, accent: section?.accent ?? null }
+}
+
 export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const rows = useMemo(() => pathRows(nodes), [nodes])
 
+
   /* the cursor starts where the learner actually is, not at the top -- opening the journey on
      step one when you are on step nine would be starting a story you are halfway through */
   const [cursor, setCursor] = useState<number | null>(null)
-  const at = cursor ?? hereIndex(rows)
+  const at = Math.max(0, Math.min(cursor ?? hereIndex(rows), rows.length - 1))
+  /* walking the road translates the rail, so a tablet slides under a stationary pointer whose
+     `mouseenter` would drag the selection back. See `useHoverPick`. */
+  const hover = useHoverPick(setCursor)
 
   useEffect(() => {
     if (cursor === null && rows.length) setCursor(hereIndex(rows))
@@ -39,21 +78,24 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
   /* THE SCREEN TAKES FOCUS WHEN IT ARRIVES, or its own arrow keys do nothing. The listener below
      is on this subtree rather than on the window — deliberately, so the menu never eats the arrows
      a study session needs — but a subtree only receives keydown when focus is inside it, and after
-     a click on the level above, focus is on <body>. Measured live: two ArrowDowns moved the cursor
-     nowhere at all. `tabIndex={-1}` makes the container focusable without putting it in the tab
-     order, which is the same thing a dialog does. */
+     a click on the level above, focus is on <body>. `tabIndex={-1}` makes the container focusable
+     without putting it in the tab order, which is the same thing a dialog does.
+
+     LEFT AND RIGHT, BECAUSE THE ROAD IS HORIZONTAL NOW. The up/down pair is kept as well: it is
+     what the hint bar promised for three phases and what a hand already on the arrows will try. */
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
     node.focus({ preventScroll: true })
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown') {
+      const walk = (d: 1 | -1) => {
         event.preventDefault()
-        setCursor((c) => Math.min((c ?? at) + 1, rows.length - 1))
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        setCursor((c) => Math.max((c ?? at) - 1, 0))
-      } else if (event.key === 'Enter') {
+        hover.keyed()
+        setCursor((c) => Math.max(0, Math.min((c ?? at) + d, rows.length - 1)))
+      }
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') walk(1)
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') walk(-1)
+      else if (event.key === 'Enter') {
         event.preventDefault()
         const row = rows[at]
         if (row) onOpenNode(row.id)
@@ -61,68 +103,343 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, rows, onOpenNode])
+  }, [at, rows, onOpenNode, hover])
 
-  const win = pathWindow(rows, at)
+  const n = rows.length
+  const { centers, seamX, end } = useMemo(() => courseSlots(rows, at), [rows, at])
+  const mark = useMemo(() => courseMark(rows, centers), [rows, centers])
   const done = rows.filter((r) => r.state === 'done').length
+  const sel = rows[at]
+  const chapter = Math.max(0, csChapter(at))
+  const chap = CS_CHAPTERS[chapter]
+
+  const selStatus = sel ? statusOf(sel) : 'locked'
+  const selUp = selStatus !== 'locked'
+  const selHand = sel ? handOff(sel) : null
+  const selDead = !!sel && !sel.goesTo
+
+  /* the card's big slot is Japanese and CJK glyphs are one em wide, so the size is the card's 250px
+     divided by the count -- capped at the 66 one- and two-character names are drawn at, floored at
+     28 where mincho stops being mincho */
+  const bigJp = sel?.jp ?? ''
+  const bigSize = bigJp ? Math.max(28, Math.min(66, Math.floor(250 / (bigJp.length * 1.06)))) : 0
+
+  const slabLine = !sel ? ''
+    : selDead ? 'NOTHING HERE YET'
+      : selStatus === 'locked' ? 'LOCKED'
+        : selHand ? `GO TO ${selHand.label} ▸`
+          : selStatus === 'current' ? 'START THIS STEP ▸' : 'REVISIT THIS STEP ▸'
+  const slabLive = !selDead && selStatus !== 'locked'
 
   return (
     <div className="mn-open" ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>道</b><i>THE PATH</i>
-          <s>{loading && !rows.length
-            ? 'READING THE CURRICULUM…'
-            : `${done} OF ${rows.length} MILESTONES BEHIND YOU`}</s>
-        </div>
-
-        {/* an absence is drawn as an absence: no curriculum is not an empty list */}
-        {!loading && !rows.length ? (
-          <div className="pj-empty">THE CURRICULUM DID NOT ANSWER · NOTHING TO WALK YET</div>
+        {/* an absence is drawn as an absence, and "still reading" is not the same absence as
+            "answered with nothing" -- a road with no tablets on it must say which */}
+        {!n ? (
+          <div className="pj-empty">
+            {loading
+              ? 'READING THE CURRICULUM…'
+              : 'THE CURRICULUM DID NOT ANSWER · NOTHING TO WALK YET'}
+          </div>
         ) : null}
 
-        <div className="pj-list">
-          {win.behind > 0 ? <div className="pj-fold">▲ {win.behind} BEHIND</div> : null}
+        {n ? (
+          <div className="course-wrap">
+            <div className="cs-chapline">
+              <span className="cs-chaplead">THE PATH 道</span>
+              <s>/</s>
+              <span className="cs-chapnow">
+                {`${CS_CHNUM[chapter]} ${chap.jp} ${chap.en}`}
+              </span>
+            </div>
 
-          {win.rows.map((row, index) => {
-            const isCursor = index === win.cursorInWindow
-            const classes = ['pj-row', `is-${row.state}`]
-            if (isCursor) classes.push('on')
-            if (!row.isOpen) classes.push('shut')
-            return (
-              <button
-                key={row.id}
-                type="button"
-                className={classes.join(' ')}
-                onFocus={() => setCursor(win.behind + index)}
-                onClick={() => onOpenNode(row.id)}
-                aria-label={`${row.no} ${row.en}${row.isOpen ? '' : ' — not open yet'}`}
+            <div className="cs-strip">
+              <div
+                className="cs-rail"
+                style={{ transform: `translateX(${Math.round(CS_FOCUS - centers[at])}px)` }}
               >
-                <span className="pj-no">{row.no}</span>
-                <span className="pj-name">
-                  <span className="pj-en">{row.en}</span>
-                  <span className="pj-jp">{row.jp}</span>
-                </span>
-                <span className="pj-want">
-                  {row.state === 'done' ? 'DONE' : row.want || '—'}
-                  {row.isOverridden ? ' · OPENED EARLY' : ''}
-                </span>
-                <span className="pj-bar" aria-hidden="true">
-                  <i style={{ width: `${row.pct}%` }} />
-                </span>
-                <span className="pj-figs">
-                  <b>{row.count || `${row.pct}%`}</b>
-                  <em>{row.goesTo || 'STEP'}</em>
-                </span>
-              </button>
-            )
-          })}
+                {rows.map((row, i) => {
+                  const status = statusOf(row)
+                  const isSel = i === at
+                  const d = Math.abs(i - at)
+                  const faceUp = status !== 'locked'
+                  const dead = !row.goesTo
+                  const op = isSel ? 0 : FADE[d] ?? 0
+                  /* DIRECTION, DRAWN. What is finished sinks and takes a small shadow; what is
+                     ahead stands proud of the road and casts a long one, so behind and ahead stop
+                     being mirror images of each other. */
+                  const dep = status === 'done'
+                    ? { y: 9, sh: '3px 4px 0 rgba(0,0,0,0.32)' }
+                    : { y: -6, sh: '6px 9px 0 rgba(0,0,0,0.5)' }
+                  const keyline = faceUp ? 'rgba(20,17,13,0.2)' : 'rgba(242,234,216,0.16)'
+                  const bits = csBits(row)
+                  const hand = handOff(row)
+                  const style: CSSProperties = {
+                    left: Math.round(centers[i] - CS.W / 2),
+                    top: CS.TABY,
+                    opacity: op,
+                    pointerEvents: isSel || op < 0.1 ? 'none' : 'auto',
+                    background: faceUp ? CS_FACE : CS_BACK,
+                    boxShadow: `${dep.sh}, inset 0 0 0 1px ${keyline}`,
+                    border: dead ? '1px dashed rgba(242,234,216,0.3)' : undefined,
+                    transform: `skewX(-8deg) rotate(-1.2deg) translateY(${dep.y}px)`
+                      + ` scale(${isSel ? 0.94 : csScale(d)})`,
+                    transitionDelay: `${Math.min(d, 3) * 14}ms`,
+                  }
+                  const destStyle: CSSProperties = hand && hand.accent
+                    ? { background: hand.accent, color: 'var(--washi)' }
+                    : dead
+                      ? faceUp
+                        ? {
+                          background: 'rgba(20,17,13,0.14)',
+                          borderBottom: '1px dashed rgba(20,17,13,0.45)',
+                          color: 'rgba(20,17,13,0.55)',
+                        }
+                        : {
+                          background: 'rgba(242,234,216,0.07)',
+                          borderBottom: '1px dashed rgba(242,234,216,0.34)',
+                          color: 'rgba(222,214,189,0.62)',
+                        }
+                      : faceUp
+                        ? { background: 'var(--ink)', color: 'var(--gold-hi)' }
+                        : { background: 'rgba(242,234,216,0.13)', color: 'var(--gold-hi)' }
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className="cs-tab"
+                      data-state={row.state}
+                      style={style}
+                      onMouseEnter={() => hover.pick(i)}
+                      onFocus={() => hover.pick(i)}
+                      onClick={() => (i === at ? onOpenNode(row.id) : setCursor(i))}
+                      aria-label={`${row.no} ${row.en}${row.isOpen ? '' : ' — not open yet'}`}
+                    >
+                      <span className="cs-dest" style={destStyle}>
+                        {hand ? `→ ${hand.label}` : dead ? 'NOT BUILT' : 'DECK'}
+                      </span>
+                      <b className="cs-num" style={{ color: faceUp ? 'var(--ink)' : 'rgba(242,234,216,0.66)' }}>
+                        {row.no}
+                      </b>
+                      <span
+                        className="cs-hair"
+                        style={{
+                          width: faceUp ? 30 : 16,
+                          background: faceUp ? 'rgba(20,17,13,0.4)' : 'rgba(242,234,216,0.4)',
+                        }}
+                      />
+                      {bits.lv ? (
+                        <b className="cs-lv" style={{ color: faceUp ? 'var(--hi-deep)' : '#f2ead8' }}>
+                          {bits.lv}
+                        </b>
+                      ) : null}
+                      <span
+                        className="cs-vjp"
+                        data-lat={/[぀-ヿ一-龯]/.test(bits.vjp) ? '0' : '1'}
+                        style={{ color: faceUp ? 'var(--ink)' : 'rgba(232,224,203,0.78)' }}
+                      >
+                        {bits.vjp}
+                      </span>
+                      <span
+                        className="cs-gate"
+                        style={{ color: faceUp ? 'rgba(20,17,13,0.62)' : 'rgba(242,234,216,0.62)' }}
+                      >
+                        {bits.tok}
+                      </span>
+                      <span
+                        className="cs-glyph"
+                        data-seal={status === 'done' ? '1' : '0'}
+                        style={status === 'done' ? undefined : {
+                          color: status === 'current' ? 'var(--hi-deep)' : 'rgba(242,234,216,0.52)',
+                        }}
+                      >
+                        {status === 'done' ? '済'
+                          : status === 'current' ? 'YOU ARE HERE'
+                            : dead ? 'NOT YET' : 'LOCKED'}
+                      </span>
+                    </button>
+                  )
+                })}
 
-          {win.ahead > 0 ? <div className="pj-fold">▼ {win.ahead} AHEAD</div> : null}
+                <span className="cs-cap start" style={{ left: Math.round(centers[0] - CS.W / 2 - CS.GAP - CS.CAP_W), top: CS.TABY }}>
+                  <b>START</b>
+                </span>
+                {seamX != null ? (
+                  <span className="cs-cap seam" style={{ left: Math.round(seamX), top: CS.TABY }}>
+                    <b>CERTIFICATION</b>
+                  </span>
+                ) : null}
+                <span className="cs-cap end" style={{ left: Math.round(end + CS.GAP), top: CS.TABY }}>
+                  <b>END</b>
+                </span>
+
+                {/* HIDDEN WHEN THE CARD IS STANDING ON IT. The marker rides the rule at the card's
+                    foot, and when you are on the step the card is already saying the same number in
+                    its gauge -- so it steps aside rather than competing. */}
+                <span
+                  className="cs-mark"
+                  style={{
+                    left: Math.round(mark.x) - 4,
+                    top: CS.RULE - 7,
+                    opacity: Math.abs(mark.x - centers[at]) < CS.WSEL / 2 + 10 ? 0 : 1,
+                  }}
+                >
+                  <i>{mark.pct}%</i>
+                </span>
+
+                {sel ? (
+                  <button
+                    type="button"
+                    className="cs-hero"
+                    style={{
+                      left: Math.round(centers[at] - CS.WSEL / 2),
+                      top: 0,
+                      background: selUp ? 'var(--washi)' : CS_BACK,
+                      boxShadow: '6px 8px 0 rgba(0,0,0,0.5), inset 0 0 0 1px '
+                        + (selUp ? 'rgba(20,17,13,0.15)' : 'rgba(242,234,216,0.14)'),
+                      border: !selUp && selDead ? '1px dashed rgba(242,234,216,0.4)' : undefined,
+                    }}
+                    onClick={() => onOpenNode(sel.id)}
+                  >
+                    <span
+                      className="cs-htab"
+                      style={selHand && selHand.accent
+                        ? { background: selHand.accent, color: 'var(--washi)' }
+                        : selUp
+                          ? { background: 'var(--ink)', color: 'var(--gold-hi)' }
+                          : { background: 'rgba(242,234,216,0.13)', color: 'var(--gold-hi)' }}
+                    >
+                      {selHand ? `→ ${selHand.label}` : selDead ? 'NOT BUILT' : 'DECK'}
+                    </span>
+                    <span className="cs-hhead">
+                      <span className="cs-hnum" style={{ color: selUp ? 'var(--ink)' : DIM }}>
+                        {sel.no}
+                      </span>
+                    </span>
+                    <span
+                      className="cs-hjp"
+                      data-lat={bigJp ? '0' : '1'}
+                      style={{
+                        fontSize: bigSize ? `${bigSize}px` : undefined,
+                        color: selUp ? 'var(--ink)' : 'rgba(230,222,200,0.72)',
+                      }}
+                    >
+                      {bigJp || sel.en}
+                    </span>
+                    <span className="cs-hen" style={{ color: selUp ? 'var(--hi-deep)' : DIM }}>
+                      {sel.en}
+                    </span>
+                    <span className="cs-hfoot">
+                      <span className="cs-gaterow">
+                        <span
+                          className="cs-gatelabel"
+                          style={{ color: selUp ? 'rgba(20,17,13,0.45)' : 'rgba(242,234,216,0.45)' }}
+                        >
+                          {selStatus === 'current' ? 'GATE TO CLEAR'
+                            : selStatus === 'done' ? 'CLEARED'
+                              : selDead ? 'NOT BUILT YET' : 'LOCKED UNTIL'}
+                        </span>
+                        <span
+                          className="cs-gateval"
+                          style={{ color: selUp ? 'rgba(20,17,13,0.8)' : 'rgba(242,234,216,0.78)' }}
+                        >
+                          {selDead ? '—' : sel.want || '—'}
+                          {sel.isOverridden ? ' · OPENED EARLY' : ''}
+                        </span>
+                      </span>
+                      <span
+                        className="cs-gaugerow"
+                        style={{ display: selStatus === 'current' ? 'flex' : 'none' }}
+                      >
+                        <span className="cs-segs">
+                          {Array.from({ length: 12 }, (_, k) => (
+                            <i
+                              key={k}
+                              style={{
+                                background: k < Math.round((12 * Math.max(0, sel.pct)) / 100)
+                                  ? 'var(--gold)'
+                                  : selUp ? 'rgba(20,17,13,0.12)' : 'rgba(242,234,216,0.12)',
+                                boxShadow: `inset 0 0 0 1px ${selUp ? 'rgba(20,17,13,0.18)' : 'rgba(242,234,216,0.16)'}`,
+                              }}
+                            />
+                          ))}
+                        </span>
+                        <b className="cs-pct" style={{ color: selUp ? 'var(--hi-deep)' : 'var(--gold-hi)' }}>
+                          {Math.max(0, sel.pct)}%
+                        </b>
+                      </span>
+                    </span>
+                    <span
+                      className="cs-hseal"
+                      style={{ display: selStatus === 'done' ? 'block' : 'none' }}
+                    >
+                      済
+                    </span>
+                    <span className="cs-slabwrap">
+                      <span
+                        className="cs-slab"
+                        style={{ background: slabLive ? 'var(--hi)' : 'rgba(12,10,8,0.72)' }}
+                      >
+                        <i style={{
+                          color: slabLive ? '#ffd9a1' : 'rgba(242,234,216,0.62)',
+                          fontWeight: slabLive ? 700 : 600,
+                          letterSpacing: slabLive ? '0.16em' : '0.14em',
+                        }}>
+                          {slabLine}
+                        </i>
+                      </span>
+                    </span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <span className="cs-side lo" style={{ opacity: at ? 1 : 0.14 }}>
+              <i /><i /><i><b>{at}</b><u>BEHIND</u></i>
+            </span>
+            <span className="cs-side hi" style={{ opacity: n - 1 - at ? 1 : 0.14 }}>
+              <i /><i /><i><b>{n - 1 - at}</b><u>AHEAD</u></i>
+            </span>
+
+            <div className="cs-mini">
+              <span className="cs-minibars">
+                {rows.map((row, i) => {
+                  const d = Math.abs(i - at)
+                  return (
+                    <i
+                      key={row.id}
+                      title={`${i + 1}. ${row.en}`}
+                      style={{
+                        width: [26, 21, 17, 13][d] ?? 10,
+                        height: [36, 28, 22, 16][d] ?? 12,
+                        background: row.state === 'done' ? 'var(--gold)'
+                          : row.state === 'here' ? 'var(--gold-hi)' : 'rgba(242,234,216,0.26)',
+                        boxShadow: i === at ? '0 0 0 3px var(--hi)' : undefined,
+                      }}
+                    />
+                  )
+                })}
+              </span>
+              <span className="cs-minitext">
+                <span className="cs-cleared">{done} {done === 1 ? 'STEP' : 'STEPS'} CLEARED</span>
+                <s>·</s>
+                <em className="cs-togo">{Math.max(0, n - done - 1)} TO GO</em>
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
         </div>
-
-        <button type="button" className="pj-back" onClick={onUp}>← THE MENU</button>
-        <div className="mn-hint">↑ ↓ WALK · ENTER OPENS THE STEP · ESC GOES BACK</div>
+        <div className="hints">
+          <span><b>← →</b>Walk<em>歩く</em></span>
+          <span><b>ENTER</b>Open<em>決定</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

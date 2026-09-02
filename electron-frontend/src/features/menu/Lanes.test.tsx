@@ -105,7 +105,8 @@ describe('the lanes screen', () => {
 
   it('goes back up a level', () => {
     show(practiceLanes(summary(2)))
-    fireEvent.click(screen.getByText('← THE MENU'))
+    /* the back control is the mockup's washi tab in the corner now, not a gold line at the top */
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }))
     expect(onUp).toHaveBeenCalled()
   })
 

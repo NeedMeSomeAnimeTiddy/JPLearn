@@ -64,7 +64,12 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
           <s>{loading ? 'READING YOUR MASTERY' : `${rungs.length} LEVELS`}</s>
         </div>
 
-        <div className="ascent">
+        {/* `.as-wrap`, NOT `.ascent`. Both are in the mockup and only one of them is this screen's:
+            `.ascent` is a flow-positioned box sized `calc(100vw / var(--u))`, which measures the
+            WINDOW -- correct where it sat, wrong inside a centred 1280x720 board, where it would
+            run off whichever edge the letterboxing put it nearest. `.as-wrap` is the absolute
+            inset-0 container the mockup's own ascent markup emits. */}
+        <div className="as-wrap">
           <span className="as-tick" style={{ top: ASCENT_TOP }}>100</span>
           <span className="as-tick" style={{ top: ASCENT_BOT }}>0</span>
 
@@ -156,8 +161,16 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
         <div className="as-note">
           検定 · A BAR IS MASTERY, NOT STUDY — THREE CORRECT REVIEWS AND A 21-DAY INTERVAL, PER CARD
         </div>
-        <button type="button" className="pj-back" onClick={onUp}>← THE MENU</button>
-        <div className="mn-hint">← → CHOOSE A LEVEL · ENTER OPENS · ESC GOES BACK</div>
+                <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
+        </div>
+        <div className="hints">
+          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>ENTER</b>Open<em>決定</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

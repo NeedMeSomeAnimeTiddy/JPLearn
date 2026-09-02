@@ -83,7 +83,8 @@ describe('the scenes screen', () => {
 
   it('goes back up to the lane it came from', () => {
     show()
-    fireEvent.click(screen.getByText('← THE WORLD'))
+    /* the back control is the mockup's washi tab in the corner now, not a gold line at the top */
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }))
     expect(onUp).toHaveBeenCalled()
   })
 

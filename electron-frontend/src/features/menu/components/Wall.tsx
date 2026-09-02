@@ -103,8 +103,15 @@ export function Wall({ onUp }: WallProps) {
           </div>
         ) : null}
 
-        <button type="button" className="pj-back" onClick={onUp}>← THE LEDGER</button>
-        <div className="mn-hint">← → EVERY SEAL · ↑ ↓ JUMP A GROUP · ESC GOES BACK</div>
+                <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
+        </div>
+        <div className="hints">
+          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

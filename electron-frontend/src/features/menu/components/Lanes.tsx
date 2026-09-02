@@ -57,13 +57,12 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
   }, [at, lanes, onPick])
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    /* THE SECTION'S NAME IS NOT DRAWN TWICE. The note under the cards already opens with it --
+       "練習 · NOTHING NEW IS TAUGHT HERE" -- which is where the mockup puts it, so the heading that
+       said the same thing at the top of the stage is gone. It stays as the region's accessible
+       name, because a screen reader has no note to have read yet when it announces the screen. */
+    <div className="mn-open" ref={rootRef} tabIndex={-1} role="group" aria-label={`${en} ${jp}`}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>{jp}</b><i>{en}</i>
-          <s>{lanes.length} LANES</s>
-        </div>
-
         <div className={lanes.length === 2 ? 'lanes two' : 'lanes'}>
           {lanes.map((lane, index) => {
             const classes = ['pr-lane']
@@ -118,8 +117,16 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
         </div>
 
         <div className="pr-note">{note}</div>
-        <button type="button" className="pj-back" onClick={onUp}>← THE MENU</button>
-        <div className="mn-hint">← → CHOOSE · ENTER OPENS · ESC GOES BACK</div>
+        <div className="back-tab">
+          <button type="button" onClick={onUp}>
+            <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
+          </button>
+        </div>
+        <div className="hints">
+          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>ENTER</b>Open<em>決定</em></span>
+          <span><b>ESC</b>Back<em>戻る</em></span>
+        </div>
       </div>
     </div>
   )

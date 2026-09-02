@@ -107,23 +107,26 @@ describe('the path, built from the live curriculum', () => {
 describe('the path screen', () => {
   it('opens on the step the learner is on', async () => {
     render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
-    await waitFor(() => expect(document.querySelector('.pj-row.on')).not.toBeNull())
-    expect(document.querySelector('.pj-row.on .pj-en')?.textContent).toBe('HIRAGANA')
+    await waitFor(() => expect(document.querySelector('.cs-hero')).not.toBeNull())
+    expect(document.querySelector('.cs-hero .cs-hen')?.textContent).toBe('HIRAGANA')
   })
 
-  it('counts what is behind you in the caption', () => {
+  it('counts what is behind you, on the strip under the road', () => {
+    /* the count moved off a caption and onto the minimap, which is where the mockup puts it -- the
+       caption sat at the top of the stage and the road's tablets stand on top of that */
     render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
-    expect(screen.getByText(/1 OF 10 MILESTONES BEHIND YOU/)).toBeTruthy()
+    expect(document.querySelector('.cs-cleared')?.textContent).toBe('1 STEP CLEARED')
+    expect(document.querySelector('.cs-togo')?.textContent).toBe('8 TO GO')
   })
 
   it('walks with the arrows and opens with Enter', async () => {
     render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
     const root = document.querySelector('.mn-open') as HTMLElement
-    await waitFor(() => expect(document.querySelector('.pj-row.on')).not.toBeNull())
+    await waitFor(() => expect(document.querySelector('.cs-hero')).not.toBeNull())
 
     fireEvent.keyDown(root, { key: 'ArrowDown' })
     fireEvent.keyDown(root, { key: 'ArrowDown' })
-    await waitFor(() => expect(document.querySelector('.pj-row.on .pj-en')?.textContent).toBe('VOCABULARY N5'))
+    await waitFor(() => expect(document.querySelector('.cs-hero .cs-hen')?.textContent).toBe('VOCABULARY N5'))
 
     fireEvent.keyDown(root, { key: 'Enter' })
     expect(onOpenNode).toHaveBeenCalledWith('vocabulary_n5')
@@ -142,13 +145,14 @@ describe('the path screen', () => {
 
   it('goes back up a level', () => {
     render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
-    fireEvent.click(screen.getByText('← THE MENU'))
+    /* the back control is the mockup's washi tab in the corner now, not a gold line at the top */
+    fireEvent.click(screen.getByRole('button', { name: /Back/ }))
     expect(onUp).toHaveBeenCalled()
   })
 
   it('has no accessibility violations', async () => {
     render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
-    await waitFor(() => expect(document.querySelector('.pj-row.on')).not.toBeNull())
+    await waitFor(() => expect(document.querySelector('.cs-hero')).not.toBeNull())
 
     const results = await (axe as {
       run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
