@@ -112,6 +112,16 @@ describe('the wall', () => {
     expect(groups.reduce((a, g) => a + g.earned, 0)).toBe(1)
   })
 
+  it('names each group in something short enough to fit the slot it is drawn in', () => {
+    /* `.bw-lab` is 186px and holds the Japanese, the English and the count on ONE baseline.
+       'HOW FAR YOU HAVE COME' needed 189 of it: the label wrapped, the row's label block doubled
+       from 19px to 38, and the count broke across two lines as "1 /" over "9". Measured live, at
+       this face the English runs about 5.9px per character and the rest of the row takes 73, so
+       eighteen characters is the whole budget. The mockup's own labels here were single words.
+       A length check is a poor substitute for measuring type, but it is the one that runs. */
+    for (const group of sealGroups([])) expect(group.en.length).toBeLessThanOrEqual(18)
+  })
+
   it('carries the catalog\'s sentence as what the badge takes', () => {
     /* the description IS the requirement, so an unearned seal has something to say without a
        second field being invented for it */

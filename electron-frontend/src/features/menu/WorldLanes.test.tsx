@@ -54,6 +54,7 @@ const build = (over: Partial<Parameters<typeof worldLanes>[0]> = {}) => worldLan
 function show(lanes = build()) {
   render(
     <Lanes
+      section="READING"
       jp="実践" en="THE WORLD" note="NOTE"
       lanes={lanes} onPick={onPick} onUp={onUp}
     />,
@@ -67,6 +68,18 @@ afterEach(() => {
 })
 
 describe('what the world lanes are made of', () => {
+  it('wears its own name, not the other lane screen\'s', () => {
+    /* `Lanes` is one component and two screens, and its heading slab was hard-coded to
+       `screenHead('DRILLS', null)` -- so THE WORLD's two lanes stood under 練 PRACTICE 練習 in
+       PRACTICE's red. The one thing the slab exists to say, said wrong, on half the screens that
+       carry it. The section is a prop now, and this is what stops it becoming a constant again. */
+    show()
+    expect(document.querySelector('.pj-mark')?.textContent).toBe('実')
+    expect(document.querySelector('.pj-title b')?.textContent).toBe('THE WORLD')
+    expect((document.querySelector('.pj-cap') as HTMLElement).style.getPropertyValue('--pj-accent'))
+      .toBe('#4f9d6b')
+  })
+
   it('counts the texts rather than stating them', () => {
     expect(build()[0].fig).toBe(String(LIBRARY.length))
   })

@@ -147,7 +147,8 @@
 .stat-chip.shu { background: var(--hi); color: var(--washi); transform: skewX(-8deg) rotate(1deg); }
 .stat-chip.shu b { color: #ffd9a1; }
 .stat-chip:hover { filter: brightness(1.08); }
-.stat-chip.open { filter: brightness(0.9); }
+/* `is-open`, which is the class the component actually writes; `.open` matched nothing */
+.stat-chip.is-open { filter: brightness(0.9); }
 .stat-chip .mut { opacity: 0.5; }
 /* the same object as the app titlebar's XP track, at chip scale */
 .stat-chip .xp-track {
@@ -295,7 +296,9 @@
 .sh-fig b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 44px;
   line-height: 0.9; color: var(--ink); }
 .sh-fig span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sh-fig em { font-style: normal; font-family: var(--lat); font-style: italic; font-weight: 900;
+/* italic, and only italic -- a vestigial `font-style: normal` used to sit first in this rule,
+   copied from `.sh-fig i` beside it, doing nothing but making the declaration read both ways */
+.sh-fig em { font-family: var(--lat); font-style: italic; font-weight: 900;
   font-size: 16px; line-height: 1.05; color: #b23320; }
 .sh-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
   letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
@@ -554,6 +557,27 @@
 /* the app's own gradient would paint straight over the valley, so the shell goes transparent
    while the menu is the front door -- and only then */
 .app-shell.mn-showing { background: transparent; box-shadow: none; }
+
+/* ==================================================================================================
+   AND THE MENU STANDS DOWN WHILE A MODAL IS UP.
+
+   The brand, the four chips and the key hints are drawn on `view === 'home'` and nothing else --
+   which was right when the only thing over them was another menu screen, and wrong the moment a
+   dialog opened on top. The scrim dims them; it does not remove them, and the hints bar goes on
+   advertising "ENTER Confirm" and "/ Look up" over a Control Panel where neither key does anything.
+
+   `:has` RATHER THAN A PROP, deliberately. The alternative is threading an "is any overlay open"
+   boolean through App.tsx from six separate pieces of state -- settings, overview, the tutor panel,
+   the palette, the cheat sheet, the close dialog -- and the seventh overlay somebody adds would be
+   missing from it. Every one of them mounts a `.modal-backdrop` as a sibling of the menu, so asking
+   the DOM cannot fall out of step with the state the way a hand-maintained list can.
+
+   OPACITY, NOT `display`. The menu is mid-flight often enough that tearing its subtree out and
+   putting it back would restart every entrance animation on the way out of a dialog. */
+.app-shell-scroll:has(> .modal-backdrop) .mn-open {
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* ==================================================================================================
    THE SCREEN ARRIVES RATHER THAN APPEARING.
@@ -836,8 +860,6 @@ body.in-flight .pj-cap { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) tra
 
 .as-lockbox { position: absolute; left: 11px; right: 11px; top: 118px; text-align: center; }
 
-.as-lockbox { left: 7px; right: 7px; }
-
 .as-lockbox b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
   letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.5); }
 
@@ -1057,6 +1079,19 @@ body.in-flight .pj-cap { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) tra
 .lv-mode u { margin-top: auto; text-decoration: none; font-family: var(--lat-ui);
   font-weight: 700; font-size: 8px; letter-spacing: 0.15em;
   color: rgba(20, 17, 13, 0.4); }
+
+/* AND THE SENTENCE UNDER IT, WHICH HAD NO RULE AT ALL.
+   The mockup's card was a glyph, a name, a purpose and a `<u>` label. The real one drops the glyph
+   and adds `<em>{m.description}</em>` -- the app's own copy for each mode, out of `JLPT_MODE_META`
+   -- and nothing in this file has ever mentioned `em` inside `.lv-mode`. So it inherited: `.lv-mode`
+   sets `font: inherit` to reset the button, which lands the description on the page's 16px body
+   face, 1.45x the 11px heading directly above it and 2x the 8px label beside it. Three lines of it
+   at that size needs 116px in a 98px card, so DIAGNOSTIC's last line printed on the world below.
+   Clamped at three, because the copy belongs to the backend and a fourth line would do it again. */
+.lv-mode em { margin-top: 5px; font-style: normal; font-family: var(--lat-ui);
+  font-weight: 600; font-size: 9px; line-height: 1.35; letter-spacing: 0.02em;
+  color: rgba(20, 17, 13, 0.6);
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 
 .lv-mode.moves u { color: rgba(20, 17, 13, 0.62); }
 
@@ -2371,7 +2406,11 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   background: var(--gold); font-family: var(--jp); font-style: normal; font-size: 14px;
   color: var(--ink); }
 
-.lg-frz u { margin-left: auto; text-decoration: none; color: rgba(20, 17, 13, 0.8); }
+/* `em`, AND IT USED TO SAY `u`. `Ledger.tsx` renders `<em>` here and no `<u>` exists inside
+   `.lg-frz` anywhere, so this rule matched nothing -- which cost the caption its `margin-left: auto`
+   and left it jammed against the freeze tiles instead of pushed to the plate's right edge, in the
+   browser's italic, at the container's dimmer alpha. A rename that stopped at the markup. */
+.lg-frz em { margin-left: auto; font-style: normal; color: rgba(20, 17, 13, 0.8); }
 
 /* ---- the other three figures ---- */
 .lg-rest { position: absolute; left: 745px; top: 34px; width: 362px; height: 210px;
@@ -2392,8 +2431,19 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    See `ledgerSheet` for what goes on it. Laid over the plates rather than beside them, because the
    figure it is expanding is the thing it should be covering -- an inset panel would make you read
    the number and the breakdown as two separate claims. */
+/* INSET: 0 IS THE BOARD, AND THE BOARD IS NOT THE SCREEN. This sits inside `.mn-frame`, which is
+   1,280 by 720 of design pixels centred in the window -- so `inset: 0` dimmed exactly that rectangle
+   and left the letterbox, the brand, the four chips and the heading slab at full brightness around
+   it. What you saw was a grey box on the valley with lit margins, not a screen going dim.
+   The frame's own coordinates can still reach the window, and this file already does it in three
+   other places: `100vw / var(--lk-u)` is the window's width measured in design pixels, and half the
+   difference from 1,280 is how far left of the board its left edge is. */
 .lg-scrim {
-  position: absolute; inset: 0; z-index: 20; border: 0; padding: 0; margin: 0;
+  position: absolute; z-index: 20; border: 0; padding: 0; margin: 0;
+  left: calc((1280px - 100vw / var(--lk-u, 1)) / 2);
+  top: calc((720px - 100vh / var(--lk-u, 1)) / 2);
+  width: calc(100vw / var(--lk-u, 1));
+  height: calc(100vh / var(--lk-u, 1));
   background: rgba(12, 10, 8, 0.55); cursor: pointer;
   animation: lgScrim 0.18s ease both;
 }
@@ -2541,60 +2591,21 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-badges span { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
   letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
 
-/* THE OVERLAY IS EMITTED OUTSIDE THE LEDGER, as a child of `.hud` -- which is `position:
-   fixed` across the whole frame and carries no zoom of its own. Drawn inside `.ledger` it
-   inherited that block's zoom AND its box, which starts under the heading slab and stops above
-   the caption strip: the scrim then dimmed the middle of the screen and left the head and the
-   foot lit. `.lg-frame` is the design-pixel canvas the sheet is positioned on, zoomed as one
-   piece the way `.chrome` is, so the sheet is placed in 1280x720 coordinates at any size. */
-.lg-open { position: absolute; inset: 0; z-index: 40; }
+/* ==================================================================================================
+   AN EARLIER COPY OF THIS SHEET USED TO SIT HERE, AND IT WAS THE ONE THAT RENDERED.
 
-.lg-scrim { position: absolute; inset: 0; background: rgba(8, 11, 18, 0.62); border: 0; }
+   Two full `.lg-scrim` / `.lg-sheet` / `.lg-cap` / `.lg-strip` / `.lg-line` / `.lg-note` blocks were
+   in this file at the same specificity -- the design above, written for HEAD, and an older copy 150
+   lines below it. Source order is the only tiebreaker with no `@media` in the way, so the OLDER one
+   won all twenty-one properties they shared: the sheet drew at the old `top: 205px`, the old flat
+   `--washi`, a 74px strip instead of 42, 24px figures instead of 19. Everything visible about the
+   new design was dead and only its entrance animation survived, because that was the one thing the
+   old copy had no opinion about.
 
-.lg-frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
-  zoom: var(--lk-u, 1); pointer-events: none; }
-
-.lg-frame > * { pointer-events: auto; }
-
-/* frame space, like the deck's sheet -- centred on the STAGE rather than on the frame,
-   so a modal opens where the screen under it lives */
-.lg-sheet { position: absolute; left: 310px; top: 205px; width: 660px;
-  display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
-  background: var(--washi);
-  box-shadow: 12px 14px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
-
-.lg-sheet > .lg-cap { background: #e0913a; color: var(--ink); font-size: 10px;
-  letter-spacing: 0.2em; padding: 7px 18px 8px; }
-
-.lg-sheet > .lg-cap i { color: rgba(20, 17, 13, 0.6); }
-
-.lg-strip { display: flex; align-items: flex-end; gap: 2px; height: 74px;
-  padding: 14px 20px 0; }
-
-.lg-strip i { flex: 1; display: block; min-height: 2px;
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14); }
-
-.lg-strip i.none { background: rgba(20, 17, 13, 0.13); box-shadow: none; }
-
-.lg-stripcap { display: flex; justify-content: space-between; padding: 5px 20px 0;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
-  color: rgba(20, 17, 13, 0.45); }
-
-.lg-line { display: flex; align-items: baseline; justify-content: space-between;
-  padding: 11px 20px; box-shadow: inset 0 -1px 0 rgba(207, 164, 92, 0.6); }
-
-.lg-line b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.55); white-space: nowrap; }
-
-.lg-line i { font-style: normal; font-family: var(--lat); font-weight: 900;
-  font-size: 24px; line-height: 1; color: var(--ink); }
-
-.lg-line.off b, .lg-line.off i { color: rgba(20, 17, 13, 0.32); }
-
-.lg-line i.got { color: #b23320; }
-
-.lg-note { padding: 12px 20px 14px; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 10px; line-height: 1.7; letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.6); }
+   Its comment argued for a `.lg-open` / `.lg-frame` wrapper that would let the scrim escape the
+   board. That markup was never written -- neither class appears anywhere outside this file -- so the
+   argument is answered below instead, on the scrim itself, in the frame's own coordinates.
+   ================================================================================================== */
 
 /* THE BADGES WERE PIPS INSIDE `.lg-lv`, which made the doorway to a whole screen a
    decoration on a different figure -- and an unaddressable one, because `.lg-lv` is
@@ -3792,11 +3803,20 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .un-card.on .w s { color: var(--ink); }
 
+/* TWO CHILDREN, WHERE THE MOCKUP SET ONE STRING. Its slab was `textContent = 'GO TO THE PATH ·
+   ENTER'`; this one carries an `<em>` and a `<b>`, and `place-items: center` on a grid puts each in
+   its own implicit ROW -- so a 40px slab drew two stacked lines, the first in the browser's italic
+   because nothing here had ever needed to say otherwise. `grid-auto-flow: column` puts them back on
+   the one line the slab was drawn for. */
 .un-slab { position: absolute; left: 452px; top: 356px; width: 648px; height: 40px;
-  display: grid; place-items: center; transform: skewX(-8deg);
+  display: grid; grid-auto-flow: column; gap: 12px; place-items: center;
+  transform: skewX(-8deg);
   background: var(--hi); box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45);
   font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.17em;
   color: #ffd9a1; white-space: nowrap; }
+
+/* the reassurance is the quieter half of the pair; the action keeps the full cream */
+.un-slab em { font-style: normal; color: rgba(255, 217, 161, 0.7); }
 
 
 
@@ -3917,7 +3937,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    is called. "Voiced G + Z" tells you less than か・が・き・ぎ does.
 
    Set in the mincho at the size the sub-line takes, so it reads as part of the name rather than as
-   another figure. */
+   another figure.
+ */
 .dk-chars {
   margin-top: 5px;
   font-family: var(--jp); font-weight: 400; font-size: 15px; letter-spacing: 0.08em;
@@ -4117,8 +4138,15 @@ body.is-dragging { user-select: none; }
    it covers the whole board, including the corner the chips sit in -- so with the chips as spans
    nobody noticed and the moment they became buttons every click on one was swallowed by the row
    list underneath. Playwright named it exactly: "<div class=\"mn-standing\"> intercepts pointer
-   events". The bar is chrome; chrome sits over the screen it describes. */
-.stats { position: absolute; z-index: 30; }
+   events". The bar is chrome; chrome sits over the screen it describes.
+
+   Z-INDEX ONLY. This rule used to carry `position: absolute` as well, which is the fourth time this
+   file has been caught by a second rule at equal specificity winning on source order -- the ten-line
+   argument at the top of the file for `position: fixed` at the WINDOW's corners was being quietly
+   reversed 4,000 lines below it. It happened to look right because an absolute box with no
+   positioned ancestor falls back to the initial containing block, which is the viewport; the day
+   anything above `.stats` grew a `position`, the chips would have walked off with it. */
+.stats { z-index: 30; }
 .stat-panel {
   position: absolute; top: calc(100% + 11px);
   min-width: 236px; max-width: 330px;
@@ -4158,5 +4186,13 @@ body.is-dragging { user-select: none; }
   font-family: var(--jp-go); font-size: 10.5px; line-height: 1.5; letter-spacing: 0.04em;
   color: rgba(20, 17, 13, 0.56);
 }
-/* the chip you pressed keeps its pressed look while its panel is down */
-.stat-chip.is-open { box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5); transform: translateY(1px); }
+/* the chip you pressed keeps its pressed look while its panel is down -- AND KEEPS ITS SKEW.
+   `transform` replaces wholesale, so `translateY(1px)` on its own threw away the -8deg every slanted
+   thing in this project shares, and the chip snapped upright the moment you clicked it. The streak
+   chip lost its extra 1deg with it. Every other press state in this file re-states the skew; see
+   `.lg-plate:active`. */
+.stat-chip.is-open {
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+  transform: skewX(-8deg) rotate(-1.2deg) translateY(1px);
+}
+.stat-chip.shu.is-open { transform: skewX(-8deg) rotate(1deg) translateY(1px); }

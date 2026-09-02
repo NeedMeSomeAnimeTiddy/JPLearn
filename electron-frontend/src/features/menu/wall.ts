@@ -42,7 +42,13 @@ export interface SealGroup {
 const GROUP_COPY: Record<string, { en: string; jp: string }> = {
   learning_mode: { en: 'WHAT OPENED', jp: '解禁' },
   mastery: { en: 'WHAT YOU MASTERED', jp: '熟達' },
-  milestone: { en: 'HOW FAR YOU HAVE COME', jp: '道程' },
+  /* 'WHAT YOU REACHED' AND NOT 'HOW FAR YOU HAVE COME', WHICH IS A MEASUREMENT.
+     `.bw-lab` is 186px and holds the Japanese, the English and the count on one baseline. At this
+     face the twenty-one characters of the longer phrase need 116px where 'WHAT YOU MASTERED' needs
+     101 -- 189 of a 186px slot -- so the label wrapped, the row's label block doubled from 19px to
+     38, and the count broke across two lines as '1 /' over '9'. The mockup's own labels here were
+     single words for the same reason. */
+  milestone: { en: 'WHAT YOU REACHED', jp: '道程' },
 }
 
 /** the catalog's own order, which is the order `useAchievements` returns them in */

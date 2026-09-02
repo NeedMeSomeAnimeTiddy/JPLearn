@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Lane } from '../lanes'
+import type { MenuSectionKey } from '../types'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { refuse } from '../refuse'
@@ -8,6 +9,8 @@ import '../../../styles/stage.css'
 import '../menu.css'
 
 export interface LanesProps {
+  /** which section these lanes belong to — what the heading slab takes its mark and colour from */
+  section: MenuSectionKey
   /** the caption strip: the section's own name */
   jp: string
   en: string
@@ -21,7 +24,7 @@ export interface LanesProps {
 /* ONE CARD, TWO SCREENS. Three lanes across the stage or two — the card does not change, only how
    many there are and what fills them. THE WORLD passes two parts PRACTICE does not: the milestone
    that opened each lane, and the three things inside it. See the note in `lanes.ts`. */
-export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
+export function Lanes({ section, jp, en, note, lanes, onPick, onUp }: LanesProps) {
   const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -71,7 +74,10 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
        name, because a screen reader has no note to have read yet when it announces the screen. */
     <div className={screenClass(entered)} ref={rootRef} tabIndex={-1} role="group" aria-label={`${en} ${jp}`}>
       <div className="mn-frame" ref={frameRef}>
-        <ScreenHead head={screenHead('DRILLS', null)} />
+        {/* THE SECTION IS A PROP, NOT A CONSTANT. This was hard-coded to DRILLS, so THE WORLD's
+            two lanes stood under a slab reading 練 PRACTICE 練習 in PRACTICE's red -- the one thing
+            the heading exists to get right, said wrong, on the only other screen that uses it. */}
+        <ScreenHead head={screenHead(section, null)} />
         <div className={lanes.length === 2 ? 'lanes two' : 'lanes'}>
           {lanes.map((lane, index) => {
             const classes = ['pr-lane']

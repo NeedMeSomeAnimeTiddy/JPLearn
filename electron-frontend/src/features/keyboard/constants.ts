@@ -5,7 +5,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   { key: 'Ctrl + ,', description: 'Open Settings', context: 'global' },
   { key: 'Escape', description: 'Close modal / go back', context: 'global' },
 
-  { key: '1 – 5', description: 'Jump to script hub (Hiragana → Grammar)', context: 'home' },
+  { key: '1 – 5', description: 'Select a menu row (The Path → You)', context: 'home' },
   { key: '6', description: 'Open Study Overview', context: 'home' },
   { key: '7', description: 'Jump to Sentence Examples', context: 'home' },
 

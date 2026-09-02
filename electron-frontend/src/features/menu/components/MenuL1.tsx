@@ -152,6 +152,11 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
         const index = Number(event.key) - 1
         if (index < MENU_SECTIONS.length) {
           event.preventDefault()
+          /* AND STOPS IT GOING ANY FURTHER. `preventDefault` only cancels the browser's own
+             behaviour; the event still bubbles to the window, where the app's handler used to
+             read the same key and navigate away from the menu. That handler no longer claims
+             1-5 at home, and this is the guard that keeps it that way. */
+          event.stopPropagation()
           hover.keyed()
           setActive(index)
         }

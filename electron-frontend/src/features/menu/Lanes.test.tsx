@@ -13,7 +13,7 @@ const summary = (...due: number[]) => ({
 } as unknown as StudySummaryPayload)
 
 function show(lanes: Lane[]) {
-  render(<Lanes jp="練習" en="PRACTICE" note="NOTE" lanes={lanes} onPick={onPick} onUp={onUp} />)
+  render(<Lanes section="DRILLS" jp="練習" en="PRACTICE" note="NOTE" lanes={lanes} onPick={onPick} onUp={onUp} />)
 }
 
 afterEach(() => {
