@@ -47,6 +47,7 @@ import { buildWalkers, type WalkField } from './walk'
 import { buildLake, lakeShore, type Lake } from './lake'
 import { buildLife, type LifeField } from './life'
 import { buildOutfits } from './outfit'
+import { buildBirds, type BirdField } from './birds'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
@@ -111,6 +112,7 @@ let windows: WindowField | null = null
 let crowd: CrowdField | null = null
 let walkers: WalkField | null = null
 let life: LifeField | null = null
+let birds: BirdField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -157,6 +159,8 @@ const walking = new URLSearchParams(window.location.search).get('walk') !== 'off
 const alive = new URLSearchParams(window.location.search).get('life') !== 'off'
 /* `?outfits=off` -- 0 puts every authored robe back, which is the A/B this exists for */
 const dressed = new URLSearchParams(window.location.search).get('outfits') !== 'off'
+/* `?birds=off` -- 107 instance matrices a frame, which is the whole of what they cost */
+const flying = new URLSearchParams(window.location.search).get('birds') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -577,6 +581,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       )
     }
 
+    if (flying) {
+      birds = buildBirds(root)
+      console.info(`[valley] birds: ${birds.birds} on ${birds.meshes.length} meshes`)
+    }
+
     /* AND THEY ARE NOT ALL WEARING THE SAME THING. Last of everything, because it dresses the
        walkers and the boats' passengers as well as the standing crowd -- those are crowd geometries
        on meshes of their own, and a passenger in the authored slate next to a walker in twenty-two
@@ -709,6 +718,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     crowd?.tick(dt / 1000)
     walkers?.tick(dt / 1000)
     life?.tick(dt / 1000)
+    birds?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -773,6 +783,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       walkers = null
       life?.dispose()
       life = null
+      birds = null
       ground = null
       lake?.dispose()
       lake = null
