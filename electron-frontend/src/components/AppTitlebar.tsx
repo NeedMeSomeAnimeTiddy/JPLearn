@@ -43,6 +43,15 @@ export interface AppTitlebarProps {
   openDictionaryForCurrentRound: () => void
   canTitlebarBack: boolean
   canTitlebarForward: boolean
+  /* THE MENU BRINGS ITS OWN CORNERS. Level one draws the brand mark top-left and four stat chips
+     top-right -- the same two things this bar carries -- so with both up the frame says everything
+     twice. It cannot simply be unmounted, though: the window is `frame: false`, which makes the
+     controls on the right the ONLY way to minimise, maximise or close the app.
+
+     So on the menu it keeps exactly those two jobs and drops the rest: the drag strip stays (a
+     frameless window still has to be draggable) and the window controls stay; the nav, the search,
+     the streak, the XP bar and the shortcut menu all go. */
+  bare?: boolean
   /* PHASE 2 SCAFFOLDING, AND IT COMES OUT AT PHASE 6. The valley menu and the old home screen
      coexist while the tree is ported, so every phase can ship on its own and a regression is a
      switch away rather than a blocked release. */
@@ -119,9 +128,13 @@ export function AppTitlebar({
   minimizeWindow,
   toggleMaximizeWindow,
   handleCloseRequest,
+  bare = false,
 }: AppTitlebarProps) {
   return (
-    <header className="window-titlebar" aria-label="Window controls">
+    <header
+      className={bare ? 'window-titlebar is-bare' : 'window-titlebar'}
+      aria-label="Window controls"
+    >
       <div className="window-titlebar-drag" {...windowDrag}>
         <div className="window-titlebar-nav" role="group" aria-label="App navigation">
           <div className="titlebar-shortcut-wrap" ref={shortcutMenuRef}>

@@ -26,9 +26,48 @@
      world and then zooming into the pixels to see that the chart had no bars in it. */
   --gold: #cfa45c;
   --gold-hi: #e8c47c;
+  /* THE DEEP VERMILION, WHICH IS A SECOND RED AND NOT A SHADE OF THE FIRST. `--hi` is the action
+     colour -- the slab you press, the due badge. `--hi-deep` is the same hue with the light taken
+     out of it, and its whole job is to sit NEXT TO `--hi` without reading as the same shape: an
+     open row's token in `--hi-deep` under a slab in `--hi` is an accent and an action, where two
+     `--hi`s a centimetre apart read as one block with a hole in it. */
+  --hi-deep: #b23320;
+  /* washi with the light off -- the brand's second line, and anything that is paper but not the
+     thing you are reading */
+  --washi-dim: #cfc6ae;
+  /* ---- HOW SOLID THE PAPER IS ----------------------------------------------------------------
+     Every plate that carries type stands on the valley, and these two are the dial that decides how
+     much of it comes through. They ship at the mockup's own settled values -- fully opaque paper, no
+     blur -- because that is where it landed after transparency was built, looked at over the busiest
+     pose, and reverted ("solid paper again -- transparency tried, looked at, not liked").
+
+     THEY ARE STILL TOKENS RATHER THAN LITERALS because the plates read them in fourteen places, and
+     the honest way to ask the question again is to turn one number over the real thing rather than
+     to edit fourteen gradients. NOT NAMED `--glass`: in the mockup that name is taken by the
+     per-section backdrop tints, which are inherited INTO the plates -- so `rgba(…, var(--glass))`
+     resolved to a colour nested inside a colour, which is invalid, and an invalid background is not
+     ignored, it is NONE. Every plate went fully transparent at every setting including 1, which is
+     why the before and after frames looked equally broken. */
+  --paper: 1;
+  --frost: 0px;
   --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+  /* THE GOTHIC JAPANESE, WHICH IS NOT THE MINCHO. `--jp` is the serif the section names are set
+     in; this is the sans the small Japanese labels take -- 連続 on a chip, 選択 beside a keycap.
+     Mincho at 9px is mud. */
+  --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
   --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
   --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", "Arial", sans-serif;
+  /* THE HEAVY ONE, for type that stands ON the world with no paper under it at all -- the feed's
+     word, the section names. A hard offset plus a wide soft glow: the offset gives the glyph an
+     edge against a bright hillside, the glow gives it a ground against a dark one. Small type gets
+     `--halo-soft` instead, where this much shadow is nearly as wide as the strokes. */
+  --ftShadow: 3px 3px 0 rgba(0, 0, 0, 0.72), 0 0 22px rgba(6, 9, 15, 0.85);
+  /* A SOFT HALO, NOT A HARD SHADOW, AND IT BREATHES WITH THE SKY. Cream type stands on an open
+     valley that runs from near-black at midnight to bright grass at noon, so the amount of dark
+     it needs behind it is a function of the hour. `--sky` is 0..1 from the day cycle and is
+     ABSENT when the valley is off, so it is read with its fallback here as everywhere. */
+  --halo-soft: 0 0 calc(7px + 11px * var(--sky, 0.5))
+    rgba(6, 9, 15, calc(0.50 + 0.36 * var(--sky, 0.5)));
 }
 
 /* the board itself. `--u` is set from JS to min(vw/1280, vh/720). */

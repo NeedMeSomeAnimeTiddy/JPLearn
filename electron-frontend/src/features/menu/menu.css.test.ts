@@ -19,15 +19,25 @@ import { describe, expect, it } from 'vitest'
    A missing token is not a design question, so it does not need an eye — it needs this.
    ================================================================================================== */
 
+/* COMMENTS ARE PROSE, NOT CODE, and this family of stylesheets quotes CSS in its prose constantly
+   -- the L1 header alone names `zoom: var(--u)` three times, explaining what the transplant dropped
+   and why. Scanned with the comments left in, every token a comment MENTIONS counted as one the
+   stylesheet USES, so the guard demanded a declaration for a property that is deliberately gone.
+   Stripping them first is what makes this a check on the rules rather than on the writing. */
+const strip = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, ' ')
+
 const CSS = ['../../styles/stage.css', './menu.css', '../lookup/lookup.css']
-  .map((rel) => readFileSync(join(__dirname, rel), 'utf8'))
+  .map((rel) => strip(readFileSync(join(__dirname, rel), 'utf8')))
   .join('\n')
 
 /* set per element from TypeScript rather than declared in a stylesheet, so a search of the CSS
    alone would call them missing:
      --acc   the section's own accent, written onto each L1 row from `MENU_SECTIONS`
-     --lk-u  the stage's scale, written onto the frame by every screen's fit() */
-const SET_IN_TS = new Set(['--acc', '--lk-u'])
+     --lk-u  the stage's scale, written onto the frame by every screen's fit()
+     --top   where an L1 row sits, which is SOLVED per selection and cannot have a resting value
+     --h     how tall it is -- 40 shut, 118/126/122 open by which figure it carries
+     --i     its index down the column, which the entrance staggers off */
+const SET_IN_TS = new Set(['--acc', '--lk-u', '--top', '--h', '--i'])
 
 /* AND A `var()` THAT CARRIES A FALLBACK IS ALREADY DEFINED, which is the whole difference between
    `--sky` and `--gold`. `--sky` is written on :root by the valley's day cycle and is absent

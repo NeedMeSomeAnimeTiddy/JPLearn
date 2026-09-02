@@ -58,7 +58,7 @@ import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks,
   MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed, Unlock,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
-  unlockMoment, heroFromStudyBlock, crownFrom, type MenuSectionKey,
+  unlockMoment, heroFromStudyBlock, crownFrom, rowsFrom, type MenuSectionKey,
 } from './features/menu'
 import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
@@ -902,7 +902,13 @@ function App() {
     return PETAL_STREAM.slice(0, count)
   }, [settings.motionStyle, settings.reducedMotion])
 
-  const showPetalLayer = activePetalStream.length > 0 && !(view === 'minigame' && sessionActive)
+  /* THE CSS PETALS ARE THE OLD FRONT DOOR'S WEATHER, and the menu grows its own -- `petals.ts`
+     drops them off the valley's actual sakura and momiji, in perspective, behind the interface.
+     Drawn on top of that, the flat ones read as debris on the lens: they are the only thing on
+     screen with no depth, they cross the paper plates, and they fall at a screen-space rate the
+     world underneath them contradicts. So the menu takes the world's petals and nothing else. */
+  const showPetalLayer = activePetalStream.length > 0
+    && !(view === 'minigame' && sessionActive) && view !== 'home'
 
   useEffect(() => {
     let mounted = true
@@ -2460,6 +2466,11 @@ function App() {
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
           crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress)}
+          rows={rowsFrom({
+            nodes: progression.nodes,
+            block: studyBlock,
+            streakDays: summary?.streak?.current_days ?? null,
+          })}
           onOpenSection={enterMenuSection}
           onRunHero={runMenuHero}
         />
@@ -2780,6 +2791,7 @@ function App() {
   return (
     <main className={view === 'home' ? 'app-shell mn-showing' : 'app-shell'}>
       <AppTitlebar
+        bare={view === 'home'}
         windowDrag={windowDrag}
         shortcutMenuRef={shortcutMenuRef}
         shortcutMenuOpen={shortcutMenuOpen}

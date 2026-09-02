@@ -48,7 +48,7 @@ export { pathRows, pathWindow, hereIndex, milestone, PATH_WINDOW } from './pathL
 export type { PathRow, PathRowState, PathWindow } from './pathL2'
 export { useMenuL1 } from './useMenuL1'
 export { MENU_SECTIONS, HERO_INDEX } from './constants'
-export { heroFromStudyBlock, crownFrom, reasonSentence } from './utils'
+export { heroFromStudyBlock, crownFrom, reasonSentence, rowsFrom } from './utils'
 export type {
   MenuController, MenuCrown, MenuGate, MenuHero, MenuSection, MenuSectionKey,
 } from './types'

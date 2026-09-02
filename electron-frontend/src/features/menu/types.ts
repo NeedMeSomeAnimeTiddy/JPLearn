@@ -64,3 +64,34 @@ export interface MenuController {
   /** stop announcing them, and remember the mark that says so */
   dismissUnlocks: (mark: string) => void
 }
+
+/* ==================================================================================================
+   WHAT A ROW CARRIES, which is the thing the first port left out.
+
+   The mockup's level-one row is an accordion: 40px shut, and 118/126/122 open depending on which
+   kind of figure the section holds. Open, it shows a state line and one of three figures -- a
+   twelve-segment gauge, a pulsing due badge, or a plain number -- above a vermilion action slab.
+   Shut, it shows a token on the right where the figure would be. The first port drew a uniform
+   62px card with a description sentence and none of this, which is most of why it did not look
+   like the mockup.
+   ================================================================================================== */
+export type MenuFigKind = 'gauge' | 'due' | 'fig'
+
+export interface MenuRow {
+  /** right of the name on a shut row: `STEP 09/16`, `3 LANES` */
+  tok: string
+  /** the state line an open row shows: label above, value below */
+  lab: string
+  val: string
+  /** which of the three figures this section's open row draws */
+  kind: MenuFigKind
+  /** `gauge` only — 0..100, drawn as twelve segments */
+  pct: number
+  /** `due` only — the badge's number */
+  due: number
+  /** `fig` only — the number, already a string so an absence can be an em dash */
+  fig: string
+  figLab: string
+  /** the vermilion slab: what pressing the row does */
+  slab: string
+}

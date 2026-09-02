@@ -4,10 +4,17 @@ import axe from 'axe-core'
 import type { StudyBlockPayload, XPProgressPayload } from '../../generated/types'
 import { MenuL1 } from './components/MenuL1'
 import { useMenuL1 } from './useMenuL1'
-import { crownFrom, heroFromStudyBlock, reasonSentence } from './utils'
+import { crownFrom, heroFromStudyBlock, reasonSentence, rowsFrom } from './utils'
+import type { ProgressionNodeView } from '../progression'
 
 const onOpenSection = vi.fn()
 const onRunHero = vi.fn()
+
+/* two steps of a curriculum, which is all the rows need to derive a place on the path */
+const NODES = [
+  { node_id: 'hiragana', name: 'Hiragana', status: 'mastered', progressLabel: '46/46' },
+  { node_id: 'katakana', name: 'Katakana', status: 'active', progressLabel: '23/46' },
+] as unknown as ProgressionNodeView[]
 
 function Harness({ block }: { block?: StudyBlockPayload | null }) {
   const controller = useMenuL1(true)
@@ -16,6 +23,7 @@ function Harness({ block }: { block?: StudyBlockPayload | null }) {
       controller={controller}
       hero={heroFromStudyBlock(block ?? null)}
       crown={crownFrom(4, { level: 2, total_xp: 300, xp_to_next_level: 50, xp_for_current_level: 150 })}
+      rows={rowsFrom({ nodes: NODES, block: block ?? null, streakDays: 4 })}
       onOpenSection={onOpenSection}
       onRunHero={onRunHero}
     />
@@ -55,9 +63,9 @@ describe('the L1 menu', () => {
   it('draws the five sections in curriculum order', async () => {
     installApi(['conversation_mode', 'jlpt_dashboard'])
     render(<Harness block={block()} />)
-    await waitFor(() => expect(document.querySelectorAll('.mn-row').length).toBe(5))
+    await waitFor(() => expect(document.querySelectorAll('.st-row').length).toBe(5))
 
-    const labels = [...document.querySelectorAll('.mn-en')].map((n) => n.textContent)
+    const labels = [...document.querySelectorAll('.st-en')].map((n) => n.textContent)
     expect(labels).toEqual(['THE PATH', 'PRACTICE', 'THE WORLD', 'THE EXAM', 'YOU'])
   })
 
@@ -65,23 +73,26 @@ describe('the L1 menu', () => {
     installApi([])
     render(<Harness block={block()} />)
 
-    await waitFor(() => expect(document.querySelectorAll('.mn-row.locked').length).toBe(2))
+    await waitFor(() => expect(document.querySelectorAll('.st-row.is-locked').length).toBe(2))
     /* READ OFF THE CATALOG, not restated here: the milestone comes from the curriculum and the
        trigger word from the requirement, so "reach GRAMMAR on the path" -- which named a step the
        path draws as GRAMMAR N5, and called a mastered gate a reached one -- cannot come back. */
     expect(screen.getByText(/GRAMMAR N5 · MASTERED/i)).toBeTruthy()
     expect(screen.getByText(/VOCABULARY N5 · REACHED/i)).toBeTruthy()
     /* the two that are always open must never be locked, whatever the catalog says */
-    expect(screen.getByText('THE PATH').closest('.mn-row')?.className).not.toContain('locked')
-    expect(screen.getByText('YOU').closest('.mn-row')?.className).not.toContain('locked')
+    expect(screen.getByText('THE PATH').closest('.st-row')?.className).not.toContain('is-locked')
+    expect(screen.getByText('YOU').closest('.st-row')?.className).not.toContain('is-locked')
   })
 
   it('a locked row does not go anywhere', async () => {
     installApi([])
     render(<Harness block={block()} />)
-    await waitFor(() => expect(document.querySelectorAll('.mn-row.locked').length).toBe(2))
+    await waitFor(() => expect(document.querySelectorAll('.st-row.is-locked').length).toBe(2))
 
-    const locked = document.querySelector('.mn-row.locked .mn-card') as HTMLButtonElement
+    const locked = document.querySelector('.st-row.is-locked .st-card') as HTMLButtonElement
+    /* twice, because pointing is not choosing: the first press only selects, and it is the SECOND
+       that would open a row that was allowed to open */
+    fireEvent.click(locked)
     fireEvent.click(locked)
     expect(onOpenSection).not.toHaveBeenCalled()
   })
@@ -89,9 +100,14 @@ describe('the L1 menu', () => {
   it('an open row dispatches its own section key', async () => {
     installApi(['conversation_mode', 'jlpt_dashboard'])
     render(<Harness block={block()} />)
-    await waitFor(() => expect(document.querySelectorAll('.mn-row').length).toBe(5))
+    await waitFor(() => expect(document.querySelectorAll('.st-row').length).toBe(5))
 
-    fireEvent.click(screen.getByText('THE WORLD').closest('button') as HTMLButtonElement)
+    /* HOVER OPENS, A CLICK ON THE OPEN ONE GOES -- the mockup's two-step, so a mouse never enters
+       a section it only crossed. The first press selects the row; the second is the one that acts. */
+    const world = screen.getByText('THE WORLD').closest('button') as HTMLButtonElement
+    fireEvent.click(world)
+    expect(onOpenSection).not.toHaveBeenCalled()
+    fireEvent.click(world)
     expect(onOpenSection).toHaveBeenCalledWith('READING')
   })
 
@@ -99,7 +115,7 @@ describe('the L1 menu', () => {
     /* a menu that draws five locked rows for a second and then opens four reads as a bug */
     window.jplearnDesktop = { getFeatureState: undefined } as unknown as Window['jplearnDesktop']
     render(<Harness block={block()} />)
-    expect(document.querySelectorAll('.mn-row.locked').length).toBe(0)
+    expect(document.querySelectorAll('.st-row.is-locked').length).toBe(0)
   })
 
   it('the hero says why, in words rather than in the enum', async () => {
@@ -118,26 +134,28 @@ describe('the L1 menu', () => {
     render(<Harness block={block({ recommendations: [] })} />)
 
     expect(document.querySelector('.sh-fig b')?.textContent).toBe('—')
-    expect(screen.getByText(/nothing due/i)).toBeTruthy()
+    /* scoped to the hero: PRACTICE's own row also says NOTHING DUE when the queue is empty, and
+       that is two different true statements rather than one duplicated one */
+    expect(document.querySelector('.sh-fig em')?.textContent).toMatch(/nothing due/i)
     expect(screen.getByText(/OPEN THE PATH/)).toBeTruthy()
   })
 
   it('the arrows walk the rows', async () => {
     installApi(['conversation_mode', 'jlpt_dashboard'])
     render(<Harness block={block()} />)
-    await waitFor(() => expect(document.querySelectorAll('.mn-row').length).toBe(5))
+    await waitFor(() => expect(document.querySelectorAll('.st-row').length).toBe(5))
 
     const root = document.querySelector('.mn-open') as HTMLElement
-    expect(document.querySelector('.mn-hero')?.className).toContain('on')
+    expect(document.querySelector('.st-hero')?.className).toContain('on')
     fireEvent.keyDown(root, { key: 'ArrowDown' })
-    await waitFor(() => expect(document.querySelectorAll('.mn-row.on').length).toBe(1))
-    expect(document.querySelector('.mn-row.on .mn-en')?.textContent).toBe('THE PATH')
+    await waitFor(() => expect(document.querySelectorAll('.st-row.is-open').length).toBe(1))
+    expect(document.querySelector('.st-row.is-open .st-en')?.textContent).toBe('THE PATH')
   })
 
   it('has no accessibility violations', async () => {
     installApi([])
     render(<Harness block={block()} />)
-    await waitFor(() => expect(document.querySelectorAll('.mn-row').length).toBe(5))
+    await waitFor(() => expect(document.querySelectorAll('.st-row').length).toBe(5))
 
     const results = await (axe as {
       run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
