@@ -56,9 +56,13 @@ export interface LifeRule {
 }
 
 export const PROP_LIFE: readonly LifeRule[] = [
-  /* a puff is born at the vent, grows as it lifts, and is gone by the top — scaled to nothing at
-     both ends of its cycle so the loop has no seam to see */
-  { m: /Onsen_Props_Steam/i, kind: 'puff', rise: 110, period: [4.5, 8.5], spin: 0.6 },
+  /* THE TWELVE STEAM COLUMNS USED TO BE HERE, ON A `puff` RULE, and they are now `steam.ts`'s vent
+     list instead. Two kinds of steam in one town did not agree with each other: solid modelled
+     columns rising and spinning, and soft sprite plumes off the baths beside them. The props lose
+     that argument as drawings — a modelled column cannot be soft at its edges or grow as it climbs,
+     and at 82 units it is the height of a person and a half — and win it as SITING, because where
+     the steam is was Robbie's decision and the sprite system only knows about the baths it can find
+     by name. The `puff` kind stays in the tick for whatever needs it next. */
   /* MonkeyBath before Monkey, because the second pattern would swallow the first */
   { m: /Onsen_People_MonkeyBath/i, kind: 'bob', y: 2.4, yaw: 0.09, period: [4, 7] },
   { m: /Onsen_People_Monkey[_\-\d]/i, kind: 'bob', y: 1.1, yaw: 0.30, period: [3, 6] },

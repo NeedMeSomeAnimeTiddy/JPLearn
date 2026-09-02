@@ -49,6 +49,8 @@ import { buildLife, type LifeField } from './life'
 import { buildOutfits } from './outfit'
 import { buildBirds, type BirdField } from './birds'
 import { buildPetals, type PetalField } from './petals'
+import { buildSteam, type SteamField } from './steam'
+import { buildFireflies, type FireflyField } from './fireflies'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
@@ -115,6 +117,8 @@ let walkers: WalkField | null = null
 let life: LifeField | null = null
 let birds: BirdField | null = null
 let petals: PetalField | null = null
+let steam: SteamField | null = null
+let fireflies: FireflyField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -166,6 +170,12 @@ const flying = new URLSearchParams(window.location.search).get('birds') !== 'off
 /* `?petals=off` -- a few hundred transparent quads, which is the one thing here that touches the
    blend pipeline */
 const shedding = new URLSearchParams(window.location.search).get('petals') !== 'off'
+/* `?steam=off` -- and with it off the twelve authored columns are drawn again, which is what the
+   town looked like before any of this */
+const steaming = new URLSearchParams(window.location.search).get('steam') !== 'off'
+/* `?flies=off` -- they only exist after dark, so this is the one switch whose without-arm is free
+   for twelve hours of the day anyway */
+const glowing = new URLSearchParams(window.location.search).get('flies') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -591,6 +601,27 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       console.info(`[valley] birds: ${birds.birds} on ${birds.meshes.length} meshes`)
     }
 
+    /* AFTER THE WALKERS, because the knots stand on the footing grid they build, and after the
+       lanterns, because a firefly is only a firefly away from a flame. */
+    if (glowing && ground) {
+      fireflies = buildFireflies(
+        scene, walkers?.footing.at ?? ground.at, ground.at, lanterns?.spots ?? [],
+      )
+      console.info(
+        `[valley] fireflies: ${fireflies.flies} in ${fireflies.knots.length} knots, `
+        + `${fireflies.distances.join('/')} units from their own eye`,
+      )
+    }
+
+    if (steaming) {
+      steam = buildSteam(scene, root)
+      console.info(
+        `[valley] steam: ${steam.puffs} puffs over ${steam.vents} vents `
+        + `(${steam.fromProps} of them the authored columns, now hidden); `
+        + Object.entries(steam.found).map(([k, v]) => `${k} x${v}`).join(', '),
+      )
+    }
+
     if (shedding) {
       petals = buildPetals(scene, root)
       console.info(
@@ -733,6 +764,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     life?.tick(dt / 1000)
     birds?.tick(dt / 1000)
     petals?.tick(dt / 1000)
+    steam?.tick(dt / 1000)
+    fireflies?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -800,6 +833,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       birds = null
       petals?.dispose()
       petals = null
+      steam?.dispose()
+      steam = null
+      fireflies?.dispose()
+      fireflies = null
       ground = null
       lake?.dispose()
       lake = null
@@ -882,6 +919,8 @@ function applyDay(
      before it is properly dark and left on a while after, which is what a town does. */
   lanterns?.setOn(n.lampOn)
   petals?.setNight(n.lampOn)
+  steam?.setCold(n.lampOn)
+  fireflies?.setOn(n.lampOn)
   nightMap?.setOn(n.lampOn)
   /* the windows keep their own hours off the CLOCK rather than off the sun: a bedtime is
      a decision about the time, not about how high the sun is. */

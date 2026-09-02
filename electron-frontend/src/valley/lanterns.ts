@@ -1,4 +1,4 @@
-import { Color, Mesh, MeshStandardMaterial, Object3D } from 'three'
+import { Color, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, Vector3 } from 'three'
 
 /* ==================================================================================================
    THE LANTERNS — what makes the mockup's night a place and this port's night an empty valley.
@@ -62,6 +62,12 @@ export interface LanternField {
   mats: LampMat[]
   /** how many meshes were caught, for the boot line */
   meshes: number
+  /* WHERE EVERY FLAME IN THE VALLEY IS, collected on the same pass that finds them. Nothing needed
+     this while the lanterns were only ever emissive -- but a firefly is only a firefly in the dark,
+     so siting one means asking how far the nearest lit thing is, and this walk is already visiting
+     all of them. The mockup keeps the same list for its lamp-cluster grid; here it is the darkness
+     test and nothing else. */
+  spots: Vector3[]
   /** turn the whole valley's lanterns up or down; 0 is out, 1 is full night */
   setOn: (on: number) => void
 }
@@ -81,6 +87,9 @@ export function buildLanterns(root: Object3D): LanternField {
   /* KEYED ON THE MATERIAL AND ON WHAT IT IS MADE OF. One source material is shared across both
      kinds here, and a paper lantern and a stone one must not end up sharing a clone. */
   const swap = new Map<string, MeshStandardMaterial>()
+  const spots: Vector3[] = []
+  const _m = new Matrix4()
+  const _p = new Vector3()
   let meshes = 0
 
   root.traverse((o) => {
@@ -110,6 +119,17 @@ export function buildLanterns(root: Object3D): LanternField {
     }
     mesh.material = clone
     meshes++
+    /* the placement, not the batch -- `collapseToInstances` leaves the group at the identity and
+       puts every member's real position in `instanceMatrix` */
+    const inst = mesh as unknown as InstancedMesh
+    mesh.updateWorldMatrix(true, false)
+    if (inst.isInstancedMesh) {
+      for (let i = 0; i < inst.count; i++) {
+        inst.getMatrixAt(i, _m)
+        _m.premultiply(mesh.matrixWorld)
+        spots.push(_p.setFromMatrixPosition(_m).clone())
+      }
+    } else spots.push(_p.setFromMatrixPosition(mesh.matrixWorld).clone())
   })
 
   const setOn = (on: number) => {
@@ -118,5 +138,5 @@ export function buildLanterns(root: Object3D): LanternField {
   /* out at build time: the day cycle turns them up, and it runs before the first frame */
   setOn(0)
 
-  return { mats, meshes, setOn }
+  return { mats, meshes, spots, setOn }
 }

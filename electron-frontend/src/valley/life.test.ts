@@ -41,7 +41,6 @@ describe('what moves and how', () => {
     expect(hit('Nature_Wildlife_Boat0_001')).toBe('sail')
     expect(hit('Nature_Wildlife_Duck1_022')).toBe('swim')
     expect(hit('Garden_People_Koi2_003')).toBe('swim')
-    expect(hit('Onsen_Props_Steam_007')).toBe('puff')
     expect(hit('Festival_Structures_Nobori0_001')).toBe('sway')
   })
 
@@ -199,10 +198,11 @@ describe('the wake', () => {
     const f = buildLife(scene, world(
       prop('Nature_Wildlife_Boat0_001', at),
       prop('Nature_Wildlife_Duck0_001', onLake(1400, 0.2), 30, 16, 14),
-      prop('Onsen_Props_Steam_001', new Vector3(0, 0, 0), 20, 82, 20),
       prop('Festival_Structures_Nobori0_001', new Vector3(100, 0, 100), 20, 120, 20),
+      /* and the steam columns are `steam.ts`'s vent list now, so they are not items at all */
+      prop('Onsen_Props_Steam_001', new Vector3(0, 0, 0), 20, 82, 20),
     ), null, round(3000), null)
-    expect(f.items).toBe(4)
+    expect(f.items).toBe(3)
     expect(f.wakes).toBe(2)
   })
 
@@ -220,20 +220,11 @@ describe('the wake', () => {
 })
 
 describe('the still things', () => {
-  it('grow and shrink to nothing at both ends of a puff, so the loop has no seam', () => {
-    const scene = new Scene()
-    const steam = prop('Onsen_Props_Steam_001', new Vector3(0, -300, 0), 20, 82, 20)
-    const f = buildLife(scene, world(steam), null, null, null)
-    let lo = Infinity
-    let hiY = -Infinity
-    for (let k = 0; k < 200; k++) {
-      f.tick(0.1)
-      lo = Math.min(lo, steam.matrix.elements[0])
-      hiY = Math.max(hiY, steam.matrix.elements[13])
-    }
-    expect(lo).toBeLessThan(0.3)
-    /* and it climbs the rise it was given */
-    expect(hiY).toBeGreaterThan(-300 + 90)
+  it('has handed the twelve steam columns over to the plumes', () => {
+    /* two kinds of steam in one town did not agree: solid modelled columns beside soft sprite
+       plumes. The props are `steam.ts`'s vent list now -- the siting is still Robbie's and there
+       is one kind of steam in the valley. */
+    expect(PROP_LIFE.some((r) => r.m.test('Onsen_Props_Steam_007'))).toBe(false)
   })
 
   it('advances its own clock rather than reading the wall', () => {
