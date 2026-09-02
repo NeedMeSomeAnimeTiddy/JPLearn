@@ -45,6 +45,28 @@ export const CLOUD_SHADOW_AMOUNT = 0.3
 /** radians a second the cover creeps, matched to the sky's own clusters so the two agree */
 export const CLOUD_SHADOW_DRIFT = 0.0016
 
+/* WHICH WAY THE WEATHER IS GOING, AND IT LIVES HERE BECAUSE THIS IS THE ONLY THING THAT ALREADY
+   KNEW. The cover's offset advances in +x and +0.4y, and the shader samples at
+   `world.xz * scale + uCoverOff` — so INCREASING the offset walks the pattern the other way, and
+   what the ground actually sees is a shadow moving toward −(1, 0.4).
+
+   Nothing else in this port had a wind. The petals need one, and a valley where the blossom blows
+   one way while the cloud shadow crosses it the other is a valley with two weathers in it. So the
+   direction is named once, the cover's drift is derived FROM it rather than the other way round
+   (the length term keeps the creep at exactly the rate it was tuned at), and anything else that
+   blows reads the same vector.
+
+   ONLY THE DIRECTION IS SHARED. The cover creeps at `DRIFT / SCALE` = 5.4 units a second, which is
+   a cloud shadow a long way up moving slowly across a wide valley; `WIND_SPEED` is what the air
+   does down among the trees. They are different quantities and pretending otherwise would put the
+   petals on a conveyor belt. */
+export const WIND_DIR = new Vector2(-1, -0.4).normalize()
+/* what (1, 0.4) measured, so deriving the cover's creep from a UNIT vector leaves it exactly where
+   it was rather than 8% slower */
+const WIND_LEN = Math.hypot(1, 0.4)
+/** units a second, at the height a petal falls through */
+export const WIND_SPEED = 300
+
 /* MIST IS WATER IN THE AIR AND IT IS THE COLOUR OF WHAT LIGHTS IT, which at this hour is the same
    warm the fog and the key already carry. A neutral grey mist under a sunset reads as a rendering
    default. */
@@ -190,8 +212,10 @@ export function aimCover(sunAt: Vector3): void {
 
 /** creep the cover; called on the frame loop's own capped clock */
 export function driftCover(dt: number): void {
-  ATMOS_U.uCoverOff.value.x += CLOUD_SHADOW_DRIFT * dt
-  ATMOS_U.uCoverOff.value.y += CLOUD_SHADOW_DRIFT * 0.4 * dt
+  /* the offset walks AGAINST the wind, because the shader adds it to the sample point -- see
+     WIND_DIR. `WIND_LEN` keeps the creep at the rate it was tuned at before this was a vector. */
+  ATMOS_U.uCoverOff.value.x -= WIND_DIR.x * WIND_LEN * CLOUD_SHADOW_DRIFT * dt
+  ATMOS_U.uCoverOff.value.y -= WIND_DIR.y * WIND_LEN * CLOUD_SHADOW_DRIFT * dt
 }
 
 const VERT_HEAD = `#include <common>

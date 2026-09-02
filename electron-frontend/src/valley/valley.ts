@@ -48,6 +48,7 @@ import { buildLake, lakeShore, type Lake } from './lake'
 import { buildLife, type LifeField } from './life'
 import { buildOutfits } from './outfit'
 import { buildBirds, type BirdField } from './birds'
+import { buildPetals, type PetalField } from './petals'
 import { createReflection, type Reflection } from './reflection'
 import { ATMOS_U, LANDFORM, aimCover, breathe, driftCover, makeCoverTexture } from './atmosphere'
 import { arcPlace, dayPalette, siteHere, solarState, type SolarState } from './daycycle'
@@ -113,6 +114,7 @@ let crowd: CrowdField | null = null
 let walkers: WalkField | null = null
 let life: LifeField | null = null
 let birds: BirdField | null = null
+let petals: PetalField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -161,6 +163,9 @@ const alive = new URLSearchParams(window.location.search).get('life') !== 'off'
 const dressed = new URLSearchParams(window.location.search).get('outfits') !== 'off'
 /* `?birds=off` -- 107 instance matrices a frame, which is the whole of what they cost */
 const flying = new URLSearchParams(window.location.search).get('birds') !== 'off'
+/* `?petals=off` -- a few hundred transparent quads, which is the one thing here that touches the
+   blend pipeline */
+const shedding = new URLSearchParams(window.location.search).get('petals') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -586,6 +591,14 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       console.info(`[valley] birds: ${birds.birds} on ${birds.meshes.length} meshes`)
     }
 
+    if (shedding) {
+      petals = buildPetals(scene, root)
+      console.info(
+        `[valley] petals: ${petals.petals} off ${petals.sources} trees `
+        + `(${petals.nearSources} of them near a camera stop)`,
+      )
+    }
+
     /* AND THEY ARE NOT ALL WEARING THE SAME THING. Last of everything, because it dresses the
        walkers and the boats' passengers as well as the standing crowd -- those are crowd geometries
        on meshes of their own, and a passenger in the authored slate next to a walker in twenty-two
@@ -719,6 +732,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     walkers?.tick(dt / 1000)
     life?.tick(dt / 1000)
     birds?.tick(dt / 1000)
+    petals?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -784,6 +798,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       life?.dispose()
       life = null
       birds = null
+      petals?.dispose()
+      petals = null
       ground = null
       lake?.dispose()
       lake = null
@@ -865,6 +881,7 @@ function applyDay(
      through civil twilight, 0.45 at sunrise and out by mid-morning -- lanterns are lit
      before it is properly dark and left on a while after, which is what a town does. */
   lanterns?.setOn(n.lampOn)
+  petals?.setNight(n.lampOn)
   nightMap?.setOn(n.lampOn)
   /* the windows keep their own hours off the CLOCK rather than off the sun: a bedtime is
      a decision about the time, not about how high the sun is. */
