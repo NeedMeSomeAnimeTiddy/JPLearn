@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import axe from 'axe-core'
-import type { BlockInfo } from '../../types'
+import type { BlockInfo, JlptLevelProgress } from '../../types'
 import type { VocabFeed, VocabFeedWord } from '../vocab-feed'
 import { VOCAB_BUDGET_STEPS } from '../vocab-feed'
 import { Deck } from './components/Deck'
 import { Feed } from './components/Feed'
 import { DECK_PER_PAGE, DEFAULT_GATE, deckChain, deckSheet, gateLine, railLine } from './deck'
 import { feedAt, feedHead, feedNote, kanjiOf, wordKanji, wordSize } from './feed'
+import { levelForKey, levelStep } from './levels'
+
+/* THE LADDER THE TWO STUDY SCREENS DRAW, as `buildJlptLevelProgressFromLevelDecks` shapes it. */
+const LEVELS: JlptLevelProgress[] = (['n5', 'n4', 'n3', 'n2', 'n1'] as const).map((key, i) => ({
+  key, label: key.toUpperCase(), cardIds: [], sampleChars: [],
+  mastery: [0.81, 0.4, 0.12, 0, 0][i], unlocked: i < 3, total: 100 * (i + 1),
+}))
 
 /* a block chain, with `unlocked` a prefix exactly as `compute_unlocked_count` produces it */
 const chainOf = (count: number, unlockedCount: number, mastery = 0.5): BlockInfo[] =>
@@ -120,17 +127,105 @@ describe('the cleared pile', () => {
   })
 })
 
+const deckProps = {
+  title: { en: 'KANJI N5', jp: '漢字' },
+  slug: 'kanji_n5',
+  blocks: chainOf(6, 3, 0.62),
+  gate: 0.7,
+  loading: false,
+  error: null,
+  mode: 'Romaji Sprint',
+  levels: LEVELS,
+  level: 'n5' as const,
+  onLevel: vi.fn(),
+  onStart: vi.fn(),
+  onUp: vi.fn(),
+}
+
+const feedProps = {
+  title: { en: 'VOCABULARY N5', jp: '語彙' },
+  feed: feedOf(),
+  mode: 'Meaning Match',
+  levels: LEVELS,
+  level: 'n5' as const,
+  onLevel: vi.fn(),
+  onStart: vi.fn(),
+  onUp: vi.fn(),
+}
+
+describe('the ladder two of the six decks stand on', () => {
+  it('reads a printed digit as the level it is printed on', () => {
+    expect(levelForKey(LEVELS, '1')).toBe('n5')
+    expect(levelForKey(LEVELS, '3')).toBe('n3')
+  })
+
+  it('names nothing for a digit the row does not draw', () => {
+    /* bounded by the row rather than by CATEGORY_LEVEL_ORDER: a build whose bridge answered with
+       three levels must not be askable for a fourth */
+    expect(levelForKey(LEVELS.slice(0, 3), '4')).toBeNull()
+    expect(levelForKey(LEVELS, '0')).toBeNull()
+    expect(levelForKey(LEVELS, 'Enter')).toBeNull()
+  })
+
+  it('clamps at both ends rather than wrapping', () => {
+    /* wrapping would make one press on this row skip four decks */
+    expect(levelStep(LEVELS, 'n5', -1)).toBe('n5')
+    expect(levelStep(LEVELS, 'n1', 1)).toBe('n1')
+    expect(levelStep(LEVELS, 'n4', 1)).toBe('n3')
+  })
+
+  it('draws no row at all for a deck that is one deck', () => {
+    /* four of the six are not laddered, and a control with one choice on it reads as broken */
+    const { container } = render(<Deck {...deckProps} levels={[]} />)
+    expect(container.querySelector('.lvb')).toBeNull()
+    expect(container.textContent).not.toContain('Level')
+  })
+
+  it('carries what you have done to each rung, not only its name', () => {
+    const { container } = render(<Deck {...deckProps} />)
+    const chips = container.querySelectorAll('.lvb-chip')
+    expect(chips).toHaveLength(5)
+    expect(chips[0].textContent).toBe('1N581%')
+    expect(container.querySelector('.lvb-chip.on b')?.textContent).toBe('N5')
+  })
+
+  it('changes level on the digit the chip prints', () => {
+    const onLevel = vi.fn()
+    const { container } = render(<Deck {...deckProps} onLevel={onLevel} />)
+    fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: '3' })
+    expect(onLevel).toHaveBeenCalledWith('n3')
+  })
+
+  it('keeps the press to itself, because App binds the same digits on the window', () => {
+    /* 1 through 5 are also App's route into a deck from anywhere the menu is not listening. A
+       press that bubbled would change the level and then leave the screen it had just changed --
+       the same collision `MenuL1`'s row numbers hit, and the same fix. */
+    const seen = vi.fn()
+    window.addEventListener('keydown', seen)
+    try {
+      const { container } = render(<Deck {...deckProps} />)
+      const root = container.querySelector('.mn-open') as Element
+      fireEvent.keyDown(root, { key: '3' })
+      expect(seen).not.toHaveBeenCalled()
+      /* and a digit the row does NOT draw is left alone rather than swallowed */
+      fireEvent.keyDown(root, { key: '7' })
+      expect(seen).toHaveBeenCalledTimes(1)
+    } finally {
+      window.removeEventListener('keydown', seen)
+    }
+  })
+
+  it('is drawn on the feed as well, since vocabulary is five decks behind one milestone', () => {
+    const onLevel = vi.fn()
+    const { container } = render(<Feed {...feedProps} onLevel={onLevel} />)
+    expect(container.querySelectorAll('.lvb-chip')).toHaveLength(5)
+    fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: '2' })
+    expect(onLevel).toHaveBeenCalledWith('n4')
+  })
+})
+
 describe('the deck screen', () => {
-  const props = {
-    title: { en: 'KANJI N5', jp: '漢字' },
-    slug: 'kanji_n5',
-    blocks: chainOf(6, 3, 0.62),
-    gate: 0.7,
-    loading: false,
-    error: null,
-    onStart: vi.fn(),
-    onUp: vi.fn(),
-  }
+  const props = deckProps
 
   it('names the deck it drew, not only the milestone that led there', () => {
     /* the mockup's own recorded bug: kanji N1's blocks under a heading reading HIRAGANA */
@@ -154,6 +249,39 @@ describe('the deck screen', () => {
     fireEvent.click(cells[0])
     fireEvent.click(container.querySelector('.dk-here') as Element)
     expect(onStart).toHaveBeenCalledWith(0)
+  })
+
+  it('sets the block name from its own length, because the stylesheet cannot', () => {
+    /* `.dk-name` declares family, weight and line-height and deliberately no size -- so a port
+       that forgot the inline one rendered a 46px headline at the body's 16, which is what this
+       card looked like until it was measured in the running app. */
+    const short = render(<Deck {...props} blocks={chainOf(2, 2)} />)
+    expect((short.container.querySelector('.dk-name') as HTMLElement).style.fontSize).toBe('46px')
+    cleanup()
+    const long = render(
+      <Deck {...props} blocks={chainOf(2, 2).map((b) => ({ ...b, name: 'Old Units and Measures' }))} />,
+    )
+    /* twenty-two characters is past the point where 46 fits, and it is set down rather than wrapped */
+    expect((long.container.querySelector('.dk-name') as HTMLElement).style.fontSize).toBe('34px')
+  })
+
+  it('names the drill its one button is about to run', () => {
+    /* the slab used to read THE ONLY WAY ON over a button that opened a picker. It starts a round
+       now, and a button that performs an action has to say which action. */
+    const { container } = render(<Deck {...props} mode="Stroke Order" />)
+    expect(container.querySelector('.dk-slab em')?.textContent).toBe('STROKE ORDER')
+    expect(container.querySelector('.dk-slab b')?.textContent).toContain('START THIS BLOCK')
+  })
+
+  it('offers a deck it could not cut rather than leaving you at a dead end', () => {
+    /* while this screen was a stop on the way to a hub, "not cut into blocks" was a fact you read
+       and carried on past. It is the last screen before the round now. */
+    const onStart = vi.fn()
+    const { container } = render(<Deck {...props} blocks={[]} onStart={onStart} />)
+    const door = container.querySelector('.pj-go') as HTMLButtonElement
+    expect(door.textContent).toContain('STUDY IT WHOLE')
+    fireEvent.click(door)
+    expect(onStart).toHaveBeenCalledWith(-1)
   })
 
   it('will not open a pile that has nothing in it', () => {
@@ -257,12 +385,7 @@ describe('the feed', () => {
 })
 
 describe('the feed screen', () => {
-  const props = {
-    title: { en: 'VOCABULARY N5', jp: '語彙' },
-    feed: feedOf(),
-    onStart: vi.fn(),
-    onUp: vi.fn(),
-  }
+  const props = feedProps
 
   it('offers the shared budget steps rather than a second copy of them', () => {
     const { container } = render(<Feed {...props} />)
@@ -308,6 +431,11 @@ describe('the feed screen', () => {
     fireEvent.keyDown(root, { key: 'ArrowDown' })
     expect(container.querySelector('.fd-cap b')?.textContent).toContain('2 OF 2')
     expect(container.querySelector('.fd-word')?.textContent).toBe('二')
+  })
+
+  it('names its drill on the slab, the same way the deck screen does', () => {
+    const { container } = render(<Feed {...props} mode="Typed Recall" />)
+    expect(container.querySelector('.fd-slab em')?.textContent).toContain('TYPED RECALL')
   })
 
   it('says which empty it is rather than drawing a blank queue', () => {

@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTraversal } from '../useTraversal'
-import type { BlockInfo } from '../../../types'
+import type { BlockInfo, JlptLevel, JlptLevelProgress } from '../../../types'
 import { deckChain, deckSheet, gateLine, railLine } from '../deck'
+import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
+import { LevelBar } from './LevelBar'
 import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
@@ -22,12 +24,23 @@ export interface DeckProps {
   gate: number
   loading: boolean
   error: string | null
+  /* WHAT PRESSING START ACTUALLY RUNS. The screen used to hand you to a hub that asked which drill
+     -- so the slab could promise "START THIS BLOCK" without ever saying what starting meant. It
+     goes straight into a round now, and a button that performs an action has to name it. */
+  mode: string
+  /* THE LADDER, FOR THE TWO DECKS THAT ARE FIVE DECKS. Empty for the four that are not, and the
+     row draws nothing rather than a control with one choice on it. See `levels.ts`. */
+  levels: readonly JlptLevelProgress[]
+  level: JlptLevel
+  onLevel: (level: JlptLevel) => void
   /** study one block. `index` is the block's own index, so a revisit says which. */
   onStart: (index: number) => void
   onUp: () => void
 }
 
-export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp }: DeckProps) {
+export function Deck({
+  title, slug, blocks, gate, loading, error, mode, levels, level, onLevel, onStart, onUp,
+}: DeckProps) {
   const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -97,20 +110,44 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
         }
         return
       }
+      /* THE PRINTED DIGITS PICK THE LEVEL, and they are STOPPED rather than merely prevented:
+         `App` binds 1 through 5 on the window as the way into a deck from anywhere the menu is not
+         listening, so a press that bubbled would change the level and then leave the screen it had
+         just changed. Same collision, same fix, as `MenuL1`'s row numbers. */
+      const wanted = levelForKey(levels, event.key)
+      if (wanted) {
+        event.preventDefault()
+        event.stopPropagation()
+        if (wanted !== level) onLevel(wanted)
+        return
+      }
       if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
         event.preventDefault()
         setAt((i) => (i === 0 ? 1 : 0))
       } else if (event.key === 'Enter') {
         event.preventDefault()
         if (at === 1) { if (chain.cleared > 0) { setSheet(true); setCell(0) } return }
-        if (here) onStart(here.index)
+        /* A DECK THAT ANSWERED WITH NO BLOCKS IS STILL A DECK YOU CAN STUDY. -1 is "no block
+           filter, the whole thing" -- the pool the app falls back to anyway when nothing is
+           selected. Without it this screen is a dead end for a deck the bridge could not cut. */
+        onStart(here ? here.index : -1)
       }
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, cell, chain.cleared, here, onStart, sheet, view.cells, view.pages])
+  }, [at, cell, chain.cleared, here, level, levels, onLevel, onStart, sheet, view.cells, view.pages])
 
   const revisiting = pick >= 0
+  /* THE NAME IS SET FROM ITS OWN LENGTH, which the stylesheet's own comment says and the port
+     then did not do: `.dk-name` declares family, weight and line-height and no SIZE, because the
+     size is per-name and belongs on the element. Measured live at 46px in the mockup and 16 here
+     -- the card's headline was rendering at the body's inherited size, which is why the deck card
+     had a hand's width of empty paper under it. 470 is the card's own width; 0.62 is the average
+     glyph advance of the italic black at that width, and the floor of 26 is where "Old Units &
+     Measures" stops shrinking and starts wrapping instead. */
+  const nameSize = here
+    ? Math.max(26, Math.min(46, Math.floor(470 / (here.name.length * 0.62))))
+    : 26
 
   return (
     /* the deck's name is not drawn as a heading -- the open block's cap says it -- but a screen
@@ -124,6 +161,12 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
     >
       <div className="mn-frame" ref={frameRef}>
         <ScreenHead head={screenHead('STUDY', 'deck')} />
+        <LevelBar
+          deck={slug.replace(/_n[1-5]$/, '').replace(/_/g, ' ').toUpperCase()}
+          levels={levels}
+          at={level}
+          onPick={onLevel}
+        />
         {/* THE SCREEN'S OWN CAPTION IS THE HERE-CARD'S. `.dk-cap` on the open block already says
             which deck this is and where in it you are standing, so the heading at the top of the
             stage was the same sentence a second time -- and on this screen it landed on the cards.
@@ -132,8 +175,14 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
         {error ? <div className="pj-empty">{error.toUpperCase()}</div> : null}
         {loading && !chain.blocks.length && !error
           ? <div className="pj-empty">READING THE DECK…</div> : null}
+        {/* NOT CUT INTO BLOCKS IS NOT THE SAME AS NOTHING TO STUDY, and while this screen was a
+            stop on the way to a hub the difference did not matter -- you carried on and picked a
+            drill there. It is the last screen before the round now, so the deck the bridge could
+            not cut is still offered whole rather than left as a dead end with a Back button. */}
         {!error && !loading && !chain.blocks.length ? (
-          <div className="pj-empty">THIS DECK IS NOT CUT INTO BLOCKS</div>
+          <button type="button" className="pj-empty pj-go" onClick={() => onStart(-1)}>
+            THIS DECK IS NOT CUT INTO BLOCKS · STUDY IT WHOLE · {mode.toUpperCase()} ▸
+          </button>
         ) : null}
 
         {chain.blocks.length && here ? (
@@ -171,7 +220,7 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
                   <i>{slug.replace(/_/g, ' ').toUpperCase()}</i>
                 </span>
                 <span className="dk-body">
-                  <span className="dk-name">{here.name}</span>
+                  <span className="dk-name" style={{ fontSize: nameSize }}>{here.name}</span>
                   <span className="dk-chars" lang="ja">{here.sample.join(' · ')}</span>
                   <span className="dk-sub">
                     <span>{here.cards} CARDS</span>
@@ -190,8 +239,12 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
                 </span>
                 {/* WHAT THE PERCENTAGE IS FOR. Not a score — a key, and the gate says what it opens. */}
                 <span className="dk-gate">{gateLine(chain, revisiting)}</span>
+                {/* THE SLAB NAMES THE DRILL IT IS ABOUT TO RUN. It said THE ONLY WAY ON, which is
+                    the gate line's argument said a second time, and it said it over a button that
+                    used to open a picker. The picker is gone; this press starts a round, so the
+                    small line is the one fact you could not otherwise get: which round. */}
                 <span className="dk-slab">
-                  <em>{revisiting ? `BLOCK ${here.no}` : 'THE ONLY WAY ON'}</em>
+                  <em>{mode.toUpperCase()}</em>
                   <b>{revisiting ? 'STUDY IT AGAIN' : 'START THIS BLOCK'} ▸</b>
                 </span>
               </button>
@@ -288,7 +341,8 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
         </div>
         <div className="hints">
           <span><b>← →</b>Choose<em>選択</em></span>
-          <span><b>ENTER</b>Open<em>決定</em></span>
+          {levels.length > 1 ? <span><b>1–{levels.length}</b>Level<em>級</em></span> : null}
+          <span><b>ENTER</b>Start<em>開始</em></span>
           <span><b>ESC</b>Back<em>戻る</em></span>
         </div>
       </div>

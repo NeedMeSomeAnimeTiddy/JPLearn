@@ -722,6 +722,61 @@ body.in-flight .pj-cap { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) tra
   background: rgba(20, 17, 13, 0.28);
 }
 
+/* ---- WHICH RUNG OF A LADDERED DECK ---------------------------------------------------------
+   Two of the six decks are five decks -- see `levels.ts` for why the level cannot be a milestone
+   and therefore cannot be chosen on the path screen.
+
+   IT HANGS UNDER THE HEADING, IN THE CROWN, and it is `position: fixed` for the same reason
+   `.brand`, `.stats` and `.pj-cap` are: the board is 1280 by 720 centred in the window, so the
+   letterbox above it is room nothing composed on the stage can ever reach. `top: 84px` clears the
+   heading slab, which runs from 20 to about 72 and carries its own rule four pixels below that.
+
+   AND IT IS SET SMALLER THAN THE HEADING ON PURPOSE. The heading says which screen you are on and
+   the row says which of five decks it is drawing; making them the same weight would be two titles.
+   ------------------------------------------------------------------------------------------- */
+.lvb {
+  position: fixed; left: 250px; top: 84px; zoom: var(--lk-u, 1);
+  display: flex; align-items: stretch; gap: 5px; pointer-events: auto;
+}
+/* the deck's own name, on the leading edge where `.pj-mark` sits one line up */
+.lvb-lab {
+  display: flex; align-items: center; padding: 0 11px;
+  background: rgba(20, 17, 13, 0.72);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+  color: rgba(242, 234, 216, 0.72); white-space: nowrap;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+}
+.lvb-chip {
+  display: flex; align-items: baseline; gap: 6px; padding: 5px 10px 6px;
+  border: 0; cursor: pointer; font: inherit; white-space: nowrap;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease;
+}
+/* the printed digit, which is the whole reason this row needs no axis of its own */
+.lvb-chip s {
+  text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.42);
+}
+.lvb-chip b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
+  color: var(--ink);
+}
+.lvb-chip i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.48);
+}
+.lvb-chip:hover { filter: brightness(1.06); }
+.lvb-chip.on {
+  background: var(--ink);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 2px var(--gold);
+}
+.lvb-chip.on s { color: rgba(232, 196, 124, 0.55); }
+.lvb-chip.on b { color: var(--gold-hi); }
+.lvb-chip.on i { color: rgba(242, 234, 216, 0.6); }
+
 /* ---- THE ROAD, LIFTED WHOLE ----------------------------------------------------------------
    The first port drew this as a vertical list of milestone rows with a six-row window and two
    fold counts. The mockup's is a WALKED ROAD: sixteen standing tablets on a horizontal rail that
@@ -3985,6 +4040,14 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   color: rgba(20, 17, 13, 0.5);
   box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
 }
+/* AN ABSENCE THAT IS ALSO A DOOR -- the deck screen's "not cut into blocks", which is still a deck
+   you can study. Deliberately NOT `font: inherit`: that shorthand resets family, size and weight,
+   and `.pj-empty` above is where all three are set. Writing it here would leave this slab at the
+   user agent's 13px sans, which is the same shorthand mistake `.stat-chip` shipped. */
+.pj-go {
+  border: 0; cursor: pointer; text-align: left; line-height: 1.4;
+}
+.pj-go:hover { filter: brightness(1.05); }
 
 /* the gloss is Japanese when the material carries no English — thirty Aozora texts have an author
    and no translated title, and setting a Japanese name in a Latin UI face is how you get tofu */

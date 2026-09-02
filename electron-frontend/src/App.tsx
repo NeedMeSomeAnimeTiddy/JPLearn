@@ -1855,6 +1855,45 @@ function App() {
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
   }, [closeKanjiDetail, closeShortcutMenu, navigate, resetSessionWithLives, resolveScriptMinigame])
 
+  /* WHAT THE STUDY PATH'S LAST SCREEN DOES, and it is a round rather than another screen.
+     Picking a block used to land on the script hub, which asked which blocks (a question the deck
+     screen had just answered), which level (a row), and which drill — three questions for a press
+     that had already made its choice. The block travels with the press and the drill is the one you
+     last ran, which the app has persisted in its session preferences the whole time.
+
+     THE TWO PIECES OF STATE CANNOT BE SET IN ONE BREATH. `startSession` closes over
+     `activeBlockCards`, a render-time value, so calling it in the handler that changed the
+     selection would build the round out of the block you were standing on a moment ago.
+     `requestResumeSession` is the app's own answer to exactly that shape: it holds the request
+     until the pool it names has settled, then starts. The titlebar already leans on it when it
+     changes deck. */
+  const startBlockDrill = useCallback((index: number) => {
+    /* -1 is the deck the bridge could not cut into blocks: no filter, study it whole */
+    if (index < 0) blockSelection.clear()
+    else blockSelection.select(index)
+    const minigame = resolveScriptMinigame(activeScript, activeGame)
+    closeKanjiDetail()
+    setActiveGame(minigame)
+    navigate('minigame', 'forward')
+    resetSessionWithLives()
+    session.requestResumeSession({ script: activeScript, minigame })
+  // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
+  }, [activeGame, activeScript, blockSelection, closeKanjiDetail, navigate,
+    resetSessionWithLives, resolveScriptMinigame])
+
+  /** the drill the two study screens promise on their slab, named rather than implied */
+  const menuDrillName = useMemo(() => {
+    const key = resolveScriptMinigame(activeScript, activeGame)
+    return MINIGAMES.find((entry) => entry.key === key)?.title ?? key
+  }, [activeGame, activeScript, resolveScriptMinigame])
+
+  /* THE LADDER THE DECK SCREEN DRAWS, which is empty for the four decks that are not laddered.
+     Kanji is five decks behind one milestone; the other four non-fed decks are one each. */
+  const deckLevels = useMemo(
+    () => (activeScript === 'kanji_n5' ? kanjiLevelProgress : []),
+    [activeScript, kanjiLevelProgress],
+  )
+
   const openSettingsFromMenu = useCallback(() => {
     closeKanjiDetail()
     setDictionaryOpen(false)
@@ -2404,13 +2443,14 @@ function App() {
           gate={menuDeck.gate}
           loading={menuDeck.loading}
           error={menuDeck.error}
-          onStart={(index) => {
-            /* THE CHOSEN BLOCK IS HANDED OVER, which is what the pile is for -- the hub's own
-               default is the furthest unlocked one and would quietly discard a revisit. */
-            blockSelection.select(index)
-            const node = progression.nodes.find((n) => n.node_id === menuNode)
-            if (node) openProgressionNode(node)
+          mode={menuDrillName}
+          levels={deckLevels}
+          level={activeKanjiLevel}
+          onLevel={(level) => {
+            setActiveKanjiLevel(level)
+            resetSessionWithLives()
           }}
+          onStart={startBlockDrill}
           onUp={leaveMenuLevel}
         />
       ) : null}
@@ -2419,10 +2459,16 @@ function App() {
         <Feed
           title={menuMilestone}
           feed={vocabFeed}
-          onStart={() => {
-            const node = progression.nodes.find((n) => n.node_id === menuNode)
-            if (node) openProgressionNode(node)
+          mode={menuDrillName}
+          levels={vocabLevelProgress}
+          level={activeVocabLevel}
+          onLevel={(level) => {
+            setActiveVocabLevel(level)
+            resetSessionWithLives()
           }}
+          /* a fed level has no blocks to choose between, so the whole level is the pool -- which
+             is what an empty selection already means to `unionBlockCards` */
+          onStart={() => startBlockDrill(-1)}
           onUp={leaveMenuLevel}
         />
       ) : null}

@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { VOCAB_BUDGET_STEPS, type VocabFeed } from '../../vocab-feed'
+import type { JlptLevel, JlptLevelProgress } from '../../../types'
 import { feedAt, feedHead, feedNote, wordKanji, wordSize } from '../feed'
+import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
+import { LevelBar } from './LevelBar'
 import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
@@ -11,11 +14,18 @@ export interface FeedProps {
   /** the milestone this screen was opened from, in the curriculum's own words */
   title: { en: string; jp: string }
   feed: VocabFeed
+  /** the drill this screen's one button runs -- see the same prop on `Deck` */
+  mode: string
+  /* THE FIVE VOCABULARY LEVELS. The curriculum has one node for all of them, so this row is the
+     only thing in the app that reaches N4 through N1 now the hub is gone. See `levels.ts`. */
+  levels: readonly JlptLevelProgress[]
+  level: JlptLevel
+  onLevel: (level: JlptLevel) => void
   onStart: () => void
   onUp: () => void
 }
 
-export function Feed({ title, feed, onStart, onUp }: FeedProps) {
+export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp }: FeedProps) {
   const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -49,6 +59,14 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
     const node = rootRef.current
     if (!node) return
     const onKey = (event: KeyboardEvent) => {
+      /* the printed digits pick the level, stopped rather than prevented -- see `Deck` */
+      const wanted = levelForKey(levels, event.key)
+      if (wanted) {
+        event.preventDefault()
+        event.stopPropagation()
+        if (wanted !== level) onLevel(wanted)
+        return
+      }
       if (event.key === 'ArrowRight') {
         event.preventDefault()
         setAt((i) => Math.min(i + 1, VOCAB_BUDGET_STEPS.length))
@@ -69,7 +87,7 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, feed, onStart])
+  }, [at, feed, level, levels, onLevel, onStart])
 
   const kanji = here ? wordKanji(here) : null
 
@@ -83,6 +101,7 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
     >
       <div className="mn-frame" ref={frameRef}>
         <ScreenHead head={screenHead('STUDY', 'feed')} />
+        <LevelBar deck="VOCABULARY" levels={levels} at={level} onPick={onLevel} />
         {/* the hero's cap and the today panel already say which level this is and how many words
             are in it, so the heading at the top of the stage was the third statement of it */}
         {feed.error ? <div className="pj-empty">{feed.error.toUpperCase()}</div> : null}
@@ -135,8 +154,9 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
                 )}
 
                 <span className="fd-theme">{here?.theme?.toUpperCase() || 'NO THEME'}</span>
+                {/* the slab names the drill it runs, for the same reason the deck screen's does */}
                 <span className="fd-slab">
-                  <em>{head.queued ? `${head.queued} QUEUED` : 'NOTHING QUEUED'}</em>
+                  <em>{head.queued ? `${head.queued} QUEUED · ${mode.toUpperCase()}` : mode.toUpperCase()}</em>
                   <b>{head.queued ? 'START TODAY’S WORDS' : 'GO TO REVIEWS'} ▸</b>
                 </span>
               </button>
@@ -227,7 +247,8 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
         </div>
         <div className="hints">
           <span><b>← →</b>Choose<em>選択</em></span>
-          <span><b>ENTER</b>Open<em>決定</em></span>
+          {levels.length > 1 ? <span><b>1–{levels.length}</b>Level<em>級</em></span> : null}
+          <span><b>ENTER</b>Start<em>開始</em></span>
           <span><b>ESC</b>Back<em>戻る</em></span>
         </div>
       </div>
