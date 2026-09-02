@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTraversal } from '../useTraversal'
 import type { BlockInfo, JlptLevel, JlptLevelProgress } from '../../../types'
 import { deckChain, deckSheet, gateLine, railLine } from '../deck'
@@ -6,7 +6,7 @@ import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { LevelBar } from './LevelBar'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -42,7 +42,7 @@ export function Deck({
   title, slug, blocks, gate, loading, error, mode, levels, level, onLevel, onStart, onUp,
 }: DeckProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const chain = useMemo(() => deckChain(blocks, gate), [blocks, gate])
 
@@ -77,15 +77,6 @@ export function Deck({
   const next = chain.blocks[chain.here + 1]
   const view = deckSheet(chain.cleared, page)
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 

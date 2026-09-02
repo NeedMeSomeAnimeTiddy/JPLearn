@@ -20,12 +20,34 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
    spelling; one is enough in most browsers and not in all of them.
    ================================================================================================== */
 
+/* ==================================================================================================
+   THE BOARD'S SCALE, AND THE THIRD ARGUMENT THAT WAS NOT IN THE MOCKUP.
+
+   `Math.min(vw / 1280, vh / 720)` is what the mockup computes. The port wrote
+   `Math.min(vw / 1280, vh / 720, 1)` -- fifteen times, one copy per screen -- and that cap is why
+   the whole interface sat in a small island in the middle of any window bigger than 1280x720. On a
+   1600x1028 window the honest scale is 1.25 and the capped one is 1.0, so the board was 1280x720
+   with 160px of dead letterbox down each side and 154 top and bottom, and then the stage's own
+   160px moat inside that. Three hundred and twenty pixels of nothing between the window's edge and
+   the first thing you can read.
+
+   THE MOCKUP SAYS WHY IN ONE LINE, on the rule that pins the four corners: "40px from the edge on a
+   laptop is 80 on a 2K screen, or the interface drifts into the corners as the display grows." The
+   offsets scale WITH the board on purpose. Capping the scale keeps the offsets and throws away the
+   growth, which is the worst of both.
+
+   AND IT IS COMPUTED ONCE NOW. Fifteen copies of a formula is fifteen places to fix it, and this
+   one had been fixed in none of them. */
+export function boardScale(): number {
+  return Math.min(window.innerWidth / 1280, window.innerHeight / 720)
+}
+
 /** the board's scale, written to `--lk-u` on the frame it returns */
 export function useFrameFit() {
   const frameRef = useRef<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
+      const u = boardScale()
       frameRef.current?.style.setProperty('--lk-u', String(u))
       /* AND ON THE ROOT, for the chrome. The brand and the chips are pinned to the WINDOW rather
          than to the board -- see `.mn-chrome` in `menu.css` -- so they are outside the frame that

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BADGE_METADATA, useAchievements } from '../../achievements'
 import type { StudySummaryPayload } from '../../../types'
 import type { XPProgressPayload } from '../../../generated/types'
@@ -8,7 +8,7 @@ import {
 } from '../ledger'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -50,7 +50,7 @@ export interface LedgerProps {
 
 export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const { year, loading } = useYear()
   const { badges } = useAchievements()
@@ -58,15 +58,6 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
   const earned = badges.filter((b) => b.earned).length
   const L = buildLedger(summary, xp, year, { earned, total })
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 

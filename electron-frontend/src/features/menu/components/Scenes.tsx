@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FREE_TALK, type Scene } from '../scenes'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -17,20 +17,11 @@ export interface ScenesProps {
    cursor goes one past the end rather than free talk being a card of its own. */
 export function Scenes({ scenes, onPick, onUp }: ScenesProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
   const last = scenes.length
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 

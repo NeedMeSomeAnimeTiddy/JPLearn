@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BADGE_ICONS, BADGE_ICON_FALLBACK, useAchievements } from '../../achievements'
 import { flatSeals, sealGroups, wallStep } from '../wall'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -13,7 +13,7 @@ export interface WallProps {
 
 export function Wall({ onUp }: WallProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
   const { badges, loading } = useAchievements()
@@ -21,15 +21,6 @@ export function Wall({ onUp }: WallProps) {
   const flat = flatSeals(groups)
   const here = flat[Math.min(at, Math.max(0, flat.length - 1))]
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 

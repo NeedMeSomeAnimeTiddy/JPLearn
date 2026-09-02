@@ -51,11 +51,11 @@ import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
-import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
+import { flyHome, flyToSection } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
   MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed, Unlock,
-  MenuChrome, leaveBoard,
+  MenuChrome, leaveBoard, cancelLeaving,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
   unlockMoment, heroFromStudyBlock, crownFrom, rowsFrom, type MenuSectionKey,
 } from './features/menu'
@@ -1350,7 +1350,18 @@ function App() {
      the level change for the length of the fade -- see `leaving.ts` -- and this function still
      answers its caller synchronously, so nothing downstream learns that leaving takes 200 ms. */
   const enterMenuSection = useCallback((section: MenuSectionKey) => {
-    if (valleyIsFlying()) return
+    /* A PRESS DURING A FLIGHT REDIRECTS IT. This used to `return` on `valleyIsFlying()`, and the
+       window that guard covers is not small: leaving a section shows the front door immediately and
+       then flies home for two seconds, so for two seconds every row on it was a dead control --
+       pressed, nothing, no flash, no reason given. That is most of "the buttons don't work".
+
+       AND IT IS SAFE, because a flight is composed from the camera's CURRENT pose rather than from
+       where the last one started: `flyToSectionImpl` reads `cam` and replaces `live` outright, so
+       redirecting mid-move is one arc from wherever the eye is to wherever you just asked for. The
+       abandoned flight's `onOpen` simply never fires, which is exactly right -- you changed your
+       mind before it arrived. `cancelLeaving` drops the pending unmount from the Escape that
+       started the flight home, so it cannot take the screen you are now entering back off. */
+    cancelLeaving()
     flyToSection(section, () => menuPath.enterSection(section))
   }, [menuPath])
 
@@ -2649,7 +2660,7 @@ function App() {
              front door's rows take, so arriving at a section from here looks like arriving at it
              from anywhere else. */
           onGo={(section, screen) => {
-            if (valleyIsFlying()) return
+            cancelLeaving()
             flyToSection(section, () => {
               menuPath.enterSection(section)
               if (screen) menuPath.enterScreen(screen)

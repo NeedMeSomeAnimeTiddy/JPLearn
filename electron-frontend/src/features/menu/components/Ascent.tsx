@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ASCENT_BOT, ASCENT_H, ASCENT_TOP, JLPT_READY_PCT, JLPT_UNLOCK_PCT,
   badgeFor, pctY, stateWord, type Rung,
@@ -6,7 +6,7 @@ import {
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { refuse } from '../refuse'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -25,19 +25,10 @@ export interface AscentProps {
    cards: you can follow one line across all five levels at once. */
 export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   /* on arrival, once — the readiness figures land after the screen is up, and a focus call that
      re-ran with them would take focus back off whatever the reader had reached for */

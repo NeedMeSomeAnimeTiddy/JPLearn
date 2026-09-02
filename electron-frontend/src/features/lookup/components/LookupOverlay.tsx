@@ -5,6 +5,7 @@ import type { LookupController, LookupRouteKey, LookupStatus } from '../types'
 import { kanjiIn } from '../utils'
 import '../../../styles/stage.css'
 import '../lookup.css'
+import { boardScale } from '../../menu/useScreen'
 
 export interface LookupOverlayProps {
   controller: LookupController
@@ -47,7 +48,7 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary 
   useLayoutEffect(() => {
     if (!isOpen) return
     const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
+      const u = boardScale()
       frameRef.current?.style.setProperty('--lk-u', String(u))
     }
     fit()

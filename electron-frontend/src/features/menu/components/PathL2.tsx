@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ProgressionNodeView } from '../../progression'
 import {
@@ -10,7 +10,7 @@ import { MENU_SECTIONS } from '../constants'
 import { useHoverPick } from '../useHoverPick'
 import { useTraversal } from '../useTraversal'
 import { refuse } from '../refuse'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -52,7 +52,7 @@ function handOff(row: PathRow): { label: string; accent: string | null } | null 
 
 export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const rows = useMemo(() => pathRows(nodes), [nodes])
 
@@ -76,15 +76,6 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
     if (cursor === null && rows.length) setCursor(hereIndex(rows))
   }, [cursor, rows])
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   /* THE SCREEN TAKES FOCUS WHEN IT ARRIVES, or its own arrow keys do nothing. The listener below
      is on this subtree rather than on the window — deliberately, so the menu never eats the arrows

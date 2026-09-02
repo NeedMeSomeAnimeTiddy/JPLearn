@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Lane } from '../lanes'
 import type { MenuSectionKey } from '../types'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { refuse } from '../refuse'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -26,19 +26,10 @@ export interface LanesProps {
    that opened each lane, and the three things inside it. See the note in `lanes.ts`. */
 export function Lanes({ section, jp, en, note, lanes, onPick, onUp }: LanesProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   /* ON ARRIVAL, ONCE. The screen takes focus or its own arrow keys do nothing (see the note in
      MenuL1) — but taking it on every render is a different bug: THE WORLD's figures arrive from

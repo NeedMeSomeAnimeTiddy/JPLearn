@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { HERO_INDEX, MENU_SECTIONS } from '../constants'
 import { useHoverPick } from '../useHoverPick'
 import { burstPetals } from '../petalBurst'
@@ -7,7 +7,7 @@ import { Brand, Stats } from './Chrome'
 import type {
   MenuController, MenuCrown, MenuHero, MenuRow, MenuSection, MenuSectionKey,
 } from '../types'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -75,7 +75,7 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
     const gate = section.gate ? gateOf(section.gate.feature) : null
     return gate ? gate.en : 'LOCKED'
   }
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   /* ONE DOOR FOR BOTH WAYS IN. The mouse and the keyboard both arrive here, so the paper comes off
@@ -89,15 +89,6 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
     onOpenSection(key)
   }
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   /* THE ARROWS BELONG TO THE MENU WHILE THE MENU IS THE SCREEN. Bound on the root rather than the
      window so the keys stop at this subtree -- the app has its own arrow handling inside a study

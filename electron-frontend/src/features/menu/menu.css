@@ -52,11 +52,6 @@
 /* the chrome layer carries a frame only to compute the board's scale -- see `MenuChrome` */
 .mn-measure { visibility: hidden; }
 .mn-open .mn-frame > * { pointer-events: auto; }
-/* ---- the chrome: the four corners, in board pixels on the stage ----
-   Lifted from the mockup's `.chrome` family. There they are `position: fixed` and carry
-   `zoom: var(--u)` each; here they are children of `.mn-frame`, which is already the centred,
-   zoomed 1280x720 board -- so they keep their authored offsets and drop the fixed positioning. */
-.mn-open .hints { position: absolute; }
 
 /* ==================================================================================================
    THE BRAND AND THE CHIPS ARE PINNED TO THE WINDOW, NOT TO THE BOARD, AND THAT IS THE FIX FOR A
@@ -77,11 +72,29 @@
 
    `--lk-u` COMES OFF THE ROOT because these are outside the frame that computes it; `useFrameFit`
    writes it in both places for exactly this. */
-.brand, .stats {
+/* ==================================================================================================
+   ALL FOUR CORNERS ARE PINNED TO THE WINDOW, WHICH IS ONE RULE IN THE MOCKUP AND WAS TWO HERE.
+
+   The mockup has a single `.chrome` declaration -- `position: fixed; zoom: var(--u)` -- and it
+   covers the brand, the streak chips, the hint bar and the back tab, with a comment saying exactly
+   why: "40px from the edge on a laptop is 80 on a 2K screen, or the interface drifts into the
+   corners as the display grows."
+
+   THE PORT MOVED TWO OF THEM AND LEFT TWO BEHIND. The brand and the chips became `position: fixed`
+   when they were found painting over the ledger's plates; the hints and the back tab stayed
+   children of `.mn-frame`. Measured on a 1600x1028 window: the brand sat at (40, 24) and the back
+   tab at (200, 801) -- two corners hugging the window and two floating a hundred and sixty pixels
+   inside it, on every screen. That is the "controls are not in the corner".
+
+   POINTER EVENTS ARE THE ONE THING TO KEEP STRAIGHT. These sit over the whole window, so the
+   containers pass clicks through and only their controls take them. */
+.brand, .stats, .hints, .back-tab {
   position: fixed;
   zoom: var(--lk-u, 1);
-  pointer-events: auto;
+  pointer-events: none;
 }
+.brand, .stats { pointer-events: auto; }
+.hints button, .back-tab button { pointer-events: auto; }
 .brand { top: 24px; left: 40px; display: flex; gap: 11px; align-items: center; }
 /* ================================================================================
    THE CRANE FROM THE KICKSTARTER BRAND, AND ONLY THE CRANE.
@@ -1681,7 +1694,16 @@ body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
   margin-left: -52px; width: calc(100vw / var(--lk-u, 1));
 }
 
-.course-wrap { position: relative; width: 100%; height: 440px; }
+/* ==================================================================================================
+   THE ROAD STANDS ON THE STAGE, WHICH IT HAD NEVER DONE.
+
+   `.course-wrap` was `position: relative` in the frame's normal flow, so its own y 0 was the BOARD's
+   y 0 -- and every offset inside it was therefore measured from the top of the window rather than
+   from the stage. Measured on the running build: the chapter line painted at board y 0, straight
+   through the brand; the strip ran y 32 to 412 when the stage starts at 192; and the minimap was
+   `position: fixed` to the window at a hard 1280 wide, so it neither scaled with the board nor sat
+   in the foot band. This screen predates the frame contract and had never been moved onto it. */
+.course-wrap { position: absolute; inset: 0; }
 
 /* ---- the chapter line, above the road ----
    THE LAST BARE THING IN THIS CORNER. It was cream type with a heavy dark stroke around it,
@@ -1698,7 +1720,8 @@ body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
    and at opposite angles as two things set down separately. The slab above rolls -1.2, so this
    rolls +1. The stroke goes with the wash -- it is ink on paper now. */
 .cs-chapline {
-  position: absolute; left: 52px; top: 0;
+  /* the caption chip's own slot, which is where every other screen puts its second line */
+  position: absolute; left: 52px; top: 152px;
   display: flex; align-items: center; gap: 9px; white-space: nowrap;
   padding: 5px 13px 6px;
   background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
@@ -1721,7 +1744,7 @@ body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
    reading survives the move; arguably it is better, because what it runs out into is a
    place rather than a screen edge. ---- */
 .cs-strip {
-  position: absolute; left: 160px; right: 160px; top: 32px; height: 380px; overflow: hidden;
+  position: absolute; left: 160px; right: 160px; top: 192px; height: 380px; overflow: hidden;
   /* the gutter the counted tags stand in, and where the road starts existing again.
      SCALED WITH THE STRIP: 116/300 of 1280 became 70/190 of 960, so the fully-painted
      middle is the same fraction of the road as it was of the frame. */
@@ -2045,8 +2068,9 @@ body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
 
 /* THE FOOT BAND, like the library's strip -- at `bottom: 24` this ran to y697, which is
    not a band, it is the bottom of the screen. */
+/* the foot band's one object, on the board rather than pinned to the window */
 .cs-mini {
-  position: fixed; left: 0; right: 0; bottom: 71px; z-index: 6;
+  position: absolute; left: 160px; right: 160px; top: 588px; z-index: 6;
   display: flex; flex-direction: column; align-items: center; gap: 9px;
 }
 
@@ -4092,7 +4116,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    the top of the stage -- which on the road put it underneath the tablets. This is the mockup's:
    one washi box in the bottom-left corner, carrying both words, in the same family as the chips
    and the keycaps without pretending to be a key you press. */
-.back-tab { position: absolute; left: 40px; bottom: 46px; }
+/* left and bottom only -- the family rule above owns the pinning and the scale */
+.back-tab { left: 40px; bottom: 46px; }
 
 
 

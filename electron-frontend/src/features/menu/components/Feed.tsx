@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { VOCAB_BUDGET_STEPS, type VocabFeed } from '../../vocab-feed'
 import type { JlptLevel, JlptLevelProgress } from '../../../types'
 import { feedAt, feedHead, feedNote, wordKanji, wordSize } from '../feed'
@@ -6,7 +6,7 @@ import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { LevelBar } from './LevelBar'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -27,7 +27,7 @@ export interface FeedProps {
 
 export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp }: FeedProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   /* SIX FOCUSABLE THINGS: the queue card, and the five budget steps. The steps are ordinary
@@ -40,15 +40,6 @@ export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp 
   const head = feedHead(feed)
   const here = feedAt(feed, word)
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
   /* a new budget is a new queue, so the reader goes back to its front rather than holding an

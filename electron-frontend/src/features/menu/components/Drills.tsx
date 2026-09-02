@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MinigameKey, MinigameStats, ScriptKey } from '../../../types'
 import { SESSION_LENGTH_PRESETS } from '../../../constants'
 import {
@@ -9,7 +9,7 @@ import { useHoverPick } from '../useHoverPick'
 import { screenHead } from '../chrome'
 import { refuse } from '../refuse'
 import { ScreenHead } from './ScreenHead'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -68,7 +68,7 @@ export function Drills({
   deck, slug, session, lockReasons, stats, onDeck, onStart, onUp,
 }: DrillsProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const modes = useMemo(() => drillModes(), [])
   const chapters = useMemo(() => drillChapters(modes), [modes])
@@ -98,15 +98,6 @@ export function Drills({
      selection back off the one the keyboard just chose. See `useHoverPick`. */
   const hover = useHoverPick(setSel)
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 

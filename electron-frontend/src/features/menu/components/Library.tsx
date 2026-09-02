@@ -1,11 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   bandOf, libVeil, libraryBands, libraryNote, libraryWindow, shelfLayout, type LibraryRow,
 } from '../library'
 import { useHoverPick } from '../useHoverPick'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
-import { screenClass, useEntered } from '../useScreen'
+import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -33,7 +33,7 @@ export interface LibraryProps {
    ================================================================================================== */
 export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
   const entered = useEntered()
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
   const cursor = Math.min(at, Math.max(0, rows.length - 1))
@@ -47,15 +47,6 @@ export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
     [view.rows.length, view.cursorInWindow],
   )
 
-  useLayoutEffect(() => {
-    const fit = () => {
-      const u = Math.min(window.innerWidth / 1280, window.innerHeight / 720, 1)
-      frameRef.current?.style.setProperty('--lk-u', String(u))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 
