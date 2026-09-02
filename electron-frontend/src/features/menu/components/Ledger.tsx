@@ -3,8 +3,12 @@ import { BADGE_METADATA, useAchievements } from '../../achievements'
 import type { StudySummaryPayload } from '../../../types'
 import type { XPProgressPayload } from '../../../generated/types'
 import {
-  LEDGER_DAYS, accColour, buildLedger, ledgerYear, type ActivityDay, type LedgerYear,
+  LEDGER_DAYS, accColour, buildLedger, ledgerSheet, ledgerYear,
+  type ActivityDay, type LedgerYear, type SheetKey,
 } from '../ledger'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -45,6 +49,7 @@ export interface LedgerProps {
 }
 
 export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const { year, loading } = useYear()
@@ -77,15 +82,39 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
 
   const maxWeek = Math.max(1, ...L.year.weeks.map((w) => w.n))
 
+  /* ==================================================================================================
+     WHICH FIGURE IS OPEN, AND WHY THIS SCREEN NEEDED ONE AT ALL.
+
+     Every plate here was a dead end: a number to read and nothing to press, on the one screen whose
+     whole subject is what you have actually done. See `ledgerSheet` for what is behind each and why
+     the caveat is the part that matters.
+
+     ESCAPE IS CAPTURED, the same way the stat chips capture it: the key is already spoken for by the
+     level above, so an open sheet has to eat it or closing a sheet leaves the screen. */
+  const [sheetKey, setSheetKey] = useState<SheetKey | null>(null)
+  const sheet = sheetKey ? ledgerSheet(sheetKey, L) : null
+  useEffect(() => {
+    if (!sheetKey) return
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setSheetKey(null); e.stopPropagation() }
+    }
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
+  }, [sheetKey])
+
+  /* a plate with nothing behind it stays a plate rather than opening onto four dashes */
+  const plate = (key: SheetKey) => (ledgerSheet(key, L) ? () => setSheetKey(key) : undefined)
+
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
+        <ScreenHead head={screenHead('RECORDS', null)} />
         <div className="lg-wrap">
 
         {/* THE GHOST IS THE WHOLE IDEA OF THIS DRAWING: your best run set in the same face at the
             same weight and fifteen percent ink, so the current number is read against it without a
             second scale, a second axis or a word of explanation. */}
-        <div className="lg-f lg-streak lg-plate">
+        <button type="button" className="lg-f lg-streak lg-plate" onClick={plate('streak')}>
           <span className="lg-cap">
             <b>連続 STREAK</b><i>A DAY COUNTS WHEN YOU REVIEW</i>
           </span>
@@ -107,25 +136,31 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
               {' · ONE COVERS A MISSED DAY'}
             </em>
           </span>
-        </div>
+        </button>
 
         <div className="lg-rest">
           <span className="lg-resthead">その他 THE REST OF THE LEDGER</span>
           {L.rows.map((row) => (
-            <span key={row.key} className="lg-row">
+            <button
+              key={row.key}
+              type="button"
+              className="lg-row"
+              onClick={plate(row.key as SheetKey)}
+              aria-label={`${row.en} — see what it is made of`}
+            >
               <span className="lg-rowlab"><b>{row.en}</b><i>{row.jp}</i></span>
               {row.value === null ? (
                 <span className="lg-none">—<em>{row.absent}</em></span>
               ) : (
                 <b className="lg-figure">{row.value}<em>{row.unit}</em></b>
               )}
-            </span>
+            </button>
           ))}
         </div>
 
         {/* ONE BAR IS A WEEK. Height is volume and colour is accuracy, so both channels are on the
             screen at once — a contribution grid has one square per day and can carry only one. */}
-        <div className="lg-f lg-year lg-plate">
+        <button type="button" className="lg-f lg-year lg-plate" onClick={plate('year')}>
           <span className="lg-cap">
             {/* the caption is where "still counting" belongs now that the screen has no heading
                 of its own: a year drawn as 0 of 365 while the window is still open is a lie the
@@ -150,10 +185,10 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
                 : <i key={i} className="none" style={{ height: 3 }} />
             ))}
           </span>
-        </div>
+        </button>
 
         {L.level ? (
-          <div className="lg-f lg-lv">
+          <button type="button" className="lg-f lg-lv" onClick={plate('level')}>
             <span className="lg-lvn"><span>LEVEL 等級</span><b>{L.level.level}</b></span>
             <span className="lg-xp">
               <span className="lg-xprow">
@@ -164,7 +199,7 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
                 <i style={{ width: `${Math.round((L.level.xpIn / Math.max(1, L.level.xpOf)) * 100)}%` }} />
               </span>
             </span>
-          </div>
+          </button>
         ) : null}
 
         {/* THE ONE THING HERE THAT IS A PLACE rather than a figure, which is why it is a door and
@@ -185,6 +220,48 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
         </button>
 
         </div>
+
+        {sheet ? (
+          <>
+            {/* THE SCRIM IS A BUTTON, not a div with a handler: it is the primary way out of this
+                sheet and a click target that no keyboard can reach is not a way out at all. */}
+            <button
+              type="button"
+              className="lg-scrim"
+              aria-label="Close"
+              onClick={() => setSheetKey(null)}
+            />
+            <div className="lg-sheet" role="dialog" aria-label={`${sheet.en} — the whole of it`}>
+              <span className="lg-cap"><b>{sheet.jp} {sheet.en}</b><i>THE WHOLE OF IT</i></span>
+              {sheet.strip ? (
+                <>
+                  <span className="lg-strip">
+                    {L.year.weeks.map((w, i) => (
+                      w.n
+                        ? (
+                          <i
+                            key={i}
+                            style={{
+                              height: 4 + Math.round(36 * (w.n / maxWeek)),
+                              background: sheet.acc ? accColour(w.acc) : 'var(--gold)',
+                            }}
+                          />
+                        )
+                        : <i key={i} className="none" style={{ height: 3 }} />
+                    ))}
+                  </span>
+                  <span className="lg-stripcap"><b>52 WEEKS AGO</b><b>THIS WEEK</b></span>
+                </>
+              ) : null}
+              {sheet.lines.map((l) => (
+                <span key={l.k} className={l.off ? 'lg-line off' : 'lg-line'}>
+                  <b>{l.k}</b><i>{l.v}</i>
+                </span>
+              ))}
+              <span className="lg-note">{sheet.note}</span>
+            </div>
+          </>
+        ) : null}
 
         <div className="back-tab">
           <button type="button" onClick={onUp}>

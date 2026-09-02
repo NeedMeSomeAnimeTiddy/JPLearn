@@ -168,3 +168,151 @@ export function buildLedger(
     badges,
   }
 }
+
+/* ==================================================================================================
+   AND EVERY FIGURE OPENS ONTO WHAT IT IS MADE OF.
+
+   THE LEDGER WAS A WALL OF DEAD ENDS. Six plates, every one of them a number you could read and
+   nothing you could do — no press, no cursor, no second level — on the one screen in this menu whose
+   entire subject is "what have I actually done". A records screen that answers "62%" and refuses
+   "62% of what" is the shape of a dashboard rather than of a record.
+
+   A SHEET, NOT A TOOLTIP, and for the same reason the chips got panels: the answer is four lines and
+   a caveat, and a tooltip is one line. Each carries the same three things —
+
+     - THE LINES, which are the figure taken apart. Best and worst week, days counted, longest gap.
+     - THE STRIP, which is the same 52 weeks the year plate draws, at a third the height. It is on
+       five of the six sheets because almost every figure here is a MEAN over that window, and a mean
+       shown without its distribution is the number people misread.
+     - THE NOTE, which is the caveat. This is the part the mockup got right and it is the reason the
+       sheets exist at all: "the figure on the front is a mean of 41 days, not a single number the app
+       keeps". Every one of these numbers has a caveat like that, and the front of the plate has no
+       room for any of them.
+
+   AND NOT THE MOCKUP'S SIX. Its STUDY TIME sheet leads on hours and its RANK sheet on a grade; this
+   app keeps neither, and a records screen that invents a figure is worse than one that omits it. The
+   four it can honestly fill are here, and the rest of the mockup's lines come from the same year
+   window this file already builds.
+   ================================================================================================== */
+
+export type SheetKey = 'streak' | 'accuracy' | 'reviews' | 'year' | 'level'
+
+export interface SheetLine {
+  k: string
+  v: string
+  /** drawn faint, for a line whose answer is an absence */
+  off?: boolean
+}
+
+export interface LedgerSheet {
+  jp: string
+  en: string
+  lines: SheetLine[]
+  note: string
+  /** whether the 52-week strip is drawn under the caption, and coloured by accuracy */
+  strip: boolean
+  acc: boolean
+}
+
+/** the busiest week in the window, the best and worst weeks that had anything in them, and the
+    longest run of weeks with nothing at all */
+export function yearShape(year: LedgerYear): {
+  busiest: number; best: number | null; worst: number | null; gap: number
+} {
+  let busiest = 0, best: number | null = null, worst: number | null = null
+  let gap = 0, run = 0
+  for (const w of year.weeks) {
+    if (w.n > busiest) busiest = w.n
+    if (w.n > 0) {
+      if (best === null || w.acc > best) best = w.acc
+      if (worst === null || w.acc < worst) worst = w.acc
+      run = 0
+    } else {
+      run++
+      if (run > gap) gap = run
+    }
+  }
+  return { busiest, best, worst, gap }
+}
+
+const n = (v: number) => v.toLocaleString()
+
+/**
+ * What is behind one plate.
+ *
+ * Returns null for a plate with nothing behind it — the level sheet on an account that has no XP
+ * payload — so a plate that cannot answer stays a plate rather than opening onto four dashes.
+ */
+export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
+  const s = yearShape(L.year)
+  if (key === 'streak') {
+    return {
+      jp: '連続', en: 'STREAK', strip: true, acc: false,
+      lines: [
+        { k: 'RUNNING NOW', v: `${n(L.streak.now)} DAY${L.streak.now === 1 ? '' : 'S'}` },
+        { k: 'YOUR BEST RUN', v: `${n(L.streak.best)} DAY${L.streak.best === 1 ? '' : 'S'}` },
+        { k: 'FREEZES LEFT', v: n(L.streak.freezes), off: L.streak.freezes === 0 },
+        { k: 'ACTIVE DAYS THIS YEAR', v: `${n(L.year.active)} OF ${n(L.year.total)}` },
+      ],
+      note: 'A DAY COUNTS ONCE YOU HAVE GRADED ANYTHING AT ALL — THE STREAK IS ABOUT TURNING UP. '
+        + 'A FREEZE COVERS ONE MISSED DAY.',
+    }
+  }
+  if (key === 'accuracy') {
+    return {
+      jp: '正答率', en: 'ACCURACY', strip: true, acc: true,
+      lines: [
+        { k: 'THIS YEAR', v: L.year.accuracy === null ? '—' : `${L.year.accuracy}%`,
+          off: L.year.accuracy === null },
+        { k: 'BEST WEEK', v: s.best === null ? '—' : `${s.best}%`, off: s.best === null },
+        { k: 'WORST WEEK', v: s.worst === null ? '—' : `${s.worst}%`, off: s.worst === null },
+        { k: 'DAYS COUNTED', v: n(L.year.active) },
+      ],
+      note: `THE FIGURE ON THE FRONT IS A MEAN OF ${n(L.year.active)} DAYS, NOT A SINGLE NUMBER `
+        + 'THE APP KEEPS. EVERY BAR ABOVE IS ONE WEEK, COLOURED BY ITS OWN ACCURACY.',
+    }
+  }
+  if (key === 'reviews') {
+    return {
+      jp: '復習', en: 'REVIEWS', strip: true, acc: false,
+      lines: [
+        { k: 'THIS YEAR', v: n(L.year.reviews) },
+        { k: 'ACTIVE DAYS', v: `${n(L.year.active)} OF ${n(L.year.total)}` },
+        { k: 'BUSIEST WEEK', v: `${n(s.busiest)} REVIEWS`, off: s.busiest === 0 },
+        { k: 'A DAY YOU STUDIED', v: L.year.active
+          ? `${n(Math.round(L.year.reviews / L.year.active))} REVIEWS`
+          : '—', off: L.year.active === 0 },
+      ],
+      note: 'THE LAST LINE IS A MEAN OVER THE DAYS YOU TURNED UP, NOT OVER THE YEAR — DIVIDING BY '
+        + '364 WOULD MEASURE HOW OFTEN YOU STUDY RATHER THAN HOW MUCH.',
+    }
+  }
+  if (key === 'year') {
+    return {
+      jp: '一年', en: 'THE YEAR', strip: true, acc: false,
+      lines: [
+        { k: 'ACTIVE DAYS', v: `${n(L.year.active)} OF ${n(L.year.total)}` },
+        { k: 'TOTAL REVIEWS', v: n(L.year.reviews) },
+        { k: 'BUSIEST WEEK', v: `${n(s.busiest)} REVIEWS`, off: s.busiest === 0 },
+        { k: 'LONGEST GAP', v: `${n(s.gap)} WEEK${s.gap === 1 ? '' : 'S'}`, off: s.gap === 0 },
+      ],
+      note: 'THE GAP IS PART OF THE RECORD. A YEAR DRAWN WITH THE EMPTY WEEKS LEFT OUT WOULD BE A '
+        + 'DIFFERENT YEAR.',
+    }
+  }
+  if (!L.level) return null
+  return {
+    jp: '等級', en: `LEVEL ${L.level.level}`, strip: false, acc: false,
+    lines: [
+      { k: 'THIS LEVEL', v: `${n(L.level.xpIn)} / ${n(L.level.xpOf)} XP` },
+      { k: `TO LEVEL ${L.level.level + 1}`, v: `${n(Math.max(0, L.level.xpOf - L.level.xpIn))} XP` },
+      { k: 'BADGES EARNED', v: `${n(L.badges.earned)} OF ${n(L.badges.total)}`,
+        off: L.badges.earned === 0 },
+    ],
+    /* THE ONE SHEET WITHOUT A YEAR ON IT, and the reason is meaning rather than height: XP is a
+       running total that only goes up, so a 52-week distribution of it says nothing a level bar
+       does not already say. */
+    note: 'XP COMES OFF EVERY GRADED ANSWER. THE STREAK MULTIPLIER IN THE ROUND SCORING IS WHAT '
+      + 'MAKES A LONG CORRECT RUN WORTH MORE THAN THE SAME CARDS SPREAD OVER A WEEK.',
+  }
+}

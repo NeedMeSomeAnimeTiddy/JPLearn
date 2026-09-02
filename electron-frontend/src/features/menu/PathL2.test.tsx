@@ -160,3 +160,36 @@ describe('the path screen', () => {
     expect(results.violations).toEqual([])
   })
 })
+
+describe('the road says no where it cannot go', () => {
+  it('refuses a step with no destination, which is the genuinely silent case', () => {
+    /* the slab beside it already reads NOTHING HERE YET; the refusal is what sends you to read it */
+    const nodes = [node({ node_id: 'listening', name: 'Listening', status: 'active', isOpen: true, destination: { kind: 'none' } })]
+    render(<PathL2 nodes={nodes} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
+    fireEvent.keyDown(document.querySelector('.mn-open') as HTMLElement, { key: 'Enter' })
+    expect(onOpenNode).not.toHaveBeenCalled()
+    expect(document.querySelector('.mn-flash')).not.toBeNull()
+  })
+
+  it('still lets a LOCKED step through, because that gate is soft and always has been', () => {
+    /* `useProgression` calls its gating soft on the ground that onboarding is skippable: pressing a
+       locked node raises a confirmation, which is already feedback and already the right one.
+       Refusing here would quietly turn a soft gate into a hard one. */
+    render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
+    const root = document.querySelector('.mn-open') as HTMLElement
+    fireEvent.keyDown(root, { key: 'ArrowDown' })
+    fireEvent.keyDown(root, { key: 'ArrowDown' })
+    fireEvent.keyDown(root, { key: 'Enter' })
+    expect(onOpenNode).toHaveBeenCalledWith('vocabulary_n5')
+  })
+
+  it('keeps walking after the listener has been bound, which a stale closure would not', () => {
+    /* the keydown handler is bound once and reads the cursor through a ref; read out of the closure
+       it would be whatever it was on the first frame, and the road would take one step and stop */
+    render(<PathL2 nodes={curriculum()} loading={false} onOpenNode={onOpenNode} onUp={onUp} />)
+    const root = document.querySelector('.mn-open') as HTMLElement
+    /* the cursor opens on HIRAGANA, which is index 1, so four steps land on index 5 */
+    for (let i = 0; i < 4; i++) fireEvent.keyDown(root, { key: 'ArrowRight' })
+    expect(document.querySelector('.cs-hero .cs-hen')?.textContent).toBe('SENTENCE EXAMPLES')
+  })
+})

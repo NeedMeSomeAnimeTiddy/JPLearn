@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { UNLOCK_LEADS_TO, type UnlockMoment } from '../unlock'
+import { UNLOCK_GOES_TO, UNLOCK_LEADS_TO, type UnlockMoment } from '../unlock'
+import type { MenuSectionKey } from '../types'
+import { screenClass, useEntered } from '../useScreen'
+import { ScreenHead } from './ScreenHead'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -7,9 +10,14 @@ export interface UnlockProps {
   moment: UnlockMoment
   /** dismiss, and remember the mark that says this was announced */
   onContinue: (mark: string) => void
+  /* WHERE A CARD LEADS, if the caller can take you there. Optional so the moment can still be
+     rendered on its own -- in a test, or anywhere the menu's navigation is not mounted -- in which
+     case every card stays a plain card rather than a door that goes nowhere. */
+  onGo?: (section: MenuSectionKey, screen?: string) => void
 }
 
-export function Unlock({ moment, onContinue }: UnlockProps) {
+export function Unlock({ moment, onContinue, onGo }: UnlockProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -44,12 +52,16 @@ export function Unlock({ moment, onContinue }: UnlockProps) {
   const count = moment.cards.length
 
   return (
-    <div className="mn-open un-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered, 'un-open')} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>解放</b><i>SOMETHING OPENED</i>
-          <s>{count === 1 ? 'ONE NEW THING' : `${count} NEW THINGS`}</s>
-        </div>
+        {/* THE ONE HEADING THAT BELONGS TO NO SECTION, because the moment belongs to none: it can
+            fire off the path, off a drill or off a streak. The mark is 解 on the menu's own gold
+            rather than a section's colour, which is the whole of what says "this is not a place you
+            navigated to". */}
+        <ScreenHead
+          head={{ mark: '解', accent: '#cfa45c', kick: null, en: 'SOMETHING OPENED', jp: '解放' }}
+          note={count === 1 ? 'ONE NEW THING' : `${count} NEW THINGS`}
+        />
 
         {/* WHAT YOU JUST FINISHED. The moment is named for the MILESTONE that fired it, not for
             what it opened — and where no single milestone is common to all of them, there is no
@@ -77,16 +89,47 @@ export function Unlock({ moment, onContinue }: UnlockProps) {
             in a blank sheet, which reads as a load failure rather than as emphasis. */}
         <div className="un-lead">これが開いた · AND THIS IS NOW OPEN TO YOU</div>
         <div className="un-list">
-          {moment.cards.map((card) => (
-            <div className="un-card" key={card.featureId}>
-              <span className="t">
-                <b>{card.name}</b>
-                <i>{UNLOCK_LEADS_TO[card.featureId] ?? card.category.replace(/_/g, ' ').toUpperCase()}</i>
-              </span>
-              {/* two of the nine award no badge, and an absent one is drawn as absent */}
-              {card.badge ? <span className="b">BADGE EARNED</span> : null}
-            </div>
-          ))}
+          {moment.cards.map((card) => {
+            const where = UNLOCK_LEADS_TO[card.featureId]
+              ?? card.category.replace(/_/g, ' ').toUpperCase()
+            const route = onGo ? UNLOCK_GOES_TO[card.featureId] : undefined
+            const body = (
+              <>
+                <span className="t">
+                  <b>{card.name}</b>
+                  <i>{where}</i>
+                </span>
+                {/* two of the nine award no badge, and an absent one is drawn as absent */}
+                {card.badge ? <span className="b">BADGE EARNED</span> : null}
+                {route ? <span className="go">GO ▸</span> : null}
+              </>
+            )
+            /* A CARD WITH A ROUTE IS A DOOR; ONE WITHOUT IS STILL A CARD. Every one of these has
+               named its destination since the screen landed and none of them could reach it -- the
+               only way out was CONTINUE, back to the front door, and then navigating by hand to the
+               place the card had just told you about. `themes` lives in Settings, which this menu
+               has no route into, so it keeps its label and stays a card: saying the true thing you
+               have beats inventing the one you do not. */
+            if (!route) return <div className="un-card" key={card.featureId}>{body}</div>
+            return (
+              <button
+                type="button"
+                className="un-card is-door"
+                key={card.featureId}
+                aria-label={`${card.name} — open ${where}`}
+                onClick={() => {
+                  /* THE MOMENT IS DISMISSED FIRST. It is an event rather than a place, and
+                     `menuLevel` goes to a level nothing matches while it is up -- so navigating
+                     without marking it seen would put the section behind a moment that is still
+                     on screen and never comes down. */
+                  onContinue(moment.mark)
+                  onGo?.(route.section, route.screen)
+                }}
+              >
+                {body}
+              </button>
+            )
+          })}
         </div>
 
         <button

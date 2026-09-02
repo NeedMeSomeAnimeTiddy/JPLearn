@@ -3,6 +3,9 @@ import {
   bandOf, libVeil, libraryBands, libraryNote, libraryWindow, shelfLayout, type LibraryRow,
 } from '../library'
 import { useHoverPick } from '../useHoverPick'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -29,6 +32,7 @@ export interface LibraryProps {
    once, and the caption says it for the shelf.
    ================================================================================================== */
 export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
@@ -78,8 +82,9 @@ export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
   const total = shelf.length ? shelf[shelf.length - 1].top + shelf[shelf.length - 1].height : 0
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
+        <ScreenHead head={screenHead('READING', 'library')} />
         <div className="library">
           <div className="lb-view">
             <div className="lb-rail" style={{ height: total }}>
@@ -163,11 +168,19 @@ export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
                       + 'var(--gold) 85%,rgba(0,0,0,0) 100%)',
                   }}
                 />
-                <span className="lb-plate">
+                {/* AND THE PLATE IS A DOOR TO ITS OWN BAND. It names a run of texts and gives
+                    its size; pressing it goes to the first of them, which is the only thing it
+                    could sensibly mean and was the only thing it did not do. */}
+                <button
+                  type="button"
+                  className="lb-plate"
+                  onClick={() => setAt(band.from)}
+                  aria-label={`${band.name} — go to the first of ${band.to - band.from + 1} texts`}
+                >
                   <b className="k">{band.kanji}</b>
                   <b className="n">{band.name}</b>
                   <i>{band.to - band.from + 1} TEXTS</i>
-                </span>
+                </button>
               </div>
             ) : null}
           </div>
@@ -179,14 +192,29 @@ export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
             <b>{view.below}</b><span>BELOW</span>
           </div>
 
+          {/* ==================================================================================================
+              AND THE SHELF IS A MAP, WHICH MEANS IT HAS TO BE PRESSABLE.
+
+              This drew the whole shelf as thirty bars sized by their distance from the cursor -- a
+              genuine minimap, showing where you are among thirty texts and where the grade bands
+              fall -- and none of it did anything. A map you can read and not travel on is a diagram.
+
+              On a shelf this long the strip is the only control that can cross it in one gesture:
+              the rail steps one row at a time and holds six on screen, so reaching the far end is
+              twenty-four presses or one click down here.
+              ================================================================================================== */}
           <div className="lb-mini">
             <span className="lb-bars">
               {rows.map((row, i) => {
                 const d = Math.abs(i - cursor)
                 const newBand = i > 0 && rows[i - 1].grade !== row.grade
                 return (
-                  <i
+                  <button
                     key={row.id}
+                    type="button"
+                    className="lb-bar"
+                    onClick={() => setAt(i)}
+                    aria-label={`Go to ${row.title}`}
                     style={{
                       width: d === 0 ? 13 : d === 1 ? 10 : d === 2 ? 8 : d <= 4 ? 7 : 6,
                       height: d === 0 ? 20 : d === 1 ? 15 : d === 2 ? 12 : d <= 4 ? 10 : 8,

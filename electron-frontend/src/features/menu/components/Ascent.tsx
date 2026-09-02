@@ -3,6 +3,10 @@ import {
   ASCENT_BOT, ASCENT_H, ASCENT_TOP, JLPT_READY_PCT, JLPT_UNLOCK_PCT,
   badgeFor, pctY, stateWord, type Rung,
 } from '../ascent'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { refuse } from '../refuse'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -20,6 +24,7 @@ export interface AscentProps {
    only in the gaps — which throws away the entire reason this shape was chosen over five separate
    cards: you can follow one line across all five levels at once. */
 export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
@@ -47,7 +52,11 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
       else if (event.key === 'Enter') {
         event.preventDefault()
         const rung = rungs[at]
-        if (rung && rung.state !== 'locked') onOpen(rung.level)
+        if (!rung) return
+        /* AND A LOCKED RUNG SAYS SO. This did nothing at all -- see `refuse.ts`; the column
+           already carries the percentage it is waiting for. */
+        if (rung.state === 'locked') { refuse(); return }
+        onOpen(rung.level)
       }
     }
     node.addEventListener('keydown', onKey)
@@ -57,12 +66,12 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
   const cursor = rungs[Math.min(at, Math.max(rungs.length - 1, 0))]
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>検定</b><i>THE EXAM</i>
-          <s>{loading ? 'READING YOUR MASTERY' : `${rungs.length} LEVELS`}</s>
-        </div>
+        <ScreenHead
+          head={screenHead('JLPT', null)}
+          note={loading ? 'READING YOUR MASTERY' : `${rungs.length} LEVELS`}
+        />
 
         {/* `.as-wrap`, NOT `.ascent`. Both are in the mockup and only one of them is this screen's:
             `.ascent` is a flow-positioned box sized `calc(100vw / var(--u))`, which measures the
@@ -89,7 +98,7 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
                 className={classes.join(' ')}
                 style={{ left: rung.x, width: rung.w, top: ASCENT_TOP, height: ASCENT_H }}
                 onFocus={() => setAt(index)}
-                onClick={() => rung.state !== 'locked' && onOpen(rung.level)}
+                onClick={() => (rung.state === 'locked' ? refuse() : onOpen(rung.level))}
                 aria-disabled={rung.state === 'locked'}
                 aria-label={rung.opensAt
                   ? `${rung.id} — locked, opens at ${rung.opensAt.need}% on ${rung.opensAt.id}, which is at ${rung.opensAt.at}%`

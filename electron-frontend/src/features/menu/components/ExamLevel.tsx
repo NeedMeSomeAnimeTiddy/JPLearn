@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { JLPT_READY_PCT } from '../../../constants'
 import type { JlptExamMode } from '../../../types'
 import { EXAM_MODES, sectionLine, type LevelDetail } from '../examLevel'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { refuse } from '../refuse'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -12,6 +16,7 @@ export interface ExamLevelProps {
 }
 
 export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
@@ -49,12 +54,12 @@ export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
   const markPct = Math.round((level.section.passMark / level.section.max) * 100)
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>検定</b><i>{level.id}</i>
-          <s>この級が求めるもの · WHAT THIS LEVEL ASKS OF YOU</s>
-        </div>
+        <ScreenHead
+          head={screenHead('JLPT', 'level', { en: level.id, jp: '級' })}
+          note="WHAT THIS LEVEL ASKS OF YOU"
+        />
 
         <div className="lv-head">
           <b>{level.id}</b>
@@ -131,7 +136,7 @@ export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
               type="button"
               className={i === at ? 'lv-mode on' : 'lv-mode'}
               onFocus={() => setAt(i)}
-              onClick={() => !level.locked && onStart(m.key)}
+              onClick={() => (level.locked ? refuse() : onStart(m.key))}
               aria-disabled={level.locked}
               aria-label={`${m.label} — ${m.description}`}
             >

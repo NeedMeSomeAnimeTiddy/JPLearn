@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { VOCAB_BUDGET_STEPS, type VocabFeed } from '../../vocab-feed'
 import { feedAt, feedHead, feedNote, wordKanji, wordSize } from '../feed'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -13,6 +16,7 @@ export interface FeedProps {
 }
 
 export function Feed({ title, feed, onStart, onUp }: FeedProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -71,13 +75,14 @@ export function Feed({ title, feed, onStart, onUp }: FeedProps) {
 
   return (
     <div
-      className="mn-open"
+      className={screenClass(entered)}
       ref={rootRef}
       tabIndex={-1}
       role="group"
       aria-label={`${title.en} ${title.jp}`}
     >
       <div className="mn-frame" ref={frameRef}>
+        <ScreenHead head={screenHead('STUDY', 'feed')} />
         {/* the hero's cap and the today panel already say which level this is and how many words
             are in it, so the heading at the top of the stage was the third statement of it */}
         {feed.error ? <div className="pj-empty">{feed.error.toUpperCase()}</div> : null}

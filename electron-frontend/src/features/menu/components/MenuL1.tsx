@@ -1,11 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { HERO_INDEX, MENU_SECTIONS } from '../constants'
 import { useHoverPick } from '../useHoverPick'
 import { burstPetals } from '../petalBurst'
-import { type StatKey, statPanelsFrom } from '../statPanels'
+import { refuse } from '../refuse'
+import { Brand, Stats } from './Chrome'
 import type {
   MenuController, MenuCrown, MenuHero, MenuRow, MenuSection, MenuSectionKey,
 } from '../types'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -44,23 +46,9 @@ const ST_TOP = 192 + Math.round((384 - ST_STACK) / 2)
 /** twelve segments, because that is what the gauge is made of */
 const SEGMENTS = Array.from({ length: 12 }, (_, k) => k)
 
-function useClock(): { time: string; date: string } {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    /* on the minute, not every second: nothing on this bar shows seconds, and a 1Hz setState on the
-       front door would re-render the menu sixty times for every one thing that changed */
-    const id = window.setInterval(() => setNow(new Date()), 30_000)
-    return () => window.clearInterval(id)
-  }, [])
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const day = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][now.getDay()]
-  return { time: `${hh}:${mm}`, date: `${now.getMonth() + 1}/${now.getDate()} ${day}` }
-}
-
 export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero }: MenuL1Props) {
+  const entered = useEntered()
   const { active, setActive, step, isLocked, gateOf } = controller
-  const { time, date } = useClock()
   /* opening a row pushes every row below it down past a stationary pointer, whose `mouseenter`
      would then drag the selection back -- the same fight the road has. See `useHoverPick`. */
   const hover = useHoverPick(setActive)
@@ -128,7 +116,12 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
   confirmRef.current = () => {
     if (active === HERO_INDEX) { onRunHero(); return }
     const section = ordered[active]
-    if (section && !isLocked(section)) enter(section.key, active)
+    if (!section) return
+    /* AND IT SAYS NO OUT LOUD. Pressing Enter on a locked row did nothing whatsoever -- no flash,
+       no sound, no movement -- which is indistinguishable from a broken key. The row already says
+       what it is waiting for; the refusal's whole job is to send you to read it. See `refuse.ts`. */
+    if (isLocked(section)) { refuse(); return }
+    enter(section.key, active)
   }
 
   useEffect(() => {
@@ -147,10 +140,26 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
         event.preventDefault()
         confirmRef.current()
       }
+      /* AND THE NUMBERS, WHICH ARE ALREADY PRINTED ON THE ROWS. Every slab carries its ordinal --
+         01 through 05 in the accent block, which is where the eye goes first -- and until now the
+         only thing you could do with that number was read it. Five arrow presses to reach YOU on a
+         screen that has YOU labelled 05 is an interface ignoring its own signposting.
+
+         SELECT RATHER THAN ENTER, deliberately. A number that opened a section outright would make
+         a mistyped key a flight across the valley, and the row it lands on is the one thing the
+         keyboard can already confirm. */
+      else if (event.key >= '1' && event.key <= '9') {
+        const index = Number(event.key) - 1
+        if (index < MENU_SECTIONS.length) {
+          event.preventDefault()
+          hover.keyed()
+          setActive(index)
+        }
+      }
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [step, hover])
+  }, [step, hover, setActive])
 
   const ordered = useMemo(() => [...MENU_SECTIONS].sort((a, b) => a.ord - b.ord), [])
 
@@ -167,127 +176,25 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
   }, [ordered, active, rows])
 
   const heroOn = active === HERO_INDEX
-  const xpPct = crown.xpForLevel ? Math.round(((crown.xpInLevel ?? 0) / crown.xpForLevel) * 100) : 0
-
-  /* ---- what is behind the chips; see `statPanels.ts` ---- */
-  const panels = useMemo(() => statPanelsFrom(crown), [crown])
-  const [openStat, setOpenStat] = useState<StatKey | null>(null)
-  /* WHERE THE PANEL HANGS, which is under the chip you pressed rather than under the bar. Measured
-     off the chip's own offsets at the moment of the press: `.stats` is the positioned parent and
-     is inside the zoomed frame, so these are design pixels and need no scale factor. */
-  const [statRight, setStatRight] = useState(0)
-  const statsRef = useRef<HTMLDivElement | null>(null)
-  const toggleStat = (key: StatKey, el: HTMLElement) => {
-    const bar = statsRef.current
-    if (bar) setStatRight(Math.max(0, bar.clientWidth - el.offsetLeft - el.offsetWidth))
-    setOpenStat((k) => (k === key ? null : key))
-  }
-  const openPanel = openStat ? panels[openStat] : null
-  useEffect(() => {
-    if (!openStat) return
-    const away = () => setOpenStat(null)
-    /* CAPTURE, because Escape here is already spoken for by the level above -- a panel that is
-       open has to eat the key before the navigation sees it, or opening a chip and pressing
-       Escape leaves the screen instead of closing the chip. */
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setOpenStat(null); e.stopPropagation() }
-    }
-    window.addEventListener('click', away)
-    window.addEventListener('keydown', key, true)
-    return () => {
-      window.removeEventListener('click', away)
-      window.removeEventListener('keydown', key, true)
-    }
-  }, [openStat])
-
-  /* a chip with nothing behind it stays a chip: no button, no cursor, no empty panel */
-  const chip = (key: StatKey, label: string, body: React.ReactNode) => {
-    const panel = panels[key]
-    if (!panel) return <span className="stat-chip">{body}</span>
-    return (
-      <button
-        type="button"
-        className={openStat === key ? 'stat-chip is-open' : 'stat-chip'}
-        aria-expanded={openStat === key}
-        aria-label={label}
-        onClick={(e) => { e.stopPropagation(); toggleStat(key, e.currentTarget) }}
-      >
-        {body}
-      </button>
-    )
-  }
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
+      {/* THE BRAND AND THE FOUR CLAIMS, which are not this screen's -- see `Chrome.tsx`. They used
+          to be written inside this frame and lived exactly as long as the front door did, so
+          entering a section took the streak, the level and the mark off the screen with the rows.
+          OUTSIDE the frame, pinned to the window, so the front door and every screen past it put
+          them in exactly the same place. */}
+      <Brand />
+      <Stats crown={crown} />
       <div className="mn-frame" ref={frameRef}>
 
-        {/* ---- the brand, top left ---- */}
-        <header className="brand">
-          <div className="brand-seal">
-            <svg className="brand-crane" viewBox="18 20 228 154" aria-hidden="true">
-              <path d="M116 120 L 178 26 L 196 122 Z" fill="#ffffff" />
-              <path d="M134 112 L 218 56 L 200 122 Z" fill="#b8ada0" />
-              <path d="M96 128 L 126 102 L 184 134 L 130 170 Z" fill="#f2ead8" />
-              <path d="M180 138 L 238 164 L 170 162 Z" fill="#f2ead8" />
-              <path d="M50 36 L 70 42 L 130 110 L 94 140 Z" fill="#f2ead8" />
-              <path d="M26 54 L 58 42 L 56 58 Z" fill="#b8ada0" />
-            </svg>
-          </div>
-          <div className="brand-col">
-            <div className="brand-lat2">JPLEARN</div>
-            <div className="brand-jp2">日本語学習</div>
-          </div>
-        </header>
-
-        {/* ---- the four claims, top right ---- */}
-        <div className="stats" ref={statsRef}>
-          <span className="stat-chip">{time}</span>
-          {chip('week', 'This week', date)}
-          {crown.streakDays != null && crown.streakDays > 0 ? (
-            <button
-              type="button"
-              className={openStat === 'streak' ? 'stat-chip shu is-open' : 'stat-chip shu'}
-              aria-expanded={openStat === 'streak'}
-              aria-label={`Streak — ${crown.streakDays} days`}
-              onClick={(e) => { e.stopPropagation(); toggleStat('streak', e.currentTarget) }}
-            >
-              <b>{crown.streakDays}</b> DAY STREAK <span className="jp">連続</span>
-            </button>
-          ) : (
-            <span className="stat-chip"><span className="mut">NO STREAK YET</span></span>
-          )}
-          {crown.level != null ? (
-            <button
-              type="button"
-              className={openStat === 'level' ? 'stat-chip is-open' : 'stat-chip'}
-              aria-expanded={openStat === 'level'}
-              aria-label={`Level ${crown.level}`}
-              onClick={(e) => { e.stopPropagation(); toggleStat('level', e.currentTarget) }}
-            >
-              <span>Lv</span> <b>{crown.level}</b>
-              <span className="xp-track"><i style={{ width: `${xpPct}%` }} /></span>
-            </button>
-          ) : null}
-
-          {openPanel ? (
-            <div
-              className="stat-panel"
-              style={{ right: `${statRight}px` }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="sp-h"><b>{openPanel.jp}</b><i>{openPanel.en}</i></div>
-              {openPanel.rows.map((r) => (
-                <div key={r.label} className={r.lead ? 'sp-r hi' : 'sp-r'}>
-                  <span>{r.label}</span><b>{r.value}</b>
-                </div>
-              ))}
-              <div className="sp-n">{openPanel.note}</div>
-            </div>
-          ) : null}
-        </div>
-
         {/* ---- level one ---- */}
-        <div className="mn-standing">
+        {/* THE CASCADE THE STYLESHEET HAS BEEN WAITING FOR. `.mn-standing.enter .st-row` and its two
+            keyframes have been in `menu.css` since the front door landed, and nothing ever set the
+            class -- so five slabs that were written to fly in from the left at 70 ms apart simply
+            appeared, all five at once, at final position. The whole of the fix is the word `enter`
+            and the frame it is applied in; see `useEntered`. */}
+        <div className={entered ? 'mn-standing enter' : 'mn-standing'}>
 
           <button
             type="button"
@@ -341,7 +248,10 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
                        mouse never enters a section it only crossed. */
                     onClick={() => {
                       if (active !== index) { setActive(index); return }
-                      if (!locked) enter(section.key, index)
+                      /* and the mouse gets the same refusal the keyboard does -- a click on a
+                         locked slab did nothing at all, which is the shape of a broken control */
+                      if (locked) { refuse(); return }
+                      enter(section.key, index)
                     }}
                     aria-disabled={locked}
                     aria-label={locked

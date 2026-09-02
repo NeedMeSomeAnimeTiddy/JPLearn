@@ -55,8 +55,9 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, useDeckBlocks,
+  useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
   MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed, Unlock,
+  MenuChrome,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
   unlockMoment, heroFromStudyBlock, crownFrom, rowsFrom, type MenuSectionKey,
 } from './features/menu'
@@ -1388,13 +1389,24 @@ function App() {
     routeMilestone(node)
   }, [progression, routeMilestone])
 
+  /* THE LAST MOCK FOR THE LEVEL WHOSE PANEL IS OPEN, and only while one is -- see `useLastMock`.
+     This was a hard-coded `null` and the whole "you scored X last time, projecting Y" branch had
+     never once been taken. */
+  const examLevelId = useMemo(
+    () => (menuPath.screen === 'level'
+      ? examRungs.find((r) => r.level === examRung)?.id.toLowerCase() ?? null
+      : null),
+    [menuPath.screen, examRungs, examRung],
+  )
+  const lastMock = useLastMock(examLevelId)
+
   const examDetail = useMemo(() => {
     const rung = examRungs.find((r) => r.level === examRung)
     const data = rung && exam.readiness ? exam.readiness.levels[rung.level] : null
     if (!rung || !data) return null
     /* the projection is the BACKEND's, stored on the result -- `project_mock_score` already ran */
-    return levelDetail(rung, data, null)
-  }, [examRungs, examRung, exam.readiness])
+    return levelDetail(rung, data, lastMock.mock)
+  }, [examRungs, examRung, exam.readiness, lastMock.mock])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
@@ -1586,6 +1598,28 @@ function App() {
         month: { days: 30, reviewed: 0, correct: 0, incorrect: 0, accuracy: 0, points_earned: 0, active_days: 0 },
       },
     [summary],
+  )
+  /* WHAT THE MENU'S FOUR CLAIMS SAY, and it is hoisted out of the level-one branch because the
+     chrome outlives that branch now -- the brand and the chips stand on every screen past the front
+     door rather than only on it. See `Chrome.tsx`.
+
+     EVERY FIELD IS ONE `summary` ALREADY CARRIES; see `statPanels.ts` for why nothing here is
+     invented and why the clock chip has no panel behind it. */
+  const menuCrown = useMemo(
+    () => crownFrom(summary?.streak?.current_days ?? null, xpProgress, {
+      streakBest: summary?.streak?.best_days ?? null,
+      freezes: summary?.streak?.freezes_available ?? null,
+      week: summary?.activity?.week
+        ? {
+          reviewed: activity.week.reviewed,
+          correct: activity.week.correct,
+          accuracy: activity.week.accuracy,
+          activeDays: activity.week.active_days,
+          points: activity.week.points_earned,
+        }
+        : null,
+    }),
+    [summary, xpProgress, activity],
   )
   const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
   const minigamePerf = useMemo(() => summary?.minigame_performance ?? [], [summary])
@@ -2458,28 +2492,28 @@ function App() {
           it is the only screen here that is an event -- and `menuLevel` has already closed every
           other menu branch, so this is the whole of the menu while it is up. */}
       {view === 'home' && moment ? (
-        <Unlock moment={moment} onContinue={menu.dismissUnlocks} />
+        <Unlock
+          moment={moment}
+          onContinue={menu.dismissUnlocks}
+          /* AND THE CARDS ARE DOORS. Every one of them names where its feature lives and none of
+             them could reach it -- see the note in `Unlock.tsx`. The flight is the same one the
+             front door's rows take, so arriving at a section from here looks like arriving at it
+             from anywhere else. */
+          onGo={(section, screen) => {
+            if (valleyIsFlying()) return
+            flyToSection(section, () => {
+              menuPath.enterSection(section)
+              if (screen) menuPath.enterScreen(screen)
+            })
+          }}
+        />
       ) : null}
 
       {view === 'home' && menuLevel === 1 ? (
         <MenuL1
           controller={menu}
           hero={heroFromStudyBlock(studyBlock)}
-          crown={crownFrom(summary?.streak?.current_days ?? null, xpProgress, {
-            /* WHAT THE CHIPS OPEN ONTO, and every field is one `summary` already carries -- see
-               `statPanels.ts` for why nothing here is invented and why the clock has no panel. */
-            streakBest: summary?.streak?.best_days ?? null,
-            freezes: summary?.streak?.freezes_available ?? null,
-            week: summary?.activity?.week
-              ? {
-                reviewed: activity.week.reviewed,
-                correct: activity.week.correct,
-                accuracy: activity.week.accuracy,
-                activeDays: activity.week.active_days,
-                points: activity.week.points_earned,
-              }
-              : null,
-          })}
+          crown={menuCrown}
           rows={rowsFrom({
             nodes: progression.nodes,
             block: studyBlock,
@@ -2489,6 +2523,18 @@ function App() {
           onRunHero={runMenuHero}
         />
       ) : null}
+
+      {/* ==================================================================================================
+          THE CORNERS THAT DO NOT BELONG TO ANY SCREEN -- see `Chrome.tsx`.
+
+          AFTER the screens rather than before, because a chip's panel opens downward over whatever is
+          underneath it; rendered first, the board would paint over it.
+
+          LEVEL TWO AND THREE ONLY. Level one draws its own, inside its own frame, because it is the
+          only screen whose layout is composed around them -- the rows are placed against the brand's
+          baseline. Everywhere else they are chrome laid on top.
+          ================================================================================================== */}
+      {view === 'home' && menuLevel > 1 ? <MenuChrome crown={menuCrown} /> : null}
 
       {/* Keyboard shortcut cheatsheet */}
       <KeyboardCheatsheet isOpen={keyboardCheatsheetOpen} onClose={closeKeyboardCheatsheet} />

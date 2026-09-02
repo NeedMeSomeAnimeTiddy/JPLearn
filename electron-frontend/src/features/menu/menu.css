@@ -49,12 +49,39 @@
 }
 
 .mn-open .mn-frame { pointer-events: none; }
+/* the chrome layer carries a frame only to compute the board's scale -- see `MenuChrome` */
+.mn-measure { visibility: hidden; }
 .mn-open .mn-frame > * { pointer-events: auto; }
 /* ---- the chrome: the four corners, in board pixels on the stage ----
    Lifted from the mockup's `.chrome` family. There they are `position: fixed` and carry
    `zoom: var(--u)` each; here they are children of `.mn-frame`, which is already the centred,
    zoomed 1280x720 board -- so they keep their authored offsets and drop the fixed positioning. */
-.mn-open .brand, .mn-open .stats, .mn-open .hints { position: absolute; }
+.mn-open .hints { position: absolute; }
+
+/* ==================================================================================================
+   THE BRAND AND THE CHIPS ARE PINNED TO THE WINDOW, NOT TO THE BOARD, AND THAT IS THE FIX FOR A
+   WHOLE CLASS OF COLLISION RATHER THAN A PREFERENCE.
+
+   They used to be children of `.mn-frame`, keeping their authored offsets on the 1,280 by 720 board
+   -- which is fine for exactly one screen, the front door, whose rows are composed around them. The
+   other twelve are composed to FILL that board: the ledger's second plate runs x 745 to 1107 at
+   y 34, the practice lanes span x 180 to 1100 at y 40. Both land squarely under a chip bar at
+   y 30 to 56, and the chips won, painting over live figures.
+
+   THE MOCKUP HAS ALWAYS HAD THIS RIGHT: `.brand` and `.stats` there are `position: fixed` with their
+   own `zoom`, at the WINDOW's corners -- outside the board entirely, in the letterbox margin the
+   frame contract leaves. On a 1600 by 1028 window the board is 1280 by 720 centred, so there are 160
+   pixels either side and 154 above and below going spare. Nothing composed on the board can reach
+   them, on any screen, ever -- which is a structural guarantee rather than five screens re-solved by
+   hand and a sixth that collides the day somebody adds it.
+
+   `--lk-u` COMES OFF THE ROOT because these are outside the frame that computes it; `useFrameFit`
+   writes it in both places for exactly this. */
+.brand, .stats {
+  position: fixed;
+  zoom: var(--lk-u, 1);
+  pointer-events: auto;
+}
 .brand { top: 24px; left: 40px; display: flex; gap: 11px; align-items: center; }
 /* ================================================================================
    THE CRANE FROM THE KICKSTARTER BRAND, AND ONLY THE CRANE.
@@ -528,28 +555,147 @@
    while the menu is the front door -- and only then */
 .app-shell.mn-showing { background: transparent; box-shadow: none; }
 
+/* ==================================================================================================
+   THE SCREEN ARRIVES RATHER THAN APPEARING.
+
+   Every screen in this menu CUT IN: one frame the valley, the next a full board of type at final
+   opacity. The mockup fades its `.hud` in on a class set a frame after the screen is built, which is
+   220 ms of the board assembling -- and the reason that reads as arriving rather than as a delay is
+   that the camera is still settling underneath it. `openAt` in `valley.ts` hands the screen over at
+   82% of the flight for exactly this.
+
+   THE LIFT IS TINY AND IT IS UPWARD. Eight pixels of board, which at this scale is a settle rather
+   than a slide; anything larger fights the camera, which is doing the travelling. */
+.mn-open {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.22s ease-out, transform 0.26s cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+.mn-open.on { opacity: 1; transform: none; }
+
+/* ==================================================================================================
+   AND IT LEAVES WITH THE CAMERA.
+
+   The chrome used to sit at full opacity through a second and a half of flight while the world tore
+   past behind it -- four fixed corners pinned to a moving picture, which is the one arrangement that
+   makes a 3D background read as wallpaper. The mockup takes all of it off as the camera goes, each
+   corner sliding the short way OUT of frame, so the whole composition leaves together and the flight
+   is a move rather than a slideshow with a border.
+
+   `body.in-flight` IS WRITTEN BY THE VALLEY, not by React -- see `flyToSectionImpl`. The flight is
+   the valley's own state and lasts less than two seconds; routing it through a store so a component
+   could re-render twice would be a worse version of a class name. */
+body.in-flight .brand { opacity: 0; transform: translate(-20px, -12px); }
+body.in-flight .stats { opacity: 0; transform: translate(20px, -12px); }
+body.in-flight .hints { opacity: 0; transform: translate(16px, 12px); }
+body.in-flight .back-tab { opacity: 0; transform: translate(-18px, 10px); }
+body.in-flight .pj-cap { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) translate(-24px, 0); }
+.brand, .stats, .hints, .back-tab {
+  transition: opacity 0.34s ease, transform 0.42s cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.pj-cap { transition: opacity 0.34s ease, transform 0.42s cubic-bezier(0.3, 0.9, 0.3, 1); }
+
+/* ==================================================================================================
+   AND WHAT A REFUSED PRESS LOOKS LIKE -- see `refuse.ts` for why there is one at all.
+
+   Above everything, including the chrome and any open panel, because it is the window blinking
+   rather than an element flashing. Cream rather than white: this palette has no pure white in it and
+   a white flash on a warm interface reads as a fault.  */
+.mn-flash {
+  position: fixed; inset: 0; z-index: 60; background: #fdf7e8; opacity: 0;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mn-open * { animation: none !important; transition: none !important; }
+  /* THE ENTRANCE GOES AND THE SCREEN STAYS, which is the distinction that matters: turning the
+     transition off must not leave the board at `opacity: 0` forever. */
+  .mn-open { opacity: 1; transform: none; transition: none; }
 }
 
 /* ==================================================================================================
    THE PATH, LEVEL TWO — the journey. A column of milestones on the same left-hand stage the rows
    stand on, so arriving here reads as going deeper rather than as going somewhere else.
    ================================================================================================== */
+/* ==================================================================================================
+   THE HEADING SLAB, AND IT IS THE MENU ROW ONE SIZE DOWN.
+
+   This was a strip of gold type on an ink bar: the one piece of unhoused chrome in an interface that
+   is otherwise entirely washi slabs. The menu is six washi slabs with an accent block on the leading
+   edge; the road is washi tablets and a washi hero; the chips, the keycaps and the back tab are all
+   small washi slabs. An ink bar in the corner reads as left over, which is what it was.
+
+   SO IT TAKES THE MENU ROW'S OWN ANATOMY -- accent block carrying the section's mark, then the name
+   -- because that IS the object it names. You pressed a slab with 練 on a red block and PRACTICE
+   beside it; the screen it opens says the same thing in the same shape, one size down and in the
+   corner. Nothing new is invented and the two levels stop looking like two projects.
+
+   AND THE TYPE LOSES ITS HALO, because it has a ground now. Cream type over an open valley needs a
+   hard shadow and a soft aura to hold; on cream paper it is ink on light and the halo is only stroke
+   weight -- the same trade the menu's own word made when it moved onto a card.
+
+   ENGLISH LED, JAPANESE AS TEXTURE. Robbie does not read Japanese, so the word you navigate by has
+   to be the one you can read at a glance. Level one's rows were already this way round; this slab
+   was the only thing in the interface inverted.
+   ================================================================================================== */
+/* ==================================================================================================
+   AND IT STANDS BESIDE THE BRAND, IN THE WINDOW, FOR THE SAME REASON THE CHIPS DO.
+
+   Placed on the board at (166, 168) -- the obvious spot, and where the port's five captioned screens
+   had theirs -- it landed inside the road's tablets, behind the ledger's streak plate and under the
+   practice lanes. Every one of those screens is composed to fill the board; there is no free
+   rectangle on it, and hunting for one per screen is how you get twelve different answers.
+
+   So the whole of the chrome is one bar in the window's top margin: the mark at the left, the screen
+   it names beside it, the four claims at the right. That is what it IS -- the brand says which app,
+   the slab says which screen, the chips say how you are doing -- and reading as one row is closer to
+   the truth than three things scattered over a picture.
+   ================================================================================================== */
 .pj-cap {
-  position: absolute; left: 166px; top: 168px; width: 800px;
-  display: flex; align-items: baseline; gap: 12px;
-  padding: 7px 18px 8px; background: var(--ink); white-space: nowrap;
+  position: fixed; left: 250px; top: 20px; zoom: var(--lk-u, 1);
+  max-width: 640px; width: max-content; pointer-events: auto;
+  display: flex; flex-direction: row; align-items: stretch; gap: 0;
+  padding: 0; white-space: nowrap;
+  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
+  box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
   transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
 }
-.pj-cap b { font-family: var(--jp); font-weight: 700; font-size: 14px; color: var(--gold-hi); }
-.pj-cap i {
-  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.2em; color: var(--gold-hi);
+/* the mark, on the leading edge, exactly where the menu row puts it */
+.pj-mark {
+  flex: none; width: 46px; display: grid; place-items: center;
+  background: var(--pj-accent, var(--gold)); color: var(--ink);
+  font-family: var(--jp); font-weight: 400; font-size: 26px; line-height: 1;
+  box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.2);
 }
-.pj-cap s {
-  margin-left: auto; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.15em; color: rgba(242, 234, 216, 0.5);
+.pj-text {
+  display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
+  padding: 9px 18px 10px;
+}
+/* WHERE YOU CAME FROM, and only at level three -- at level two the heading IS the section, so a
+   kicker would be the same word twice */
+.pj-kick {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.22em;
+  color: rgba(20, 17, 13, 0.5); margin-bottom: 4px;
+}
+.pj-title { display: flex; flex-direction: row; align-items: baseline; gap: 14px; }
+.pj-title b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+  letter-spacing: 0.01em; color: var(--ink); line-height: 1;
+}
+.pj-title i {
+  font-family: var(--jp); font-weight: 700; font-style: normal; font-size: 16px;
+  letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.55);
+}
+/* the live line the screen wants to say about itself -- how many levels, how many seals */
+.pj-note {
+  align-self: center; padding: 0 18px 0 4px; margin-left: auto;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.15em;
+  color: rgba(20, 17, 13, 0.45);
+}
+/* a heading has a line under it, which is the other half of "this is not an item" */
+.pj-cap::after {
+  content: ''; position: absolute; left: 46px; right: 0; bottom: -4px; height: 2px;
+  background: rgba(20, 17, 13, 0.28);
 }
 
 /* ---- THE ROAD, LIFTED WHOLE ----------------------------------------------------------------
@@ -1641,12 +1787,33 @@ body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
   line-height: 16px; text-align: center; white-space: nowrap; overflow: hidden;
 }
 
+/* ==================================================================================================
+   AND THE WORDS ARRIVE WITH THE FURNITURE -- see the note in `PathL2.tsx`. The three lines enter from
+   the side you walked from, staggered down the card so the eye lands on the number first. `--cs-dir`
+   is written by the component because only it knows which way you moved. */
+.cs-hero { --cs-dir: 1; }
+.cs-hero[data-dir="-1"] { --cs-dir: -1; }
+.cs-hnum, .cs-hjp, .cs-hen {
+  animation: csArrive 0.34s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+}
+.cs-hjp { animation-delay: 0.045s; }
+.cs-hen { animation-delay: 0.09s; }
+@keyframes csArrive {
+  from { opacity: 0; transform: translateX(calc(var(--cs-dir) * 20px)); }
+}
+
 /* ---- the marker: how far between this step and the next ---- */
 .cs-mark {
   position: absolute; width: 8px; height: 8px; background: var(--gold);
   transform: rotate(45deg); animation: csMark 2.6s ease-in-out infinite;
   transition: left 0.62s cubic-bezier(0.22, 0.9, 0.24, 1);
 }
+/* THE KEYFRAMES THIS HAS BEEN NAMING SINCE THE ROAD LANDED. An `animation` whose name resolves to
+   nothing is not an error in CSS -- the declaration is simply dropped -- so the marker sat perfectly
+   still and the only trace was a name in a stylesheet that matched nothing. It is the one thing on
+   the road that says "you are HERE rather than at the tablet you are looking at", and a still gold
+   diamond says that much less loudly than a breathing one. */
+@keyframes csMark { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 .cs-mark i {
   position: absolute; left: 9px; top: -5px; font-family: var(--lat-ui); font-style: normal;
@@ -2220,6 +2387,72 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 /* the rows are positioned by flex INSIDE the plate, so the ring has to be relative to the
    row rather than the frame -- hence its own positioning context here */
+/* ==================================================================================================
+   THE SHEET, AND IT IS THE HALF OF THIS SCREEN THAT MAKES IT A RECORD RATHER THAN A DASHBOARD.
+   See `ledgerSheet` for what goes on it. Laid over the plates rather than beside them, because the
+   figure it is expanding is the thing it should be covering -- an inset panel would make you read
+   the number and the breakdown as two separate claims. */
+.lg-scrim {
+  position: absolute; inset: 0; z-index: 20; border: 0; padding: 0; margin: 0;
+  background: rgba(12, 10, 8, 0.55); cursor: pointer;
+  animation: lgScrim 0.18s ease both;
+}
+@keyframes lgScrim { from { opacity: 0; } }
+.lg-sheet {
+  position: absolute; left: 310px; top: 168px; width: 660px; z-index: 21;
+  display: flex; flex-direction: column; padding: 0 0 16px;
+  background: linear-gradient(178deg, rgba(251, 248, 241, 0.98) 0%, rgba(235, 230, 217, 0.98) 100%);
+  box-shadow: 10px 13px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  animation: lgSheet 0.24s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+}
+@keyframes lgSheet {
+  from { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) translateY(14px); }
+}
+.lg-sheet > .lg-cap {
+  display: flex; align-items: baseline; gap: 12px; padding: 8px 20px 9px; margin-bottom: 14px;
+  background: #e0913a; color: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+}
+.lg-sheet > .lg-cap i { font-style: normal; color: rgba(20, 17, 13, 0.6); }
+/* the same 52 weeks the year plate draws, at a third the height: almost every figure on this screen
+   is a MEAN over that window, and a mean shown without its distribution is what people misread */
+.lg-strip {
+  display: flex; align-items: flex-end; gap: 2px; height: 42px; padding: 0 20px;
+}
+.lg-strip i { flex: 1; min-width: 0; display: block; background: var(--gold); }
+.lg-strip i.none { background: rgba(20, 17, 13, 0.16); }
+.lg-stripcap {
+  display: flex; justify-content: space-between; padding: 5px 20px 12px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.42);
+}
+.lg-line {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 7px 20px; box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.09);
+}
+.lg-line b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.6);
+}
+.lg-line i {
+  font-style: normal; font-family: var(--lat); font-weight: 900; font-size: 19px;
+  color: var(--ink);
+}
+/* AN ABSENCE IS DRAWN AS AN ABSENCE, faint rather than missing: a line that vanishes when its
+   answer is nothing makes two accounts' sheets different shapes. */
+.lg-line.off i { color: rgba(20, 17, 13, 0.32); font-weight: 700; }
+/* the caveat, which is the reason the sheet exists at all */
+.lg-note {
+  padding: 12px 20px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 9px;
+  line-height: 1.6; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5);
+}
+
+/* a row is a door now, and has to look like one under the pointer */
+.lg-row { border: 0; font: inherit; text-align: left; cursor: pointer; background: none; }
+.lg-row:hover { background: rgba(20, 17, 13, 0.05); }
+.lg-plate:active, .lg-row:active { transform: skewX(-8deg) rotate(-1.2deg) translate(2px, 3px); }
+
 .lg-row { position: relative; flex: 1; display: flex; align-items: center;
   justify-content: space-between; padding: 0 20px;
   box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.22); background: none; }
@@ -2946,6 +3179,16 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .lb-count.down { top: 386px; }
 
+/* the bars are buttons now -- see `Library.tsx`. A reset, because a `<button>` brings a border,
+   a background and a font nobody asked for, and they are drawn entirely from inline sizes. */
+.lb-bar {
+  border: 0; padding: 0; margin: 0; font: inherit; display: block; cursor: pointer;
+  transition: box-shadow 0.14s ease, filter 0.14s ease;
+}
+.lb-bar:hover { filter: brightness(1.9); }
+.lb-plate { border: 0; font: inherit; text-align: left; cursor: pointer; }
+.lb-plate:hover { filter: brightness(1.08); }
+
 .lb-bars { display: flex; align-items: flex-end; gap: 3px; }
 
 .lb-bars i { display: block; }
@@ -3498,6 +3741,31 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .un-card.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
     rgba(235,230,217,var(--paper)) 100%);
   box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px rgba(20, 17, 13, 0.42); }
+
+/* ==================================================================================================
+   A CARD WITH A ROUTE IS A DOOR -- see `Unlock.tsx`. It has said where its feature lives since the
+   screen landed and could never take you there; the only way out was CONTINUE and a walk back down
+   the tree by hand.
+
+   AND IT HAS TO LOOK LIKE ONE. Every other pressable thing in this interface lifts under the
+   pointer and presses in under the finger; a card that navigates and does neither is a card people
+   read rather than press. The gold GO on the trailing edge is the same mark the road's tablets and
+   the hero slab carry, so it is recognised rather than learned. */
+.un-card.is-door:hover {
+  background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
+    rgba(235, 230, 217, var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px rgba(20, 17, 13, 0.42);
+}
+.un-card.is-door:active { transform: skewX(-8deg) translate(2px, 3px); }
+.un-card .go {
+  flex: none; align-self: stretch; display: grid; place-items: center; padding: 0 14px;
+  margin: 0 -18px 0 0;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: var(--ink); background: var(--gold);
+  box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2);
+}
+/* a card that is only a card must not look like it is missing one */
+.un-card:not(.is-door) { cursor: default; }
 
 .un-card .g { flex: none; width: 46px; text-align: center; font-family: var(--jp);
   font-weight: 400; font-size: 34px; line-height: 1; color: rgba(20, 17, 13, 0.3); }

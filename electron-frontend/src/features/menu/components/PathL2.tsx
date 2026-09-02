@@ -9,6 +9,8 @@ import type { PathRow } from '../pathL2'
 import { MENU_SECTIONS } from '../constants'
 import { useHoverPick } from '../useHoverPick'
 import { useTraversal } from '../useTraversal'
+import { refuse } from '../refuse'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -49,6 +51,7 @@ function handOff(row: PathRow): { label: string; accent: string | null } | null 
 }
 
 export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const rows = useMemo(() => pathRows(nodes), [nodes])
@@ -91,6 +94,9 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
 
      LEFT AND RIGHT, BECAUSE THE ROAD IS HORIZONTAL NOW. The up/down pair is kept as well: it is
      what the hint bar promised for three phases and what a hand already on the arrows will try. */
+  const walkRef = useRef({ at: 0, len: 0 })
+  walkRef.current = { at, len: rows.length }
+
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
@@ -99,19 +105,24 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
       const walk = (d: 1 | -1) => {
         event.preventDefault()
         hover.keyed()
-        setCursor((c) => Math.max(0, Math.min((c ?? at) + d, rows.length - 1)))
+        /* THROUGH THE REF, LIKE THE DOOR BELOW IT. This listener is bound once and must not be
+           re-subscribed every time the cursor moves; the two things it needs to know about the
+           current road -- where you are, and how long it is -- are kept where a stable listener
+           can read them. Read out of the closure they would be whatever they were on the frame
+           the effect ran, which is the first one. */
+        const { at: here, len } = walkRef.current
+        setCursor((c) => Math.max(0, Math.min((c ?? here) + d, len - 1)))
       }
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown') walk(1)
       else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') walk(-1)
       else if (event.key === 'Enter') {
         event.preventDefault()
-        const row = rows[at]
-        if (row) onOpenNode(row.id)
+        openRef.current()
       }
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, rows, onOpenNode, hover])
+  }, [hover])
 
   const n = rows.length
   const { centers, seamX, end } = useMemo(() => courseSlots(rows, at), [rows, at])
@@ -139,9 +150,59 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
           : selStatus === 'current' ? 'START THIS STEP ▸' : 'REVISIT THIS STEP ▸'
   const slabLive = !selDead && selStatus !== 'locked'
 
+  /* ==================================================================================================
+     ONE DOOR, AND IT SAYS NO OUT LOUD.
+
+     Three places entered a step -- Enter, a click on the tablet under the cursor, and the hero slab
+     -- and all three called `onOpenNode` for any row at all. A step that is LOCKED or that leads
+     nowhere yet went through the same call, `requestOpen` returned nothing, and the screen sat
+     there: no flash, no movement, and a slab two inches away already reading LOCKED or NOTHING HERE
+     YET. The refusal is what sends you to read it. See `refuse.ts`.
+
+     THROUGH A REF FOR THE SAME REASON THE CONFIRM ON LEVEL ONE IS: the keydown listener is bound
+     once and deliberately does not depend on the cursor, so what it needs to know about the current
+     row has to live where a stable listener can read it. */
+  /* ==================================================================================================
+     THE WORDS ARRIVE WITH THE FURNITURE.
+
+     The tablets slide, the marker travels, the minimap eases -- and the three lines on the hero card
+     HARD-CUT. Every piece of furniture on this screen moves and the only thing carrying information
+     teleports, which reads as the card being replaced rather than as the road being walked. It is
+     also the one thing on screen the eye is actually reading.
+
+     SO THE TEXT ENTERS FROM THE SIDE YOU CAME FROM, which ties the animation to the navigation
+     rather than decorating it: walk forward and the new name comes in from the right. A small
+     stagger down the three lines lets the eye land on the NUMBER first, which is the line that says
+     where you are.
+
+     A KEY, NOT A TRANSITION. These are text nodes whose content changes, and CSS cannot transition
+     that -- but remounting the three spans restarts their entrance animation, which is exactly the
+     effect, and it is three spans rather than the card, so nothing that is sliding is interrupted. */
+  const dirRef = useRef(1)
+  const wasRef = useRef(at)
+  if (at !== wasRef.current) {
+    dirRef.current = at > wasRef.current ? 1 : -1
+    wasRef.current = at
+  }
+
+  const openRef = useRef<() => void>(() => {})
+  openRef.current = () => {
+    if (!sel) return
+    /* AND ONLY THE DEAD ONE IS REFUSED. A LOCKED step is not unreachable and never has been --
+       `useProgression` calls its gating SOFT, on the ground that onboarding is skippable and a hard
+       gate would shut out anyone who skipped it: pressing one raises a confirmation, which is
+       already feedback and already the right feedback. A step with no destination at all is the
+       genuinely silent case, and the slab beside it already reads NOTHING HERE YET. */
+    if (selDead) { refuse(); return }
+    onOpenNode(sel.id)
+  }
+
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
+        {/* NO SLAB ON THE ROAD, and this is a decision rather than an omission: `.cs-chapline` two
+            lines down already reads "THE PATH 道 / 一 基礎 FOUNDATIONS", which is the heading plus
+            the chapter you are standing in. A second heading over it would say less, twice. */}
         {/* an absence is drawn as an absence, and "still reading" is not the same absence as
             "answered with nothing" -- a road with no tablets on it must say which */}
         {!n ? (
@@ -233,7 +294,7 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
                          enters it, which on the road means a flight you did not ask for */
                       onClick={() => {
                         if (reel.dragged()) return
-                        if (i === at) onOpenNode(row.id)
+                        if (i === at) openRef.current()
                         else setCursor(i)
                       }}
                       aria-label={`${row.no} ${row.en}${row.isOpen ? '' : ' — not open yet'}`}
@@ -322,7 +383,8 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
                         + (selUp ? 'rgba(20,17,13,0.15)' : 'rgba(242,234,216,0.14)'),
                       border: !selUp && selDead ? '1px dashed rgba(242,234,216,0.4)' : undefined,
                     }}
-                    onClick={() => onOpenNode(sel.id)}
+                    onClick={() => openRef.current()}
+                    data-dir={dirRef.current}
                   >
                     <span
                       className="cs-htab"
@@ -335,11 +397,16 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
                       {selHand ? `→ ${selHand.label}` : selDead ? 'NOT BUILT' : 'DECK'}
                     </span>
                     <span className="cs-hhead">
-                      <span className="cs-hnum" style={{ color: selUp ? 'var(--ink)' : DIM }}>
+                      <span
+                        key={`n${at}`}
+                        className="cs-hnum"
+                        style={{ color: selUp ? 'var(--ink)' : DIM }}
+                      >
                         {sel.no}
                       </span>
                     </span>
                     <span
+                      key={`j${at}`}
                       className="cs-hjp"
                       data-lat={bigJp ? '0' : '1'}
                       style={{
@@ -349,7 +416,11 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
                     >
                       {bigJp || sel.en}
                     </span>
-                    <span className="cs-hen" style={{ color: selUp ? 'var(--hi-deep)' : DIM }}>
+                    <span
+                      key={`e${at}`}
+                      className="cs-hen"
+                      style={{ color: selUp ? 'var(--hi-deep)' : DIM }}
+                    >
                       {sel.en}
                     </span>
                     <span className="cs-hfoot">

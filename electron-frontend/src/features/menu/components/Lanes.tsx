@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Lane } from '../lanes'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { refuse } from '../refuse'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -18,6 +22,7 @@ export interface LanesProps {
    many there are and what fills them. THE WORLD passes two parts PRACTICE does not: the milestone
    that opened each lane, and the three things inside it. See the note in `lanes.ts`. */
 export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
@@ -49,7 +54,10 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
       else if (event.key === 'Enter') {
         event.preventDefault()
         const lane = lanes[at]
-        if (lane && !lane.shut) onPick(lane.key)
+        if (!lane) return
+        /* a shut lane already says what it is waiting for; the refusal sends you to read it */
+        if (lane.shut) { refuse(); return }
+        onPick(lane.key)
       }
     }
     node.addEventListener('keydown', onKey)
@@ -61,8 +69,9 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
        "練習 · NOTHING NEW IS TAUGHT HERE" -- which is where the mockup puts it, so the heading that
        said the same thing at the top of the stage is gone. It stays as the region's accessible
        name, because a screen reader has no note to have read yet when it announces the screen. */
-    <div className="mn-open" ref={rootRef} tabIndex={-1} role="group" aria-label={`${en} ${jp}`}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1} role="group" aria-label={`${en} ${jp}`}>
       <div className="mn-frame" ref={frameRef}>
+        <ScreenHead head={screenHead('DRILLS', null)} />
         <div className={lanes.length === 2 ? 'lanes two' : 'lanes'}>
           {lanes.map((lane, index) => {
             const classes = ['pr-lane']
@@ -75,7 +84,7 @@ export function Lanes({ jp, en, note, lanes, onPick, onUp }: LanesProps) {
                 type="button"
                 className={classes.join(' ')}
                 onFocus={() => setAt(index)}
-                onClick={() => !lane.shut && onPick(lane.key)}
+                onClick={() => (lane.shut ? refuse() : onPick(lane.key))}
                 aria-disabled={lane.shut}
                 aria-label={lane.shut
                   ? `${lane.en} — locked, ${lane.opens ?? 'not open yet'}`

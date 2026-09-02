@@ -260,3 +260,50 @@ describe('the mark, through the hook that owns it', () => {
     await waitFor(() => expect(getFeatureState).toHaveBeenCalledTimes(2))
   })
 })
+
+describe('a card that names a place can go there', () => {
+  it('takes you to the section and the screen its feature lives on', () => {
+    /* every card has named its destination since this screen landed and none of them could reach
+       it: the only way out was CONTINUE, back to the front door, and then a walk down the tree by
+       hand to the place the card had just told you about */
+    const onGo = vi.fn()
+    const onContinue = vi.fn()
+    const moment = unlockMoment([feature()], NODES)!
+    render(<Unlock moment={moment} onContinue={onContinue} onGo={onGo} />)
+    const door = document.querySelector('.un-card.is-door') as HTMLElement
+    expect(door.tagName).toBe('BUTTON')
+    fireEvent.click(door)
+    expect(onGo).toHaveBeenCalledWith('READING', 'scenes')
+  })
+
+  it('marks the moment seen before it navigates', () => {
+    /* the moment is an EVENT: `menuLevel` goes to a level nothing matches while it is up, so
+       navigating without marking it would put the section behind a screen that never comes down */
+    const calls: string[] = []
+    const moment = unlockMoment([feature()], NODES)!
+    render(
+      <Unlock
+        moment={moment}
+        onContinue={() => calls.push('continue')}
+        onGo={() => calls.push('go')}
+      />,
+    )
+    fireEvent.click(document.querySelector('.un-card.is-door') as HTMLElement)
+    expect(calls).toEqual(['continue', 'go'])
+  })
+
+  it('stays a plain card where the menu has no route, rather than a door to nowhere', () => {
+    /* `themes` lives in Settings; the label is honest and the route would not be */
+    const moment = unlockMoment([feature({ feature_id: 'themes', name: 'Themes' })], NODES)!
+    render(<Unlock moment={moment} onContinue={vi.fn()} onGo={vi.fn()} />)
+    expect(document.querySelector('.un-card.is-door')).toBeNull()
+    expect(document.querySelector('.un-card')).not.toBeNull()
+  })
+
+  it('is a card again when nobody is listening for a destination', () => {
+    /* rendered without `onGo` -- in a test, or anywhere the navigation is not mounted */
+    const moment = unlockMoment([feature()], NODES)!
+    render(<Unlock moment={moment} onContinue={vi.fn()} />)
+    expect(document.querySelector('.un-card.is-door')).toBeNull()
+  })
+})

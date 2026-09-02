@@ -210,3 +210,65 @@ describe('what the crown and the hero are derived from', () => {
     expect(reasonSentence('some_new_reason')).toBe('Some new reason.')
   })
 })
+
+/* ==================================================================================================
+   THE THREE THINGS THE FRONT DOOR PROMISED AND DID NOT DO.
+   ================================================================================================== */
+describe('the numbers already printed on the rows', () => {
+  it('selects the row whose ordinal you typed', async () => {
+    /* every slab carries 01 through 05 in its accent block, which is where the eye goes first, and
+       until now the only thing you could do with that number was read it -- five arrow presses to
+       reach a row labelled 05 is an interface ignoring its own signposting */
+    installApi([])
+    render(<Harness />)
+    const root = document.querySelector('.mn-open') as HTMLElement
+    fireEvent.keyDown(root, { key: '3' })
+    await waitFor(() => expect(document.querySelector('.st-row.is-open .st-en')?.textContent)
+      .toBe('THE WORLD'))
+  })
+
+  it('selects rather than enters, so a mistyped key is not a flight across the valley', async () => {
+    installApi([])
+    render(<Harness />)
+    const root = document.querySelector('.mn-open') as HTMLElement
+    fireEvent.keyDown(root, { key: '1' })
+    await waitFor(() => expect(document.querySelector('.st-row.is-open')).not.toBeNull())
+    expect(onOpenSection).not.toHaveBeenCalled()
+  })
+
+  it('ignores a number with no row behind it', async () => {
+    installApi([])
+    render(<Harness />)
+    const root = document.querySelector('.mn-open') as HTMLElement
+    fireEvent.keyDown(root, { key: '9' })
+    await waitFor(() => expect(document.querySelector('.st-row.is-open .st-en')?.textContent)
+      .not.toBe(''))
+    expect(onOpenSection).not.toHaveBeenCalled()
+  })
+})
+
+describe('the entrance cascade', () => {
+  it('sets the class the stylesheet has been waiting for since this screen landed', async () => {
+    /* `.mn-standing.enter .st-row` and its two keyframes have been in menu.css from the start and
+       nothing ever set the class, so five slabs written to fly in 70 ms apart simply appeared */
+    installApi([])
+    render(<Harness />)
+    await waitFor(() => expect(document.querySelector('.mn-standing.enter')).not.toBeNull())
+  })
+})
+
+describe('a locked row', () => {
+  it('says no out loud rather than doing nothing at all', async () => {
+    /* pressing Enter on a locked row did nothing whatsoever, which is indistinguishable from a
+       broken key -- and the row already carries the thing it is waiting for */
+    installApi([])
+    render(<Harness />)
+    await waitFor(() => expect(document.querySelectorAll('.st-row')).toHaveLength(5))
+    const root = document.querySelector('.mn-open') as HTMLElement
+    fireEvent.keyDown(root, { key: '3' })
+    await waitFor(() => expect(document.querySelector('.st-row.is-locked.is-open')).not.toBeNull())
+    fireEvent.keyDown(root, { key: 'Enter' })
+    expect(onOpenSection).not.toHaveBeenCalled()
+    expect(document.querySelector('.mn-flash')).not.toBeNull()
+  })
+})

@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BADGE_ICONS, BADGE_ICON_FALLBACK, useAchievements } from '../../achievements'
 import { flatSeals, sealGroups, wallStep } from '../wall'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -9,6 +12,7 @@ export interface WallProps {
 }
 
 export function Wall({ onUp }: WallProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
@@ -51,12 +55,12 @@ export function Wall({ onUp }: WallProps) {
   const Icon = here ? (BADGE_ICONS[here.icon] ?? BADGE_ICON_FALLBACK) : BADGE_ICON_FALLBACK
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>章</b><i>ACHIEVEMENTS</i>
-          <s>{loading ? 'READING YOUR BADGES' : `${earned} / ${total} · 印 SEALS, AND WHAT EACH ONE TAKES`}</s>
-        </div>
+        <ScreenHead
+          head={screenHead('RECORDS', 'wall')}
+          note={loading ? 'READING YOUR BADGES' : `${earned} / ${total} SEALS`}
+        />
 
         <div className="bw-rows">
           {groups.map((g) => (

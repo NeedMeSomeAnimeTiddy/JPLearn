@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FREE_TALK, type Scene } from '../scenes'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -13,6 +16,7 @@ export interface ScenesProps {
 /* TWO CARDS AND A STRIP. The walk runs across the scenes and then onto free talk, which is why the
    cursor goes one past the end rather than free talk being a card of its own. */
 export function Scenes({ scenes, onPick, onUp }: ScenesProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [at, setAt] = useState(0)
@@ -48,12 +52,12 @@ export function Scenes({ scenes, onPick, onUp }: ScenesProps) {
   }, [at, last, scenes, onPick])
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
-        <div className="pj-cap">
-          <b>会話</b><i>TALK</i>
-          <s>場面を選んでください · CHOOSE A CONVERSATION</s>
-        </div>
+        <ScreenHead
+          head={screenHead('READING', 'scenes')}
+          note="CHOOSE A CONVERSATION"
+        />
 
         <div className="scenes">
           {scenes.map((s, i) => (

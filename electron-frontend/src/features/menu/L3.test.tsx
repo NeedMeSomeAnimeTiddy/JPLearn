@@ -279,3 +279,32 @@ describe('the drills road', () => {
     expect(tabScale(0)).toBe(1)
   })
 })
+
+describe('the shelf is a map, which means it can be travelled', () => {
+  it('goes to the text whose bar you press', () => {
+    /* the strip drew all thirty rows sized by their distance from the cursor -- a genuine minimap
+       -- and none of it did anything. On a shelf this long it is the only control that can cross
+       the whole thing in one gesture: the rail steps one row at a time and holds six. */
+    render(<Library rows={libraryRows(shelf)} loading={false} onOpen={vi.fn()} onUp={vi.fn()} />)
+    const bars = document.querySelectorAll('.lb-bar')
+    expect(bars.length).toBe(libraryRows(shelf).length)
+    fireEvent.click(bars[bars.length - 1] as HTMLElement)
+    expect(document.querySelector('.lb-row.on .lb-jp')?.textContent)
+      .toBe(libraryRows(shelf)[libraryRows(shelf).length - 1].title)
+  })
+
+  it('makes every bar a real button, so the keyboard reaches them too', () => {
+    render(<Library rows={libraryRows(shelf)} loading={false} onOpen={vi.fn()} onUp={vi.fn()} />)
+    expect((document.querySelector('.lb-bar') as HTMLElement).tagName).toBe('BUTTON')
+  })
+
+  it('opens a band onto the first of its texts, which is all it could mean', () => {
+    render(<Library rows={libraryRows(shelf)} loading={false} onOpen={vi.fn()} onUp={vi.fn()} />)
+    const plate = document.querySelector('.lb-plate') as HTMLElement
+    expect(plate.tagName).toBe('BUTTON')
+    fireEvent.keyDown(document.querySelector('.mn-open') as HTMLElement, { key: 'ArrowDown' })
+    fireEvent.click(plate)
+    expect(document.querySelector('.lb-row.on .lb-jp')?.textContent)
+      .toBe(libraryRows(shelf)[0].title)
+  })
+})

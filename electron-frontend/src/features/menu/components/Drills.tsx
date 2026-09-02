@@ -5,6 +5,9 @@ import {
   nearestOffered, railDistance, railEnds, railLayout, railStep, tabScale,
 } from '../drills'
 import { useHoverPick } from '../useHoverPick'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -29,6 +32,7 @@ export interface DrillsProps {
 const STRIP_MID = 474
 
 export function Drills({ deck, onStart, onUp }: DrillsProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const modes = useMemo(() => drillModes(), [])
@@ -94,8 +98,9 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
     : 16
 
   return (
-    <div className="mn-open" ref={rootRef} tabIndex={-1}>
+    <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
+        <ScreenHead head={screenHead('DRILLS', 'drills')} />
         {/* THE DECK AXIS. Its figure is counted out of SCRIPT_MINIGAMES rather than stated. */}
         <div className="dr-decks">
           {decks.map((d) => (

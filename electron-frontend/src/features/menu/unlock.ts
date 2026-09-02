@@ -1,4 +1,5 @@
 import type { FeatureRequirementPayload, FeatureStatusPayload } from '../../generated/types'
+import type { MenuSectionKey } from './types'
 import type { ProgressionNodeView } from '../progression'
 import { milestone } from './pathL2'
 
@@ -167,4 +168,37 @@ export const UNLOCK_LEADS_TO: Record<string, string> = {
   achievements: 'YOU · THE WALL',
   advanced_analytics: 'YOU',
   themes: 'SETTINGS',
+}
+
+/* ==================================================================================================
+   AND THE NAME IS NOT THE SAME THING AS THE DOOR.
+
+   Every card on this screen has said where its feature lives since the moment landed -- "THE WORLD ·
+   TALK", "YOU · THE WALL" -- and every one of them was a dead end. The whole screen was one button:
+   CONTINUE, back to the front door, from which you then navigated to the place the card had just
+   named. Telling somebody where a thing is, on a screen you built to celebrate it, and then making
+   them walk there themselves is the interface knowing the answer and refusing to act on it.
+
+   THE TABLE IS SEPARATE FROM THE LABEL, deliberately. Two of the nine open something that is not a
+   menu section at all -- `themes` is in Settings -- and a label can honestly say SETTINGS where a
+   route cannot honestly go there from here. A feature with a label and no route keeps its label and
+   stays a plain card, which is the same rule the whole file already follows: say the true thing you
+   have, never invent the one you do not.
+   ================================================================================================== */
+export interface UnlockRoute {
+  section: MenuSectionKey
+  /** the level-three screen inside it, where the feature is not the section itself */
+  screen?: string
+}
+
+export const UNLOCK_GOES_TO: Record<string, UnlockRoute> = {
+  conversation_mode: { section: 'READING', screen: 'scenes' },
+  tutor_chat: { section: 'READING', screen: 'scenes' },
+  reading_mode: { section: 'READING', screen: 'library' },
+  jlpt_dashboard: { section: 'JLPT' },
+  listening_mode: { section: 'DRILLS', screen: 'drills' },
+  kanji_mode: { section: 'STUDY' },
+  achievements: { section: 'RECORDS', screen: 'wall' },
+  advanced_analytics: { section: 'RECORDS' },
+  /* `themes` is in Settings, which this menu has no route into. It keeps its label. */
 }

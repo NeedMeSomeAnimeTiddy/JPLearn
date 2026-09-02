@@ -2,6 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTraversal } from '../useTraversal'
 import type { BlockInfo } from '../../../types'
 import { deckChain, deckSheet, gateLine, railLine } from '../deck'
+import { screenHead } from '../chrome'
+import { ScreenHead } from './ScreenHead'
+import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
@@ -25,6 +28,7 @@ export interface DeckProps {
 }
 
 export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp }: DeckProps) {
+  const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const chain = useMemo(() => deckChain(blocks, gate), [blocks, gate])
@@ -112,13 +116,14 @@ export function Deck({ title, slug, blocks, gate, loading, error, onStart, onUp 
     /* the deck's name is not drawn as a heading -- the open block's cap says it -- but a screen
        reader announcing this screen has not reached that cap yet */
     <div
-      className="mn-open"
+      className={screenClass(entered)}
       ref={rootRef}
       tabIndex={-1}
       role="group"
       aria-label={`${title.en} ${title.jp}`}
     >
       <div className="mn-frame" ref={frameRef}>
+        <ScreenHead head={screenHead('STUDY', 'deck')} />
         {/* THE SCREEN'S OWN CAPTION IS THE HERE-CARD'S. `.dk-cap` on the open block already says
             which deck this is and where in it you are standing, so the heading at the top of the
             stage was the same sentence a second time -- and on this screen it landed on the cards.

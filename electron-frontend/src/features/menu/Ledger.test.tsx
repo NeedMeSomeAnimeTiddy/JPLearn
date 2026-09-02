@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import axe from 'axe-core'
 import type { StudySummaryPayload } from '../../types'
 import type { XPProgressPayload } from '../../generated/types'
 import { Ledger } from './components/Ledger'
-import { LEDGER_DAYS, LEDGER_WEEKS, accColour, buildLedger, ledgerYear } from './ledger'
+import {
+  LEDGER_DAYS, LEDGER_WEEKS, accColour, buildLedger, ledgerSheet, ledgerYear, yearShape,
+} from './ledger'
 
 /* the day the fixtures are counted back from, so a test does not change meaning tomorrow */
 const TODAY = new Date(2026, 8, 1)
@@ -156,5 +158,131 @@ describe('the ledger screen', () => {
       run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
     }).run(document.querySelector('.mn-open') as Element)
     expect(results.violations).toEqual([])
+  })
+})
+
+/* ==================================================================================================
+   AND WHAT IS BEHIND EACH FIGURE — see `ledgerSheet` for why a records screen full of dead ends is
+   the one kind of dashboard this app must not be.
+   ================================================================================================== */
+
+const busyYear = ledgerYear([
+  { date: back(2), count: 40, accuracy: 90 },
+  { date: back(3), count: 10, accuracy: 50 },
+  { date: back(40), count: 5, accuracy: 70 },
+], TODAY)
+
+const ledgerOf = (year = busyYear) => buildLedger(
+  summary({ current_days: 4, best_days: 11, freezes_available: 2 }),
+  xp({ level: 2, xp_for_current_level: 150, xp_to_next_level: 50, total_xp: 300 }),
+  year,
+  { earned: 2, total: 25 },
+)
+
+describe('the shape of the year, which every sheet reads', () => {
+  it('finds the busiest week, and the best and worst that had anything in them', () => {
+    const s = yearShape(busyYear)
+    expect(s.busiest).toBe(50)
+    /* the two recent days fall in one week: 40 at 90% and 10 at 50% weights to 82% */
+    expect(s.best).toBe(82)
+    expect(s.worst).toBe(70)
+  })
+
+  it('counts the longest run of empty weeks, because the gap is part of the record', () => {
+    expect(yearShape(busyYear).gap).toBeGreaterThan(0)
+  })
+
+  it('has no best and no worst on a year with nothing in it, rather than zero', () => {
+    /* 0% accuracy and "you have not answered anything" are different claims */
+    const s = yearShape(ledgerYear([], TODAY))
+    expect(s.best).toBeNull()
+    expect(s.worst).toBeNull()
+    expect(s.gap).toBe(LEDGER_WEEKS)
+  })
+})
+
+describe('what a figure opens onto', () => {
+  it('takes the streak apart into the things the front cannot hold', () => {
+    const s = ledgerSheet('streak', ledgerOf())!
+    expect(s.en).toBe('STREAK')
+    expect(s.lines.map((l) => l.k)).toEqual(
+      ['RUNNING NOW', 'YOUR BEST RUN', 'FREEZES LEFT', 'ACTIVE DAYS THIS YEAR'],
+    )
+    expect(s.lines[0].v).toBe('4 DAYS')
+  })
+
+  it('says out loud that the accuracy on the front is a mean', () => {
+    /* THE CAVEAT IS THE REASON THE SHEETS EXIST. "74%" on a plate is a number people read as a
+       property of themselves; "a mean of 3 days" is the same number and a different claim. */
+    const s = ledgerSheet('accuracy', ledgerOf())!
+    expect(s.note).toContain('MEAN OF')
+    expect(s.acc).toBe(true)
+  })
+
+  it('divides the reviews by the days you turned up, not by the year', () => {
+    /* dividing by 364 would measure how OFTEN you study rather than how much */
+    const s = ledgerSheet('reviews', ledgerOf())!
+    const perDay = s.lines.find((l) => l.k === 'A DAY YOU STUDIED')!
+    expect(perDay.v).toBe('18 REVIEWS')
+  })
+
+  it('draws an absence faint rather than leaving the line out', () => {
+    /* a line that vanishes when its answer is nothing makes two accounts' sheets different shapes */
+    const empty = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 25 })
+    const s = ledgerSheet('accuracy', empty)!
+    expect(s.lines).toHaveLength(4)
+    expect(s.lines.every((l) => l.off || l.v !== '—')).toBe(true)
+  })
+
+  it('carries the 52 weeks on every sheet whose figure is a mean over them', () => {
+    for (const k of ['streak', 'accuracy', 'reviews', 'year'] as const) {
+      expect(ledgerSheet(k, ledgerOf())!.strip).toBe(true)
+    }
+  })
+
+  it('leaves the year off the level sheet, where a distribution would say nothing', () => {
+    /* XP is a running total that only goes up */
+    expect(ledgerSheet('level', ledgerOf())!.strip).toBe(false)
+  })
+
+  it('has no level sheet at all on an account with no XP payload', () => {
+    /* a plate that cannot answer stays a plate rather than opening onto four dashes */
+    const noXp = buildLedger(summary(null), null, busyYear, { earned: 0, total: 25 })
+    expect(ledgerSheet('level', noXp)).toBeNull()
+  })
+})
+
+describe('the ledger on screen', () => {
+  it('opens a sheet when a figure is pressed, and closes it on the scrim', async () => {
+    render(<Ledger summary={summary({ current_days: 4, best_days: 11, freezes_available: 2 })}
+      xp={xp({})} onOpenAchievements={vi.fn()} onUp={vi.fn()} />)
+    await waitFor(() => expect(document.querySelector('.lg-streak')).not.toBeNull())
+    expect(document.querySelector('.lg-sheet')).toBeNull()
+    fireEvent.click(document.querySelector('.lg-streak') as HTMLElement)
+    await waitFor(() => expect(document.querySelector('.lg-sheet')).not.toBeNull())
+    expect(document.querySelector('.lg-sheet .lg-cap b')?.textContent).toBe('連続 STREAK')
+    fireEvent.click(document.querySelector('.lg-scrim') as HTMLElement)
+    await waitFor(() => expect(document.querySelector('.lg-sheet')).toBeNull())
+  })
+
+  it('closes on Escape before the level above sees the key', async () => {
+    /* opening a figure and pressing Escape must close the figure, not leave the screen */
+    const onUp = vi.fn()
+    render(<Ledger summary={summary({ current_days: 4, best_days: 11, freezes_available: 2 })}
+      xp={xp({})} onOpenAchievements={vi.fn()} onUp={onUp} />)
+    await waitFor(() => expect(document.querySelector('.lg-streak')).not.toBeNull())
+    fireEvent.click(document.querySelector('.lg-streak') as HTMLElement)
+    await waitFor(() => expect(document.querySelector('.lg-sheet')).not.toBeNull())
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(document.querySelector('.lg-sheet')).toBeNull())
+    expect(onUp).not.toHaveBeenCalled()
+  })
+
+  it('makes every figure a real button, so the mouse and the keyboard agree', () => {
+    render(<Ledger summary={summary({ current_days: 4, best_days: 11, freezes_available: 2 })}
+      xp={xp({})} onOpenAchievements={vi.fn()} onUp={vi.fn()} />)
+    for (const q of ['.lg-streak', '.lg-year', '.lg-lv']) {
+      expect((document.querySelector(q) as HTMLElement).tagName).toBe('BUTTON')
+    }
   })
 })
