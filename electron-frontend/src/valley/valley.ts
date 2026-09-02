@@ -44,9 +44,13 @@ import { buildNightMap, type NightMap } from './nightmap'
 import { buildWindows, type WindowField } from './windows'
 import { bakeHeightfield, type Heightfield } from './heightfield'
 import { bloomTrack, disposeBloom, renderBloom, setBloomNight, sizeBloom } from './bloom'
-import { buildLampGrid, type LampGrid } from './lampgrid'
+import { LAMP_U, MOVE_LAMPS, buildLampGrid, type LampGrid } from './lampgrid'
 import { celWorld } from './cel'
 import { disposeInk, inkTrackCrowd, renderInk, renderND, sizeInk } from './ink'
+import { type BoatLamps, buildBoatLamps } from './boatlamp'
+import { type Ponds, buildPonds } from './pond'
+import { SWAY_LAYER, type SwayField, buildSway, swayTick } from './sway'
+import { type WindField, buildWind } from './wind'
 import { buildCrowd, type CrowdField } from './crowd'
 import { buildWalkers, type WalkField } from './walk'
 import { buildLake, lakeShore, type Lake } from './lake'
@@ -136,6 +140,10 @@ let birds: BirdField | null = null
 let petals: PetalField | null = null
 let steam: SteamField | null = null
 let fireflies: FireflyField | null = null
+let sway: SwayField | null = null
+let ponds: Ponds | null = null
+let boatLamps: BoatLamps | null = null
+let wind: WindField | null = null
 let ground: Heightfield | null = null
 let lake: Lake | null = null
 let mirror: Reflection | null = null
@@ -210,6 +218,12 @@ const steaming = new URLSearchParams(window.location.search).get('steam') !== 'o
 /* `?flies=off` -- they only exist after dark, so this is the one switch whose without-arm is free
    for twelve hours of the day anyway */
 const glowing = new URLSearchParams(window.location.search).get('flies') !== 'off'
+/* `?sway=off` -- one patched material and a second outline pass over 17,291 plants, which is both
+   the largest thing in the frame and the largest bill in it. Its own switch for the usual reason. */
+const swaying = new URLSearchParams(window.location.search).get('sway') !== 'off'
+/* `?wind=off` -- 44 transparent strokes and 160 matrices a frame, and the only thing in the valley
+   that is the air rather than a thing in it */
+const blowing = new URLSearchParams(window.location.search).get('wind') !== 'off'
 const _eye = new Vector3()
 
 let handle: Handle | null = null
@@ -673,7 +687,8 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        this build BRIGHTER than the mockup while visibly having fewer lights in it. */
     console.info(
       `[valley] lanterns: ${lanterns.mats.length} materials over ${lanterns.meshes} meshes, `
-      + `${lanterns.spots.length} flames`,
+      + `${lanterns.spots.length} flames`
+      + (lanterns.moving.length ? ` and ${lanterns.moving.length} that travel` : ''),
     )
     /* and the same meshes are what bleeds -- see `bloom.ts` */
     if (bloom) bloomTrack(lanterns.lit)
@@ -744,6 +759,42 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       }
     }
 
+    /* AND THE TREES, on the same side of `breathe` as the crowd and for the same reason: the sway
+       chains onto that hook rather than replacing it, and its bake reads the position arrays that
+       the first render is about to free. The heights in the line are WORLD units reconstructed from
+       each plant's transform -- see `sway.ts` for why they cannot simply be read off the geometry
+       in this build. */
+    if (swaying) {
+      sway = buildSway(root)
+      /* the plants go on their own layer so the prepass can render just them, with the same
+         displacement their lit material has -- the crowd's arrangement exactly */
+      if (ink) for (const m of sway.meshes) m.layers.enable(SWAY_LAYER)
+      console.info(
+        `[valley] sway: ${sway.plants} plants on ${sway.meshes.length} meshes, `
+        + `${sway.geos} geometries baked, ${sway.heights[0]}..${sway.heights[1]} units tall`,
+      )
+    }
+
+    /* AND THE AIR THEY ARE BENDING IN. After the sway, because it borrows the same wind vector --
+       one Vector3 behind both, so the trees and the strokes can never disagree about the weather. */
+    if (blowing) {
+      wind = buildWind(scene)
+      if (wind) {
+        console.info(`[valley] wind: ${wind.shown} wisps drawn out of a pool of ${wind.pool}`)
+      }
+    }
+
+    /* AND THE STANDING WATER. After `celWorld`, which is what put a matte toon material on it, and
+       after the lake, whose material and mirror the garden pond borrows. */
+    if (water) {
+      ponds = buildPonds(root, lake?.material ?? null)
+      console.info(
+        `[valley] ponds: ${ponds.garden.length} on the lake's own material, `
+        + `${ponds.pools.length} bath ${ponds.pools.length === 1 ? 'surface' : 'surfaces'} `
+        + `on the garden-scale shader`,
+      )
+    }
+
     /* AND EVERYTHING ELSE THAT WAS STILL: the boats, the ducks, the koi, the monkeys, the steam and
        the banners. LAST, because the boats sail a coast measured off the heightfield and their
        passengers wear the walkers' un-idled material -- both of which have to exist first. */
@@ -755,6 +806,15 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
         + `aboard, ${life.wakes} wakes, ${life.moored} moored`
         + (shore ? `; shore ${Math.round(shore.min)}..${Math.round(shore.max)} units out` : ''),
       )
+      /* AND THE LANTERNS THEY CARRY GET A LIGHT. After the boats, because it reads the weld they
+         set up; and it is the reason `lanterns.moving` exists -- see `boatlamp.ts`. */
+      boatLamps = buildBoatLamps(life)
+      if (boatLamps) {
+        console.info(
+          `[valley] boat lamps: ${boatLamps.lamps} of ${MOVE_LAMPS} moving slots`
+          + (boatLamps.merged ? `, ${boatLamps.merged} second primitives dropped` : ''),
+        )
+      }
     }
 
     if (flying) {
@@ -907,6 +967,10 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* the same clock and the same two sines, written into the lamps' own strengths -- see
        `lampgrid.ts`. One source, so the flame and the pool it casts can never disagree. */
     lampGrid?.flicker(FLICKER.t.value * FLICKER.rate.value, FLICKER.amt.value, lampNow)
+    /* AFTER `life.tick` HAS MOVED THE HULLS, which is further down this same loop -- so a boat lamp
+       is one frame behind its boat. At 16 ms and the speed a boat sails that is under a unit, and
+       the alternative is splitting the life tick in two to put the weld before the light. */
+    boatLamps?.tick(FLICKER.t.value * FLICKER.rate.value, FLICKER.amt.value, lampNow)
 
     if (live) {
       live.elapsed += dt / 1000
@@ -941,6 +1005,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     petals?.tick(dt / 1000)
     steam?.tick(dt / 1000)
     fireflies?.tick(dt / 1000)
+    /* THE WIND'S OWN CLOCK, and one line rather than a walk: every plant's phase comes off its
+       own position in the shader, so seventeen thousand of them move on a single float. */
+    if (!reduced) swayTick(dt / 1000)
+    ponds?.tick(dt / 1000)
+    if (!reduced) wind?.tick(dt / 1000)
 
     /* THE DAY IS RE-EVALUATED EVERY FEW SECONDS, NOT EVERY FRAME. The sun moves a quarter of a
        degree a minute; at that rate a two-second beat is thirty times finer than anything the
@@ -968,13 +1037,16 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* THE OUTLINES' PREPASS IS A WHOLE SCENE PASS TOO, and it goes in the same place and for the
        same reason as the two below it: before the shadow flag is raised, so a pending shadow build
        cannot land in this render instead of the real one. */
-    if (ink) renderND(renderer, scene, camera, crowd?.meshes ?? [], !reduced)
+    if (ink) {
+      renderND(renderer, scene, camera, crowd?.meshes ?? [], !reduced,
+        sway?.meshes ?? [], !reduced)
+    }
 
     /* THE MIRROR IS A WHOLE SCENE PASS, so it goes before the shadow flag is raised rather than
        after it -- a pending build would otherwise land in the reflection instead of the real one,
        which is exactly how the mockup lost every shadow in the valley. Same reason as the sky
        mask above, and the two now sit together. */
-    if (lake && mirror) mirror.render(renderer, scene, camera, lake.mesh)
+    if (lake && mirror) mirror.render(renderer, scene, camera, lake.mesh, ponds?.hideFromMirror)
 
     /* and the shadow build goes HERE, in the last gap before the render -- see `shadowDirty` */
     if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false }
@@ -1037,6 +1109,14 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       lake = null
       mirror?.dispose()
       mirror = null
+      wind?.dispose()
+      wind = null
+      /* the world's own meshes go with `root`; these are the three that hold state OUTSIDE it --
+         a material of their own, or a list of the world's meshes that must not outlive it */
+      ponds?.material?.dispose()
+      ponds = null
+      sway = null
+      boatLamps = null
       coverTex?.dispose()
       coverTex = null
       disposeShafts()
@@ -1073,6 +1153,20 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* the sky's own uniforms, so any one of them can be turned over on the running build and the
        answer read off the frame rather than argued from the source */
     sky: SKY_U,
+    /* AND THE LAMPS', FOR THE SAME REASON AND A SHARPER ONE. Every system here has an `?x=off`
+       switch, but a switch costs a RELOAD -- and a reload puts the boats, the walkers and the
+       crowd somewhere else, so the two frames being compared differ by everything that moved
+       while the world was loading as well as by the thing under test. Measuring the six boat
+       lanterns that way put their contribution at 95 pixels with an unknown error bar around it.
+       Reachable uniforms mean the A and the B are the same frame of the same run. */
+    lamps: LAMP_U,
+    /* and the four systems that came last, each of which has something worth asking */
+    live: () => ({
+      sway: sway && { plants: sway.plants, meshes: sway.meshes.length, heights: sway.heights },
+      wind: wind && { pool: wind.pool, shown: wind.shown, visible: wind.mesh.visible },
+      ponds: ponds && { garden: ponds.garden.length, pools: ponds.pools.length },
+      boatLamps: boatLamps && { lamps: boatLamps.lamps, live: LAMP_U.uMoveN.value },
+    }),
     /* AND THE DAY, which is what everything else is a function of. The sky's brightness, the
        lanterns, the stars, the fog and the moon are all keyed on one number -- the sun's altitude
        -- and until this was reachable the only way to ask what it was was to infer it backwards

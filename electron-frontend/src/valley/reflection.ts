@@ -61,6 +61,7 @@ export interface Reflection {
   /** render the mirror; returns false when there was no water on screen to reflect */
   render: (
     renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, water: Object3D,
+    also?: readonly Object3D[],
   ) => boolean
   dispose: () => void
 }
@@ -80,9 +81,11 @@ export function createReflection(): Reflection {
   const _box = new Box3()
   const fwd = new Vector3()
   const tgt = new Vector3()
+  const alsoWas: boolean[] = []
 
   const render = (
     renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, water: Object3D,
+    also: readonly Object3D[] = [],
   ): boolean => {
     /* IS THERE ANY WATER ON SCREEN AT ALL? Asked of the MAIN camera, because that is the question:
        the mirror is only ever read where the water is drawn.
@@ -117,6 +120,11 @@ export function createReflection(): Reflection {
       .multiply(cam.matrixWorldInverse)
 
     water.visible = false
+    /* AND ANYTHING ELSE WEARING THE LAKE'S MATERIAL. The garden pond borrows it -- see `pond.ts` --
+       and a material that samples `tReflect` drawn INTO `tReflect` is a feedback loop: three warns,
+       and the pond comes back holding a picture of itself from the frame before. */
+    alsoWas.length = 0
+    also.forEach((o, i) => { alsoWas[i] = o.visible; o.visible = false })
     const prevClip = renderer.clippingPlanes
     const prevTarget = renderer.getRenderTarget()
     renderer.clippingPlanes = clip
@@ -126,6 +134,7 @@ export function createReflection(): Reflection {
     renderer.setRenderTarget(prevTarget)
     renderer.clippingPlanes = prevClip
     water.visible = true
+    also.forEach((o, i) => { o.visible = alsoWas[i] })
     return true
   }
 

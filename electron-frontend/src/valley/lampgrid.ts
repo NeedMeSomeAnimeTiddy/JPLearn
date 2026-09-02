@@ -1,4 +1,6 @@
-import { Color, DataTexture, FloatType, NearestFilter, RGBAFormat, Vector2, type Vector3 } from 'three'
+import {
+  Color, DataTexture, FloatType, NearestFilter, RGBAFormat, Vector2, Vector4, type Vector3,
+} from 'three'
 
 /* ==================================================================================================
    THE LANTERNS LIGHT THINGS, WHICH UNTIL NOW THEY DID NOT.
@@ -41,6 +43,22 @@ export const LAMP_REACH = 300
 export const LAMP_I = 0.7
 export const LAMP_LIGHT_COLOUR = 0xffa64a
 
+/* ==================================================================================================
+   AND EIGHT LAMPS THAT ARE NOT IN THE GRID, because they are on boats.
+
+   THE GRID IS A FLOOR PLAN BAKED ONCE. Every cell holds the ids of the four nearest lamps to it,
+   worked out at load and never touched again -- which is exactly what makes it affordable, and
+   exactly why a lamp that MOVES cannot live in it. A sailing boat's chochin would light the mooring
+   it was exported at for the rest of the run.
+
+   SO THEY ARE PLAIN UNIFORMS INSTEAD, and at this count that is the cheaper answer anyway: eight
+   vec4s and a loop with a uniform bound costs every lit fragment eight distance tests, against a
+   rebuild of a 192 x 192 grid every frame. The bound is a uniform rather than a literal, so the
+   whole draw takes the same branch and there is no divergence to pay for. `uMoveN` is the real off
+   switch -- zeroing it skips the loop outright rather than adding eight lights of strength zero.
+   ================================================================================================== */
+export const MOVE_LAMPS = 8
+
 export const LAMP_U = {
   uLampData: { value: null as DataTexture | null },
   uLampGrid: { value: null as DataTexture | null },
@@ -52,6 +70,10 @@ export const LAMP_U = {
   uLampI: { value: LAMP_I },
   /** 0 by day; the same `lampOn` the emissives take */
   uLampOn: { value: 0 },
+  /** how many of the slots below are live this frame; 0 skips the loop */
+  uMoveN: { value: 0 },
+  /** xyz where a travelling flame is, w how hard it is burning this frame */
+  uMoveL: { value: Array.from({ length: MOVE_LAMPS }, () => new Vector4()) },
 }
 
 /* THE BLOCK EVERY LIT MATERIAL NEEDS. It goes in at `lights_fragment_end`, where three has finished
@@ -68,12 +90,24 @@ export const LAMP_HEAD = `
   uniform sampler2D uLampData, uLampGrid;
   uniform vec2 uLampDataSize, uLampOrigin, uLampInvSpan;
   uniform vec3 uLampColor;
-  uniform float uLampReach, uLampI, uLampOn;`
+  uniform float uLampReach, uLampI, uLampOn;
+  uniform int uMoveN;
+  uniform vec4 uMoveL[ ${MOVE_LAMPS} ];`
 
 export const LAMP_GLSL = `
   if ( uLampOn > 0.001 ) {
     vec3 lampN = normalize( vAtmosN );
     vec3 lamp = vec3( 0.0 );
+    /* the boats' lanterns, which move -- see MOVE_LAMPS. Same falloff as the grid's, so a lantern
+       carried off a jetty and onto a hull does not change brightness as it crosses. */
+    for ( int i = 0; i < ${MOVE_LAMPS}; i++ ) {
+      if ( i >= uMoveN ) break;
+      vec3 md = uMoveL[ i ].xyz - vAtmosPos;
+      float mdist = max( length( md ), 1e-4 );
+      float matt = uMoveL[ i ].w / ( 1.0 + mdist * mdist / ( uLampReach * uLampReach ) );
+      matt *= max( 0.0, 1.0 - mdist / ( uLampReach * 2.6 ) );
+      lamp += uLampColor * ( matt * max( dot( lampN, md / mdist ), 0.0 ) );
+    }
     vec2 g = ( vAtmosPos.xz - uLampOrigin ) * uLampInvSpan;
     if ( g.x > 0.0 && g.x < 1.0 && g.y > 0.0 && g.y < 1.0 ) {
       vec4 cell = texture2D( uLampGrid, g );

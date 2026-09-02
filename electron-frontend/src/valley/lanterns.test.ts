@@ -108,3 +108,25 @@ describe('turning them up', () => {
     expect(field.meshes).toBe(0)
   })
 })
+
+describe('the ones that do not stay put', () => {
+  it('keeps a boat lantern out of the grid, which is baked once at load', () => {
+    /* the lamp grid is a floor plan worked out at load and never touched again -- so a flame on a
+       hull left in it lights the mooring it was exported at for the rest of the run, while the
+       boat carrying it crosses the lake in the dark. Measured on this world: 879 flames, 12 of
+       them chochin primitives on six boats. */
+    const field = buildLanterns(world(
+      lamp('Nature_Wildlife_Chochin_001'), lamp('Legacy_Props_Lamp_004'),
+    ))
+    expect(field.spots).toHaveLength(1)
+    expect(field.moving).toHaveLength(1)
+  })
+
+  it('still lights it, because it is a lantern either way', () => {
+    /* out of the GRID, not out of the world: it is drawn, it glows, and it bleeds */
+    const field = buildLanterns(world(lamp('Nature_Wildlife_Chochin_001')))
+    expect(field.meshes).toBe(1)
+    expect(field.lit).toHaveLength(1)
+    expect(field.mats).toHaveLength(1)
+  })
+})

@@ -5,6 +5,7 @@ import {
 } from 'three'
 import { IDLE_GLSL } from './crowd'
 import { LAKE_U } from './lake'
+import { SWAY_GLSL, SWAY_LAYER, SWAY_U, swayCall } from './sway'
 
 /* ==================================================================================================
    INK — OUTLINES IN SCREEN SPACE, AND THE REASON THE VALLEY LOOKED LIKE NOTHING.
@@ -87,15 +88,25 @@ const QUAD_VS = `
    the animation lives in. So every displacement has to be repeated here, from the same source: this
    reads `IDLE_GLSL` out of `crowd.ts` rather than restating it, or the two drift the moment either
    is tuned and the symptom is an outline sliding half a body off its figure. */
-function prepassVS(idle: boolean): string {
+type Moving = 'still' | 'idle' | 'sway'
+
+function prepassVS(moving: Moving): string {
+  const idle = moving === 'idle'
+  const sway = moving === 'sway'
   return `
     ${idle ? IDLE_GLSL : ''}
+    ${sway ? SWAY_GLSL : ''}
     varying vec3 vN;
     varying float vD;
     void main() {
       vec3 lpos = position;
       vec3 ln = normal;
       vec4 lp;
+      /* THE SWAY IS OUTSIDE THE INSTANCING BRANCH AND THE IDLE IS INSIDE IT, because three of this
+         world's plants are loose meshes rather than instanced sets -- the sacred cedar by the torii
+         is one of them, and it is 1,907 units tall in the middle of the frame. The crowd has no
+         such case: every figure in the valley arrives instanced. */
+      ${sway ? swayCall('lpos') : ''}
       #ifdef USE_INSTANCING
         ${idle ? 'idleFigure( lpos, ln, IDLE_ORIGIN );' : ''}
         lp = instanceMatrix * vec4( lpos, 1.0 );
@@ -132,12 +143,22 @@ const PREPASS_FS = `
    there belonged to whatever was BEHIND it, and the ink drew that thing's outlines across the front
    of the banner. Counted on this world: 454 double-sided meshes, 37 front-sided, 1 back-sided. */
 const matPrepass = new ShaderMaterial({
-  vertexShader: prepassVS(false),
+  vertexShader: prepassVS('still'),
   fragmentShader: PREPASS_FS,
   side: DoubleSide,
 })
 const matPrepassIdle = new ShaderMaterial({
-  vertexShader: prepassVS(true),
+  vertexShader: prepassVS('idle'),
+  fragmentShader: PREPASS_FS,
+  side: DoubleSide,
+})
+/* AND THE PLANTS GET THEIR OWN, carrying the same uniforms the lit material does rather than copies
+   of them -- `SWAY_U` is the objects themselves, so one write to `SWAY.t` moves the tree and the
+   line round it on the same frame. Given by hand because a ShaderMaterial has no `onBeforeCompile`
+   step to assign them in. */
+const matPrepassSway = new ShaderMaterial({
+  uniforms: SWAY_U,
+  vertexShader: prepassVS('sway'),
   fragmentShader: PREPASS_FS,
   side: DoubleSide,
 })
@@ -243,6 +264,7 @@ quadScene.add(quadMesh)
 const hidden: Object3D[] = []
 const wasVisible: boolean[] = []
 const crowdWas: boolean[] = []
+const plantWas: boolean[] = []
 
 /** put the crowd on its own layer, so its prepass can be a second render of just those meshes */
 export function inkTrackCrowd(meshes: readonly InstancedMesh[]): void {
@@ -260,10 +282,16 @@ export function inkTrackCrowd(meshes: readonly InstancedMesh[]): void {
    leaving every figure with a stationary ghost of itself. So they are hidden for the override pass
    and drawn afterwards, on their own layer, with the same idle displacement their lit material has.
    Nothing is cleared in between, so a figure behind a stall is still occluded by it.
+
+   AND THE PLANTS DO THE SAME THING, on a layer of their own, for the same reason and at rather more
+   scale: 17,291 of them against a thousand figures. Two extra renders of a subset each, and the
+   alternative -- leaving the vegetation in the still pass -- is every tree in the valley drawn with
+   a line round where it was standing before the wind got up.
    ================================================================================================== */
 export function renderND(
   renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera,
   crowd: readonly InstancedMesh[], idle: boolean,
+  plants: readonly Object3D[] = [], swayed = false,
 ): void {
   hidden.length = 0
   scene.traverse((o) => {
@@ -274,10 +302,15 @@ export function renderND(
   wasVisible.length = 0
   hidden.forEach((o, i) => { wasVisible[i] = o.visible; o.visible = false })
 
-  const swaying = idle && crowd.length > 0
-  if (swaying) {
+  const breathing = idle && crowd.length > 0
+  if (breathing) {
     crowdWas.length = 0
     crowd.forEach((o, i) => { crowdWas[i] = o.visible; o.visible = false })
+  }
+  const swaying = swayed && plants.length > 0
+  if (swaying) {
+    plantWas.length = 0
+    plants.forEach((o, i) => { plantWas[i] = o.visible; o.visible = false })
   }
 
   const prevAlpha = renderer.getClearAlpha()
@@ -287,11 +320,9 @@ export function renderND(
   renderer.clear()
   renderer.render(scene, camera)
 
-  if (swaying) {
+  if (breathing || swaying) {
     const prevAuto = renderer.autoClear
     renderer.autoClear = false
-    crowd.forEach((o, i) => { o.visible = crowdWas[i] })
-    scene.overrideMaterial = matPrepassIdle
     /* THE MASK IS SAVED AND PUT BACK, NOT RESET TO ZERO. `camera.layers.set(0)` does not mean
        "back to normal" -- it means "see layer 0 and nothing else", and this camera is deliberately
        on two: the sky dome and the sun disc live alone on ATMOS_LAYER so the shafts can render the
@@ -300,8 +331,21 @@ export function renderND(
        symptom was "the sky shader's new uniforms do nothing" -- they were doing it to a mesh that
        was no longer being rendered. */
     const prevLayers = camera.layers.mask
-    camera.layers.set(CROWD_LAYER)
-    renderer.render(scene, camera)
+    /* VISIBLE AGAIN BEFORE EITHER PASS, and safe because a layer mask of one layer draws only what
+       is ON that layer: the plants are on 0 and SWAY_LAYER, so the crowd's render cannot pick them
+       up and the crowd cannot appear in theirs. */
+    if (breathing) crowd.forEach((o, i) => { o.visible = crowdWas[i] })
+    if (swaying) plants.forEach((o, i) => { o.visible = plantWas[i] })
+    if (breathing) {
+      scene.overrideMaterial = matPrepassIdle
+      camera.layers.set(CROWD_LAYER)
+      renderer.render(scene, camera)
+    }
+    if (swaying) {
+      scene.overrideMaterial = matPrepassSway
+      camera.layers.set(SWAY_LAYER)
+      renderer.render(scene, camera)
+    }
     renderer.autoClear = prevAuto
     camera.layers.mask = prevLayers
   }

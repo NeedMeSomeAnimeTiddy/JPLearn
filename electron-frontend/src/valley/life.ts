@@ -187,10 +187,15 @@ interface LifeItem {
   wid: number
 }
 
-interface Rider {
+/* EXPORTED, BECAUSE SOMETHING ELSE RIDES THIS RIDE. The boats' lanterns are welded to their hulls
+   by exactly this mechanism, and `boatlamp.ts` has to hang a light where each one has got to --
+   which means reading the same `boat.delta * authored` the tick below applies. Recomputing it there
+   from the boat's own state would be a second copy of the weld, and the two would drift. */
+export interface Rider {
   o: Object3D
   i: number
-  boat: LifeItem
+  /** the hull it is standing on; `boat.delta` is what has moved since it was exported */
+  boat: { delta: Matrix4 | null }
   authored: Matrix4
 }
 
@@ -200,6 +205,8 @@ export interface LifeField {
   items: number
   boats: number
   riders: number
+  /** everyone and everything welded to a hull, for anything that has to follow one */
+  aboard: Rider[]
   wakes: number
   /** how many kept their authored place because no circle would fit them on the water */
   moored: number
@@ -479,6 +486,7 @@ export function buildLife(
     items: items.length,
     boats: sails.length,
     riders: riders.length,
+    aboard: riders,
     wakes: wakers.length,
     moored: items.filter((it) => it.still).length,
     tick,

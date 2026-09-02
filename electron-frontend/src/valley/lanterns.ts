@@ -60,6 +60,13 @@ export const LAMP_NOT = /(pole|post|stand|bracket|base)/i
 /** the ones that are a candle behind paper rather than behind stone */
 export const LAMP_PAPER = /(chochin|gaslamp|andon|lamp)/i
 
+/* THE ONES THAT DO NOT STAY PUT. A chochin in this world is hung on a boat's deck, and a boat
+   sails -- so its flame cannot go into the lamp grid, which is a floor plan baked once at load.
+   Left in it, six lanterns light the mooring they were exported at for the rest of the run while
+   the boats carrying them cross the lake in the dark. They are collected separately and given
+   moving slots instead; see `boatlamp.ts`. */
+export const LAMP_MOVING = /Chochin/i
+
 /* AND A MATERIAL CAN SAY SO ITSELF, which is the rule that reaches the windows. Object names
    carry the lamp patterns above, but a building is not called a lantern -- `PROP_inn_1` and
    `PROP_bathhouse` are inns and bathhouses, and what glows on them is a material slot named
@@ -96,6 +103,8 @@ export interface LanternField {
      all of them. The mockup keeps the same list for its lamp-cluster grid; here it is the darkness
      test and nothing else. */
   spots: Vector3[]
+  /** and the ones that travel, kept out of it -- see `LAMP_MOVING` */
+  moving: Vector3[]
   /** turn the whole valley's lanterns up or down; 0 is out, 1 is full night */
   setOn: (on: number) => void
 }
@@ -116,6 +125,7 @@ export function buildLanterns(root: Object3D): LanternField {
      kinds here, and a paper lantern and a stone one must not end up sharing a clone. */
   const swap = new Map<string, Emissive>()
   const spots: Vector3[] = []
+  const moving: Vector3[] = []
   const lit: Object3D[] = []
   const _m = new Matrix4()
   const _p = new Vector3()
@@ -153,13 +163,14 @@ export function buildLanterns(root: Object3D): LanternField {
        puts every member's real position in `instanceMatrix` */
     const inst = mesh as unknown as InstancedMesh
     mesh.updateWorldMatrix(true, false)
+    const into = LAMP_MOVING.test(o.name) ? moving : spots
     if (inst.isInstancedMesh) {
       for (let i = 0; i < inst.count; i++) {
         inst.getMatrixAt(i, _m)
         _m.premultiply(mesh.matrixWorld)
-        spots.push(_p.setFromMatrixPosition(_m).clone())
+        into.push(_p.setFromMatrixPosition(_m).clone())
       }
-    } else spots.push(_p.setFromMatrixPosition(mesh.matrixWorld).clone())
+    } else into.push(_p.setFromMatrixPosition(mesh.matrixWorld).clone())
   })
 
   const setOn = (on: number) => {
@@ -168,7 +179,7 @@ export function buildLanterns(root: Object3D): LanternField {
   /* out at build time: the day cycle turns them up, and it runs before the first frame */
   setOn(0)
 
-  return { mats, meshes, spots, lit, setOn }
+  return { mats, meshes, spots, moving, lit, setOn }
 }
 
 /* ==================================================================================================
