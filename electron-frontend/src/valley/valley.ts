@@ -37,6 +37,7 @@ import {
 } from './lighting'
 import {
   ATMOS_LAYER, disposeShafts, renderGlow, renderSkyMask, setGlow, sizeShafts, updateSunUv,
+  glowNow,
 } from './shafts'
 import { buildClouds, type CloudField } from './clouds'
 import { FLICKER, buildLanterns, flameFlicker, flickerTick, type LanternField } from './lanterns'
@@ -1178,6 +1179,7 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
        lanterns that way put their contribution at 95 pixels with an unknown error bar around it.
        Reachable uniforms mean the A and the B are the same frame of the same run. */
     lamps: LAMP_U,
+    glow: glowNow,
     /* and the four systems that came last, each of which has something worth asking */
     live: () => ({
       sway: sway && { plants: sway.plants, meshes: sway.meshes.length, heights: sway.heights },

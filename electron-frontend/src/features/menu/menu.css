@@ -1803,18 +1803,40 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    lit valley now holds these screens to, and the ascent's translucent columns were tuned against a
    world that was accidentally black.
    ================================================================================================== */
-/* AND THE BAND FOLLOWS THE SUN, which the day cycle is what made necessary. 0.28 was measured
-   against a valley at dusk, and at noon the same band leaves the hint line -- gold type with a dark
-   stroke, drawn for a dark ground -- sitting on lit grass. `--sky` is the one number the day cycle
-   hands the chrome: 0 at midnight, 1 at noon. The band takes a little over half its weight from it,
-   so night keeps the composition it was tuned for and midday gets the help it needs. */
+/* ==================================================================================================
+   AND IT IS THE WHOLE FRAME, NOT A BAND AT THE BOTTOM. This rule used to fade in only over the last
+   22% of the screen, on the argument above -- that anything higher brings its own ground and a
+   screen needing help was never legible. The argument still holds for LEGIBILITY. What it missed is
+   that the shade is also the picture: the mockup dims the entire valley by 15% at the top rising to
+   33% at the bottom, plus a wash down the left where the column stands, and without it this build's
+   world is simply a brighter, hotter version of the same scene.
+
+   MEASURED, WHICH IS THE ONLY REASON THIS OVERRULES THE NOTE ABOVE. Rendered side by side at 18:20,
+   the two builds agree on every number that makes light -- sun altitude 12.46 in both, the sky's
+   `uGain` to sixteen digits, the key at 6.332 / #ffcd9d, the fill at 1.247, the hemisphere at 0.478,
+   the fog at #daaf8f and 1.1e-5, the shafts at rayAmt 1.558, ACES at exposure 1, the same
+   `saturate(1.34) contrast(1.05)` on the canvas, and the same dome mesh wearing the same 2048x1024
+   sRGB texture. And the port's sky still came out +47 luminance brighter with the clouds hidden and
+   the shafts off. Predicting the mockup's pixels from this build's THROUGH these gradients lands
+   within about five levels across the frame -- so this rule is the entire difference, and the
+   lighting was never the thing that differed.
+
+   `--lk-crush` IS THE DIAL, and the mockup's own is 0.25 (`NAV.crush` there, `sway.json`'s sibling
+   in spirit). Nothing else needs touching to make the world lighter or heavier.
+   ================================================================================================== */
+.mn-open {
+  --lk-crush: 0.25;
+}
 .mn-open::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  --band: calc(0.24 + 0.26 * var(--sky, 0.5));
-  background: linear-gradient(180deg,
-    rgba(14, 17, 26, 0) 0%,
-    rgba(14, 17, 26, 0) 77.8%,
-    rgba(14, 17, 26, var(--band)) 100%);
+  background:
+    linear-gradient(180deg,
+      rgba(10, 14, 22, calc(var(--lk-crush) * 0.62)) 0%,
+      rgba(10, 14, 22, calc(var(--lk-crush) * 1.05)) 58%,
+      rgba(10, 14, 22, calc(var(--lk-crush) * 1.3)) 100%),
+    /* down the left, where the column of slabs stands and the world behind it is busiest */
+    linear-gradient(100deg, rgba(10, 14, 22, 0.16) 0%, rgba(10, 14, 22, 0.08) 34%,
+      rgba(10, 14, 22, 0) 58%);
 }
 
 /* the screen container is focusable so its arrow keys work; it must not draw a ring for that */

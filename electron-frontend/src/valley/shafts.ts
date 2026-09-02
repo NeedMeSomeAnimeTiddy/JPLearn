@@ -219,6 +219,28 @@ export function setGlow(
   ;(matGlow.uniforms.haloCol.value as Color).copy(haloCol)
 }
 
+/* WHAT IT IS ACTUALLY RUNNING, for the same reason `lamps` is on the handle: the base constants
+   here are the mockup's to the digit, and the day cycle rewrites five of them every beat -- so
+   comparing the two builds by reading source compares two tables of numbers neither one uses. */
+export function glowNow(): Record<string, number | string> {
+  const u = matGlow.uniforms
+  const n = (v: number) => Math.round(v * 10000) / 10000
+  return {
+    rayAmt: n(u.rayAmt.value as number),
+    rayCol: `#${(u.rayCol.value as Color).getHexString()}`,
+    haloAmt: n(u.haloAmt.value as number),
+    haloSharp: u.haloSharp.value as number,
+    haloCol: `#${(u.haloCol.value as Color).getHexString()}`,
+    coreAmt: n(u.coreAmt.value as number),
+    coreSharp: u.coreSharp.value as number,
+    coreCol: `#${(u.coreCol.value as Color).getHexString()}`,
+    sunU: n((u.sunUv.value as { x: number; y: number }).x),
+    sunV: n((u.sunUv.value as { x: number; y: number }).y),
+    sunVis: n(u.sunVis.value as number),
+    aspect: n(u.aspect.value as number),
+  }
+}
+
 export function sizeShafts(width: number, height: number, dpr: number): void {
   const w = Math.max(1, Math.floor(width * dpr) >> 1)
   const h = Math.max(1, Math.floor(height * dpr) >> 1)
