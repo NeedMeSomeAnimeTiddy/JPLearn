@@ -1554,6 +1554,15 @@ function App() {
       }
 
       if (view === 'home') {
+        /* 1 THROUGH 5 REACH THE MENU FIRST, AND ONLY GET HERE IF IT DID NOT WANT THEM.
+           These five jumped straight into a script hub, which was right when home was the flat deck
+           grid. Home is the menu now, every row carries a printed 01..05, and `MenuL1` reads those
+           numbers to move its cursor -- but its listener is on its own subtree while this one is on
+           the window, so the menu selected a row and this fired immediately after and left the menu
+           entirely. Pressing 2 on the front door landed you in Katakana.
+           `preventDefault` could not stop that; `stopPropagation` does, and `MenuL1` now calls it.
+           The block stays because it is still the route in from anywhere the menu is not listening
+           -- a study surface, or `test-entry.ts`, which dispatches these on the window by design. */
         if (event.key === '1') {
           setActiveScript('hiragana')
           navigate('script_hub', 'forward')
@@ -2381,6 +2390,7 @@ function App() {
 
       {view === 'home' && menuLevel === 2 && menuPath.section === 'DRILLS' ? (
         <Lanes
+          section="DRILLS"
           jp="練習" en="PRACTICE"
           note="練習 · NOTHING NEW IS TAUGHT HERE — THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU"
           lanes={practiceLanes(summary)}
@@ -2396,6 +2406,7 @@ function App() {
 
       {worldOpen ? (
         <Lanes
+          section="READING"
           jp="実践" en="THE WORLD"
           note="実践 · REAL JAPANESE, NOT EXERCISES — NOTHING IN HERE IS EVER DUE"
           lanes={worldCards}
@@ -2814,7 +2825,7 @@ function App() {
           <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
 
           <header className="hub-topbar">
-            <h1 className="sr-only">Daily Games</h1>
+            <h1 className="sr-only" id="daily-games-title">Daily Games</h1>
             <button
               type="button"
               className="back-button back-button-icon-only"

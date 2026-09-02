@@ -5,8 +5,18 @@
   color: var(--text-main);
 }
 
+/* A COLUMN, NOT THE WHOLE WINDOW. Four tiles across a 1,550px shell made each one 767 pixels wide
+   for a name, one sentence and two controls -- 338px of nothing between the text and the buttons in
+   the widest of them. Capping the column is what makes the tiles a size rather than a consequence
+   of the monitor, and it centres what is left. */
 .daily-games-hub {
   padding: 1.5rem;
+  /* `width: 100%` AND NOT JUST THE CAP. This sits in a flex column, and an auto margin on the cross
+     axis stops a flex item stretching -- so `max-width` plus `margin: 0 auto` alone collapsed the
+     hub to its fit-content width of 628px and put the four tiles in one narrow column. */
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
 }
 
 .daily-games-summary {
@@ -15,6 +25,14 @@
   gap: 1rem;
   justify-content: space-between;
   margin: 1.5rem 0;
+}
+
+/* the same omission one row up: the summary line styled its row and not the sentence in it, so a
+   16px paragraph sat beside 10.9px streak badges on the same baseline */
+.daily-games-summary p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-soft);
 }
 
 /* ── Buttons: squared 3D push-button ──────────────────────── */
@@ -162,8 +180,15 @@
   margin: 0.5rem 0 0;
 }
 
+/* THE TILE'S NAME NEEDED A SIZE, AND AN `h2` WITHOUT ONE IS THE BROWSER'S 24px.
+   That made the four game names the largest type on the screen -- larger than the "Daily Games"
+   nameplate at 16.3px, beside 14px body copy and 10.9px chips -- which is exactly backwards for a
+   card in a grid of four. The rule set `margin` and stopped. */
 .daily-game-tile h2 {
   margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .daily-game-tile-status {
@@ -191,10 +216,12 @@
 /* ── Skeleton (squared) ────────────────────────────────────── */
 
 .daily-games-skeleton,
+/* `auto-fit` RATHER THAN A FIXED TWO, so the pair becomes one column when the column is narrow
+   instead of squeezing two 200px tiles side by side. */
 .daily-games-tile-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
 }
 
 .daily-games-skeleton span {

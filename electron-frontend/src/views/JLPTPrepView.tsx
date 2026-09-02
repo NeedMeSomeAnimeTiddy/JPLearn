@@ -517,7 +517,7 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
   }
 
   return (
-    <div className="view-shell">
+    <div className="view-shell view-center">
       <section className="jlpt-prep-view panel-glass">
       <header className="jlpt-prep-header">
         <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to home">

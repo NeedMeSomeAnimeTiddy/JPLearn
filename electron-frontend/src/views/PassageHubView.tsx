@@ -151,10 +151,12 @@ export function PassageHubView({ onBack, onOpenDictionary, onPlayAudio, voiceBus
           <ArrowLeft size={18} strokeWidth={2.2} />
         </button>
         <h2 className="passages-title">Passages</h2>
-        <span className="passages-subtitle">{passages.length} stories</span>
+        <span className="passages-subtitle">{passages.length} {passages.length === 1 ? 'story' : 'stories'}</span>
       </header>
 
-      <div className="passages-list" role="list">
+      {/* `role="list"` goes with `listitem` children; without them it is a plain container and
+          the buttons keep their own role */}
+      <div className="passages-list">
         {passages.map((passage) => {
           const entry = progress.get(passage.id)
           const status = entry?.status ?? 'not-started'
@@ -163,7 +165,9 @@ export function PassageHubView({ onBack, onOpenDictionary, onPlayAudio, voiceBus
             <button
               key={passage.id}
               type="button"
-              role="listitem"
+              /* NO `role="listitem"`. An explicit role REPLACES the implicit one, so every card in
+                 this list announced itself as a list item and nothing told a screen-reader user it
+                 could be pressed -- on a screen whose only purpose is pressing them. */
               className="passages-card"
               onClick={() => handleSelectPassage(passage)}
             >

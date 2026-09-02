@@ -501,14 +501,6 @@ export function ScriptHubView({
                 <span className="home-section-hint">◀◀  scroll  ▶▶</span>
               </div>
 
-              <div className="hub-eq" aria-hidden="true">
-                <span className="hub-eq-bar" style={{ animationDelay: '0s' } as CSSProperties} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.1s' } as CSSProperties} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.2s' } as CSSProperties} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.05s' } as CSSProperties} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.15s' } as CSSProperties} />
-                <span className="hub-eq-bar" style={{ animationDelay: '0.25s' } as CSSProperties} />
-              </div>
               <div className="hub-deck-badge" aria-hidden="true">
                 <span>DOLBY NR</span>
                 <span className="hub-deck-dot" />
