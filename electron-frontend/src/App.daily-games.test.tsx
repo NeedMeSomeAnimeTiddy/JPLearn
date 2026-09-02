@@ -265,7 +265,7 @@ describe('Daily Games navigation', () => {
     expect(screen.queryByRole('heading', { name: 'Typing Blitz' })).toBeNull()
     expect(recordGameResult).toHaveBeenCalledTimes(2)
 
-    fireEvent.click(screen.getByRole('button', { name: /back to map/i }))
+    fireEvent.click(screen.getByRole('button', { name: /leave this round/i }))
     expect(await screen.findByRole('heading', { name: 'Typing Blitz' })).toBeTruthy()
     expect(recordGameResult).toHaveBeenCalledTimes(2)
   })
@@ -276,7 +276,7 @@ describe('Daily Games navigation', () => {
     render(<App />)
 
     await openMissedWordReview()
-    fireEvent.click(screen.getByRole('button', { name: /back to map/i }))
+    fireEvent.click(screen.getByRole('button', { name: /leave this round/i }))
     expect(await screen.findByRole('heading', { name: 'Typing Blitz' })).toBeTruthy()
     expect(review.recordGameResult).not.toHaveBeenCalled()
 

@@ -446,8 +446,8 @@ export function MinigameView({
                         type="button"
                         className="hub-chip-button"
                         onClick={onBack}
-                        aria-label="Back to map"
-                        title="Back to map"
+                        aria-label="Leave this round"
+                        title="Leave this round"
                       >
                         <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
                         <span>Back</span>

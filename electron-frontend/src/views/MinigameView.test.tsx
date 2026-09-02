@@ -173,7 +173,7 @@ describe('MinigameView', () => {
   it('calls onBack from the map back button', () => {
     const onBack = vi.fn()
     renderView({}, { onBack })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Back to map' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Leave this round' })[0])
     expect(onBack).toHaveBeenCalledOnce()
   })
 

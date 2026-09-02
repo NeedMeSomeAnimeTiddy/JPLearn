@@ -141,8 +141,8 @@ export function SessionRunSummary({
           type="button"
           className="back-button back-button-icon-only"
           onClick={onBack}
-          aria-label="Back to map"
-          title="Back to map"
+          aria-label="Leave this round"
+          title="Leave this round"
         >
           <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
         </button>
