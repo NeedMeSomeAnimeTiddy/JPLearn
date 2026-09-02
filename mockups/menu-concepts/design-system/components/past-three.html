@@ -1,0 +1,812 @@
+<!-- @dsCard group="Components" name="The screens past level three" subtitle="The session shell, and the six screens still standing on the old app layout" width="1360" height="7451" -->
+<!doctype html>
+<meta charset="utf-8">
+<title>The screens past level three</title>
+<style>
+  :root {
+    --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --hi-deep: #b23320;
+    --gold: #cfa45c; --gold-hi: #e8c47c; --washi-dim: #cfc6ae;
+    --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --skew: skewX(-8deg) rotate(-1.2deg);
+    --skew2: skewX(-8deg) rotate(1deg);
+    --drop: 6px 8px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.16);
+    --drop-s: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { background: #10131e; color: var(--washi); font-family: var(--lat-ui);
+    font-weight: 600; letter-spacing: 0.03em; padding: 34px 40px 60px; }
+  h1 { font-family: var(--lat); font-style: italic; font-size: 26px; margin-bottom: 10px; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 40px 0 12px; }
+  .lede { max-width: 1010px; font-size: 13px; line-height: 1.75; color: rgba(242,234,216,0.82); }
+  .lede + .lede { margin-top: 8px; }
+  .lede b { color: var(--gold-hi); }
+  code { font-family: ui-monospace, Consolas, monospace; color: var(--gold-hi);
+    letter-spacing: 0; font-size: 11px; }
+  .note { margin: 10px 0 26px; padding: 15px 18px; background: rgba(227,74,51,0.1);
+    box-shadow: inset 0 0 0 1px rgba(227,74,51,0.4); max-width: 1010px;
+    font-size: 12px; line-height: 1.7; }
+  .note b { color: #ff9d86; }
+  .note.calm { background: rgba(207,164,92,0.09); box-shadow: inset 0 0 0 1px rgba(207,164,92,0.34); }
+  .note.calm b { color: var(--gold-hi); }
+  figure { margin: 0 0 12px; background: rgba(255,255,255,0.03);
+    box-shadow: inset 0 0 0 1px rgba(242,234,216,0.13); width: max-content; }
+  figcaption { padding: 13px 18px 17px; max-width: 1280px; }
+  .name { display: flex; align-items: baseline; gap: 13px; flex-wrap: wrap; margin-bottom: 7px; }
+  .name b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px; }
+  .name i { font-style: normal; font-size: 9px; letter-spacing: 0.2em; color: rgba(242,234,216,0.45); }
+  .name u { text-decoration: none; font-size: 9px; letter-spacing: 0.16em; padding: 2px 8px;
+    background: rgba(227,74,51,0.2); color: #ff9d86; }
+  figcaption p { font-size: 12px; line-height: 1.7; color: rgba(242,234,216,0.76); }
+  figcaption p + p { margin-top: 6px; }
+
+  /* ================================================================================================
+     THE PLATE. 1280x720 of real valley with a board of design over it, at 1:1 — the same size the
+     app draws at, so nothing here is a sketch that will have to be re-measured later. */
+  .plate { position: relative; width: 1280px; height: 720px; overflow: hidden; }
+  .plate > img { display: block; width: 1280px; height: 720px; }
+  .board { position: absolute; inset: 0; font-family: var(--lat-ui); }
+
+  /* ---- the crown: brand, heading slab, caption chip, the session's own chips ---- */
+  .brand { position: absolute; left: 48px; top: 24px; display: flex; gap: 9px; align-items: center; }
+  .brand i { width: 28px; height: 28px; background: var(--hi); display: block;
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.45); }
+  .brand b { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 13px; letter-spacing: 0.16em; color: var(--washi);
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.6); }
+  .brand s { display: block; text-decoration: none; font-family: var(--jp-go); font-size: 8.5px;
+    letter-spacing: 0.24em; color: rgba(242,234,216,0.72); text-shadow: 1px 1px 0 rgba(0,0,0,0.6); }
+
+  .hd { position: absolute; left: 48px; top: 56px; display: flex; align-items: stretch;
+    width: max-content; transform: var(--skew); background: var(--washi); box-shadow: var(--drop); }
+  .hd-mark { flex: none; width: 54px; display: grid; place-items: center; background: var(--gold);
+    color: var(--ink); font-family: var(--jp); font-size: 30px; line-height: 1;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.2); }
+  .hd-mark.duty { background: var(--hi); color: #ffe9c9; }
+  .hd-txt { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 20px 11px; }
+  .hd-kick { font-weight: 700; font-size: 9.5px; letter-spacing: 0.22em;
+    color: rgba(20,17,13,0.5); margin-bottom: 5px; }
+  .hd-title { display: flex; align-items: baseline; gap: 16px; }
+  .hd-title b { font-family: var(--jp); font-weight: 700; font-size: 32px; letter-spacing: 0.13em;
+    line-height: 1; color: var(--ink); }
+  .hd-title i { font-style: normal; font-weight: 700; font-size: 13px; letter-spacing: 0.3em;
+    color: rgba(20,17,13,0.55); }
+
+  .cap { position: absolute; left: 52px; top: 152px; width: max-content; display: flex;
+    align-items: center; gap: 9px; padding: 5px 13px 6px; background: var(--washi);
+    box-shadow: var(--drop-s); transform: var(--skew2); transform-origin: 0 50%;
+    font-weight: 700; font-size: 10px; letter-spacing: 0.2em; color: var(--ink); }
+  .cap s { text-decoration: none; color: rgba(20,17,13,0.3); }
+
+  /* the session's own numbers, where the front door keeps the streak and the level */
+  .run { position: absolute; right: 48px; top: 30px; display: flex; align-items: stretch; gap: 6px; }
+  .run > span { display: flex; align-items: center; gap: 7px; padding: 6px 12px 7px;
+    background: var(--washi); box-shadow: var(--drop-s); transform: var(--skew);
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20,17,13,0.6); }
+  .run b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+    letter-spacing: 0; color: var(--ink); }
+  .run > span.duty { background: var(--hi); color: #ffd9a1; }
+  .run > span.duty b { color: #fff; }
+
+  /* ---- the foot band: one thin object spanning the stage, and nothing else ---- */
+  /* GROUND, not cream on nothing — this is the instrument `legibility.html` names for anything
+     small or measured, and a twenty-tick strip laid over a lit valley is the definition of it. */
+  .foot { position: absolute; left: 174px; top: 598px; width: 932px; display: flex;
+    align-items: center; gap: 15px; padding: 6px 14px 7px; transform: var(--skew);
+    background: rgba(10,9,6,0.82); box-shadow: inset 0 0 0 1px rgba(242,234,216,0.2),
+      2px 3px 0 rgba(0,0,0,0.45); }
+  .foot > b, .foot > s { flex: none; font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+    color: var(--washi); }
+  .foot > s { text-decoration: none; color: rgba(242,234,216,0.56); margin-left: auto; }
+  .ticks { flex: 1; display: flex; gap: 3px; height: 15px; }
+  .ticks i { flex: 1; background: rgba(242,234,216,0.14); box-shadow: inset 0 0 0 1px rgba(242,234,216,0.3); }
+  .ticks i.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.3); }
+  .ticks i.bad { background: var(--hi); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.3); }
+  .ticks i.here { background: var(--washi); box-shadow: inset 0 0 0 2px var(--ink); }
+
+  /* ---- back tab and hints, exactly where every other screen keeps them ---- */
+  .back { position: absolute; left: 48px; top: 648px; padding: 6px 16px 7px; background: var(--washi);
+    box-shadow: var(--drop-s); transform: var(--skew); font-weight: 700; font-size: 10px;
+    letter-spacing: 0.18em; color: var(--ink); }
+  .back em { font-style: normal; font-family: var(--jp-go); font-size: 9px; margin-left: 7px;
+    color: rgba(20,17,13,0.5); }
+  .hints { position: absolute; right: 46px; top: 618px; display: flex; flex-direction: column;
+    gap: 6px; align-items: flex-end; }
+  .hints span { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.14em; color: var(--washi); text-shadow: 2px 2px 0 rgba(0,0,0,0.72); }
+  .hints b { padding: 3px 8px 4px; background: var(--washi); color: var(--ink);
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.45); transform: var(--skew); font-size: 9px;
+    text-shadow: none; letter-spacing: 0.1em; }
+  .hints em { font-style: normal; font-family: var(--jp-go); font-size: 9px;
+    color: rgba(242,234,216,0.68); }
+
+  /* ================================================================================================
+     THE SHEET — the one object every one of these screens is built on. A washi plate filling the
+     stage, divided into a PROMPT cell and a WORK cell, with an action slab bled to its own floor. */
+  .sheet { position: absolute; left: 174px; top: 192px; width: 932px; height: 384px;
+    display: flex; background: var(--washi); transform: var(--skew);
+    box-shadow: 8px 11px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.16); }
+  .ask { flex: none; width: 322px; display: flex; flex-direction: column;
+    padding: 18px 22px 0; box-shadow: inset -1px 0 0 rgba(20,17,13,0.16); }
+  .ask-kick { font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em; color: var(--hi-deep); }
+  .ask-jp { flex: 1; display: grid; place-items: center; font-family: var(--jp); font-weight: 400;
+    color: var(--ink); font-size: 132px; line-height: 1; padding-bottom: 6px; }
+  .ask-src { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 0 0 15px; font-weight: 700; font-size: 8.5px; letter-spacing: 0.18em;
+    color: rgba(20,17,13,0.45); }
+  .ask-src i { font-style: normal; color: var(--ink); letter-spacing: 0.1em; }
+  .work { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 18px 22px 0; }
+  .work-kick { display: flex; align-items: baseline; justify-content: space-between;
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(20,17,13,0.45);
+    margin-bottom: 12px; }
+  .work-kick i { font-style: normal; font-family: var(--jp-go); font-size: 9px; }
+
+  /* the four slips */
+  .slips { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 11px;
+    padding-bottom: 16px; }
+  .slip { display: flex; align-items: center; gap: 14px; padding: 0 16px;
+    background: var(--washi-dim); box-shadow: 3px 4px 0 rgba(20,17,13,0.22),
+      inset 0 0 0 1px rgba(20,17,13,0.16); }
+  .slip u { text-decoration: none; flex: none; width: 26px; height: 26px; display: grid;
+    place-items: center; background: var(--gold); color: var(--ink);
+    font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px; }
+  .slip b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 25px;
+    color: var(--ink); letter-spacing: 0.01em; }
+  .slip.hot { background: var(--washi); box-shadow: 5px 6px 0 rgba(20,17,13,0.3),
+      inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .slip.hot u { background: var(--hi); color: #ffe9c9; }
+  .slip.right { background: var(--washi); box-shadow: 5px 6px 0 rgba(20,17,13,0.3),
+      inset 4px 0 0 var(--gold), inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .slip.wrong b { color: rgba(20,17,13,0.34); text-decoration: line-through;
+    text-decoration-color: var(--hi); }
+  .slip.wrong u { background: var(--hi-deep); color: #ffd9a1; }
+  .slip.dead { opacity: 1; }
+  .slip.dead b { color: rgba(20,17,13,0.34); }
+  .slip.dead u { background: rgba(20,17,13,0.14); color: rgba(20,17,13,0.4); }
+
+  /* the slab, bled to the sheet's own floor */
+  .slab { margin: auto -1px -1px; height: 40px; display: flex; align-items: center;
+    justify-content: center; gap: 14px; background: var(--hi); font-weight: 700; font-size: 11.5px;
+    letter-spacing: 0.18em; color: #ffd9a1; }
+  .slab.calm { background: var(--ink); color: var(--gold-hi); }
+  .slab em { font-style: normal; font-family: var(--jp-go); font-size: 10px;
+    color: rgba(255,217,161,0.66); }
+  .sheet-foot { margin-top: auto; }
+
+  /* the gloss the answered state opens under the character */
+  .gloss { padding: 0 0 14px; }
+  .gloss b { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 21px; color: var(--hi-deep); }
+  .gloss p { margin-top: 4px; font-size: 10.5px; line-height: 1.5; letter-spacing: 0.04em;
+    color: rgba(20,17,13,0.66); font-weight: 600; }
+
+  /* ---- the crossword grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(9, 32px); grid-auto-rows: 32px; gap: 2px;
+    margin: 10px 0 0; }
+  .grid i { background: rgba(20,17,13,0.1); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.1); }
+  .grid i.open { background: var(--washi); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.4);
+    font-family: var(--jp); font-size: 17px; font-style: normal; color: var(--ink);
+    display: grid; place-items: center; }
+  .grid i.here { background: var(--gold-hi); box-shadow: inset 0 0 0 2px var(--ink); }
+  .clues { flex: 1; overflow: hidden; }
+  .clue { display: flex; align-items: baseline; gap: 11px; padding: 8px 0 9px;
+    box-shadow: inset 0 -1px 0 rgba(20,17,13,0.1); }
+  .clue u { text-decoration: none; flex: none; font-family: var(--lat); font-style: italic;
+    font-weight: 900; font-size: 12px; color: var(--hi-deep); width: 26px; }
+  .clue b { font-size: 12px; letter-spacing: 0.02em; color: var(--ink); font-weight: 600; }
+  .clue s { text-decoration: none; margin-left: auto; font-size: 8.5px; letter-spacing: 0.16em;
+    color: rgba(20,17,13,0.4); }
+  .clue.done b { color: rgba(20,17,13,0.36); }
+  .clue.done s { color: var(--gold); }
+  .fold { padding: 7px 0 0; font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+    color: rgba(20,17,13,0.42); }
+
+  /* ---- the passage ---- */
+  .prose { flex: 1; padding: 2px 0 0; font-family: var(--jp); font-size: 25px; line-height: 2.05;
+    color: var(--ink); letter-spacing: 0.04em; }
+  .prose ruby rt { font-family: var(--jp-go); font-size: 9px; color: rgba(20,17,13,0.5);
+    letter-spacing: 0; }
+  .prose mark { background: none; box-shadow: inset 0 -3px 0 var(--hi); color: var(--ink); }
+  .prose mark.on { background: var(--gold-hi); box-shadow: inset 0 0 0 2px var(--ink); }
+  .word { padding: 0 0 14px; }
+  .word b { display: block; font-family: var(--jp); font-size: 40px; line-height: 1.1; color: var(--ink); }
+  .word i { display: block; font-style: normal; font-family: var(--lat); font-weight: 900;
+    font-size: 18px; color: var(--hi-deep); margin-top: 2px; }
+  .word p { margin-top: 7px; font-size: 10.5px; line-height: 1.55; color: rgba(20,17,13,0.66);
+    font-weight: 600; letter-spacing: 0.03em; }
+
+  /* ---- settings and the cheatsheet: rows of controls on one sheet ---- */
+  .cols { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 0 26px; padding-bottom: 14px; }
+  .grp { font-weight: 700; font-size: 9px; letter-spacing: 0.22em; color: var(--hi-deep);
+    padding: 13px 0 6px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px 0 9px;
+    box-shadow: inset 0 -1px 0 rgba(20,17,13,0.1); }
+  .row u { text-decoration: none; flex: none; min-width: 34px; text-align: center;
+    padding: 3px 7px 4px; background: var(--washi-dim); color: var(--ink);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.24); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.1em; }
+  .row b { font-size: 11.5px; letter-spacing: 0.04em; color: var(--ink); font-weight: 600; }
+  .row em { font-style: normal; font-family: var(--jp-go); font-size: 9px;
+    color: rgba(20,17,13,0.42); }
+  .row s { text-decoration: none; margin-left: auto; font-weight: 700; font-size: 9px;
+    letter-spacing: 0.16em; color: rgba(20,17,13,0.45); }
+  .sw { margin-left: auto; flex: none; width: 40px; height: 17px; background: rgba(20,17,13,0.14);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.24); display: flex; align-items: center; padding: 2px; }
+  .sw i { width: 15px; height: 13px; background: rgba(20,17,13,0.32); }
+  .sw.on { background: var(--gold); }
+  .sw.on i { margin-left: auto; background: var(--ink); }
+
+  /* the nav rail down the left of a settings sheet */
+  .rail { flex: none; width: 194px; display: flex; flex-direction: column; padding: 18px 0 16px;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.16); }
+  .rail a { display: flex; align-items: baseline; gap: 10px; padding: 10px 22px 11px;
+    text-decoration: none; font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+    color: rgba(20,17,13,0.55); }
+  .rail a em { font-style: normal; font-family: var(--jp-go); font-size: 9px;
+    color: rgba(20,17,13,0.34); }
+  .rail a.on { background: var(--gold); color: var(--ink); box-shadow: inset 4px 0 0 var(--hi); }
+  .rail a.on em { color: rgba(20,17,13,0.55); }
+
+  /* the exam's countdown, which is the only chip in the app that gets louder */
+  .timer b { font-variant-numeric: tabular-nums; }
+</style>
+
+<h1>The screens past level three</h1>
+<p class="lede">
+  <code>screens.html</code> is the fifteen screens of the MENU. This card is the six that come
+  after it — <b>the ones a session actually happens in</b> — and every one of them is still drawn
+  in the app's old language: dark sepia panels, rounded boxes, thin monospace, a cassette-deck
+  border, and no valley behind any of it. They are also, between them, where nearly all of the time
+  in this app is spent. The front door is beautiful and you look at it for four seconds.
+</p>
+<p class="lede">
+  <b>They are all one screen wearing six coats.</b> A session is: something that says what you are
+  in and how far through it you are, something that carries the work, and something that says what
+  the whole set looks like. That is the frame contract already — crown, stage, foot — so nothing
+  below invents a layout. It invents <b>one object</b>, the sheet, and then fills it six ways.
+</p>
+
+<div class="note calm">
+  <b>What is NOT here, and why.</b>
+  <p style="margin:6px 0 0">The <b>daily games hub</b> is not redesigned. It is deleted. Its whole
+  job is picking one of four puzzles, and <code>assets/screen-road-daily.png</code> — designed in
+  August, never ported — already does that as a road of four tablets. This is the script hub's
+  argument exactly: level three ends the walk, and a screen that asks a question the menu has
+  already answered is a screen with nothing in it. What needed designing was not the hub but the
+  four puzzles it opens, and one of them is below.</p>
+  <p style="margin:6px 0 0"><b>Look it up</b> is not here either — it is the one piece of this
+  language that already reached the app (<code>features/lookup/lookup.css</code>), and settings was
+  always going to share its shell. So settings below is drawn on the sheet rather than on a
+  modal, and the two stay mutually exclusive.</p>
+</div>
+
+<h2>ONE — THE ROUND, ASKING</h2>
+<p class="lede" style="margin-bottom:14px">
+  The screen the app is mostly made of, and the one Robbie named. Today it is a character floating
+  in a brown void over a boxed answer panel, with the run's numbers set in 9px monospace above it.
+  <b>Here it is a sheet of paper on the desk</b> — which is the one arrangement that solves
+  legibility outright rather than fighting it: <code>legibility.html</code> says dark on light needs
+  neither halo nor keyline, and a round is twenty minutes of reading small type over a lit valley.
+</p>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-drills.png" alt="the valley, with the round standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">意</div>
+        <div class="hd-txt">
+          <div class="hd-kick">PRACTICE · DRILL 03 OF 06</div>
+          <div class="hd-title"><b>意味合わせ</b><i>MEANING MATCH</i></div>
+        </div>
+      </div>
+      <div class="cap">HIRAGANA N5 <s>·</s> BLOCK 03 <s>·</s> DIGRAPHS</div>
+      <div class="run">
+        <span><b>04</b>/ 20 ROUND</span>
+        <span><b>×3</b>STREAK</span>
+        <span class="duty"><b>92</b>% CLEAN</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask">
+          <div class="ask-kick">WHAT DOES THIS SAY?</div>
+          <div class="ask-jp">しゃ</div>
+          <div class="ask-src">SEEN <i>4 TIMES</i></div>
+        </div>
+        <div class="work">
+          <div class="work-kick"><span>CHOOSE ONE</span><i>四択</i></div>
+          <div class="slips">
+            <div class="slip hot"><u>1</u><b>sha</b></div>
+            <div class="slip"><u>2</u><b>shu</b></div>
+            <div class="slip"><u>3</u><b>kya</b></div>
+            <div class="slip"><u>4</u><b>sho</b></div>
+          </div>
+          <div class="sheet-foot">
+            <div class="slab">1–4 OR ENTER TO ANSWER <em>回答</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>ROUND 04</b>
+        <span class="ticks">
+          <i class="on"></i><i class="on"></i><i class="bad"></i><i class="here"></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i>
+        </span>
+        <s>16 LEFT</s>
+      </div>
+      <div class="back">BACK <em>戻る</em></div>
+      <div class="hints">
+        <span><b>1–4</b> Answer <em>回答</em></span>
+        <span><b>/</b> Look up <em>辞書</em></span>
+        <span><b>ESC</b> Leave <em>中断</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>The round, asking</b><i>REPLACES MinigameView</i><u>NOT BUILT</u></div>
+    <p><b>The prompt is a cell of the sheet, not a card of its own.</b> One plate, split at 322px
+      by a hairline: the question on the left at the size it deserves, the four slips on the right.
+      Two plates would put a shadow between the character and its answers, and they are one act.</p>
+    <p><b>The run's numbers move to the crown.</b> Round, streak and accuracy are what the front
+      door keeps the clock and the level in — same place, same chips, same skew. The old screen set
+      them in 9px monospace <i>between</i> the title and the character, which is the one place on
+      the screen the eye has to cross on every single card.</p>
+    <p><b>The foot band is the whole round.</b> Twenty ticks: gold answered, vermilion missed,
+      cream where you are. That is the contract's foot band doing exactly what it is for — a
+      whole-set summary, one object, thin, spanning the stage — and it is the thing the old screen
+      said as "0/20" in a row of four look-alike counters.</p>
+  </figcaption>
+</figure>
+
+<h2>TWO — THE ROUND, ANSWERED</h2>
+<p class="lede" style="margin-bottom:14px">
+  The half the old screen does worst: it recolours the tile you pressed and moves on. <b>A wrong
+  answer is the only moment in a drill that can teach anything</b>, so the sheet opens the gloss
+  under the character and holds until you take the next one.
+</p>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-drills.png" alt="the valley, with the answered round standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark duty">意</div>
+        <div class="hd-txt">
+          <div class="hd-kick">PRACTICE · DRILL 03 OF 06</div>
+          <div class="hd-title"><b>意味合わせ</b><i>MEANING MATCH</i></div>
+        </div>
+      </div>
+      <div class="cap">HIRAGANA N5 <s>·</s> BLOCK 03 <s>·</s> DIGRAPHS</div>
+      <div class="run">
+        <span><b>04</b>/ 20 ROUND</span>
+        <span><b>×0</b>STREAK</span>
+        <span><b>75</b>% CLEAN</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask">
+          <div class="ask-kick" style="color:rgba(20,17,13,0.45)">NOT QUITE</div>
+          <div class="ask-jp" style="font-size:104px">しゃ</div>
+          <div class="gloss">
+            <b>sha</b>
+            <p>し plus a small や. The small kana swallows the vowel of the one before it —
+              し + や would be two beats, しゃ is one.</p>
+          </div>
+        </div>
+        <div class="work">
+          <div class="work-kick"><span>YOU CHOSE 3</span><i>不正解</i></div>
+          <div class="slips">
+            <div class="slip right"><u>1</u><b>sha</b></div>
+            <div class="slip dead"><u>2</u><b>shu</b></div>
+            <div class="slip wrong"><u>3</u><b>kya</b></div>
+            <div class="slip dead"><u>4</u><b>sho</b></div>
+          </div>
+          <div class="sheet-foot">
+            <div class="slab calm">ENTER FOR THE NEXT ONE <em>次へ</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>ROUND 04</b>
+        <span class="ticks">
+          <i class="on"></i><i class="on"></i><i class="bad"></i><i class="bad"></i><i class="here"></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i>
+        </span>
+        <s>15 LEFT</s>
+      </div>
+      <div class="back">BACK <em>戻る</em></div>
+      <div class="hints">
+        <span><b>ENTER</b> Next <em>次へ</em></span>
+        <span><b>/</b> Look up <em>辞書</em></span>
+        <span><b>ESC</b> Leave <em>中断</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>The round, answered</b><i>THE SAME SHEET</i><u>NOT BUILT</u></div>
+    <p><b>Nothing moves.</b> The character shrinks to make room for the gloss, the right answer
+      takes a gold edge and the one you pressed takes a struck-through vermilion, the two you did
+      not touch go quiet. The slab changes colour and sentence — vermilion is what you owe, ink is
+      what comes next — and that is the whole state change. A screen that re-lays itself out between
+      question and answer is a screen you have to re-read twenty times a round.</p>
+    <p><b>The heading's mark turns vermilion on a miss</b> and nothing else in the crown moves.
+      It is the smallest possible place to put "that one was wrong" that is still in your eye when
+      you are looking at the answers.</p>
+  </figcaption>
+</figure>
+
+<h2>THREE — A DAILY PUZZLE</h2>
+<p class="lede" style="margin-bottom:14px">
+  Reached from the daily road, which already exists and is not built. The crossword is the hardest
+  of the four to fit — it is the only one with a board that has a shape of its own — so it is the
+  one drawn here; word search, match pairs and typing blitz are the same sheet with a different
+  left cell.
+</p>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-daily.png" alt="the valley, with the crossword standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">日</div>
+        <div class="hd-txt">
+          <div class="hd-kick">DAILY · PUZZLE 01 OF 04</div>
+          <div class="hd-title"><b>クロスワード</b><i>CROSSWORD</i></div>
+        </div>
+      </div>
+      <div class="cap">TODAY'S POOL <s>·</s> 24 WORDS <s>·</s> RESETS 05:12</div>
+      <div class="run">
+        <span><b>07</b>/ 12 PLACED</span>
+        <span><b>04:31</b>SPENT</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask" style="width:322px;padding:16px 22px 0">
+          <div class="ask-kick">THE GRID</div>
+          <div class="grid">
+            <i></i><i class="open">か</i><i class="open">ん</i><i class="open">じ</i><i></i><i></i><i class="open">み</i><i></i><i></i>
+            <i></i><i></i><i></i><i class="open">か</i><i></i><i></i><i class="open">ず</i><i></i><i></i>
+            <i></i><i class="open">ほ</i><i class="open">ん</i><i class="open">や</i><i class="open">く</i><i></i><i class="open">う</i><i></i><i></i>
+            <i></i><i></i><i></i><i class="here"></i><i></i><i></i><i class="open">み</i><i></i><i></i>
+            <i class="open">て</i><i class="open">が</i><i class="open">み</i><i></i><i></i><i></i><i class="open">ま</i><i></i><i></i>
+            <i></i><i></i><i class="open">せ</i><i></i><i></i><i></i><i class="open">せ</i><i></i><i></i>
+            <i></i><i></i><i class="open">き</i><i class="open">た</i><i class="open">な</i><i class="open">い</i><i class="open">ん</i><i></i><i></i>
+          </div>
+        </div>
+        <div class="work">
+          <div class="work-kick"><span>CLUES</span><i>手がかり</i></div>
+          <div class="clues">
+            <div class="clue done"><u>01</u><b>Chinese characters</b><s>DONE</s></div>
+            <div class="clue done"><u>02</u><b>A number, or how many</b><s>DONE</s></div>
+            <div class="clue done"><u>03</u><b>To translate</b><s>DONE</s></div>
+            <div class="clue"><u>04</u><b>A letter, the kind you post</b><s>3 ACROSS</s></div>
+            <div class="clue"><u>05</u><b>Not clean</b><s>5 ACROSS</s></div>
+            <div class="clue"><u>06</u><b>Sea water, or the sea itself</b><s>2 DOWN</s></div>
+            <div class="clue"><u>07</u><b>What you do with a book</b><s>3 DOWN</s></div>
+            <div class="fold">5 MORE CLUES — ↑↓ TO REACH THEM</div>
+          </div>
+          <div class="sheet-foot">
+            <div class="slab">TYPE TO FILL <em>入力</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>12 WORDS</b>
+        <span class="ticks">
+          <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="here"></i><i></i><i></i><i></i><i></i>
+        </span>
+        <s>5 LEFT · 04:31</s>
+      </div>
+      <div class="back">BACK <em>戻る</em></div>
+      <div class="hints">
+        <span><b>↑↓</b> Clue <em>選択</em></span>
+        <span><b>TAB</b> Direction <em>方向</em></span>
+        <span><b>ESC</b> Leave <em>中断</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>A daily puzzle — the crossword</b><i>REPLACES DailyGamesHub's four boards</i><u>NOT BUILT</u></div>
+    <p><b>The board is the prompt cell.</b> Nine columns of 30px is 286 — it fits the 322 the
+      round's character has, which is the point of having one sheet: a puzzle and a flashcard are
+      the same object with different things in the left half.</p>
+    <p><b>The clue list folds.</b> Ten clues do not fit and are not made to — five show and the
+      rest become a line saying how many, which is the menu's own overflow law (nothing scrolls;
+      what does not fit becomes a count on the edge it left over). The old hub had two thirds of a
+      1600px screen empty and still put its content in a scroller.</p>
+  </figcaption>
+</figure>
+
+<h2>FOUR — THE EXAM RUN</h2>
+<p class="lede" style="margin-bottom:14px">
+  The one screen here with a real deadline, and the only place in the app where a chip is allowed to
+  get louder. Everything else stays exactly where the round put it.
+</p>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-jlpt.png" alt="the valley, with the exam run standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">検</div>
+        <div class="hd-txt">
+          <div class="hd-kick">N5 MOCK · SECTION 02 OF 03</div>
+          <div class="hd-title"><b>文法</b><i>GRAMMAR</i></div>
+        </div>
+      </div>
+      <div class="cap">40 QUESTIONS <s>·</s> NO GOING BACK BETWEEN SECTIONS</div>
+      <div class="run">
+        <span><b>18</b>/ 40 DONE</span>
+        <span class="duty timer"><b>01:47</b>LEFT</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask" style="width:392px">
+          <div class="ask-kick">QUESTION 18</div>
+          <div class="ask-jp" style="font-size:34px;line-height:1.95;display:flex;
+            align-items:center;text-align:left;padding:0 0 8px">
+            <span>
+            きのう、としょかん<span style="box-shadow:inset 0 -3px 0 var(--hi);padding:0 22px">　</span>ほんを
+            かりました。</span>
+          </div>
+          <div class="ask-src">MARKED <i>3 FOR REVIEW</i></div>
+        </div>
+        <div class="work">
+          <div class="work-kick"><span>CHOOSE ONE</span><i>四択</i></div>
+          <div class="slips">
+            <div class="slip"><u>1</u><b>が</b></div>
+            <div class="slip hot"><u>2</u><b>で</b></div>
+            <div class="slip"><u>3</u><b>を</b></div>
+            <div class="slip"><u>4</u><b>に</b></div>
+          </div>
+          <div class="sheet-foot">
+            <div class="slab">1–4 TO ANSWER <em>回答</em> · M TO MARK <em>保留</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>SECTION 02</b>
+        <span class="ticks">
+          <i class="on"></i><i class="on"></i><i class="on"></i><i class="bad"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="bad"></i><i class="on"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="bad"></i><i class="on"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="here"></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i></i><i></i>
+        </span>
+        <s>3 MARKED · 22 LEFT</s>
+      </div>
+      <div class="back">END THE SECTION <em>終了</em></div>
+      <div class="hints">
+        <span><b>1–4</b> Answer <em>回答</em></span>
+        <span><b>M</b> Mark <em>保留</em></span>
+        <span><b>ESC</b> Abandon <em>中止</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>The exam run</b><i>REPLACES JLPTPrepView</i><u>NOT BUILT</u></div>
+    <p><b>The stem is long, so the prompt cell is wider — 392 rather than 322 — and that is the
+      only dimension any of these six change.</b> A sentence with a hole in it is not a character;
+      it needs a line length. The four particles are still four slips, still 1–4, still in the same
+      corner of the screen they are in during a drill, which is the whole argument for one sheet.</p>
+    <p><b>The countdown is the only vermilion chip in the crown</b>, and it is there because it is
+      the only fact on any of these screens that is against you. Marked questions are vermilion
+      ticks in the foot band — the same three-state strip the round uses, so "wrong" and "come
+      back to this" are told apart by which screen you are on rather than by a legend.</p>
+  </figcaption>
+</figure>
+
+<h2>FIVE — THE PASSAGE</h2>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-reading.png" alt="the valley, with the passage standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">実</div>
+        <div class="hd-txt">
+          <div class="hd-kick">THE WORLD · READING · N5</div>
+          <div class="hd-title"><b>駅の伝言</b><i>A NOTE AT THE STATION</i></div>
+        </div>
+      </div>
+      <div class="cap">4 MIN <s>·</s> 62 WORDS <s>·</s> 3 YOU HAVE NOT MET</div>
+      <div class="run">
+        <span><b>02</b>/ 08 LINES</span>
+        <span><b>03</b>LOOKED UP</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask" style="width:322px;padding-top:18px">
+          <div class="ask-kick">UNDER THE CURSOR</div>
+          <div class="word" style="margin:auto 0">
+            <b>伝言</b><i>dengon</i>
+            <p>a message left for someone. 伝 to convey, 言 to say — the two together are the note
+              itself rather than the act of leaving it.</p>
+          </div>
+          <div class="ask-src">FIRST SEEN <i>TODAY</i></div>
+        </div>
+        <div class="work">
+          <div class="work-kick"><span>THE TEXT</span><i>本文</i></div>
+          <div class="prose">
+            <ruby>駅<rt>えき</rt></ruby>の <ruby>改札<rt>かいさつ</rt></ruby>に
+            <mark class="on"><ruby>伝言<rt>でんごん</rt></ruby></mark>が
+            <ruby>貼<rt>は</rt></ruby>って ありました。<br>
+            「<ruby>七時<rt>しちじ</rt></ruby>に <mark><ruby>戻<rt>もど</rt></ruby>ります</mark>。
+            <ruby>待<rt>ま</rt></ruby>って いて ください。」<br>
+            <ruby>名前<rt>なまえ</rt></ruby>は ありません。<ruby>字<rt>じ</rt></ruby>が
+            とても <ruby>綺麗<rt>きれい</rt></ruby>です。<br>
+            <ruby>誰<rt>だれ</rt></ruby>の <ruby>紙<rt>かみ</rt></ruby>か
+            わかりませんが、<ruby>私<rt>わたし</rt></ruby>も そこで<br>
+            <ruby>少<rt>すこ</rt></ruby>し <ruby>待<rt>ま</rt></ruby>って みる ことに しました。
+          </div>
+          <div class="sheet-foot">
+            <div class="slab calm">→ NEXT WORD <em>次語</em> · ENTER TO SAVE IT <em>登録</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>8 LINES</b>
+        <span class="ticks">
+          <i class="on"></i><i class="here"></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </span>
+        <s>6 LEFT · 3 NEW WORDS</s>
+      </div>
+      <div class="back">BACK <em>戻る</em></div>
+      <div class="hints">
+        <span><b>←→</b> Word <em>選択</em></span>
+        <span><b>ENTER</b> Save <em>登録</em></span>
+        <span><b>ESC</b> Leave <em>中断</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>The passage</b><i>REPLACES PassageHubView</i><u>NOT BUILT</u></div>
+    <p><b>The two cells swap jobs and keep their sizes.</b> On a drill the left cell asks and the
+      right one answers; here the right cell is the text and the left is what the cursor is
+      standing on. Same sheet, same hairline, same 322 — a reader who has done a drill already
+      knows where to look, and the word being explained lands where the character was.</p>
+    <p><b>Nothing opens.</b> The old reader put a definition in a popover over the sentence you were
+      reading it from. There is a whole cell for it and it is never empty, so a lookup costs no
+      motion and hides nothing.</p>
+  </figcaption>
+</figure>
+
+<h2>SIX — SETTINGS</h2>
+<p class="lede" style="margin-bottom:14px">
+  Not a screen and not a modal: the same sheet <b>Look it up</b> already stands on
+  (<code>lookup.css</code>, <code>.lk-sheet</code> at 250, 152), because the design system already
+  says those two share a shell and are mutually exclusive. The old one is a 900px dialog with a
+  scrolling body called <i>Control Panel</i>.
+</p>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-sunset.png" alt="the valley, dimmed, with settings over it">
+    <div class="board">
+      <div style="position:absolute;inset:0;background:rgba(8,11,18,0.66)"></div>
+      <div class="sheet" style="left:250px;top:152px;width:780px;height:352px">
+        <div class="rail">
+          <a class="on">STUDY <em>学習</em><s style="margin-left:auto;text-decoration:none;font-size:9px;letter-spacing:0.12em;color:rgba(20,17,13,0.32)">8</s></a>
+          <a>SOUND <em>音声</em><s style="margin-left:auto;text-decoration:none;font-size:9px;letter-spacing:0.12em;color:rgba(20,17,13,0.32)">4</s></a>
+          <a>THE VALLEY <em>風景</em><s style="margin-left:auto;text-decoration:none;font-size:9px;letter-spacing:0.12em;color:rgba(20,17,13,0.32)">5</s></a>
+          <a>TEXT <em>文字</em><s style="margin-left:auto;text-decoration:none;font-size:9px;letter-spacing:0.12em;color:rgba(20,17,13,0.32)">3</s></a>
+          <a>ASSISTANT <em>助手</em><s style="margin-left:auto;text-decoration:none;font-size:9px;letter-spacing:0.12em;color:rgba(20,17,13,0.32)">4</s></a>
+          <a>YOUR DATA <em>記録</em><s style="margin-left:auto;text-decoration:none;font-size:9px;letter-spacing:0.12em;color:rgba(20,17,13,0.32)">2</s></a>
+        </div>
+        <div class="work" style="padding:16px 22px 0">
+          <div class="work-kick"><span>STUDY <i style="letter-spacing:0.14em">学習</i></span><span>8 OF 26 · GROUP 1 OF 6</span></div>
+          <div class="cols" style="grid-template-columns:1fr">
+            <div>
+              <div class="row"><b>Round length</b><em>長さ</em><s>MEDIUM · 12</s></div>
+              <div class="row"><b>Lives</b><em>ライフ</em><span class="sw on"><i></i></span></div>
+              <div class="row"><b>Focus mode</b><em>集中</em><span class="sw"><i></i></span></div>
+              <div class="row"><b>Ask how sure you are</b><em>確信</em><span class="sw on"><i></i></span></div>
+              <div class="row"><b>Furigana</b><em>振り仮名</em><s>UNTIL MASTERED</s></div>
+              <div class="row"><b>Keyboard prompts</b><em>操作</em><span class="sw on"><i></i></span></div>
+              <div class="row"><b>Answer with the keyboard</b><em>入力</em><span class="sw"><i></i></span></div>
+              <div class="row"><b>Show what a card is worth</b><em>点数</em><span class="sw on"><i></i></span></div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <div class="slab calm">↑↓ MOVE <em>選択</em> · ENTER CHANGE <em>変更</em> · ESC CLOSE <em>閉じる</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap" style="left:254px;top:112px">SETTINGS <s>·</s> 設定 <s>·</s> PRESS , FROM ANYWHERE</div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>Settings</b><i>REPLACES AppSettingsModal</i><u>NOT BUILT</u></div>
+    <p><b>Six groups down the left, six rows at a time on the right, and a count.</b> Twenty-four
+      settings do not fit on one sheet, and the answer is the same as everywhere else in this
+      interface: they fold into groups, and the group says how many. The old dialog put all
+      twenty-four in a scroller under a heading that said <i>Quick app controls</i>.</p>
+    <p><b>It stands on the valley dimmed to 66%, not on the stage</b> — the same scrim
+      <code>lookup.css</code> already uses. These two are the only things in the app that are not a
+      place, so they are the only two that get to cover one.</p>
+  </figcaption>
+</figure>
+
+<h2>SEVEN — THE KEYS</h2>
+
+<figure>
+  <div class="plate">
+    <img src="../assets/valley-sunset.png" alt="the valley, dimmed, with the key sheet over it">
+    <div class="board">
+      <div style="position:absolute;inset:0;background:rgba(8,11,18,0.66)"></div>
+      <div class="sheet" style="left:250px;top:152px;width:780px;height:398px">
+        <div class="work" style="padding:16px 26px 0">
+          <div class="work-kick"><span>EVERY KEY <i style="letter-spacing:0.14em">操作一覧</i></span><span>? TO CLOSE</span></div>
+          <div class="cols">
+            <div>
+              <div class="grp">ANYWHERE</div>
+              <div class="row"><u>/</u><b>Look something up</b><em>辞書</em></div>
+              <div class="row"><u>,</u><b>Settings</b><em>設定</em></div>
+              <div class="row"><u>?</u><b>This sheet</b><em>操作</em></div>
+              <div class="row"><u>ESC</u><b>Back one level</b><em>戻る</em></div>
+              <div class="grp">THE MENU</div>
+              <div class="row"><u>↑↓</u><b>Move the cursor</b><em>選択</em></div>
+              <div class="row"><u>ENTER</u><b>Go in</b><em>決定</em></div>
+              <div class="row"><u>1–5</u><b>Jump to a section</b><em>移動</em></div>
+            </div>
+            <div>
+              <div class="grp">IN A ROUND</div>
+              <div class="row"><u>1–4</u><b>Answer</b><em>回答</em></div>
+              <div class="row"><u>SPACE</u><b>Hear it said</b><em>音声</em></div>
+              <div class="row"><u>H</u><b>Hint</b><em>助言</em></div>
+              <div class="row"><u>ENTER</u><b>Next card</b><em>次へ</em></div>
+              <div class="grp">ON A DECK</div>
+              <div class="row"><u>←→</u><b>Move along the blocks</b><em>選択</em></div>
+              <div class="row"><u>1–5</u><b>Change level</b><em>級</em></div>
+              <div class="row"><u>ENTER</u><b>Start the block</b><em>開始</em></div>
+            </div>
+          </div>
+          <div class="sheet-foot">
+            <div class="slab calm">EVERYTHING HERE WORKS WITH A MOUSE TOO <em>操作</em></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap" style="left:254px;top:112px">THE KEYS <s>·</s> 操作 <s>·</s> PRESS ? FROM ANYWHERE</div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>The keys</b><i>REPLACES KeyboardCheatsheet</i><u>NOT BUILT</u></div>
+    <p><b>Grouped by where you are, not by what the key is.</b> Nobody looks this up to find out
+      what <code>H</code> does; they look it up to find out what is available <i>here</i>. Two
+      columns, four groups, and the keycap is the same object the hints in every screen's bottom
+      right already use — so the sheet is a longer version of something you have been reading all
+      along rather than a document about the app.</p>
+  </figcaption>
+</figure>
+
+<h2>WHAT THIS COSTS TO BUILD</h2>
+<div class="note">
+  <b>One sheet, six fills — and one deletion.</b>
+  <p style="margin:6px 0 0">The sheet is about 90 lines of CSS: a plate, a hairline at 322 (392 for
+  the exam), a slips grid, a slab bled to the floor, and the foot band's tick strip. Everything
+  else on these plates already exists in <code>menu.css</code> — the heading slab, the caption chip,
+  the run chips, the back tab, the hints. <b>The daily hub is a deletion</b>, the way the script hub
+  was: the daily road replaces its picker and the four puzzles get the sheet.</p>
+  <p style="margin:6px 0 0"><b>The order to build them in is the order they are used.</b> The round
+  first and by a mile — it is where the app is spent. Then the passage and the exam run, which are
+  the same sheet with one dimension changed. Then settings and the keys, which are the same sheet on
+  the lookup's scrim. The four puzzles last: they are the only ones with a board of their own to
+  fit, and they are the ones a learner can go a week without opening.</p>
+</div>

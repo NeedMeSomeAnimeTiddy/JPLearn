@@ -11,6 +11,7 @@ this is stale.**
 | --- | --- |
 | `foundations/frame-contract.html` | **Start here.** Where a screen is allowed to stand: the stage, the moat, the two bands, the overflow rule, and the skew arithmetic that puts a screen in the moat while its CSS looks correct. Everything built obeys it. |
 | `components/screens.html` | The fourteen screens that exist, each as a real 1280×720 plate at one hour, with which of the four shapes it is and which two still have open problems. |
+| `components/past-three.html` | **The six screens a SESSION happens in** — the round asking and answered, a daily puzzle, the exam run, the passage, settings and the key sheet. All six are still drawn in the app's old sepia language and this is what replaces them: one object, the sheet, filled six ways. Designed September 2026, none of it built. |
 | `components/built.html` | The five objects those screens are made of — menu row, road tablet, hero card, heading slab, caption chip — at real size, on the real backdrop, with the numbers they are built from. |
 | `foundations/backdrops.html` | The ground each of the six sections actually stands on — six real plates with the interface switched off. The camera stands somewhere different in each section, so design against the one you are designing for. **JLPT and RECORDS are the two extremes.** |
 | `foundations/backdrop.html` | The older single-plate version of the above, kept for the measured menu footprints on it. |
