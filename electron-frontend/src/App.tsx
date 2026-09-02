@@ -9,6 +9,7 @@ import type {
   DeckSlugInput,
   KanjiDeckSlug,
   VocabDeckSlug,
+  JlptExamMode,
   JlptLevel,
   LearningPathStatus,
   MinigameKey,
@@ -329,7 +330,7 @@ function App() {
     const commands: Command[] = [
       { id: 'nav-home', label: 'Go to Home', category: 'navigation', action: () => { navigate('home', 'back') } },
       { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { navigate('script_hub', 'forward') } },
-      { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { navigate('jlpt_prep', 'forward') } },
+      { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { openExamLadderRef.current() } },
       { id: 'nav-daily-games', label: DAILY_GAMES_COPY.title, category: 'navigation', keywords: ['daily', 'games', 'practice'], action: openDailyGames },
       { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { closeKanjiDetail(); setShowOverview(true); void loadSummary() } },
       { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setActiveScript('hiragana'); navigate('script_hub', 'forward') } },
@@ -609,6 +610,13 @@ function App() {
 
   const queueAssistantToastRef = useRef<(toast: AssistantToast | null) => void>(() => {})
 
+  /* THE SECOND BACKWARDS EDGE, and for the same reason as the one above. Four routes into the exam
+     ladder are declared earlier in this file than the menu path they need -- the command palette's
+     registration, the curriculum's destination switch, the titlebar's jump. Read through a ref they
+     do not have to move, and the palette does not re-register on every render. */
+  const openExamLadderRef = useRef<() => void>(() => {})
+  const openLibraryRef = useRef<() => void>(() => {})
+
   const session = useStudySession({
     view,
     activeScript,
@@ -704,12 +712,10 @@ function App() {
         navigate('script_hub', 'forward')
         return
       case 'jlpt':
-        tutor.closeTutorPanel()
-        navigate('jlpt_prep', 'forward')
+        openExamLadderRef.current()
         return
       case 'passages':
-        tutor.closeTutorPanel()
-        navigate('passage_hub', 'forward')
+        openLibraryRef.current()
         return
       case 'scenarios':
         tutor.openTutorPanel('scenarios')
@@ -1273,6 +1279,40 @@ function App() {
      converts them one at a time by registering a screen, and nothing here changes. */
   const menuPath = useMenuPath(openMenuSection)
 
+  /* AND THE SHELF DOES TOO, for the same reason: `passage_hub` is the reader now, and it cannot be
+     opened without naming a text. Both routes that used to mean "show me the shelf" open LIBRARY. */
+  const openLibrary = useCallback(() => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    navigate('home', 'back')
+    menuPath.enterSection('READING')
+    menuPath.enterScreen('library')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
+  }, [navigate, menuPath, tutor])
+
+  /* THE LADDER LIVES IN THE MENU NOW. Four separate routes used to navigate to `jlpt_prep` to show
+     five readiness cards and four mode buttons -- the palette, the titlebar's shortcut menu, the
+     curriculum's `jlpt` destination and the all-maps section list. That dashboard is gone, because
+     ASCENT and EXAM LEVEL draw the same thing and `jlpt_prep` now only RUNS an exam. Each of those
+     four means "show me where I am on the ladder", so each of them opens THE EXAM. */
+  const openExamLadder = useCallback(() => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    navigate('home', 'back')
+    menuPath.enterSection('JLPT')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
+  }, [navigate, menuPath, tutor])
+  openExamLadderRef.current = openExamLadder
+  openLibraryRef.current = openLibrary
+
   /* ==================================================================================================
      THE UNLOCK MOMENT, WHICH IS AN EVENT AND NOT A PLACE.
 
@@ -1338,6 +1378,11 @@ function App() {
   /* WHICH RUNG LEVEL THREE IS ABOUT. The ascent's cursor is the ascent's own state -- it is not in
      the path, because a cursor is not a place -- so the rung is carried across when it is opened. */
   const [examRung, setExamRung] = useState<string | null>(null)
+  /* which exam is actually running: `jlpt_prep` has no dashboard to fall back on any more, so it
+     cannot be entered without both halves of the answer */
+  const [examRun, setExamRun] = useState<{ level: JlptLevel; mode: JlptExamMode } | null>(null)
+  /* and which text is being read: `passage_hub` has no shelf of its own any more either */
+  const [readingPassageId, setReadingPassageId] = useState<string | null>(null)
 
   /* ==================================================================================================
      A MILESTONE'S LEVEL THREE — and which of the two it is, is the deck's answer, not a table.
@@ -2114,16 +2159,12 @@ function App() {
   }, [])
 
   const jumpToJlptPrep = useCallback(() => {
-    // No direction argument: these titlebar jumps preserve the prior
-    // navDirection, exactly as the bare setView calls did.
-    navigate('jlpt_prep')
-    setShortcutMenuOpen(false)
-  }, [navigate])
+    openExamLadderRef.current()
+  }, [])
 
   const jumpToPassageHub = useCallback(() => {
-    navigate('passage_hub')
-    setShortcutMenuOpen(false)
-  }, [navigate])
+    openLibraryRef.current()
+  }, [])
 
   const toggleAllMapsFlyout = useCallback(() => {
     setActiveShortcutFlyout((current) => (
@@ -2437,8 +2478,11 @@ function App() {
       {view === 'home' && menuLevel === 3 && menuPath.screen === 'level' && examDetail ? (
         <ExamLevel
           level={examDetail}
-          onStart={() => {
-            /* the exam itself is the flat prep view, which is where it has always run */
+          onStart={(mode) => {
+            /* THE MODE TRAVELS WITH THE PRESS. This used to navigate to a dashboard that asked the
+               same question again -- five level cards and four mode buttons, a second time -- so
+               the level and the mode are carried over and the exam is simply built. */
+            setExamRun({ level: examDetail.id.toLowerCase() as JlptLevel, mode })
             navigate('jlpt_prep', 'forward')
           }}
           onUp={leaveMenuLevel}
@@ -2449,9 +2493,12 @@ function App() {
         <Library
           rows={libraryRows(world.passages)}
           loading={!world.passages}
-          onOpen={() => {
-            /* the reader itself is the app's own view and stays at L4 -- the plan leaves open
-               whether a page of prose should live inside the stage at all */
+          onOpen={(id) => {
+            /* THE ROW TRAVELS WITH THE PRESS. `Library` has always passed which text you opened and
+               this threw it away, so the reader's view opened on its own copy of the same shelf and
+               you picked the text a second time. The reader itself is still the app's own view --
+               a page of prose does not belong inside the stage -- but the choosing happens once. */
+            setReadingPassageId(id)
             navigate('passage_hub', 'forward')
           }}
           onUp={leaveMenuLevel}
@@ -2683,7 +2730,7 @@ function App() {
             tutor.closeTutorPanel()
 
             if (sectionId === 'jlpt_prep') {
-              navigate('jlpt_prep', 'forward')
+              openExamLadderRef.current()
               return
             }
 
@@ -2793,17 +2840,22 @@ function App() {
         />
       ) : null}
 
-      {view === 'jlpt_prep' ? (
+      {view === 'jlpt_prep' && examRun ? (
         <JLPTPrepView
+          level={examRun.level}
+          mode={examRun.mode}
           onBack={() => {
+            setExamRun(null)
             navigate('home', 'back')
           }}
         />
       ) : null}
 
-      {view === 'passage_hub' ? (
+      {view === 'passage_hub' && readingPassageId ? (
         <PassageHubView
+          passageId={readingPassageId}
           onBack={() => {
+            setReadingPassageId(null)
             navigate('home', 'back')
           }}
           onOpenDictionary={(query) => openDictionary(query ?? '')}

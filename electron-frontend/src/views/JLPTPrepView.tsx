@@ -1,25 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, CheckCircle, Clock, Lock, Target, XCircle } from 'lucide-react'
-import { JLPT_MODE_META, JLPT_UNLOCK_PCT } from '../constants'
+import { ArrowLeft, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { JLPT_MODE_META } from '../constants'
 
 type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
-type SubView = 'dashboard' | 'exam' | 'results'
+type SubView = 'building' | 'exam' | 'results'
 
 const LEVEL_LABELS: Record<JLPTLevel, string> = {
   n5: 'JLPT N5', n4: 'JLPT N4', n3: 'JLPT N3', n2: 'JLPT N2', n1: 'JLPT N1',
 }
-const LEVEL_ORDER: JLPTLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 
 // the menu's level-three screen shows the same four; see the note in constants.tsx
 const MODE_META = JLPT_MODE_META
 
 const MOCK_EXAM_SECONDS = 30 * 60   // 30 minutes for mock exam
-// % readiness on the previous level required to unlock the next. Shared with the menu's ascent,
-// which draws this same gate as a line across all five levels — see the note in constants.tsx.
-const JLPT_UNLOCK_THRESHOLD = JLPT_UNLOCK_PCT
 
+/* ==================================================================================================
+   THIS VIEW USED TO OPEN ON A DASHBOARD, AND THE MENU ALREADY IS ONE.
+
+   It had three sub-views: a readiness dashboard, the exam runner, and the results panel. The
+   dashboard drew the five levels with their kanji and vocabulary bars and a lock line, and offered
+   four modes on each -- which is, card for card, what the menu's ASCENT and EXAM LEVEL screens draw.
+   Pressing "Diagnostic" on the menu's screen navigated here and showed you the same five cards
+   again, with the same four buttons, and you pressed the same one a second time.
+
+   So the dashboard is gone and the entry point moved: this view is now only the two things the menu
+   has no answer for -- running an exam and reporting it -- and it is entered with the level and the
+   mode already decided. There is no way in that does not name both.
+   ================================================================================================== */
 interface JLPTPrepViewProps {
+  /** which ladder rung the menu was standing on when it started this */
+  level: JLPTLevel
+  /** which of the four the menu pressed */
+  mode: JLPTExamMode
   onBack: () => void
 }
 
@@ -114,7 +127,11 @@ function ExamRunner({ mode, questions, onComplete, onAbort }: ExamRunnerProps) {
   const seconds = timeLeft !== null ? timeLeft % 60 : null
 
   return (
-    <div className="jlpt-exam-runner">
+    /* CENTRED, LIKE EVERY OTHER SHORT PANEL IN THIS VIEW. A twenty-question diagnostic is a card and
+       four buttons -- about 350px of a 985px box -- and top-aligned it read as the top of a page
+       that had not finished loading. `view-center` is the same opt-in the level ladder uses. */
+    <div className="view-shell view-center">
+      <div className="jlpt-exam-runner">
       <div className="jlpt-exam-header">
         <button type="button" className="jlpt-back-btn" onClick={onAbort} aria-label="Abort exam">
           <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Abort
@@ -175,6 +192,7 @@ function ExamRunner({ mode, questions, onComplete, onAbort }: ExamRunnerProps) {
       {revealed && question.card.example_sentence ? (
         <div className="jlpt-example-sentence">{question.card.example_sentence}</div>
       ) : null}
+      </div>
     </div>
   )
 }
@@ -210,7 +228,8 @@ function ResultsPanel({ level, mode, correct, total, projectedScore, readiness, 
   const sectionPasses = projectedScore !== null && sectionPassMark !== null ? projectedScore >= sectionPassMark : null
 
   return (
-    <div className="jlpt-results-panel">
+    <div className="view-shell view-center">
+      <div className="jlpt-results-panel">
       <header className="jlpt-results-header">
         <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to JLPT Prep">
           <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> JLPT Prep
@@ -268,106 +287,7 @@ function ResultsPanel({ level, mode, correct, total, projectedScore, readiness, 
           Back to JLPT Prep
         </button>
       </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Readiness card sub-component
-// ---------------------------------------------------------------------------
-
-interface ReadinessCardProps {
-  level: JLPTLevel
-  data: JLPTLevelReadinessData & { mastered_vocab: number; total_vocab: number; mastered_kanji: number; total_kanji: number }
-  onStartMode: (level: JLPTLevel, mode: JLPTExamMode) => void
-  loading: boolean
-  isLocked: boolean
-  lockHint: string
-}
-
-function ReadinessCard({ level, data, onStartMode, loading, isLocked, lockHint }: ReadinessCardProps) {
-  const totalCards = data.total_vocab + data.total_kanji
-  const kanjiPct = data.total_kanji > 0 ? Math.round((data.mastered_kanji / data.total_kanji) * 100) : null
-  const vocabPct = data.total_vocab > 0 ? Math.round((data.mastered_vocab / data.total_vocab) * 100) : null
-
-  return (
-    <div className={`jlpt-readiness-card${data.is_ready && !isLocked ? ' is-ready' : ''}${isLocked ? ' is-locked' : ''}`}>
-      <div className="jlpt-readiness-card-header">
-        <span className="jlpt-readiness-level">{LEVEL_LABELS[level]}</span>
-        {isLocked ? (
-          <span className="jlpt-locked-badge"><Lock size={12} aria-hidden="true" /> Locked</span>
-        ) : data.is_ready ? (
-          <span className="jlpt-ready-badge"><CheckCircle size={12} aria-hidden="true" /> Ready</span>
-        ) : null}
       </div>
-
-      <div
-        className="jlpt-readiness-bar"
-        role="progressbar"
-        aria-valuenow={data.readiness_pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`${data.readiness_pct}% mastered`}
-      >
-        <div className="jlpt-readiness-fill" style={{ width: `${data.readiness_pct}%` }} />
-      </div>
-
-      <div className="jlpt-level-breakdown">
-        <div className="jlpt-breakdown-row">
-          <span className="jlpt-breakdown-label">Kanji</span>
-          <div
-            className="jlpt-breakdown-bar"
-            role="progressbar"
-            aria-valuenow={kanjiPct ?? 0}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${kanjiPct ?? 0}% kanji mastered`}
-          >
-            <div className="jlpt-breakdown-fill" style={{ width: `${kanjiPct ?? 0}%` }} />
-          </div>
-          <span className="jlpt-breakdown-count">
-            {kanjiPct !== null ? `${kanjiPct}%` : '—'} · {data.mastered_kanji}/{data.total_kanji > 0 ? data.total_kanji : '—'}
-          </span>
-        </div>
-        <div className="jlpt-breakdown-row">
-          <span className="jlpt-breakdown-label">Vocab</span>
-          <div
-            className="jlpt-breakdown-bar"
-            role="progressbar"
-            aria-valuenow={vocabPct ?? 0}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${vocabPct ?? 0}% vocabulary mastered`}
-          >
-            <div className="jlpt-breakdown-fill" style={{ width: `${vocabPct ?? 0}%` }} />
-          </div>
-          <span className="jlpt-breakdown-count">
-            {vocabPct !== null ? `${vocabPct}%` : '—'} · {data.mastered_vocab}/{data.total_vocab > 0 ? data.total_vocab : '—'}
-          </span>
-        </div>
-      </div>
-
-      {isLocked ? (
-        <div className="jlpt-card-lock-notice" aria-label={lockHint}>
-          <Lock size={13} strokeWidth={2.2} aria-hidden="true" />
-          <span>{lockHint}</span>
-        </div>
-      ) : (
-        <div className="jlpt-mode-buttons" role="group" aria-label={`Start ${LEVEL_LABELS[level]} session`}>
-          {(['diagnostic', 'mock_exam', 'adaptive_review', 'weak_area_drill'] as JLPTExamMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className="jlpt-mode-btn"
-              onClick={() => onStartMode(level, mode)}
-              disabled={loading || totalCards === 0}
-              title={MODE_META[mode].description}
-            >
-              {MODE_META[mode].label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -376,14 +296,13 @@ function ReadinessCard({ level, data, onStartMode, loading, isLocked, lockHint }
 // Main view
 // ---------------------------------------------------------------------------
 
-export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
-  const [subView, setSubView] = useState<SubView>('dashboard')
+export function JLPTPrepView({ level: startLevel, mode: startMode, onBack }: JLPTPrepViewProps) {
+  const [subView, setSubView] = useState<SubView>('building')
   const [readiness, setReadiness] = useState<JLPTReadinessPayload | null>(null)
-  const [readinessLoading, setReadinessLoading] = useState(true)
   const [readinessError, setReadinessError] = useState<string | null>(null)
 
-  const [activeLevel, setActiveLevel] = useState<JLPTLevel>('n5')
-  const [activeMode, setActiveMode] = useState<JLPTExamMode>('mock_exam')
+  const [activeLevel, setActiveLevel] = useState<JLPTLevel>(startLevel)
+  const [activeMode, setActiveMode] = useState<JLPTExamMode>(startMode)
   const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>([])
   const [examLoading, setExamLoading] = useState(false)
   const [examError, setExamError] = useState<string | null>(null)
@@ -392,37 +311,21 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
   const [lastTotal, setLastTotal] = useState(0)
   const [lastProjectedScore, setLastProjectedScore] = useState<number | null>(null)
 
-  const [history, setHistory] = useState<JLPTExamResultRecord[]>([])
-
   type JLPTReadinessPayload = NonNullable<Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getJLPTReadiness>>>>
-  type JLPTExamResultRecord = NonNullable<Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getJLPTExamHistory>>>>['results'][number]
 
   const loadReadiness = useCallback(async () => {
-    setReadinessLoading(true)
     setReadinessError(null)
     try {
       const data = await window.jplearnDesktop.getJLPTReadiness?.()
       if (data) setReadiness(data)
     } catch (err) {
       setReadinessError(err instanceof Error ? err.message : 'Failed to load readiness data')
-    } finally {
-      setReadinessLoading(false)
-    }
-  }, [])
-
-  const loadHistory = useCallback(async () => {
-    try {
-      const data = await window.jplearnDesktop.getJLPTExamHistory?.()
-      if (data) setHistory(data.results)
-    } catch {
-      // non-critical
     }
   }, [])
 
   useEffect(() => {
     void loadReadiness()
-    void loadHistory()
-  }, [loadReadiness, loadHistory])
+  }, [loadReadiness])
 
   const startExam = useCallback(async (level: JLPTLevel, mode: JLPTExamMode) => {
     setActiveLevel(level)
@@ -469,13 +372,22 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
         accuracy,
         projectedScore: projected,
       })
-      void loadHistory()
     } catch {
       // non-critical
     }
 
     setSubView('results')
-  }, [activeLevel, activeMode, readiness, loadHistory])
+  }, [activeLevel, activeMode, readiness])
+
+  /* THE EXAM IS BUILT ON ARRIVAL, because the choosing already happened on the screen that sent
+     you here. `startedRef` rather than a dependency list: `startExam` is stable, but a retry
+     changes `activeLevel`/`activeMode` and this must not fire a second time when it does. */
+  const startedRef = useRef(false)
+  useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+    void startExam(startLevel, startMode)
+  }, [startExam, startLevel, startMode])
 
   const handleRetry = useCallback(() => {
     void startExam(activeLevel, activeMode)
@@ -492,7 +404,7 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
         mode={activeMode}
         questions={examQuestions}
         onComplete={handleExamComplete}
-        onAbort={() => setSubView('dashboard')}
+        onAbort={onBack}
       />
     )
   }
@@ -508,93 +420,34 @@ export function JLPTPrepView({ onBack }: JLPTPrepViewProps) {
         readiness={readiness?.levels[activeLevel] ?? null}
         onRetry={handleRetry}
         onDrillWeakAreas={handleDrillWeakAreas}
-        onBack={() => {
-          setSubView('dashboard')
-          void loadReadiness()
-        }}
+        onBack={onBack}
       />
     )
   }
 
+  /* NOT A SCREEN, A WAIT. Building a queue takes one bridge round trip, and the only other thing
+     that can happen is that the level has too few cards to ask thirty questions about -- which is
+     a sentence, not a dashboard. Either way there is one way out and it goes back to the menu. */
   return (
     <div className="view-shell view-center">
       <section className="jlpt-prep-view panel-glass">
-      <header className="jlpt-prep-header">
-        <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to home">
-          <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Home
-        </button>
-        <div className="jlpt-prep-title-row">
-          <h1 className="jlpt-prep-title">JLPT Preparation</h1>
-          {readiness ? (
-            <span className="jlpt-prep-subtitle">
-              Target: <strong>{readiness.recommended_target.toUpperCase()}</strong>
-            </span>
-          ) : null}
-        </div>
-      </header>
+        <header className="jlpt-prep-header">
+          <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to the exam ladder">
+            <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Back
+          </button>
+          <div className="jlpt-prep-title-row">
+            <h1 className="jlpt-prep-title">{LEVEL_LABELS[activeLevel]}</h1>
+            <span className="jlpt-prep-subtitle">{MODE_META[activeMode]?.label ?? activeMode}</span>
+          </div>
+        </header>
 
-      {readinessError ? (
-        <div className="jlpt-error-banner" role="alert">{readinessError}</div>
-      ) : null}
-
-      {examError ? (
-        <div className="jlpt-error-banner" role="alert">{examError}</div>
-      ) : null}
-
-      <section className="jlpt-levels-grid" aria-label="JLPT level readiness">
-        {LEVEL_ORDER.map((level, idx) => {
-          const data = readiness?.levels[level]
-          if (readinessLoading || !data) {
-            return (
-              <div key={level} className="jlpt-readiness-card jlpt-readiness-card-skeleton" aria-busy="true">
-                <div className="jlpt-readiness-card-header">
-                  <span className="jlpt-readiness-level">{LEVEL_LABELS[level]}</span>
-                </div>
-              </div>
-            )
-          }
-          const prevLevel = idx > 0 ? LEVEL_ORDER[idx - 1] : null
-          const prevData = prevLevel ? (readiness?.levels[prevLevel] ?? null) : null
-          const isLocked = prevLevel !== null && (prevData === null || prevData.readiness_pct < JLPT_UNLOCK_THRESHOLD)
-          const lockHint = prevLevel
-            ? `Reach ${JLPT_UNLOCK_THRESHOLD}% readiness in ${LEVEL_LABELS[prevLevel]} to unlock`
-            : ''
-          return (
-            <ReadinessCard
-              key={level}
-              level={level}
-              data={data}
-              onStartMode={startExam}
-              loading={examLoading}
-              isLocked={isLocked}
-              lockHint={lockHint}
-            />
-          )
-        })}
-      </section>
-
-      {history.length > 0 ? (
-        <section className="jlpt-history-section" aria-label="Recent exam history">
-          <h2 className="jlpt-section-title">Recent Exams</h2>
-          <ul className="jlpt-history-list">
-            {history.slice(0, 8).map((record) => (
-              <li key={record.id} className="jlpt-history-item">
-                <span className="jlpt-history-level">{record.level.toUpperCase()}</span>
-                <span className="jlpt-history-mode">{MODE_META[record.mode as JLPTExamMode]?.label ?? record.mode}</span>
-                <span className="jlpt-history-accuracy">{Math.round(record.accuracy * 100)}%</span>
-                {record.projected_score !== null ? (
-                  <span className="jlpt-history-projected">
-                    <Target size={11} aria-hidden="true" /> {record.projected_score}
-                  </span>
-                ) : null}
-                <span className="jlpt-history-date">
-                  {new Date(record.completed_at_utc).toLocaleDateString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+        {examError ? <div className="jlpt-error-banner" role="alert">{examError}</div> : null}
+        {readinessError ? <div className="jlpt-error-banner" role="alert">{readinessError}</div> : null}
+        {!examError && !readinessError ? (
+          <p className="jlpt-building" aria-live="polite">
+            {examLoading ? 'Building your questions…' : 'Ready.'}
+          </p>
+        ) : null}
       </section>
     </div>
   )

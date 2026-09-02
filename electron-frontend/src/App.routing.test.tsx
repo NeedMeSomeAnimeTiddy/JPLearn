@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { openDeck } from './test-entry'
 import App from './App'
+import { VIEW_PARENT } from './features/navigation'
 
 vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => (
@@ -142,15 +143,24 @@ type ViewName = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub'
 
 function currentView(): ViewName | 'unknown' {
   if (document.querySelector('.game-hud-stat')) return 'minigame'
+  /* DAILY GAMES BEFORE SCRIPT HUB, and the container rather than a tile. Both views wear the same
+     tape-deck shell and both carry a "Back to main menu" button, so asking about that button first
+     answers 'script_hub' for either -- and the Crossword tile, which `App.daily-games.test.tsx`
+     uses, needs a fuller desktop mock than this file installs. `.daily-games-hub` is on the screen
+     whether or not its four tiles have arrived. */
+  if (document.querySelector('.daily-games-hub')) return 'daily_games'
   if (screen.queryByRole('button', { name: 'Back to main menu' })) return 'script_hub'
-  if (screen.queryByRole('heading', { name: 'Passages' })) return 'passage_hub'
-  if (screen.queryByRole('heading', { name: 'Crossword' })) return 'daily_games'
-  if (screen.queryByRole('heading', { name: 'JLPT Preparation' })) return 'jlpt_prep'
   /* HOME IS THE VALLEY MENU NOW. `HomeView` and its Daily Games button retired with phase 6's
-     toggle; `.mn-rows` is the menu's own row column and is on the stage at every level of it. */
+     toggle; `.mn-frame` is the menu's own stage and is present at every level of it. */
   if (document.querySelector('.mn-frame')) return 'home'
   return 'unknown'
 }
+
+/* `jlpt_prep` and `passage_hub` USED TO BE DETECTED HERE, by a "JLPT Preparation" heading and a
+   "Passages" one. Neither exists any more: both views lost the browsing screen that carried it --
+   the menu's ASCENT and LIBRARY draw those now -- and what is left runs an exam or renders a text,
+   neither of which can be reached without a payload this file has no cheap way to supply. Their
+   place in the parent chain is asserted directly against `VIEW_PARENT` instead. */
 
 function expectView(name: ViewName): Promise<void> {
   return waitFor(() => { expect(currentView()).toBe(name) })
@@ -185,27 +195,28 @@ describe('view -> parent (Escape back-navigation)', () => {
     await expectView('home')
   })
 
-  it('returns jlpt_prep to home', async () => {
+  it('returns daily_games to home', async () => {
     render(<App />)
     await expectView('home')
 
-    await openFromShortcutMenu('JLPT Prep')
-    await expectView('jlpt_prep')
+    await openFromShortcutMenu('Daily Games')
+    await expectView('daily_games')
 
     fireEvent.keyDown(window, { key: 'Escape' })
     await expectView('home')
   })
 
-  it('returns passage_hub to home', async () => {
-    render(<App />)
-    await expectView('home')
-
-    await openFromShortcutMenu('Passages')
-    await expectView('passage_hub')
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-    await expectView('home')
+  it('still parents the two views the shortcut menu no longer opens directly', () => {
+    /* `jlpt_prep` and `passage_hub` used to be two clicks from the titlebar, which is what these
+       tests walked. They are not any more: the menu's ASCENT and LIBRARY are the browsing screens
+       and those two views now RUN something -- an exam, a text -- so they cannot be entered without
+       naming which. Their place in the parent chain is unchanged and still matters, because Escape
+       out of a running exam has to land somewhere; asserted against the map rather than by walking
+       a route that would now be four keystrokes of menu. */
+    expect(VIEW_PARENT.jlpt_prep).toBe('home')
+    expect(VIEW_PARENT.passage_hub).toBe('home')
   })
+
 
   it('returns minigame to script_hub, not home — minigame is the one view whose parent is not home', async () => {
     render(<App />)
@@ -239,13 +250,13 @@ describe('history stack (titlebar back/forward)', () => {
     render(<App />)
     await expectView('home')
 
-    // home -> script_hub -> home -> passage_hub
+    // home -> script_hub -> home -> daily_games
     openDeck('Hiragana')
     await expectView('script_hub')
     fireEvent.keyDown(window, { key: 'Escape' })
     await expectView('home')
-    await openFromShortcutMenu('Passages')
-    await expectView('passage_hub')
+    await openFromShortcutMenu('Daily Games')
+    await expectView('daily_games')
 
     const back = () => fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
     const forward = () => fireEvent.click(screen.getByRole('button', { name: /^Forward$/ }))
@@ -266,11 +277,11 @@ describe('history stack (titlebar back/forward)', () => {
     forward()
     await expectView('home')
     forward()
-    await expectView('passage_hub')
+    await expectView('daily_games')
 
     // Already at the newest entry: another forward is a no-op.
     forward()
-    await expectView('passage_hub')
+    await expectView('daily_games')
   })
 
   it('truncates the forward trail when navigating somewhere new after going back', async () => {
@@ -282,23 +293,28 @@ describe('history stack (titlebar back/forward)', () => {
     // happens. See the note on waitForEnabled.
     openDeck('Hiragana')
     await expectView('script_hub')
-    await openFromShortcutMenu('Passages')
-    await expectView('passage_hub')
+    await openFromShortcutMenu('Daily Games')
+    await expectView('daily_games')
 
     await waitForEnabled(/^Back$/)
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
     await expectView('script_hub')
 
-    // Branching from here must discard the passage_hub forward entry, so the
-    // trail becomes [home, script_hub, jlpt_prep].
-    await openFromShortcutMenu('JLPT Prep')
-    await expectView('jlpt_prep')
+    /* Branching from here must discard the daily_games forward entry, so the trail becomes
+       [home, script_hub, minigame]. THE BRANCH USED TO BE 'JLPT Prep' FROM THE SHORTCUT MENU, and
+       that item now opens the menu's own exam ladder rather than a view of its own -- so the third
+       destination is the minigame, reached the same way the parent-chain test above reaches it. */
+    const tiles = await screen.findAllByRole('button', { name: /Meaning Match/i })
+    const cassette = (tiles[0].closest('.cassette') ?? tiles[0]) as HTMLElement
+    fireEvent.click(cassette)
+    fireEvent.click(cassette)
+    await expectView('minigame')
 
     // Forward alone can't distinguish a truncated trail from a retained one —
     // either way the new entry is at the end. Back is what proves it: the
-    // discarded passage_hub must not reappear between jlpt_prep and script_hub.
+    // discarded daily_games must not reappear between minigame and script_hub.
     fireEvent.click(screen.getByRole('button', { name: /^Forward$/ }))
-    await expectView('jlpt_prep')
+    await expectView('minigame')
 
     await waitForEnabled(/^Back$/)
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
@@ -323,10 +339,10 @@ describe('home number-key shortcuts', () => {
     render(<App />)
     await expectView('home')
 
-    await openFromShortcutMenu('Passages')
-    await expectView('passage_hub')
+    await openFromShortcutMenu('Daily Games')
+    await expectView('daily_games')
 
     fireEvent.keyDown(window, { key: '1' })
-    await expectView('passage_hub')
+    await expectView('daily_games')
   })
 })

@@ -78,92 +78,86 @@ function installDesktopApi(overrides: Record<string, unknown> = {}) {
 }
 
 describe('JLPTPrepView', () => {
-  it('shows loading skeletons then renders readiness cards once data loads', async () => {
-    installDesktopApi({
-      getJLPTReadiness: async () => readinessPayload({
-        n5: levelReadiness({ level: 'n5', readiness_pct: 42, mastered_vocab: 42, total_vocab: 100, mastered_kanji: 30, total_kanji: 80 }),
-      }),
-    })
+  /* ================================================================================================
+     WHAT THIS VIEW IS FOR NOW. It used to open on a readiness dashboard -- five level cards, four
+     mode buttons on each -- which is exactly what the menu's ASCENT and EXAM LEVEL screens draw, so
+     pressing "Diagnostic" there brought you here to press "Diagnostic" again. The dashboard is gone
+     and this view is entered with the level and the mode already decided.
 
-    render(<JLPTPrepView onBack={vi.fn()} />)
+     The three tests that covered the dashboard's LOCK RULE did not go with it: that rule lives in
+     `ascentRungs` now, and it is tested there, in `L3.test.tsx`. A rule that moves needs its test
+     to move, not to be deleted.
+     ================================================================================================ */
 
-    expect(document.querySelectorAll('.jlpt-readiness-card-skeleton').length).toBeGreaterThan(0)
+  const show = (over: Partial<{ level: 'n5' | 'n4'; mode: 'diagnostic' | 'mock_exam'; onBack: () => void }> = {}) =>
+    render(
+      <JLPTPrepView
+        level={over.level ?? 'n5'}
+        mode={over.mode ?? 'diagnostic'}
+        onBack={over.onBack ?? vi.fn()}
+      />,
+    )
 
-    await waitFor(() => {
-      expect(document.querySelectorAll('.jlpt-readiness-card-skeleton').length).toBe(0)
-    })
-    expect(screen.getByLabelText('42% mastered')).toBeTruthy()
+  it('builds the exam on arrival, without being asked a second time', async () => {
+    const buildJLPTExamQueue = vi.fn(async () => ({
+      level: 'n5' as const, mode: 'diagnostic' as const, questions: [question({ meaning: 'one' })],
+    }))
+    installDesktopApi({ buildJLPTExamQueue })
+
+    show()
+
+    await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n5', 'diagnostic', 20))
+    expect(await screen.findByRole('button', { name: 'one' })).toBeTruthy()
   })
 
-  it('locks a level whose predecessor is below the readiness threshold and hides its mode buttons', async () => {
-    installDesktopApi({
-      getJLPTReadiness: async () => readinessPayload({
-        n5: levelReadiness({ level: 'n5', readiness_pct: 10 }),
-      }),
-    })
+  it('carries the level and the mode it was given, not a default', async () => {
+    /* the old view defaulted to n5 and mock_exam because it had a dashboard to change them on;
+       there is no dashboard now, so a wrong default would be an unfixable wrong exam */
+    const buildJLPTExamQueue = vi.fn(async () => ({
+      level: 'n4' as const, mode: 'mock_exam' as const, questions: [question()],
+    }))
+    installDesktopApi({ buildJLPTExamQueue })
 
-    render(<JLPTPrepView onBack={vi.fn()} />)
+    show({ level: 'n4', mode: 'mock_exam' })
 
-    await screen.findByText('Reach 30% readiness in JLPT N5 to unlock')
-    expect(screen.getAllByText('Locked').length).toBeGreaterThan(0)
-    expect(screen.queryByRole('group', { name: 'Start JLPT N4 session' })).toBeNull()
+    await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n4', 'mock_exam', 30))
   })
 
-  it('unlocks the next level once the threshold is met', async () => {
-    installDesktopApi({
-      getJLPTReadiness: async () => readinessPayload({
-        n5: levelReadiness({ level: 'n5', readiness_pct: 30 }),
-      }),
-    })
-
-    render(<JLPTPrepView onBack={vi.fn()} />)
-
-    await waitFor(() => {
-      expect(screen.getByRole('group', { name: 'Start JLPT N4 session' })).toBeTruthy()
-    })
-    expect(screen.queryByText('Reach 30% readiness in JLPT N5 to unlock')).toBeNull()
-  })
-
-  it('shows an alert banner when readiness fails to load', async () => {
-    installDesktopApi({
-      getJLPTReadiness: async () => { throw new Error('network down') },
-    })
-
-    render(<JLPTPrepView onBack={vi.fn()} />)
-
-    expect((await screen.findByRole('alert')).textContent).toContain('network down')
-  })
-
-  it('shows an error and stays on the dashboard when no exam questions are available', async () => {
+  it('says why there is no exam rather than showing an empty one', async () => {
     installDesktopApi({
       buildJLPTExamQueue: async () => ({ level: 'n5' as const, mode: 'diagnostic' as const, questions: [] }),
     })
 
-    render(<JLPTPrepView onBack={vi.fn()} />)
-
-    const [diagnosticButton] = await screen.findAllByRole('button', { name: 'Diagnostic' })
-    fireEvent.click(diagnosticButton)
+    show()
 
     expect((await screen.findByRole('alert')).textContent).toContain('No questions available')
-    expect(screen.getAllByRole('button', { name: 'Diagnostic' }).length).toBeGreaterThan(0)
+  })
+
+  it('shows an alert banner when readiness fails to load', async () => {
+    /* readiness is still read here -- the results panel projects a mock score off it */
+    installDesktopApi({
+      getJLPTReadiness: async () => { throw new Error('network down') },
+      buildJLPTExamQueue: async () => ({ level: 'n5' as const, mode: 'diagnostic' as const, questions: [] }),
+    })
+
+    show()
+
+    await waitFor(() => {
+      const alerts = screen.getAllByRole('alert').map((a) => a.textContent ?? '')
+      expect(alerts.some((t) => t.includes('network down'))).toBe(true)
+    })
   })
 
   it('runs a full exam, records the result, and shows the results panel with retry/drill actions', async () => {
     const saveJLPTExamResult = vi.fn(async () => ({ ok: true, id: 1 }))
     const buildJLPTExamQueue = vi.fn(async () => ({
-      level: 'n5' as const,
-      mode: 'diagnostic' as const,
-      questions: [question({ meaning: 'one' })],
+      level: 'n5' as const, mode: 'diagnostic' as const, questions: [question({ meaning: 'one' })],
     }))
     installDesktopApi({ buildJLPTExamQueue, saveJLPTExamResult })
 
-    render(<JLPTPrepView onBack={vi.fn()} />)
+    show()
 
-    const [diagnosticButton] = await screen.findAllByRole('button', { name: 'Diagnostic' })
-    fireEvent.click(diagnosticButton)
-
-    const correctChoice = await screen.findByRole('button', { name: 'one' })
-    fireEvent.click(correctChoice)
+    fireEvent.click(await screen.findByRole('button', { name: 'one' }))
 
     await waitFor(() => {
       expect(saveJLPTExamResult).toHaveBeenCalledWith(
@@ -181,16 +175,12 @@ describe('JLPTPrepView', () => {
 
   it('drills weak areas from the results panel', async () => {
     const buildJLPTExamQueue = vi.fn(async () => ({
-      level: 'n5' as const,
-      mode: 'diagnostic' as const,
-      questions: [question({ meaning: 'one' })],
+      level: 'n5' as const, mode: 'diagnostic' as const, questions: [question({ meaning: 'one' })],
     }))
     installDesktopApi({ buildJLPTExamQueue })
 
-    render(<JLPTPrepView onBack={vi.fn()} />)
+    show()
 
-    const [diagnosticButton] = await screen.findAllByRole('button', { name: 'Diagnostic' })
-    fireEvent.click(diagnosticButton)
     fireEvent.click(await screen.findByRole('button', { name: 'one' }))
     await screen.findByRole('button', { name: 'Drill Weak Areas' })
 
@@ -199,13 +189,32 @@ describe('JLPTPrepView', () => {
     await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n5', 'weak_area_drill', 30))
   })
 
-  it('calls onBack when the home button is clicked', async () => {
+  it('does not rebuild the exam when a retry changes the mode under it', async () => {
+    /* the start-on-arrival effect reads `level` and `mode`, and a drill changes what the view is
+       running -- if that effect fired again it would throw away the drill and re-run the original */
+    const buildJLPTExamQueue = vi.fn(async () => ({
+      level: 'n5' as const, mode: 'diagnostic' as const, questions: [question({ meaning: 'one' })],
+    }))
+    installDesktopApi({ buildJLPTExamQueue })
+
+    show()
+    fireEvent.click(await screen.findByRole('button', { name: 'one' }))
+    await screen.findByRole('button', { name: 'Drill Weak Areas' })
+    fireEvent.click(screen.getByRole('button', { name: 'Drill Weak Areas' }))
+
+    await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n5', 'weak_area_drill', 30))
+    expect(buildJLPTExamQueue).toHaveBeenCalledTimes(2)
+  })
+
+  it('goes back to the ladder it came from, since there is nothing below it any more', async () => {
     const onBack = vi.fn()
-    installDesktopApi()
+    installDesktopApi({
+      buildJLPTExamQueue: async () => ({ level: 'n5' as const, mode: 'diagnostic' as const, questions: [] }),
+    })
 
-    render(<JLPTPrepView onBack={onBack} />)
+    show({ onBack })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Back to home' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Back to the exam ladder' }))
     expect(onBack).toHaveBeenCalledOnce()
   })
 })

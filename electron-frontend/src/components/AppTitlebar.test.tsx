@@ -48,17 +48,23 @@ async function openShortcutMenu(): Promise<void> {
 }
 
 describe('titlebar navigation handlers', () => {
-  it('navigates to JLPT Prep and closes the shortcut menu', async () => {
+  it('opens the exam ladder and closes the shortcut menu', async () => {
+    /* THIS USED TO ASSERT `.view-shell`, which was the flat JLPT prep view. That view lost its
+       dashboard -- the menu's ASCENT draws the same five levels and the same four modes -- so it
+       cannot be opened without naming an exam to run, and "JLPT Prep" in this menu now means
+       "show me where I am on the ladder", which is THE EXAM at level two of the menu. */
     window.jplearnDesktop = baseDesktopApi
     await openShortcutMenu()
 
     fireEvent.click(screen.getByRole('menuitem', { name: /jlpt prep/i }))
 
-    // jumpToJlptPrep both switches the view and closes the menu — assert both halves.
+    // both halves: the menu closes AND the destination is the menu's own screen
     await waitFor(() => {
       expect(screen.queryByRole('menuitem', { name: /jlpt prep/i })).toBeNull()
     })
-    expect(document.querySelector('.view-shell')).toBeTruthy()
+    await waitFor(() => {
+      expect(document.querySelector('.as-wrap')).toBeTruthy()
+    })
   })
 
   it('navigates to Passages and closes the shortcut menu', async () => {

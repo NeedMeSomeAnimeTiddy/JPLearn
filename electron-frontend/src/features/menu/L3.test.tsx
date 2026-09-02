@@ -9,12 +9,13 @@ import { Wall } from './components/Wall'
 import { LIBRARY_WINDOW, libraryNote, libraryRows, libraryWindow } from './library'
 import { flatSeals, sealGroups, wallStep } from './wall'
 import { EXAM_MODES, levelDetail, sectionLine, unscored } from './examLevel'
+import { JLPT_UNLOCK_PCT, ascentRungs } from './ascent'
 import {
   TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, nearestOffered, railLayout, railStep,
   tabScale,
 } from './drills'
 import { MINIGAMES, SCRIPT_MINIGAMES } from '../../constants'
-import type { LevelReadiness, Rung } from './ascent'
+import type { LevelReadiness, ReadinessPayload, Rung } from './ascent'
 
 const passage = (id: string, words: number, difficulty: number) => ({
   id, title: id, title_reading: id, author: '作者',
@@ -164,6 +165,52 @@ describe('the wall', () => {
       run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
     }).run(document.querySelector('.mn-open') as Element)
     expect(results.violations).toEqual([])
+  })
+})
+
+/* ==================================================================================================
+   THE GATE BETWEEN LEVELS, WHICH USED TO BE TESTED SOMEWHERE ELSE.
+
+   `JLPTPrepView`'s dashboard drew five readiness cards and enforced this rule on each of them, and
+   three of its tests covered it. That dashboard is gone -- ASCENT draws the same rule as one line
+   across all five levels instead -- so the tests come with it rather than being deleted. A rule that
+   moves keeps its coverage; that is the whole difference between retiring a screen and losing one.
+   ================================================================================================== */
+describe('the gate the ascent draws across the ladder', () => {
+  const level = (over: Partial<LevelReadiness>): LevelReadiness => ({
+    level: 'n5', mastered_vocab: 0, total_vocab: 100, mastered_kanji: 0, total_kanji: 80,
+    readiness_pct: 0, is_ready: false, pass_mark: 60,
+    vocab_grammar_section_max: 120, vocab_grammar_pass_mark: 38, ...over,
+  })
+  const payload = (n5pct: number): ReadinessPayload => ({
+    recommended_target: 'n5',
+    levels: {
+      n5: level({ level: 'n5', readiness_pct: n5pct }),
+      n4: level({ level: 'n4' }), n3: level({ level: 'n3' }),
+      n2: level({ level: 'n2' }), n1: level({ level: 'n1' }),
+    },
+  } as ReadinessPayload)
+
+  it('shuts a level whose predecessor is below the gate', () => {
+    const rungs = ascentRungs(payload(JLPT_UNLOCK_PCT - 1))
+    expect(rungs[0].state).not.toBe('locked')
+    expect(rungs[1].state).toBe('locked')
+  })
+
+  it('opens it the moment the one below clears', () => {
+    const rungs = ascentRungs(payload(JLPT_UNLOCK_PCT))
+    expect(rungs[1].state).not.toBe('locked')
+  })
+
+  it('says which level opens it and how far off it is, rather than only that it is shut', () => {
+    /* the old dashboard printed "Reach 30% readiness in JLPT N5 to unlock" on every locked card;
+       the ascent carries the same three facts and draws them once, as a line */
+    const shut = ascentRungs(payload(12))[1]
+    expect(shut.opensAt).toEqual({ id: 'N5', need: JLPT_UNLOCK_PCT, at: 12 })
+  })
+
+  it('has nothing to draw when readiness has not arrived', () => {
+    expect(ascentRungs(null)).toEqual([])
   })
 })
 
