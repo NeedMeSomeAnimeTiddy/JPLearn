@@ -31,6 +31,7 @@ import {
   aimAt, easeInOutSine, makeFlight, type CamState, type Flight,
 } from './flight'
 import { DESTINATIONS } from './destinations'
+import { makePacer } from './pacing'
 import {
   FOG_COLOUR, FOG_DENSITY, SKY_U, aimKey, faceSun, gradeDisc, gradeSky, installRig,
   gradeMoon, makeMoonDisc, makeSunDisc, placeSun, updateSkyDir, type Rig,
@@ -192,6 +193,9 @@ const DAY_BEAT_MS = 2000
 let shadowDirty = false
 /* `?rays=off` -- the shafts cost a second scene pass, so they get their own switch the way the
    whole valley does, and the same reason: the only honest way to price a thing is to boot without it */
+/* EVEN FRAMES BEAT FAST ONES -- see `pacing.ts` for the measurement this is the answer to.
+   `?pace=off` renders every vsync the display offers, which is what this build did before. */
+const paced = new URLSearchParams(window.location.search).get('pace') !== 'off'
 const shafts = new URLSearchParams(window.location.search).get('rays') !== 'off'
 const water = new URLSearchParams(window.location.search).get('water') !== 'off'
 /* `?ink=off` -- the outlines cost a whole extra scene pass into a float target, and they are the
@@ -1104,15 +1108,25 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
      See MAX_STEP_MS. */
   let raf = 0
   let last = performance.now()
+  /* kept apart from `last`: `last` is the clock the world moves on and only advances on a frame
+     that is worked, while this one ticks on every vsync so the pacer can measure the display */
+  let lastRaf = last
   /* the loop's own clock in seconds, capped the same way every step is, so a stall slows the world
      rather than teleporting it. Kept apart from `performance.now()` for exactly that reason. */
   let clock = 0
   /* the mirror runs on every other frame -- see the note where it is rendered */
   let mirrorTick = 0
   const _aim = new Vector3()
+  /* WHEN A FRAME WILL NOT FIT IN A VSYNC, TAKE TWO OF THEM. The cadence is what reads as smooth,
+     not the rate -- see `pacing.ts`. This does nothing at 60 Hz. */
+  const pacer = makePacer(paced)
   const frame = () => {
     raf = requestAnimationFrame(frame)
     const now = performance.now()
+    /* the raw interval goes to the pacer whether or not this frame is worked, because rAF keeps
+       firing at the display's rate and that is the only clean read of what the display's rate IS */
+    if (!pacer.due(now - lastRaf)) { lastRaf = now; return }
+    lastRaf = now
     const dt = Math.min(now - last, MAX_STEP_MS)
     last = now
     /* the twinkle's own clock. Seconds, and it simply accumulates -- a star's phase is its cell's
@@ -1283,6 +1297,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
     /* the glow goes on OVER the finished frame, so the main render still goes straight to the
        canvas and nothing about the colour path changes */
     if (glowBody && shafts) renderGlow({ renderer, scene, camera, disc: glowBody })
+
+    /* AND WHAT THAT COST, which is the only input the pacer has. Wall clock rather than a GPU timer
+       query on purpose: `renderer.render` returning late because the driver is holding it is
+       exactly the condition being paced for, and a timer query would not see it. */
+    pacer.spent(performance.now() - now)
   }
   frame()
 
@@ -1368,6 +1387,11 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
      load marks; this carries the thing they are marks ABOUT. It costs three references. */
   ;(window as unknown as { __VALLEY_SCENE__?: unknown }).__VALLEY_SCENE__ = {
     scene, camera, renderer,
+    /* WHAT THE LOOP IS DOING WITH THE DISPLAY -- `divisor()` is 1 when every vsync is rendered and
+       2 when every other one is, and `vsync()` is the interval it measured. Reachable for the same
+       reason as everything else here: a cadence that has to be inferred from frame times is a
+       cadence that gets argued about instead of read. */
+    pacer,
     /* THE POSE THE CAMERA IS DRIVEN FROM, writable. The frame loop composes the camera out of this
        every tick, so setting `camera.position` does nothing and setting this does -- which is what a
        harness needs to put this build and the mockup at the SAME standing point before comparing
