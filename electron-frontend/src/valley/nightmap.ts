@@ -1,5 +1,5 @@
 import {
-  MeshStandardMaterial, Object3D, SRGBColorSpace, Texture, TextureLoader, type Mesh,
+  Object3D, SRGBColorSpace, Texture, TextureLoader, type Material, type Mesh,
 } from 'three'
 
 /* ==================================================================================================
@@ -35,9 +35,12 @@ export const NIGHT_LM_URL = './models/night_lightmap.png'
    rather than a brightness: one number to reconcile a Blender render against ACES here. */
 export const NIGHT_LM_GAIN = 1.0
 
+/** the only thing this needs of a material: somewhere to put the bake, and a dial for it */
+type LightMapped = Material & { lightMap: Texture | null; lightMapIntensity: number }
+
 export interface NightMap {
   /** the materials that carry a second UV set, and so take the bake */
-  mats: MeshStandardMaterial[]
+  mats: LightMapped[]
   texture: Texture | null
   /** 0 by day, 1 at full night — driven by the same `lampOn` the lanterns are */
   setOn: (on: number) => void
@@ -50,7 +53,7 @@ export interface NightMap {
  * Returns immediately; the texture is attached when it arrives.
  */
 export function buildNightMap(root: Object3D, url = NIGHT_LM_URL): NightMap {
-  const mats: MeshStandardMaterial[] = []
+  const mats: LightMapped[] = []
   const seen = new Set<string>()
 
   /* EIGHTEEN MESHES, ONE MATERIAL, measured on this world -- the ground meshes the bake was
@@ -62,8 +65,15 @@ export function buildNightMap(root: Object3D, url = NIGHT_LM_URL): NightMap {
     const mesh = o as Mesh
     if (!mesh.isMesh || !mesh.geometry?.getAttribute?.('uv1')) return
     withUv1++
-    const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[]
-    if (Array.isArray(mat) || !mat?.isMeshStandardMaterial) return
+    /* NOT `isMeshStandardMaterial`, AND THAT TEST COST THE WHOLE BAKE. `cel.ts` rebuilds every
+       material in the world as a `MeshToonMaterial`, which is emphatically not a standard material
+       -- so the moment the cel pass landed, this walk matched nothing, returned early, and the town
+       lost its night bake without a word. Measured as it happened: the festival ground went from
+       rgb(66, 44, 36) to rgb(22, 21, 35), warm to blue-grey, and the only line in the boot log that
+       changed was this one disappearing.
+       What this actually needs is a material with a `lightMap` slot, which both of them have. */
+    const mat = mesh.material as LightMapped | LightMapped[]
+    if (Array.isArray(mat) || !mat || !('lightMap' in mat)) return
     if (seen.has(mat.uuid)) return
     seen.add(mat.uuid)
     mats.push(mat)

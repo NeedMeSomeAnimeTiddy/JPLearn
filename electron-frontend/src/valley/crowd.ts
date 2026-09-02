@@ -78,7 +78,11 @@ export const CROWD_U = {
    `IDLE_ORIGIN` is a macro rather than an argument because `instanceMatrix` is an attribute: it
    exists at the call site and not inside a function, and three declares it in the shader prefix
    above <common>, so the macro is always expandable wherever the crowd is being drawn. */
-const IDLE_GLSL = `
+/* EXPORTED, BECAUSE THE OUTLINE PASS HAS TO REPEAT IT. `ink.ts` renders the world with an OVERRIDE
+   material, which replaces the vertex shader this displacement lives in -- so the prepass reads this
+   string rather than restating it. Written twice they drift the moment either is tuned, and the
+   symptom is an outline sliding half a body off its figure. */
+export const IDLE_GLSL = `
   uniform float uIdleT, uIdleTurn, uIdleLean, uIdleBob;
   /* .x is how far up its own figure this vertex is, 0 at the feet and 1 at the crown; .y is how
      tall that figure is, in the geometry's own units */
