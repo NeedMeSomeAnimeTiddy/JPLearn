@@ -55,7 +55,7 @@ import { flyHome, flyToSection, valleyIsFlying } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
   MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed, Unlock,
-  MenuChrome,
+  MenuChrome, leaveBoard,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
   unlockMoment, heroFromStudyBlock, crownFrom, rowsFrom, type MenuSectionKey,
 } from './features/menu'
@@ -1340,19 +1340,26 @@ function App() {
      valley. `flyToSection` calls straight back when there is no valley -- `?valley=off` is a
      supported boot and a menu whose navigation needed a canvas would not survive it.
 
-     LEAVING IS THE OTHER WAY ROUND: the screen goes at once and the camera follows it home. You
-     have already decided to leave, and watching the board you are done with ride two seconds of
-     egress is the wrong half of the move to spend on it. */
+     LEAVING IS THE OTHER WAY ROUND: the camera goes at once and the board follows it out. You have
+     already decided to leave, and watching the screen you are done with ride two seconds of egress
+     is the wrong half of the move to spend on it -- so the flight starts on the press and the board
+     gets one short fade rather than the whole journey.
+
+     IT USED TO GET NO FADE AT ALL. `menuPath.up()` and `flyHome()` ran in the same tick, so React
+     deleted the board on that render and the flight began over an empty valley. `leaveBoard` holds
+     the level change for the length of the fade -- see `leaving.ts` -- and this function still
+     answers its caller synchronously, so nothing downstream learns that leaving takes 200 ms. */
   const enterMenuSection = useCallback((section: MenuSectionKey) => {
     if (valleyIsFlying()) return
     flyToSection(section, () => menuPath.enterSection(section))
   }, [menuPath])
 
   const leaveMenuLevel = useCallback((): boolean => {
-    const wasInSection = menuPath.level === 2
-    if (!menuPath.up()) return false
-    /* only a departure from a section is a journey home; L3 to L2 is a move within one place */
-    if (wasInSection) flyHome()
+    /* only a departure from a section is a journey home; L3 to L2 is a move within one place, and
+       a move within one place redraws where it stands rather than fading out of the valley */
+    if (menuPath.level !== 2) return menuPath.up()
+    flyHome()
+    leaveBoard(() => { menuPath.up() })
     return true
   }, [menuPath])
 

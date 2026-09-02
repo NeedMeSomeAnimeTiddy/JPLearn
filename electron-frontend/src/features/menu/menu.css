@@ -241,7 +241,12 @@
    ================================================================================ */
 .mn-standing {
   position: absolute; inset: 0;
+  /* AND IT LEAVES WITH THE CAMERA -- see `body.in-flight .mn-standing` further down. The mockup's
+     `.standing` is `opacity: 0` at rest and lit by `body.at-menu`; here the resting state is lit
+     and the flight is what takes it off, which is the same switch read the other way round and
+     survives the valley being off. */
   opacity: 1;
+  transition: opacity 0.34s ease;
 }
 
 /* the planes and the two chrome pieces this supersedes. The description line said what a
@@ -620,6 +625,43 @@ body.in-flight .pj-cap { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) tra
 .pj-cap { transition: opacity 0.34s ease, transform 0.42s cubic-bezier(0.3, 0.9, 0.3, 1); }
 
 /* ==================================================================================================
+   AND SO DOES THE FRONT DOOR ITSELF, WHICH IS THE HALF THAT WAS MISSING.
+
+   The four corners went and the five rows stayed: measured on the running build, `.mn-standing` and
+   `.st-hero` sat at opacity 1.00 for the whole 1.8 seconds of the departure and then vanished in one
+   frame at 82%, when React swapped the screen. That is the one arrangement the fade exists to
+   prevent -- a fixed board pinned to a moving picture -- and it was the biggest thing on the screen
+   doing it.
+
+   ONE RULE COVERS BOTH DIRECTIONS, and that is why it is written against the flight rather than
+   against entering or leaving. Outbound the column fades as the camera pulls away. On the way home
+   `MenuL1` mounts at the START of the flight -- the level changes the moment you press Escape -- so
+   without this the front door stood at full opacity through two seconds of approach; with it, it
+   mounts already dark and lights as the camera lands, which is the arrival the mockup has.
+
+   THE ROWS' OWN ENTRANCE STILL RUNS underneath, invisibly, and that is correct rather than wasteful:
+   the mockup does not re-stagger its rows on the way home either. The board comes back as a board. */
+body.in-flight .mn-standing { opacity: 0; }
+
+/* ==================================================================================================
+   AND THE BOARD YOU ARE LEAVING GOES WITH IT.
+
+   Escape unmounts an L2 or L3 screen in the same tick it starts the flight, so the board did not
+   leave, it was deleted -- one frame of a full screen of type, then valley. `leaveBoard` in
+   `leaving.ts` holds the unmount for the length of this transition so there is something left to
+   fade; `body.mn-leaving` is what tells it to.
+
+   ON `.mn-open.on` RATHER THAN `.mn-open`, because the arriving screen is `.mn-open` too. A rule at
+   equal specificity to `.mn-open.on` would be decided by source order alone -- which is exactly the
+   collision `menu.css.test.ts` guards against -- so it takes the extra class and wins on its own
+   merits. Quicker going than coming: you have already decided to leave. */
+body.mn-leaving .mn-open.on {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease-in, transform 0.24s ease-in;
+}
+
+/* ==================================================================================================
    AND WHAT A REFUSED PRESS LOOKS LIKE -- see `refuse.ts` for why there is one at all.
 
    Above everything, including the chrome and any open panel, because it is the window blinking
@@ -635,6 +677,9 @@ body.in-flight .pj-cap { opacity: 0; transform: skewX(-8deg) rotate(-1.2deg) tra
   /* THE ENTRANCE GOES AND THE SCREEN STAYS, which is the distinction that matters: turning the
      transition off must not leave the board at `opacity: 0` forever. */
   .mn-open { opacity: 1; transform: none; transition: none; }
+  /* and the exit goes the same way: the board simply stops being there when the level changes,
+     which is what it did before there was an exit at all */
+  body.mn-leaving .mn-open.on { opacity: 1; transform: none; transition: none; }
 }
 
 /* ==================================================================================================
