@@ -3589,6 +3589,71 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   letter-spacing: 0.16em; color: var(--gold-hi);
   paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
 
+/* ---- HOW THIS RUN GOES ----------------------------------------------------------------------
+   The four switches the script hub carried and nothing else did: how many items a round holds,
+   whether it can be lost, whether it draws the leeches first, and whether it asks how sure you
+   were. Standing under the minimap in the foot band, which the frame contract leaves for a
+   whole-set statement about the screen — and these four are exactly that.
+
+   EVERY CHIP PRINTS THE KEY THAT WORKS IT, so the row spends neither of the two axes the road
+   already has: left and right walk the seventeen modes, up and down change deck.
+   -------------------------------------------------------------------------------------------- */
+.dr-set {
+  position: absolute; left: 160px; top: 472px; width: 960px;
+  display: flex; justify-content: center; align-items: stretch; gap: 6px;
+}
+.dr-setlab {
+  display: flex; align-items: center; padding: 0 11px;
+  background: rgba(20, 17, 13, 0.72);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.22em;
+  color: rgba(242, 234, 216, 0.62); white-space: nowrap;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+}
+/* a seam between what a round IS and what it DOES, so six chips do not read as one set of six */
+.dr-setdiv {
+  width: 1px; margin: 3px 5px; background: rgba(242, 234, 216, 0.26);
+  transform: skewX(-8deg);
+}
+.dr-chip {
+  display: flex; align-items: baseline; gap: 6px; padding: 5px 10px 6px;
+  border: 0; cursor: pointer; font: inherit; white-space: nowrap;
+  background: linear-gradient(178deg, rgba(251, 248, 241, 0.9) 0%, rgba(235, 230, 217, 0.9) 100%);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease;
+}
+/* the key, which is the whole reason this row needs no axis */
+.dr-chip s {
+  text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.42);
+}
+.dr-chip b {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  color: var(--ink);
+}
+.dr-chip i {
+  font-style: normal; font-family: var(--lat); font-weight: 900; font-size: 10px;
+  color: rgba(20, 17, 13, 0.48);
+}
+.dr-chip:hover { filter: brightness(1.06); }
+.dr-chip.on {
+  background: var(--hi);
+  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.3);
+}
+.dr-chip.on s { color: rgba(255, 217, 161, 0.6); }
+.dr-chip.on b { color: #ffd9a1; }
+.dr-chip.on i { color: rgba(255, 217, 161, 0.75); }
+
+/* A MODE THE POOL CANNOT SUPPORT SAYS WHY, on the slab that would otherwise say RUN ON. Its own
+   rule rather than an override, because the reason is a SENTENCE and the action is three words:
+   `.dr-slab` is `nowrap` at 240px, and "No verbs or adjectives to conjugate here" is not. */
+.dr-slab.shut {
+  height: auto; min-height: 26px; padding: 5px 12px 6px; white-space: normal;
+  background: rgba(20, 17, 13, 0.82); color: rgba(242, 234, 216, 0.72);
+  font-size: 8.5px; line-height: 1.35; text-align: center;
+}
+
 
 
 

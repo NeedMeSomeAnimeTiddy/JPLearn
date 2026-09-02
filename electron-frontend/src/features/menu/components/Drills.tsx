@@ -1,19 +1,48 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MinigameKey, ScriptKey } from '../../../types'
+import { SESSION_LENGTH_PRESETS } from '../../../constants'
 import {
   CHAPTER_NUM, TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, groupCopy,
   nearestOffered, railDistance, railEnds, railLayout, railStep, tabScale,
 } from '../drills'
 import { useHoverPick } from '../useHoverPick'
 import { screenHead } from '../chrome'
+import { refuse } from '../refuse'
 import { ScreenHead } from './ScreenHead'
 import { screenClass, useEntered } from '../useScreen'
 import '../../../styles/stage.css'
 import '../menu.css'
 
+/* HOW THIS RUN GOES, which lived in the script hub and nowhere else. All four are persisted
+   preferences rather than per-run choices -- the app has read them out of `sessionPrefs` since
+   long before this screen existed -- and they stand beside the button that starts the round
+   because that is the moment they mean anything. */
+export interface DrillSession {
+  /** items in a round, matched against `SESSION_LENGTH_PRESETS[n].items` */
+  length: number
+  lives: boolean
+  focus: boolean
+  confidence: boolean
+  setLength: (items: number) => void
+  toggleLives: () => void
+  toggleFocus: () => void
+  toggleConfidence: () => void
+}
+
 export interface DrillsProps {
-  /** the deck the hub is already standing on, so the screen opens where the app is */
+  /* THE DECK IS THE APP'S NOW, NOT THE SCREEN'S. It was local state that committed only on start,
+     which was harmless while the hero's one claim was a name -- but the lock reasons below are
+     computed from the LIVE pool, so a road standing on a deck the app is not standing on would
+     draw another deck's refusals. */
   deck: ScriptKey
+  /** the resolved deck, level included: KANJI N3 rather than KANJI */
+  slug: string
+  session: DrillSession
+  /* WHY A MODE CANNOT RUN ON THIS POOL. The hub drew these on its cassettes and the road drew
+     nothing at all, so retiring the hub without them would leave seventeen modes that all look
+     runnable and four that quietly fail. Keyed by mode; absent means it can run. */
+  lockReasons: Partial<Record<MinigameKey, string>>
+  onDeck: (deck: ScriptKey) => void
   onStart: (deck: ScriptKey, mode: MinigameKey) => void
   onUp: () => void
 }
@@ -31,7 +60,9 @@ export interface DrillsProps {
 /** the middle of the strip, which is where the selection is held */
 const STRIP_MID = 474
 
-export function Drills({ deck, onStart, onUp }: DrillsProps) {
+export function Drills({
+  deck, slug, session, lockReasons, onDeck, onStart, onUp,
+}: DrillsProps) {
   const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -39,10 +70,24 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
   const chapters = useMemo(() => drillChapters(modes), [modes])
   const decks = useMemo(() => drillDecks(modes), [modes])
 
-  const [deckKey, setDeckKey] = useState<ScriptKey>(deck)
+  const deckKey = deck
   const [sel, setSel] = useState(() => nearestOffered(modes, deck, 0))
   const layout = railLayout(modes, deckKey, sel)
   const here = modes[sel]
+  const shut = here ? lockReasons[here.key] ?? null : null
+
+  /* the three lengths answer to their number and the three switches to their letter, both printed
+     on the chip -- the same rule level one's rows and the study screens' level row follow */
+  const setKeys = useMemo(() => {
+    const map = new Map<string, () => void>()
+    SESSION_LENGTH_PRESETS.forEach((preset, index) => {
+      map.set(String(index + 1), () => session.setLength(preset.items))
+    })
+    map.set('l', session.toggleLives)
+    map.set('f', session.toggleFocus)
+    map.set('c', session.toggleConfidence)
+    return map
+  }, [session])
   /* walking the rail slides a stone under a stationary pointer, whose `mouseenter` would drag the
      selection back off the one the keyboard just chose. See `useHoverPick`. */
   const hover = useHoverPick(setSel)
@@ -73,17 +118,25 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
         const step = event.key === 'ArrowDown' ? 1 : -1
         const i = decks.findIndex((d) => d.key === deckKey)
         const next = decks[Math.max(0, Math.min(decks.length - 1, i + step))]
-        setDeckKey(next.key)
+        onDeck(next.key)
         /* changing deck snaps to the nearest mode that deck still offers */
         setSel((s) => nearestOffered(modes, next.key, s))
       } else if (event.key === 'Enter') {
         event.preventDefault()
+        /* A REFUSED PRESS SAYS SO OUT LOUD, and the reason is already on the slab -- the flash and
+           the knock are only what send you to read it. See `refuse.ts`. */
+        if (shut) { refuse(); return }
         if (here) onStart(deckKey, here.key)
+      } else {
+        /* STOPPED, NOT MERELY PREVENTED: App binds 1 through 5 on the window as its route into a
+           deck, so a bubbling 1 would set the round to eight items and then leave the screen. */
+        const act = setKeys.get(event.key.toLowerCase())
+        if (act) { event.preventDefault(); event.stopPropagation(); act() }
       }
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [layout, decks, deckKey, modes, here, onStart, hover])
+  }, [layout, decks, deckKey, modes, here, onDeck, onStart, hover, setKeys, shut])
 
   /* the rail is shifted so the selection sits at the strip's middle */
   const shift = Math.round(STRIP_MID - (layout.centres[sel] ?? 0))
@@ -91,7 +144,10 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
   const chapter = chapters.find((c) => sel >= c.from && sel <= c.to) ?? chapters[0]
   const chapterIndex = chapters.indexOf(chapter)
   const copy = groupCopy(chapter?.key ?? '')
-  const deckLabel = decks.find((d) => d.key === deckKey)?.label.toUpperCase() ?? ''
+  /* THE RESOLVED DECK, because KANJI is five decks and the road runs on whichever of them the
+     study screen last stood on. RUN ON KANJI over an N3 round is the same half-truth the deck
+     screen's own caption exists to avoid. */
+  const deckLabel = slug.replace(/_/g, ' ').toUpperCase()
   /* the card's name is set from its own length, the same rule the deck screen's hero uses */
   const nameSize = here
     ? Math.max(14, Math.min(20, Math.floor(216 / (here.title.length * 0.62))))
@@ -108,7 +164,7 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
               key={d.key}
               type="button"
               className={d.key === deckKey ? 'dr-deck on' : 'dr-deck'}
-              onClick={() => { setDeckKey(d.key); setSel((v) => nearestOffered(modes, d.key, v)) }}
+              onClick={() => { onDeck(d.key); setSel((v) => nearestOffered(modes, d.key, v)) }}
               aria-label={`${d.label} — offers ${d.offers} of ${modes.length} drills`}
             >
               <b>{d.label.toUpperCase()}</b>
@@ -193,7 +249,7 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
                 type="button"
                 className="dr-hero"
                 style={{ left: Math.round(layout.centres[sel] - TAB_W_SEL / 2), top: 36 }}
-                onClick={() => onStart(deckKey, here.key)}
+                onClick={() => { if (shut) { refuse(); return } onStart(deckKey, here.key) }}
               >
                 <span className="dr-htab">
                   {chapter ? `${chapter.title.toUpperCase()} · ${copy.jp}` : ''}
@@ -224,7 +280,9 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
                   </span>
                   <s>OFFERED HERE</s>
                 </span>
-                <span className="dr-slab">RUN ON {deckLabel} · ENTER ▸</span>
+                <span className={shut ? 'dr-slab shut' : 'dr-slab'}>
+                  {shut ? shut.toUpperCase() : `RUN ON ${deckLabel} · ENTER ▸`}
+                </span>
               </button>
             ) : null}
           </div>
@@ -268,6 +326,58 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
           </span>
         </div>
 
+        {/* ── HOW THIS RUN GOES ───────────────────────────────────────────────────────────────
+            Four switches that existed only inside the script hub, standing where the road ends
+            rather than on a settings page: they are the difference between eight cards and
+            twenty, and between a round that can be lost and one that cannot.
+
+            IN THE FOOT BAND, under the minimap, which the frame contract leaves for a whole-set
+            statement about the screen. Every chip prints the key that works it, so this row
+            costs neither of the two axes the road already spends. */}
+        <div className="dr-set" role="group" aria-label="How this run goes">
+          <span className="dr-setlab">THIS RUN</span>
+          {SESSION_LENGTH_PRESETS.map((preset, index) => (
+            <button
+              key={preset.key}
+              type="button"
+              className={preset.items === session.length ? 'dr-chip on' : 'dr-chip'}
+              aria-pressed={preset.items === session.length}
+              aria-label={`${preset.label} round, ${preset.items} items`}
+              onClick={() => session.setLength(preset.items)}
+            >
+              <s>{index + 1}</s><b>{preset.label.toUpperCase()}</b><i>{preset.items}</i>
+            </button>
+          ))}
+          <span className="dr-setdiv" aria-hidden="true" />
+          <button
+            type="button"
+            className={session.lives ? 'dr-chip on' : 'dr-chip'}
+            aria-pressed={session.lives}
+            aria-label={`Lives ${session.lives ? 'on' : 'off'}`}
+            onClick={session.toggleLives}
+          >
+            <s>L</s><b>LIVES</b>
+          </button>
+          <button
+            type="button"
+            className={session.focus ? 'dr-chip on' : 'dr-chip'}
+            aria-pressed={session.focus}
+            aria-label={`Focused review ${session.focus ? 'on' : 'off'}`}
+            onClick={session.toggleFocus}
+          >
+            <s>F</s><b>FOCUS</b>
+          </button>
+          <button
+            type="button"
+            className={session.confidence ? 'dr-chip on' : 'dr-chip'}
+            aria-pressed={session.confidence}
+            aria-label={`Confidence capture ${session.confidence ? 'on' : 'off'}`}
+            onClick={session.toggleConfidence}
+          >
+            <s>C</s><b>CONFIDENCE</b>
+          </button>
+        </div>
+
         <div className="back-tab">
           <button type="button" onClick={onUp}>
             <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
@@ -276,6 +386,8 @@ export function Drills({ deck, onStart, onUp }: DrillsProps) {
         <div className="hints">
           <span><b>← →</b>Choose<em>選択</em></span>
           <span><b>↑ ↓</b>Deck<em>教材</em></span>
+          <span><b>1–3</b>Length<em>長さ</em></span>
+          <span><b>L F C</b>Switches<em>設定</em></span>
           <span><b>ENTER</b>Run<em>決定</em></span>
         </div>
       </div>

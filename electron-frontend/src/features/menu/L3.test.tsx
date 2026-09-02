@@ -6,6 +6,7 @@ import type { BadgeEntry } from '../achievements/types'
 import { BADGE_METADATA } from '../achievements'
 import { Library } from './components/Library'
 import { Wall } from './components/Wall'
+import { Drills } from './components/Drills'
 import { LIBRARY_WINDOW, libraryNote, libraryRows, libraryWindow } from './library'
 import { flatSeals, sealGroups, wallStep } from './wall'
 import { EXAM_MODES, levelDetail, sectionLine, unscored } from './examLevel'
@@ -14,7 +15,7 @@ import {
   TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, nearestOffered, railLayout, railStep,
   tabScale,
 } from './drills'
-import { MINIGAMES, SCRIPT_MINIGAMES } from '../../constants'
+import { MINIGAMES, SCRIPT_MINIGAMES, SESSION_LENGTH_PRESETS } from '../../constants'
 import type { LevelReadiness, ReadinessPayload, Rung } from './ascent'
 
 const passage = (id: string, words: number, difficulty: number) => ({
@@ -269,6 +270,31 @@ describe('one rung of the ascent', () => {
 describe('the drills road', () => {
   const modes = drillModes()
 
+  /* the four switches, and the calls the road makes when they are worked */
+  const acts = {
+    setLength: vi.fn(), toggleLives: vi.fn(), toggleFocus: vi.fn(), toggleConfidence: vi.fn(),
+  }
+  const drills = {
+    deck: 'kanji_n5' as const,
+    slug: 'kanji_n3',
+    session: {
+      length: SESSION_LENGTH_PRESETS[1].items as number,
+      lives: false, focus: false, confidence: false, ...acts,
+    },
+    lockReasons: {},
+    onDeck: vi.fn(),
+    onStart: vi.fn(),
+    onUp: vi.fn(),
+  }
+  const road = (over: Partial<typeof drills> = {}) => render(<Drills {...drills} {...over} />)
+
+  afterEach(() => {
+    for (const fn of [...Object.values(acts), drills.onDeck, drills.onStart, drills.onUp]) {
+      fn.mockReset()
+    }
+  })
+
+
   it('carries every mode the picker renders, and no more', () => {
     expect(modes).toHaveLength(MINIGAMES.length)
     expect(new Set(modes.map((m) => m.key)).size).toBe(MINIGAMES.length)
@@ -334,6 +360,99 @@ describe('the drills road', () => {
     /* floored, so the far end of the road stays readable rather than collapsing */
     expect(tabScale(99)).toBe(tabScale(5))
     expect(tabScale(0)).toBe(1)
+  })
+
+  describe('how this run goes, which used to exist only in the hub', () => {
+    it('draws the three lengths and the three switches, and lights what is set', () => {
+      const { container } = road()
+      const chips = container.querySelectorAll('.dr-chip')
+      expect(chips).toHaveLength(SESSION_LENGTH_PRESETS.length + 3)
+      const on = [...chips].filter((c) => c.classList.contains('on'))
+      expect(on).toHaveLength(1)
+      expect(on[0].textContent).toContain('MEDIUM')
+    })
+
+    it('lights nothing when a retry set a length no preset names', () => {
+      /* honest rather than tidy: a round of seven items is not SHORT, and lighting SHORT
+         because it is nearest would be the screen inventing a fact */
+      const { container } = road({ session: { ...drills.session, length: 7 } })
+      expect(container.querySelectorAll('.dr-chip.on')).toHaveLength(0)
+    })
+
+    it('answers to the key each chip prints, so the row costs neither axis', () => {
+      const { container } = road()
+      const root = container.querySelector('.mn-open') as Element
+      fireEvent.keyDown(root, { key: '1' })
+      expect(acts.setLength).toHaveBeenCalledWith(SESSION_LENGTH_PRESETS[0].items)
+      fireEvent.keyDown(root, { key: 'l' })
+      expect(acts.toggleLives).toHaveBeenCalledTimes(1)
+      fireEvent.keyDown(root, { key: 'F' })
+      expect(acts.toggleFocus).toHaveBeenCalledTimes(1)
+      fireEvent.keyDown(root, { key: 'c' })
+      expect(acts.toggleConfidence).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps those presses to itself, because App binds the digits on the window', () => {
+      const seen = vi.fn()
+      window.addEventListener('keydown', seen)
+      try {
+        const { container } = road()
+        fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: '1' })
+        expect(seen).not.toHaveBeenCalled()
+      } finally {
+        window.removeEventListener('keydown', seen)
+      }
+    })
+  })
+
+  describe('a mode the pool cannot support', () => {
+    const firstMode = drillModes()[0].key
+
+    it('says why on the slab that would otherwise say RUN ON', () => {
+      const { container } = road({ lockReasons: { [firstMode]: 'No compound words in this selection' } })
+      const slab = container.querySelector('.dr-slab') as HTMLElement
+      expect(slab.classList.contains('shut')).toBe(true)
+      expect(slab.textContent).toContain('NO COMPOUND WORDS')
+    })
+
+    it('refuses the press rather than starting a round that cannot be built', () => {
+      const onStart = vi.fn()
+      const { container } = road({
+        lockReasons: { [firstMode]: 'Not enough cards for this mode' }, onStart,
+      })
+      fireEvent.click(container.querySelector('.dr-hero') as Element)
+      fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'Enter' })
+      expect(onStart).not.toHaveBeenCalled()
+    })
+
+    it('still runs a mode nothing is holding back', () => {
+      const onStart = vi.fn()
+      const { container } = road({ onStart })
+      fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'Enter' })
+      expect(onStart).toHaveBeenCalledWith('kanji_n5', firstMode)
+    })
+  })
+
+  it('names the deck it will actually run on, level and all', () => {
+    /* KANJI is five decks, and the road runs on whichever one the study screen last stood on */
+    const { container } = road()
+    expect(container.querySelector('.dr-slab')?.textContent).toContain('RUN ON KANJI N3')
+    expect(container.querySelector('.dr-line')?.textContent).toContain('KANJI N3')
+  })
+
+  it('hands a deck change to the app rather than keeping it', () => {
+    /* it was local state that committed only on start -- which drew another deck's refusals */
+    const onDeck = vi.fn()
+    const { container } = road({ onDeck })
+    fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'ArrowDown' })
+    expect(onDeck).toHaveBeenCalledTimes(1)
+    expect(onDeck.mock.calls[0][0]).not.toBe('kanji_n5')
+  })
+
+  it('has no accessibility violations, switches and all', async () => {
+    const { container } = road()
+    const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } })
+    expect(results.violations).toEqual([])
   })
 })
 

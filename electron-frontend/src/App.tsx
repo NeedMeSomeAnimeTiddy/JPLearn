@@ -2510,9 +2510,30 @@ function App() {
       {view === 'home' && menuLevel === 3 && menuPath.screen === 'drills' ? (
         <Drills
           deck={activeScript}
+          slug={activeDeckSlug}
+          /* THE FOUR SWITCHES THE HUB CARRIED AND NOTHING ELSE DID. Built inline rather than
+             memoised because `session.slice` is a fresh object every render anyway, and the
+             screen's own key handler already re-registers on each one. */
+          session={{
+            /* null when a retry set a length no preset names; no chip lights, which is true */
+            length: session.slice.activeSessionLengthPreset?.items ?? 0,
+            lives: session.slice.livesEnabled,
+            focus: session.slice.leechFocusEnabled,
+            confidence: session.slice.confidenceCaptureEnabled,
+            setLength: session.slice.setSessionLength,
+            toggleLives: session.slice.toggleLives,
+            toggleFocus: session.slice.toggleLeechFocus,
+            toggleConfidence: session.slice.toggleConfidence,
+          }}
+          lockReasons={minigameLockReasons}
+          onDeck={(deck) => {
+            /* THE ROAD'S DECK IS THE APP'S DECK. It used to be local state that committed only on
+               start -- fine while the hero's one claim was a name, wrong now the slab draws a
+               refusal computed from the LIVE pool. */
+            setActiveScript(deck)
+            resetSessionWithLives()
+          }}
           onStart={(deck, mode) => {
-            /* the drill itself runs in the script hub, which is where it has always run -- the
-               screen hands over BOTH axes rather than only the deck the hub happened to hold */
             jumpToScriptHubMinigame(deck, mode)
           }}
           onUp={leaveMenuLevel}
