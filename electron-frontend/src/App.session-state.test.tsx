@@ -136,24 +136,35 @@ afterEach(() => {
 
 
 
-/** Reads the "<correct>/<rounds>" HUD stat. */
+/* THE ROUND'S NUMBERS MOVED, and where they went is the point of the redesign rather than a detail
+   of it. The four look-alike counters that sat between the title and the card are gone: the score is
+   the foot band's strip of marks -- one per card, gold answered and vermilion missed -- and the
+   points and the lives are chips in the crown, beside where the app keeps the streak and the level.
+   These helpers read the screen's own statement of each rather than a HUD that no longer exists. */
+
+/** Reads the score off the foot band, which is where the round now says it. */
 function readScore(): { correct: number; rounds: number } | null {
-  const stats = Array.from(document.querySelectorAll('.game-hud-stat'))
-  for (const s of stats) {
-    const m = (s.textContent ?? '').match(/^(\d+)\/(\d+)$/)
-    if (m) return { correct: Number(m[1]), rounds: Number(m[2]) }
-  }
-  return null
+  const ticks = Array.from(document.querySelectorAll('.rd-ticks i'))
+  if (ticks.length === 0) return null
+  const correct = ticks.filter((t) => t.classList.contains('on')).length
+  const wrong = ticks.filter((t) => t.classList.contains('bad')).length
+  return { correct, rounds: correct + wrong }
+}
+
+/** the figure on one of the crown's run chips */
+function runChip(label: RegExp): number | null {
+  const chip = Array.from(document.querySelectorAll('.rd-run .stat-chip'))
+    .find((c) => label.test(c.textContent ?? ''))
+  if (!chip) return null
+  return Number(chip.querySelector('b')?.textContent?.replace(/\D/g, '') ?? 0)
 }
 
 function readPoints(): number {
-  const stat = Array.from(document.querySelectorAll('.game-hud-stat'))
-    .find((s) => (s.textContent ?? '').includes('pts'))
-  return Number((stat?.textContent ?? '').match(/(\d+)/)?.[1] ?? 0)
+  return runChip(/PTS/) ?? 0
 }
 
 function livesRemaining(): number {
-  return document.querySelectorAll('.life-heart.is-active').length
+  return runChip(/LIVES/) ?? 0
 }
 
 /**
@@ -161,8 +172,14 @@ function livesRemaining(): number {
  * rendered options are mutually consistent — they re-render independently between
  * rounds, so a split read can pair a stale prompt with fresh options.
  */
+/* A SLIP CARRIES ITS NUMBER AND ITS ANSWER, and only the second is the answer -- `textContent` on
+   the whole button reads "1one". The digit is `aria-hidden` decoration, so the label is the `<b>`. */
+function slipLabel(slip: Element): string {
+  return (slip.querySelector('b')?.textContent ?? '').trim()
+}
+
 function readRound(): { expected: string; options: HTMLButtonElement[] } | null {
-  const options = Array.from(document.querySelectorAll('.option-button')) as HTMLButtonElement[]
+  const options = Array.from(document.querySelectorAll('.rd-slip')) as HTMLButtonElement[]
   if (options.length === 0) return null
 
   const promptEl = Array.from(document.querySelectorAll('span, div, p, h1, h2'))
@@ -171,7 +188,7 @@ function readRound(): { expected: string; options: HTMLButtonElement[] } | null 
   if (!expected) return null
 
   // Only consider the round ready once the options actually belong to this prompt.
-  if (!options.some((o) => (o.textContent ?? '').trim() === expected)) return null
+  if (!options.some((o) => slipLabel(o) === expected)) return null
   return { expected, options }
 }
 
@@ -186,8 +203,8 @@ async function answerRound(correct: boolean): Promise<void> {
   const round = readRound()
   if (!round) throw new Error('round became unreadable after settling')
   const target = correct
-    ? round.options.find((o) => (o.textContent ?? '').trim() === round.expected)
-    : round.options.find((o) => (o.textContent ?? '').trim() !== round.expected)
+    ? round.options.find((o) => slipLabel(o) === round.expected)
+    : round.options.find((o) => slipLabel(o) !== round.expected)
   if (!target) throw new Error(`no ${correct ? 'correct' : 'incorrect'} option available`)
 
   fireEvent.click(target)

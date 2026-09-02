@@ -479,7 +479,7 @@ describe('what each deck offers', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /meaning match/i }))
 
     await screen.findByText(/Meaning Match/i)
-    await screen.findByRole('button', { name: /restart challenge/i })
+    await waitFor(() => expect(document.querySelector('.rd-slips')).not.toBeNull())
 
     expect(screen.queryByRole('button', { name: /^(play|launch)$/i })).toBeNull()
     expect(screen.queryByText(/Session Report/i)).toBeNull()
@@ -512,7 +512,7 @@ describe('what each deck offers', () => {
     try {
       fireEvent.click(screen.getByRole('menuitem', { name: /typed recall/i }))
       await waitFor(() => {
-        expect(document.querySelector('.game-prompt-main')?.textContent).toBe('え')
+        expect(document.querySelector('.rd-focus')?.textContent).toBe('え')
       })
     } finally {
       randomSpy.mockRestore()
@@ -569,7 +569,7 @@ describe('what each deck offers', () => {
     render(<App />)
     await openGame('Vocabulary', 'Typed Recall')
 
-    const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
+    const typedInput = await screen.findByPlaceholderText(/Type the meaning/i)
     fireEvent.click(screen.getByRole('button', { name: /confidence high/i }))
     fireEvent.change(typedInput, { target: { value: 'a' } })
     fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
@@ -613,7 +613,7 @@ describe('what each deck offers', () => {
     /* AND NOW IT ACTUALLY DOES IT. Until the script hub was retired this press landed on the hub,
        which drew the deck's seventeen cassettes and asked the learner to choose one -- so the card
        promised a named drill and delivered a menu. It runs the drill. */
-    await waitFor(() => expect(document.querySelector('.minigame-shell')).not.toBeNull())
+    await waitFor(() => expect(document.querySelector('.rd-sheet')).not.toBeNull())
     expect(document.body.textContent).toContain('Meaning Match')
   })
 
@@ -705,9 +705,9 @@ describe('what each deck offers', () => {
     render(<App />)
     await openGame('Vocabulary', 'Particle Cloze')
 
-    // Wait for the round to render, then check .game-prompt-main text
+    // Wait for the round to render, then check .rd-focus text
     await waitFor(() => {
-      const promptMain = document.querySelector('.game-prompt-main')
+      const promptMain = document.querySelector('.rd-focus')
       expect(promptMain?.textContent).toMatch(/[あいうえ]/)
     })
     fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
@@ -721,7 +721,7 @@ describe('what each deck offers', () => {
     await openGame('Vocabulary', 'Imposter')
 
     await waitFor(() => {
-      const storyPassage = document.querySelector('.game-prompt-main')
+      const storyPassage = document.querySelector('.rd-focus')
       expect(storyPassage?.textContent).toMatch(/[あさです。いまです。うみです。えきです。]/)
     })
     fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
@@ -899,7 +899,7 @@ describe('what each deck offers', () => {
     expect(screen.getByText(/stroke order complete/i)).toBeTruthy()
     expect(screen.getByText(/your answer/i)).toBeTruthy()
     expect(screen.getByText(/the answer/i)).toBeTruthy()
-    const completedAnswerValues = Array.from(document.querySelectorAll('.round-feedback-answer-value')).map((value) => value.textContent)
+    const completedAnswerValues = Array.from(document.querySelectorAll('.rd-verdict-answers b')).map((value) => value.textContent)
     expect(completedAnswerValues).toHaveLength(2)
     expect(completedAnswerValues[0]).toBe(completedAnswerValues[1])
   })
@@ -917,7 +917,7 @@ describe('what each deck offers', () => {
     })))
     expect(screen.getByText(/stroke order complete/i)).toBeTruthy()
     expect(screen.queryByText(/stroke-order animation|rejected strokes|guide hint/i)).toBeNull()
-    const retryAnswerValues = Array.from(document.querySelectorAll('.round-feedback-answer-value')).map((value) => value.textContent)
+    const retryAnswerValues = Array.from(document.querySelectorAll('.rd-verdict-answers b')).map((value) => value.textContent)
     expect(retryAnswerValues).toHaveLength(2)
     expect(retryAnswerValues[0]).toBe(retryAnswerValues[1])
   })
@@ -934,7 +934,7 @@ describe('what each deck offers', () => {
       isCorrect: false,
     })))
     expect(screen.getByText(/character not completed/i)).toBeTruthy()
-    expect(Array.from(document.querySelectorAll('.round-feedback-answer-value')).map((value) => value.textContent)[0]).toBe('Not completed')
+    expect(Array.from(document.querySelectorAll('.rd-verdict-answers b')).map((value) => value.textContent)[0]).toBe('Not completed')
   })
 
   it('runs sentence assembly via bridge payload and records the sentence_assembly minigame', async () => {
@@ -1118,12 +1118,12 @@ describe('what each deck offers', () => {
     await screen.findByRole('button', { name: /replay audio/i })
 
     // Reveal element must exist in blurred state (not yet revealed)
-    const revealEl = document.querySelector('.game-listen-reveal')
+    const revealEl = document.querySelector('.rd-focus')
     expect(revealEl).not.toBeNull()
-    expect(revealEl?.classList.contains('is-revealed')).toBe(false)
+    expect(revealEl?.classList.contains('is-hidden')).toBe(true)
 
     // Select the first option to submit an answer
-    const optionGrid = document.querySelector('.option-grid')!
+    const optionGrid = document.querySelector('.rd-slips')!
     const optionButtons = within(optionGrid as HTMLElement).getAllByRole('button')
     fireEvent.click(optionButtons[0])
 
@@ -1132,10 +1132,11 @@ describe('what each deck offers', () => {
       minigame: 'listening_audio_first',
     }))
 
-    // Character must be revealed after answering
+    /* and it stops being hidden once the answer is in — the reveal is the class coming OFF now,
+       which is the same state change read the other way round */
     await waitFor(() => {
-      const revealed = document.querySelector('.game-listen-reveal.is-revealed')
-      expect(revealed).not.toBeNull()
+      const revealed = document.querySelector('.rd-focus')
+      expect(revealed?.classList.contains('is-hidden')).toBe(false)
       expect(revealed?.textContent).toMatch(/[あいうえ]/)
     })
   })
@@ -1158,12 +1159,12 @@ describe('what each deck offers', () => {
     await screen.findByRole('button', { name: /replay audio/i })
 
     // Reveal element must exist in blurred state (not yet revealed)
-    const revealEl = document.querySelector('.game-listen-reveal')
+    const revealEl = document.querySelector('.rd-focus')
     expect(revealEl).not.toBeNull()
-    expect(revealEl?.classList.contains('is-revealed')).toBe(false)
+    expect(revealEl?.classList.contains('is-hidden')).toBe(true)
 
     // Type the kana sequence in the text input (multi-character: あい for ai)
-    const dictationInput = await screen.findByPlaceholderText(/auto-converts/i)
+    const dictationInput = await screen.findByPlaceholderText(/becomes kana/i)
     fireEvent.input(dictationInput, { target: { value: 'あい' } })
     fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
 
@@ -1172,10 +1173,11 @@ describe('what each deck offers', () => {
       minigame: 'dictation',
     }))
 
-    // Character must be revealed after answering
+    /* and it stops being hidden once the answer is in — the reveal is the class coming OFF now,
+       which is the same state change read the other way round */
     await waitFor(() => {
-      const revealed = document.querySelector('.game-listen-reveal.is-revealed')
-      expect(revealed).not.toBeNull()
+      const revealed = document.querySelector('.rd-focus')
+      expect(revealed?.classList.contains('is-hidden')).toBe(false)
       expect(revealed?.textContent).toMatch(/[あいうえ]/)
     })
   })
@@ -1207,7 +1209,7 @@ describe('what each deck offers', () => {
 
     // and the press is refused rather than starting a round that has no audio to play
     fireEvent.click(document.querySelector('.dr-hero') as Element)
-    expect(document.querySelector('.minigame-shell')).toBeNull()
+    expect(document.querySelector('.rd-sheet')).toBeNull()
     expect(screen.queryByRole('heading', { name: /recognition/i })).toBeNull()
   })
 
@@ -1257,7 +1259,7 @@ describe('what each deck offers', () => {
     expect(document.querySelector('.dr-slab')?.textContent).toContain('SPEECH RECOGNITION MODEL')
 
     fireEvent.click(document.querySelector('.dr-hero') as Element)
-    expect(document.querySelector('.minigame-shell')).toBeNull()
+    expect(document.querySelector('.rd-sheet')).toBeNull()
   })
 
   it('keeps the drills road walkable when reduced motion is on', async () => {

@@ -1,4 +1,4 @@
-<!-- @dsCard group="Components" name="The screens past level three" subtitle="The session shell, and the six screens still standing on the old app layout" width="1360" height="7451" -->
+<!-- @dsCard group="Components" name="The screens past level three" subtitle="The session shell, and the six screens still standing on the old app layout" width="1360" height="7539" -->
 <!doctype html>
 <meta charset="utf-8">
 <title>The screens past level three</title>
@@ -40,6 +40,7 @@
   .name i { font-style: normal; font-size: 9px; letter-spacing: 0.2em; color: rgba(242,234,216,0.45); }
   .name u { text-decoration: none; font-size: 9px; letter-spacing: 0.16em; padding: 2px 8px;
     background: rgba(227,74,51,0.2); color: #ff9d86; }
+  .name u.built { background: rgba(207,164,92,0.2); color: var(--gold-hi); }
   figcaption p { font-size: 12px; line-height: 1.7; color: rgba(242,234,216,0.76); }
   figcaption p + p { margin-top: 6px; }
 
@@ -94,7 +95,7 @@
   /* ---- the foot band: one thin object spanning the stage, and nothing else ---- */
   /* GROUND, not cream on nothing — this is the instrument `legibility.html` names for anything
      small or measured, and a twenty-tick strip laid over a lit valley is the definition of it. */
-  .foot { position: absolute; left: 174px; top: 598px; width: 932px; display: flex;
+  .foot { position: absolute; left: 184px; top: 598px; width: 912px; display: flex;
     align-items: center; gap: 15px; padding: 6px 14px 7px; transform: var(--skew);
     background: rgba(10,9,6,0.82); box-shadow: inset 0 0 0 1px rgba(242,234,216,0.2),
       2px 3px 0 rgba(0,0,0,0.45); }
@@ -126,7 +127,10 @@
   /* ================================================================================================
      THE SHEET — the one object every one of these screens is built on. A washi plate filling the
      stage, divided into a PROMPT cell and a WORK cell, with an action slab bled to its own floor. */
-  .sheet { position: absolute; left: 174px; top: 192px; width: 932px; height: 384px;
+  /* 184, NOT 174 — measured on the running port and corrected here so the two agree. A 384-tall
+     plate skewed -8deg paints 23px past each of its own edges, so 174 puts its left edge at 150,
+     ten pixels inside the moat. See `foundations/frame-contract.html`. */
+  .sheet { position: absolute; left: 184px; top: 192px; width: 912px; height: 384px;
     display: flex; background: var(--washi); transform: var(--skew);
     box-shadow: 8px 11px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.16); }
   .ask { flex: none; width: 322px; display: flex; flex-direction: column;
@@ -349,7 +353,7 @@
     </div>
   </div>
   <figcaption>
-    <div class="name"><b>The round, asking</b><i>REPLACES MinigameView</i><u>NOT BUILT</u></div>
+    <div class="name"><b>The round, asking</b><i>REPLACES MinigameView</i><u class="built">BUILT</u></div>
     <p><b>The prompt is a cell of the sheet, not a card of its own.</b> One plate, split at 322px
       by a hairline: the question on the left at the size it deserves, the four slips on the right.
       Two plates would put a shadow between the character and its answers, and they are one act.</p>
@@ -361,6 +365,16 @@
       cream where you are. That is the contract's foot band doing exactly what it is for — a
       whole-set summary, one object, thin, spanning the stage — and it is the thing the old screen
       said as "0/20" in a row of four look-alike counters.</p>
+    <p><b>Built September 2026, and four things changed on the way.</b> The sheet is authored at
+      <b>184, not 174</b> — measured on the running port, 174 paints its left edge at x&nbsp;150, ten
+      pixels inside the moat, and this plate has been corrected to match. The heading is
+      <b>English-led</b>, because that is what <code>chrome.ts</code> already settled for every other
+      screen and this plate was still following the mockup's older hierarchy. The corner keeps
+      <b>two tabs</b>, Leave and Start over, because the old HUD had a restart and dropping it would
+      have been a removal rather than a redesign. And the answered state grew a <b>verdict block</b>
+      between the slips and the slab, carrying what a strip of paper cannot say — the message, the
+      combo, the time, the next review, the example sentence — so that nothing the old feedback card
+      told you was lost in the move.</p>
   </figcaption>
 </figure>
 
@@ -432,7 +446,7 @@
     </div>
   </div>
   <figcaption>
-    <div class="name"><b>The round, answered</b><i>THE SAME SHEET</i><u>NOT BUILT</u></div>
+    <div class="name"><b>The round, answered</b><i>THE SAME SHEET</i><u class="built">BUILT</u></div>
     <p><b>Nothing moves.</b> The character shrinks to make room for the gloss, the right answer
       takes a gold edge and the one you pressed takes a struck-through vermilion, the two you did
       not touch go quiet. The slab changes colour and sentence — vermilion is what you owe, ink is

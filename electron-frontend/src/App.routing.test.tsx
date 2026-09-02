@@ -147,7 +147,10 @@ function currentView(): ViewName | 'unknown' {
      the minigame view, so a shell-shaped question answers wrong for it. `.daily-games-hub` is on
      the screen whether or not its four tiles have arrived. */
   if (document.querySelector('.daily-games-hub')) return 'daily_games'
-  if (document.querySelector('.minigame-shell')) return 'minigame'
+  /* THE ROUND BEFORE THE FRAME, and the order is the whole answer now. The round moved onto the
+     menu's own stage, so it has a `.mn-frame` too -- asking the frame first would call every round
+     'home'. `.rd-sheet` is the sheet it stands on and is there in all of its states. */
+  if (document.querySelector('.rd-sheet')) return 'minigame'
   /* HOME IS THE VALLEY MENU NOW. `HomeView` and its Daily Games button retired with phase 6's
      toggle; `.mn-frame` is the menu's own stage and is present at every level of it -- including
      the deck screen, which is where the script hub's six digit shortcuts land since the hub went. */

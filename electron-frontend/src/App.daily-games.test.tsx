@@ -210,8 +210,9 @@ describe('Daily Games navigation', () => {
     expect(review.getDeckCards.mock.calls.filter(([slug]) => slug === 'deck_b' || slug === 'deck_a')).toEqual([['deck_a'], ['deck_b']])
     expect(review.getStudyQueue).not.toHaveBeenCalled()
     expect(review.recordGameResult).not.toHaveBeenCalled()
-    expect(screen.getByText('JPLearn · Romaji Sprint')).toBeTruthy()
-    expect(screen.queryByText('JPLearn · Meaning Match')).toBeNull()
+    /* the drill names itself on the heading slab now, where every other screen says what it is */
+    expect(screen.getByText('ROMAJI SPRINT')).toBeTruthy()
+    expect(screen.queryByText('MEANING MATCH')).toBeNull()
   })
 
   it('does not advance explicit review while recordGameResult is pending', async () => {

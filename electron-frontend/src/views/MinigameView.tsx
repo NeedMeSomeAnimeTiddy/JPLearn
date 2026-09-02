@@ -1,38 +1,49 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { AnimatePresence } from 'motion/react'
-import {
-  Activity,
-  ArrowLeft,
-  Flame,
-  LoaderCircle,
-  Play,
-  Target,
-  Trophy,
-} from 'lucide-react'
-import { ChallengePromptCard } from '../components/minigame/ChallengePromptCard'
-import { ChoiceAnswerPanel } from '../components/minigame/ChoiceAnswerPanel'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { Lightbulb, Volume2 } from 'lucide-react'
 import { HintPopover } from '../components/minigame/HintPopover'
-import { MinigameHud } from '../components/minigame/MinigameHud'
-import { MinigameResponsePanel } from '../components/minigame/MinigameResponsePanel'
 import { QueuePreview } from '../components/minigame/QueuePreview'
 import { SentenceAssemblyAnswerPanel } from '../components/minigame/SentenceAssemblyAnswerPanel'
 import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
-import { TypedAnswerPanel } from '../components/minigame/TypedAnswerPanel'
 import { SpeechAnswerPanel } from '../components/minigame/SpeechAnswerPanel'
 import { HandwritingAnswerPanel } from '../features/handwriting'
 import type { HandwritingOutcome } from '../features/handwriting'
-import { SessionRunSummary } from '../components/SessionRunSummary'
+import { screenHead } from '../features/menu'
+import type { MenuSectionKey } from '../features/menu'
+import {
+  EMPTY_TRAIL, Round, RoundAsk, RoundConfidence, RoundGloss, RoundSlips, RoundTyped, RoundVerdict,
+  RoundWork, promptSize, roundCopy, roundKind, stepTrail,
+} from '../features/round'
 import type { MinigameKey, NavDirection, ScriptKey } from '../types'
 import {
-  MINIGAMES,
-  SCRIPT_LABELS,
-  formatExpectedAnswer,
-  formatFeedbackAnswerLabel,
+  CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES, FEEDBACK_COPY, MINIGAMES,
+  formatExpectedAnswer, formatFeedbackAnswerLabel,
 } from '../constants'
+import { formatTagLabel } from '../utils'
 import { lookupGrammarExplanation } from '../lib/grammarExplanations'
 import { isGrammarCurriculumMode, sanitizeRomajiInput } from '../utils'
 import { useSession } from '../context/SessionContext'
+
+/* ==================================================================================================
+   THE ROUND — the last screen in the app still drawn in the old language, and the most used one.
+
+   WHAT WAS HERE: a cassette deck. A CRT surface, four glitch corners, a VHS line, three crystals, a
+   sweep, four particles, a DOLBY NR badge and a TYPE II · HIGH BIAS badge, around a character
+   floating in a brown void over a boxed answer panel. The run's four numbers were set in 9px
+   monospace between the title and the card — the one place on the screen the eye has to cross on
+   every single answer.
+
+   WHAT IS HERE NOW is the sheet: one washi plate on the stage, split into a prompt cell and a work
+   cell, with the run's numbers in the crown where the app keeps every other number about you and the
+   whole round as a strip of marks in the foot band. See `round.css` for the argument and
+   `design-system/components/past-three.html` for the plate it is built from.
+
+   THIS FILE KEPT ITS JOB AND LOST ITS LAYOUT. Every effect, every shortcut and all sixteen modes are
+   the ones that were here; what moved out is where things go (`features/round`) and the two
+   eleven-branch ternaries that decided what each mode's panel was called (`ROUND_COPY`). Four modes
+   bring a board of their own — handwriting, stroke order, sentence assembly and speech — and those
+   panels are hosted in the work cell unchanged rather than redrawn, which is a staged port and is
+   said out loud rather than hidden.
+   ================================================================================================== */
 
 // Minimal card shape needed for stroke-order answer candidates.
 type BasicCard = { id: number; character: string; romaji: string; meaning: string; dictionary_summary?: { reading: string } | null; tags?: string[] }
@@ -42,6 +53,8 @@ interface MinigameViewProps {
   activeScript: ScriptKey
   activeGame: MinigameKey
   activeSectionName: string | null
+  /** which section of the menu this round was entered from, for the heading slab's trail */
+  menuSection: MenuSectionKey | null
   gameLoading: boolean
   gameError: string | null
   activeRunCardsLength: number
@@ -59,10 +72,11 @@ interface MinigameViewProps {
 }
 
 export function MinigameView({
-  navDirection,
+  navDirection: _navDirection,
   activeScript,
   activeGame,
   activeSectionName,
+  menuSection,
   gameLoading,
   gameError,
   activeRunCardsLength,
@@ -73,8 +87,8 @@ export function MinigameView({
   activeBlockCards,
   activeRoundCard,
   onBack,
-  onOpenDictionary,
-  onOpenSettings,
+  onOpenDictionary: _onOpenDictionary,
+  onOpenSettings: _onOpenSettings,
   onRetry,
   onHandwritingOutcome,
 }: MinigameViewProps) {
@@ -94,29 +108,30 @@ export function MinigameView({
     sessionStreak,
     sessionTargetItems,
     retryTargetItems,
-    roundComboBonus,
-    roundMilestoneStreak,
     sessionRunReport,
     sessionStartPending,
     sessionSummaryLoading,
     livesEnabled,
     livesRemaining,
-    confidenceCaptureEnabled,
-    roundConfidenceScore,
     roundResponseMs,
     roundSrsResult,
     roundExampleSentence,
+    roundComboBonus,
+    roundMilestoneStreak,
+    confidenceCaptureEnabled,
+    roundConfidenceScore,
+    setRoundConfidence,
     voiceBusy,
     voiceUnavailable,
     answerInputRef,
     startSession,
     submitAnswer,
     setRoundInput,
-    setRoundConfidence,
     playAudio,
     skipFeedback,
     upcomingCards,
   } = useSession()
+
   const selectedGameMeta = MINIGAMES.find((game) => game.key === activeGame)
   const effectiveTargetItems = retryTargetItems ?? sessionTargetItems
   const resolvedGameTitle =
@@ -130,13 +145,6 @@ export function MinigameView({
   const roundGrammarExplanation = displayedRoundCard?.tags?.includes('grammar')
     ? lookupGrammarExplanation(displayedRoundCard.character)
     : null
-  const roundProgressValue = effectiveTargetItems > 0 ? Math.min(sessionRounds / effectiveTargetItems, 1) : 0
-  const remainingRounds = Math.max(effectiveTargetItems - sessionRounds, 0)
-  const sessionStatusCopy = sessionActive
-    ? `${remainingRounds} ${remainingRounds === 1 ? 'challenge' : 'challenges'} left`
-    : sessionRunReport
-      ? 'Run complete'
-      : 'Ready to begin'
 
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
   // 0 = no hint shown, 1 = clue, 2 = full answer giveaway
@@ -145,15 +153,28 @@ export function MinigameView({
   const [speechFallbackToTyped, setSpeechFallbackToTyped] = useState(false)
   const [hintRevealCount, setHintRevealCount] = useState(0)
   const [focusModeEnabled, setFocusModeEnabled] = useState(false)
-  const [pointsGainPulse, setPointsGainPulse] = useState(false)
-  const [pointsGainAmount, setPointsGainAmount] = useState<number | null>(null)
-  const previousPointsRef = useRef(sessionPoints)
   const previousSessionActiveRef = useRef(false)
   const [hintPopoverOpen, setHintPopoverOpen] = useState(false)
   const [handwritingHintUsed, setHandwritingHintUsed] = useState(false)
   const hintButtonRef = useRef<HTMLButtonElement | null>(null)
   const [queueOpen, setQueueOpen] = useState(false)
   const queueButtonRef = useRef<HTMLButtonElement | null>(null)
+  /* WHAT YOU PRESSED, so the slips can carry the verdict rather than be replaced by a panel that
+     states it. `roundFeedbackAnswer` is the session's own record of it and is the source; this is
+     only here for the modes that do not set one. */
+  const [chose, setChose] = useState<string | null>(null)
+
+  /* THE RUN'S OWN TRAIL, derived rather than stored — see `stepTrail`. The session counts how many
+     rounds have gone and how many were right; the foot band needs the order, and the order is the
+     difference between those two numbers each time either moves. */
+  const [trail, pushTrail] = useReducer(
+    (state: typeof EMPTY_TRAIL, next: { rounds: number; score: number }) =>
+      stepTrail(state, next.rounds, next.score),
+    EMPTY_TRAIL,
+  )
+  useEffect(() => {
+    pushTrail({ rounds: sessionRounds, score: sessionScore })
+  }, [sessionRounds, sessionScore])
 
   const toggleFocusMode = useCallback(() => {
     const next = !focusModeEnabled
@@ -186,27 +207,8 @@ export function MinigameView({
     setHintStep(0)
     setHintPopoverOpen(false)
     setHandwritingHintUsed(false)
+    setChose(null)
   }, [roundState?.cardId])
-
-  // Brief pulse + floating "+N" label whenever points increase.
-  useEffect(() => {
-    if (sessionPoints <= previousPointsRef.current) {
-      previousPointsRef.current = sessionPoints
-      return
-    }
-
-    const gained = sessionPoints - previousPointsRef.current
-    previousPointsRef.current = sessionPoints
-    setPointsGainAmount(gained)
-    setPointsGainPulse(true)
-
-    const timeoutHandle = window.setTimeout(() => {
-      setPointsGainPulse(false)
-      setPointsGainAmount(null)
-    }, 700)
-
-    return () => window.clearTimeout(timeoutHandle)
-  }, [sessionPoints])
 
   useEffect(() => {
     const previouslyActive = previousSessionActiveRef.current
@@ -233,27 +235,17 @@ export function MinigameView({
     setSpeechFallbackToTyped(false)
   }, [roundState?.cardId, roundState?.mode])
 
+  const kind = roundState ? roundKind(roundState.mode) : 'choice'
+  /* speech falls back to a typed answer when the microphone will not have it */
+  const fill = kind === 'panel' && roundState?.mode === 'speech_recall' && speechFallbackToTyped
+    ? 'typed'
+    : kind
+
   // ── Phase 6 + 7: Keyboard shortcuts ─────────────────────────────────────────
   useEffect(() => {
     if (!sessionActive || !roundState) return
     const activeRound = roundState
-
-    const isMultipleChoice =
-      activeRound.mode === 'meaning_match' ||
-      activeRound.mode === 'character_match' ||
-      activeRound.mode === 'particle_cloze' ||
-      activeRound.mode === 'vibe_check' ||
-      activeRound.mode === 'imposter' ||
-      activeRound.mode === 'listening_audio_first' ||
-      activeRound.mode === 'kanji_compound_builder' ||
-      activeRound.mode === 'context_cloze'
-
-    const isTyped =
-      activeRound.mode === 'romaji_sprint' ||
-      activeRound.mode === 'typed_recall' ||
-      activeRound.mode === 'speech_recall' ||
-      activeRound.mode === 'stroke_order' ||
-      activeRound.mode === 'dictation'
+    const isChoice = roundKind(activeRound.mode) === 'choice'
 
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement
@@ -288,7 +280,7 @@ export function MinigameView({
         return
       }
 
-      if (isMultipleChoice && !isRoundResolving && !isInputFocused && !isTyped) {
+      if (isChoice && !isRoundResolving && !isInputFocused) {
         if (activeRound.options.length === 0) return
 
         if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
@@ -309,17 +301,16 @@ export function MinigameView({
         if (event.key === 'Enter') {
           event.preventDefault()
           const selected = activeRound.options[activeChoiceIndex]
-          if (selected) submitAnswer(selected.label)
+          if (selected) { setChose(selected.label); submitAnswer(selected.label) }
           return
         }
-      }
 
-      // 1-4: select MC option (only for multiple-choice modes, not while resolving, not in input)
-      if (isMultipleChoice && !isRoundResolving && !isInputFocused && !isTyped) {
+        // 1-4: select an option outright
         const index = parseInt(event.key, 10) - 1
         if (index >= 0 && index < activeRound.options.length) {
           event.preventDefault()
           setActiveChoiceIndex(index)
+          setChose(activeRound.options[index].label)
           submitAnswer(activeRound.options[index].label)
         }
       }
@@ -354,394 +345,525 @@ export function MinigameView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundState?.cardId, roundState?.mode])
 
-  const tapeToneVar =
-    activeScript === 'hiragana' || activeScript === 'katakana' ? 'var(--tone-teal)'
-    : activeScript === 'kanji_n5' ? 'var(--tone-rose)'
-    : 'var(--tone-amber)'
-  const tapeStyle = { '--tape-tone': tapeToneVar } as CSSProperties
+  /* ==================================================================================================
+     WHAT THE CROWN SAYS. The heading slab is the menu's own — the section you came in through on its
+     own accent, the drill's name beside it — and the chips are the RUN's rather than the app's. */
+  const head = useMemo(
+    () => screenHead(menuSection ?? 'DRILLS', 'drills', { en: resolvedGameTitle.toUpperCase(), jp: '演習' }),
+    [menuSection, resolvedGameTitle],
+  )
+  /* THE DECK, NOT THE SCRIPT. `SCRIPT_LABELS.kanji_n5` is "Kanji", and a round on N3 kanji captioned
+     KANJI is the same half-truth the drills road already fixed for its own slab — the slug carries
+     the level and the label does not. */
+  const cap = [activeScript.replace(/_/g, ' '), activeSectionName].filter(Boolean).join(' · ').toUpperCase()
+  const accuracy = sessionRounds > 0 ? Math.round((sessionScore / sessionRounds) * 100) : null
+  const run = useMemo(() => {
+    const chips = [
+      {
+        key: 'round',
+        value: String(Math.min(sessionRounds + (sessionActive ? 1 : 0), effectiveTargetItems)).padStart(2, '0'),
+        of: `/ ${effectiveTargetItems}`,
+        label: 'ROUND',
+      },
+      { key: 'streak', value: `×${sessionStreak}`, label: 'STREAK' },
+      { key: 'points', value: String(sessionPoints), label: 'PTS' },
+    ]
+    if (accuracy !== null) {
+      chips.push({ key: 'clean', value: `${accuracy}%`, label: 'CLEAN' })
+    }
+    if (livesEnabled) {
+      chips.push({
+        key: 'lives', value: String(livesRemaining), label: 'LIVES', duty: livesRemaining <= 1,
+      } as typeof chips[number] & { duty: boolean })
+    }
+    return chips
+  }, [sessionRounds, sessionActive, effectiveTargetItems, sessionStreak, sessionPoints, accuracy, livesEnabled, livesRemaining])
 
-  return (
-    <div className={`view-shell view-${navDirection} minigame-shell ${focusModeEnabled ? 'minigame-focus-mode' : ''}`}>
-      <div className="hub-crt-surface" aria-hidden="true" />
-      <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
-      <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
-      <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
-      <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
-      <div className="hub-vhs-line" aria-hidden="true" />
-      <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
-      <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
-      <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
+  const said = roundFeedback !== null
+  const copy = roundState ? roundCopy(roundState.mode) : roundCopy('meaning_match')
+  const correct = roundState
+    ? (roundState.mode === 'sentence_assembly' ? (roundState.answerDisplay ?? roundState.answer) : roundState.answer)
+    : ''
+  const chosen = roundFeedbackAnswer ?? chose
 
-      <MinigameHud
-        activeScript={activeScript}
-        activeSectionName={activeSectionName}
-        title={resolvedGameTitle}
-        focusModeEnabled={focusModeEnabled}
-        dictionarySeed={roundState?.dictionarySeedQuery ?? roundState?.audioText ?? roundState?.answer ?? ''}
-        sessionActive={sessionActive}
-        activeRunCardsLength={activeRunCardsLength}
-        gameLoading={gameLoading}
-        sessionSummaryLoading={sessionSummaryLoading}
-        sessionStartPending={sessionStartPending}
-        livesEnabled={livesEnabled}
-        livesRemaining={livesRemaining}
-        onRestart={() => startSession()}
-        onBack={onBack}
-        onOpenDictionary={onOpenDictionary}
-        onOpenSettings={onOpenSettings}
-        onToggleFocusMode={toggleFocusMode}
-        onToggleQueue={() => setQueueOpen((prev) => !prev)}
-        queueOpen={queueOpen}
-        queueButtonRef={queueButtonRef}
-      />
+  const hints = useMemo(() => {
+    if (!sessionActive || !roundState) {
+      return [
+        { cap: 'ENTER', en: 'Start', jp: '開始' },
+        { cap: 'ESC', en: 'Leave', jp: '戻る' },
+      ]
+    }
+    const rows = [
+      fill === 'choice'
+        ? { cap: '1–4', en: 'Answer', jp: '回答' }
+        : { cap: 'ENTER', en: 'Answer', jp: '回答' },
+      { cap: 'H', en: 'Hint', jp: '助言' },
+    ]
+    if (voiceEnabled && roundState.audioText) rows.push({ cap: 'P', en: 'Hear it', jp: '音声' })
+    rows.push({ cap: 'F', en: 'Focus', jp: '集中' })
+    rows.push({ cap: '/', en: 'Look up', jp: '辞書' })
+    rows.push({ cap: 'ESC', en: 'Leave', jp: '中断' })
+    return rows
+  }, [sessionActive, roundState, fill, voiceEnabled])
 
-      <div className="hub-studio">
-        <div className="hub-player">
-          <div className="hub-sweep minigame-focus-optional" aria-hidden="true" />
-          <div className="hub-particle hub-particle--1 minigame-focus-optional" aria-hidden="true" />
-          <div className="hub-particle hub-particle--2 minigame-focus-optional" aria-hidden="true" />
-          <div className="hub-particle hub-particle--3 minigame-focus-optional" aria-hidden="true" />
-          <div className="hub-particle hub-particle--4 minigame-focus-optional" aria-hidden="true" />
+  /* ==================================================================================================
+     THE PROMPT. A specimen up to six glyphs and a wrapped stem past that — see `promptSize`. The
+     reading rides over it when furigana are on, which is the one place the old screen's
+     `ChallengePromptCard` did something this cell has to keep doing. */
+  const focusText = roundState?.focusText ?? ''
+  const hideMastered = furiganaAutoHideMastered && Boolean(roundState?.isMastered)
+  const reading = furiganaEnabled && !hideMastered
+    ? (displayedRoundCard?.dictionary_summary?.reading ?? null)
+    : null
+  /* LISTENING AND DICTATION DO NOT SHOW YOU THE ANSWER BEFORE YOU HEAR IT, which is the whole of
+     those two modes. Sentence assembly does not either, and in place of the prompt it puts the
+     button that plays it — the one affordance that cannot be a keycap, because there is nothing
+     else on that half of the sheet to press. */
+  const heardFirst = roundState?.mode === 'listening_audio_first' || roundState?.mode === 'dictation'
+  const assembling = roundState?.mode === 'sentence_assembly'
+  const focusNode = !roundState
+    ? null
+    : assembling && !said
+      ? (
+        <button
+          type="button"
+          className="rd-listen"
+          onClick={() => playAudio(roundState.audioText)}
+          disabled={voiceBusy || !voiceEnabled}
+          aria-label="Play sentence audio"
+        >
+          <Volume2 size={26} aria-hidden="true" />
+          <span>{voiceBusy ? 'LOADING…' : voiceUnavailable ? 'VOICE UNAVAILABLE' : 'LISTEN'}</span>
+        </button>
+      )
+      : reading && reading !== focusText
+        ? <ruby>{focusText}<rp>(</rp><rt>{reading}</rt><rp>)</rp></ruby>
+        : focusText
 
-          {sessionActive ? (
-            <div className="hub-player-header minigame-focus-optional">
-              <p className="hero-kicker">
-                <span className="hub-rec-dot" aria-hidden="true" />{' '}
-                Round {sessionRounds + 1} of {effectiveTargetItems} · {SCRIPT_LABELS[activeScript]}{activeSectionName ? ` · ${activeSectionName}` : ''}
-              </p>
-            </div>
-          ) : null}
+  /* THE HINT BULB AND THE SPEAKER. `H` and `P` do the same jobs and are written in the hint row, but
+     a key is not an affordance for anybody using a mouse — and these two were the whole reason the
+     old prompt card had a head. Which speaker it is depends on the mode: on a listening round the
+     audio IS the prompt, so it says replay. */
+  const wordAudio = roundState != null && !heardFirst && !assembling
+    && voiceEnabled && Boolean(roundState.audioText)
+  const listenAudio = roundState != null && heardFirst && voiceEnabled && Boolean(roundState.audioText)
+  const sentenceAudio = roundState != null && !heardFirst && !assembling
+    && activeScript === 'grammar_patterns' && voiceEnabled && Boolean(roundState.exampleSentenceAudioText)
+  const tools = roundState ? (
+    <>
+      <button
+        ref={hintButtonRef}
+        type="button"
+        className={hintPopoverOpen ? 'is-active' : undefined}
+        onClick={(event) => {
+          event.stopPropagation()
+          if (roundState.mode === 'handwriting') setHandwritingHintUsed(true)
+          setHintPopoverOpen((v) => !v)
+        }}
+        aria-label="Toggle hint"
+        title={showKeyboardPrompts ? 'Toggle hint (H)' : 'Toggle hint'}
+      >
+        <Lightbulb size={13} aria-hidden="true" />
+      </button>
+      {wordAudio || listenAudio ? (
+        <button
+          type="button"
+          onClick={() => playAudio(roundState.audioText)}
+          disabled={voiceBusy}
+          aria-label={listenAudio ? 'Replay audio' : 'Play target words'}
+          title={voiceUnavailable
+            ? 'Voice playback unavailable'
+            : showKeyboardPrompts ? 'Play (P)' : 'Play'}
+        >
+          <Volume2 size={13} aria-hidden="true" />
+        </button>
+      ) : null}
+      {sentenceAudio ? (
+        <button
+          type="button"
+          onClick={() => playAudio(roundState.exampleSentenceAudioText!)}
+          disabled={voiceBusy}
+          aria-label="Play example sentence"
+          title={voiceUnavailable ? 'Voice playback unavailable' : 'Play example sentence'}
+        >
+          <Volume2 size={11} aria-hidden="true" />
+        </button>
+      ) : null}
+    </>
+  ) : null
 
-          <div className="hub-deck-badge minigame-focus-optional" aria-hidden="true">
-            <span>DOLBY NR</span>
-            <span className="hub-deck-dot" />
-          </div>
+  /* WHAT THE WRONG ANSWER EARNS. A grammar pattern if the card has one, the dictionary's own note if
+     it does not, and the card's meaning under the answer either way — the three things the old
+     feedback panel carried, in the cell that is already open rather than in a panel that appears. */
+  const glossBody = roundGrammarExplanation
+    ? `${roundGrammarExplanation.formation} ${roundGrammarExplanation.commonMistake}`
+    : roundState?.dictionaryNote?.copy ?? roundExampleSentence?.en ?? null
+  /* THE PATTERN'S NAME BEATS THE CARD'S FIELDS. A grammar card drilled through Meaning Match is
+     still a grammar card -- the old screen gated its explanation on the card's tag rather than on
+     the mode for exactly this reason, and the line under the answer has to agree with it. */
+  const glossUnder = roundGrammarExplanation
+    ? roundGrammarExplanation.name
+    : roundState && !isGrammarCurriculumMode(roundState.mode)
+      /* AND NOT THE ANSWER AGAIN. On a kana deck the card's romaji, its meaning and the answer are
+         all the same word, so the honest line under `sha` was `sha · sha`. Anything that is only
+         the answer restated is dropped, and if that empties the line there is no line. */
+      ? [displayedRoundCard?.romaji ?? '', displayedRoundCard?.meaning ?? '']
+        .filter((part) => part && part.trim().toLowerCase() !== correct.trim().toLowerCase())
+        .filter((part, index, all) => all.indexOf(part) === index)
+        .join(' · ') || null
+      : null
 
-          <section className="minigame-stage-panel">
-            {!sessionActive ? (
-              <>
-                {sessionRunReport && !sessionStartPending ? (
-                  <div className="minigame-open-playfield" style={tapeStyle}>
-                    <SessionRunSummary
-                      report={sessionRunReport}
-                      sessionStartPending={sessionStartPending}
-                      onRestart={() => startSession()}
-                      onRetry={onRetry}
-                      onBack={onBack}
-                    />
-                  </div>
-                ) : (
-                  <div className="hub-controls" aria-label="Game controls">
-                    <div className="hub-control-group" role="group">
-                      <button
-                        type="button"
-                        className="hub-chip-button"
-                        onClick={() => startSession()}
-                        disabled={gameLoading || activeRunCardsLength === 0 || sessionSummaryLoading || sessionStartPending}
-                      >
-                        <Play size={13} strokeWidth={2.2} aria-hidden="true" />
-                        <span>{sessionRunReport ? 'Play Again' : 'Play'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="hub-chip-button"
-                        onClick={onBack}
-                        aria-label="Leave this round"
-                        title="Leave this round"
-                      >
-                        <ArrowLeft size={13} strokeWidth={2.2} aria-hidden="true" />
-                        <span>Back</span>
-                      </button>
-                    </div>
-                    <div className="hub-control-divider" aria-hidden="true" />
-                    <p className="hero-kicker minigame-state-actions">
-                      <span className="hub-rec-dot" aria-hidden="true" />{' '}
-                      {gameLoading ? 'Loading deck...' : `${activeRunCardsLength} cards available`}
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : null}
+  const back = (
+    <>
+      {roundState ? (
+        <HintPopover
+          roundState={roundState}
+          hintStep={hintStep}
+          hintRevealCount={hintRevealCount}
+          showKeyboardPrompts={showKeyboardPrompts}
+          formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
+          open={hintPopoverOpen}
+          triggerRef={hintButtonRef}
+          onClose={() => setHintPopoverOpen(false)}
+          onRevealHint={() => {
+            if (hintStep < 1) setHintRevealCount((value) => value + 1)
+            setHintStep(1)
+            if (roundState.mode === 'handwriting') setHandwritingHintUsed(true)
+          }}
+          onRevealMoreHint={advanceHintStep}
+        />
+      ) : null}
+      {sessionActive ? (
+        <QueuePreview
+          upcomingCards={upcomingCards}
+          open={queueOpen}
+          triggerRef={queueButtonRef}
+          onClose={() => setQueueOpen(false)}
+        />
+      ) : null}
+    </>
+  )
 
-            {(sessionStartPending && !sessionActive) || (sessionActive && !roundState) ? (
-              <div className="minigame-loading" role="status" aria-live="polite">
-                <LoaderCircle className="inline-button-icon spin-icon" strokeWidth={2.2} aria-hidden="true" />
-                <span>
-                  {sessionStartPending ? 'Preparing your round...' : 'Loading next card...'}
-                </span>
+  /* ==================================================================================================
+     THE THREE STATES THAT ARE NOT A QUESTION, on the same sheet — see the note in `round.css`. */
+  if (!sessionActive || !roundState) {
+    const report = sessionRunReport
+    const loading = (sessionStartPending && !sessionActive) || (sessionActive && !roundState)
+    const canStart = !gameLoading && activeRunCardsLength > 0 && !sessionSummaryLoading && !sessionStartPending
+
+    if (report && !sessionStartPending) {
+      const missed = report.wrongCardIds.length
+      return (
+        <>
+          <Round
+            head={head}
+            cap={cap}
+            run={run}
+            foot={{ at: report.rounds, target: report.rounds, trail: trail.trail, note: 'RUN COMPLETE' }}
+            onBack={onBack}
+            backLabel="Back"
+            backJp="戻る"
+            hints={[
+              { cap: 'ENTER', en: 'Again', jp: '再開' },
+              { cap: 'ESC', en: 'Back', jp: '戻る' },
+            ]}
+            ask={
+              <div className="rd-ask">
+                <div className="rd-kick"><span>HOW IT WENT</span><em>結果</em></div>
+                <div className="rd-score">
+                  <b>{report.accuracy}<sup>%</sup></b>
+                  <i>{report.correct} OF {report.rounds} CLEAN</i>
+                </div>
+                <div className="rd-src">FINISHED <i>{report.completedAt}</i></div>
               </div>
-            ) : null}
-
-            {gameError ? <p className="status-line status-error">{gameError}</p> : null}
-
-            {sessionActive && roundState ? (
-              <AnimatePresence mode="wait">
-                <article
-                  className={`minigame-open-playfield${roundState.mode === 'handwriting' ? ' minigame-open-playfield--handwriting' : ''}`}
-                  key={roundState.cardId}
-                  style={tapeStyle}
-                  data-feedback={roundFeedback !== null ? '' : undefined}
-                >
-
-                  <div className="minigame-cassette-label">
-                    <span className="cassette-brand">JPLearn · {resolvedGameTitle}</span>
-                    <div
-                      className="minigame-round-progress"
-                      role="progressbar"
-                      aria-valuemin={0}
-                      aria-valuemax={effectiveTargetItems}
-                      aria-valuenow={Math.min(sessionRounds, effectiveTargetItems)}
-                      aria-valuetext={`${sessionRounds} of ${effectiveTargetItems} challenges, ${sessionStatusCopy}`}
-                      title={`${sessionRounds}/${effectiveTargetItems} · ${sessionStatusCopy}`}
-                    >
-                      <div className="minigame-round-progress-fill" style={{ width: `${roundProgressValue * 100}%` }} />
+            }
+            work={
+              <div className="rd-work">
+                <div className="rd-kick"><span>THE RUN</span><em>記録</em></div>
+                <div className="rd-body">
+                  <div className="rd-tally">
+                    <div className="rd-tally-row">Points earned<s /><b>{report.points}</b></div>
+                    <div className="rd-tally-row">
+                      Goal<s>{report.goalCompletionPct}% OF {report.targetItems}</s>
                     </div>
-
-                    {roundState.chapterLabel || roundState.surprisePrompt ? (
-                      <div className="minigame-cassette-label-meta">
-                        {roundState.chapterLabel ? (
-                          <span className="chapter-pill">
-                            {roundState.chapterNumber ? `Chapter ${roundState.chapterNumber}` : 'Chapter'} · {roundState.chapterLabel}
-                          </span>
-                        ) : null}
-                        {roundState.surprisePrompt ? <span className="surprise-pill">Surprise</span> : null}
+                    <div className="rd-tally-row">Missed<s /><b>{missed}</b></div>
+                    {report.livesEnabled ? (
+                      <div className="rd-tally-row">Lives left<s /><b>{report.livesRemaining}</b></div>
+                    ) : null}
+                    {report.nearMissCardIds.length > 0 ? (
+                      <div className="rd-tally-row">
+                        Near misses<s /><b>{report.nearMissCardIds.length}</b>
                       </div>
                     ) : null}
-
-                    <div className="game-hud-whisper" aria-live="polite">
-                      <span className={`game-hud-stat ${pointsGainPulse ? 'is-gaining' : ''}`}>
-                        <Activity aria-hidden="true" size={11} strokeWidth={2.2} />
-                        <strong>{sessionPoints}</strong>
-                        <span>pts</span>
-                        {pointsGainAmount ? <span className="game-hud-stat-gain">+{pointsGainAmount}</span> : null}
-                      </span>
-                      <span className="game-hud-stat">
-                        <Flame aria-hidden="true" size={11} strokeWidth={2.2} />
-                        <strong>{sessionStreak}</strong>
-                        <span>x</span>
-                      </span>
-                      <span className="game-hud-stat">
-                        <Target aria-hidden="true" size={11} strokeWidth={2.2} />
-                        <strong>{sessionScore}/{sessionRounds}</strong>
-                      </span>
-                      <span className="game-hud-stat">
-                        <Trophy aria-hidden="true" size={11} strokeWidth={2.2} />
-                        <strong>{sessionRounds}/{effectiveTargetItems}</strong>
-                      </span>
-                    </div>
                   </div>
-
-                  <div className="minigame-cassette-window">
-                    <ChallengePromptCard
-                      roundState={roundState}
-                      activeScript={activeScript}
-                      voiceEnabled={voiceEnabled}
-                      voiceBusy={voiceBusy}
-                      voiceUnavailable={voiceUnavailable}
-                      showKeyboardPrompts={showKeyboardPrompts}
-                      furiganaEnabled={furiganaEnabled}
-                      furiganaAutoHideMastered={furiganaAutoHideMastered}
-                      focusReading={furiganaEnabled ? (displayedRoundCard?.dictionary_summary?.reading ?? null) : null}
-                      showRevealText={roundFeedback !== null}
-                      isMastered={Boolean(roundState.isMastered)}
-                      cardTags={displayedRoundCard?.tags ?? []}
-                      hintPopoverOpen={hintPopoverOpen}
-                      hintButtonRef={hintButtonRef}
-                      onPlayAudio={playAudio}
-                      onToggleHintPopover={() => {
-                        if (roundState.mode === 'handwriting') setHandwritingHintUsed(true)
-                        setHintPopoverOpen((v) => !v)
-                      }}
-                    />
-                  </div>
-
-                  <div className="minigame-cassette-body">
-                    <MinigameResponsePanel
-                      isRoundResolving={isRoundResolving}
-                      mode={roundState.mode}
-                      title={
-                        roundState.mode === 'stroke_order'
-                          ? 'Build the matching kanji'
-                          : roundState.mode === 'handwriting'
-                            ? 'Draw the character'
-                          : roundState.mode === 'romaji_sprint'
-                            ? 'Type the reading'
-                            : roundState.mode === 'sentence_assembly'
-                              ? 'Assemble the sentence'
-                            : roundState.mode === 'typed_recall'
-                              ? 'Type the meaning'
-                              : roundState.mode === 'speech_recall'
-                                ? 'Speak the meaning'
-                                : roundState.mode === 'particle_cloze'
-                                  ? 'Choose the missing particle'
-                                  : roundState.mode === 'vibe_check'
-                                    ? 'Read the register vibe'
-                                  : roundState.mode === 'imposter'
-                                    ? 'Spot the grammar imposter'
-                                  : roundState.mode === 'dictation'
-                                    ? 'Type the romaji'
-                                : 'Choose the best answer'
-                      }
-                      copy={
-                        roundState.mode === 'stroke_order'
-                          ? 'Type the romaji reading to narrow the kanji candidates.'
-                          : roundState.mode === 'handwriting'
-                            ? null
-                          : roundState.mode === 'romaji_sprint'
-                            ? 'Submit as soon as the reading is clear in your head.'
-                            : roundState.mode === 'sentence_assembly'
-                              ? 'Drag chunks into natural order, then submit.'
-                            : roundState.mode === 'typed_recall'
-                              ? 'Short, direct answers work best.'
-                              : roundState.mode === 'speech_recall'
-                                ? speechFallbackToTyped
-                                  ? 'Short, direct answers work best.'
-                                  : 'Tap the mic and say your answer clearly.'
-                                : roundState.mode === 'particle_cloze'
-                                  ? 'Use syntax and particle role to choose the best fit.'
-                                  : roundState.mode === 'vibe_check'
-                                    ? 'Use sentence endings like です, ます, or ください as tone clues.'
-                                  : roundState.mode === 'imposter'
-                                    ? 'Pick the token that introduces the grammar error.'
-                                    : roundState.mode === 'dictation'
-                                      ? 'Type the romaji for what you hear. Use English letters.'
-                                : 'Commit to one answer and keep the run moving.'
-                      }
-                      confidenceCaptureEnabled={confidenceCaptureEnabled}
-                      roundConfidenceScore={roundConfidenceScore}
-                      onSetRoundConfidence={setRoundConfidence}
-                      feedback={roundFeedback}
-                      feedbackTone={roundFeedbackTone}
-                      feedbackComboBonus={roundComboBonus}
-                      feedbackMilestoneStreak={roundMilestoneStreak}
-                      feedbackAnswer={roundFeedbackAnswer}
-                      feedbackAnswerLabel={formatFeedbackAnswerLabel(roundState.mode)}
-                      feedbackCorrectAnswer={
-                        roundState.mode === 'sentence_assembly'
-                          ? (roundState.answerDisplay ?? roundState.answer)
-                          : roundState.answer
-                      }
-                      livesEnabled={livesEnabled}
-                      showKeyboardPrompts={showKeyboardPrompts}
-                      onSkipFeedback={skipFeedback}
-                      feedbackAdvancePending={roundAdvancePending}
-                      feedbackAdvanceError={roundAdvanceError}
-                      responseMs={roundResponseMs}
-                      srsResult={roundSrsResult}
-                      exampleSentence={roundExampleSentence}
-                      cardCharacter={roundState.focusText}
-                      cardMeaning={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.meaning ?? '') : ''}
-                      cardRomaji={!isGrammarCurriculumMode(roundState.mode) ? (displayedRoundCard?.romaji ?? '') : ''}
-                      dictionaryNote={roundState.dictionaryNote}
-                      grammarExplanation={roundGrammarExplanation}
+                  <div className="rd-acts">
+                    <button
+                      type="button"
+                      className="rd-slab go"
+                      onClick={() => startSession()}
+                      disabled={sessionStartPending}
                     >
-                        {roundState.mode === 'handwriting' ? (
-                          <HandwritingAnswerPanel
-                            character={roundState.answer}
-                            disabled={isRoundResolving}
-                            externalHintUsed={handwritingHintUsed}
-                            onComplete={onHandwritingOutcome}
-                          />
-                        ) : roundState.mode === 'stroke_order' ? (
-                          <StrokeOrderAnswerPanel
-                            activeBlockCards={activeBlockCards}
-                            answerInputRef={answerInputRef}
-                            roundInput={roundInput}
-                            disabled={isRoundResolving}
-                            onInputChange={setRoundInput}
-                            onSelect={submitAnswer}
-                          />
-                        ) : roundState.mode === 'sentence_assembly' ? (
-                          <SentenceAssemblyAnswerPanel
-                            options={roundState.options}
-                            disabled={isRoundResolving}
-                            onSubmit={submitAnswer}
-                          />
-                        ) : roundState.mode === 'speech_recall' && !speechFallbackToTyped ? (
-                          <SpeechAnswerPanel
-                            expectedAnswer={roundState.answer}
-                            disabled={isRoundResolving}
-                            onResult={({ transcript }) => submitAnswer(transcript)}
-                            onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
-                          />
-                        ) : roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' || roundState.mode === 'dictation' || roundState.mode === 'conjugation_drill' ? (
-                          <TypedAnswerPanel
-                            answerInputRef={answerInputRef}
-                            value={roundInput}
-                            placeholder={
-                              roundState.mode === 'romaji_sprint'
-                                ? 'Enter romaji'
-                                : roundState.mode === 'dictation' || roundState.mode === 'conjugation_drill'
-                                  ? 'Type here (auto-converts to kana)'
-                                  : 'Type meaning'
-                            }
-                            disabled={isRoundResolving}
-                            onChange={(value) =>
-                              setRoundInput(
-                                roundState.mode === 'romaji_sprint'
-                                  ? sanitizeRomajiInput(value)
-                                  : value,
-                              )
-                            }
-                            onSubmit={(v) =>
-                              submitAnswer(
-                                roundState.mode === 'romaji_sprint'
-                                  ? sanitizeRomajiInput(v)
-                                  : v,
-                              )
-                            }
-                            wanakanaMode={roundState.mode === 'conjugation_drill' ? 'hiragana' : roundState.mode === 'dictation' ? (activeScript === 'katakana' ? 'katakana' : 'hiragana') : undefined}
-                          />
-                        ) : (
-                          <ChoiceAnswerPanel
-                            options={roundState.options}
-                            disabled={isRoundResolving}
-                            characterMode={roundState.mode === 'character_match'}
-                            showKeyboardPrompts={showKeyboardPrompts}
-                            activeIndex={activeChoiceIndex}
-                            onActiveIndexChange={setActiveChoiceIndex}
-                            onSelect={submitAnswer}
-                          />
-                        )}
-                    </MinigameResponsePanel>
+                      RUN IT AGAIN<em>再開</em>
+                    </button>
+                    {missed > 0 ? (
+                      <button
+                        type="button"
+                        className="rd-slab calm go"
+                        onClick={() => onRetry(report.wrongCardIds)}
+                      >
+                        THE {missed} YOU MISSED<em>復習</em>
+                      </button>
+                    ) : null}
                   </div>
+                </div>
+              </div>
+            }
+          />
+          {back}
+        </>
+      )
+    }
 
-                </article>
-              </AnimatePresence>
+    return (
+      <>
+        <Round
+          head={head}
+          cap={cap}
+          run={run}
+          foot={{ at: 0, target: effectiveTargetItems, trail: [], note: 'NOT STARTED' }}
+          onBack={onBack}
+          backLabel="Back"
+          backJp="戻る"
+          hints={hints}
+          ask={
+            <div className="rd-ask">
+              <div className="rd-kick"><span>{loading ? 'ONE MOMENT' : 'READY'}</span><em>準備</em></div>
+              <div className="rd-focus" style={{ fontSize: '96px' }}>{loading ? '…' : '始'}</div>
+              <div className="rd-src">DECK <i>{activeRunCardsLength} CARDS</i></div>
+            </div>
+          }
+          work={
+            <div className="rd-work">
+              <div className="rd-kick"><span>{resolvedGameTitle.toUpperCase()}</span><em>演習</em></div>
+              <div className="rd-body">
+                <div className="rd-plain">
+                  <h2>{loading ? (sessionStartPending ? 'Preparing your round...' : 'Loading next card...') : resolvedGameTitle}</h2>
+                  <p>
+                    {gameError
+                      ? <span className="rd-err">{gameError}</span>
+                      : gameLoading
+                        ? 'Loading deck...'
+                        : `${activeRunCardsLength} cards available`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="rd-slab go"
+                  onClick={() => startSession()}
+                  disabled={!canStart}
+                  aria-label="Play"
+                >
+                  {sessionRunReport ? 'PLAY AGAIN' : 'PLAY'}<em>開始</em>
+                </button>
+              </div>
+            </div>
+          }
+        />
+        {back}
+      </>
+    )
+  }
+
+  /* ==================================================================================================
+     AND THE ROUND ITSELF. */
+  const slab = said
+    ? {
+      /* the failure's full sentence is in the verdict, where there is room for it; the slab says
+         only that the way on is shut, because a slab is one line */
+      text: roundAdvanceError ? 'THAT REVIEW DID NOT SAVE' : 'ENTER FOR THE NEXT ONE',
+      jp: roundAdvanceError ? undefined : '次へ',
+      tone: 'calm' as const,
+      onClick: skipFeedback,
+      disabled: roundAdvancePending || roundAdvanceError,
+      /* THE NAME THE REST OF THE APP KNOWS THIS CONTROL BY. It has been "Continue immediately" since
+         the feedback card had a skip button, and it is what a screen reader and four test files
+         both reach for; the slab is the same control wearing the sheet's clothes. */
+      label: showKeyboardPrompts ? 'Continue immediately (Enter)' : 'Continue immediately',
+    }
+    : {
+      text: fill === 'choice' ? '1–4 OR ENTER TO ANSWER' : 'ENTER TO ANSWER',
+      jp: '回答',
+      tone: 'duty' as const,
+    }
+
+  const src = said && roundResponseMs != null
+    ? { label: 'ANSWERED IN', value: `${(roundResponseMs / 1000).toFixed(1)}S` }
+    : said && roundSrsResult
+      ? { label: 'NEXT REVIEW', value: `${roundSrsResult.interval}D` }
+      : roundState.isMastered
+        ? { label: 'THIS ONE IS', value: 'MASTERED' }
+        : null
+
+  return (
+    <>
+      <Round
+        head={head}
+        cap={cap}
+        run={run}
+        said={said}
+        foot={{ at: sessionRounds, target: effectiveTargetItems, trail: trail.trail }}
+        onBack={onBack}
+        onRestart={() => startSession()}
+        hints={hints}
+        ask={
+          <RoundAsk
+            kick={said ? (roundFeedbackTone === 'error' ? 'NOT QUITE' : 'THAT IS IT') : copy.ask}
+            kickJp={said ? (roundFeedbackTone === 'error' ? '不正解' : '正解') : copy.askJp}
+            tools={tools}
+            tags={(displayedRoundCard?.tags ?? []).map(formatTagLabel)}
+            hidden={heardFirst && !said}
+            size={assembling && !said ? 16 : promptSize(focusText)}
+            src={src}
+            gloss={said ? (
+              <RoundGloss
+                answer={correct}
+                answerIsJp={roundState.mode === 'character_match' || roundState.mode === 'particle_cloze'}
+                under={glossUnder}
+                body={glossBody}
+              />
             ) : null}
-            {roundState ? (
-              <HintPopover
-                roundState={roundState}
-                hintStep={hintStep}
-                hintRevealCount={hintRevealCount}
-                showKeyboardPrompts={showKeyboardPrompts}
-                formattedAnswer={roundState.answerDisplay ?? formatExpectedAnswer(roundState.answer)}
-                open={hintPopoverOpen}
-                triggerRef={hintButtonRef}
-                onClose={() => setHintPopoverOpen(false)}
-                onRevealHint={() => {
-                  if (hintStep < 1) setHintRevealCount((value) => value + 1)
-                  setHintStep(1)
-                  if (roundState.mode === 'handwriting') setHandwritingHintUsed(true)
+          >
+            {focusNode}
+          </RoundAsk>
+        }
+        work={
+          <RoundWork
+            kick={copy.work}
+            kickJp={copy.workJp}
+            /* THE ROUND'S OWN INSTRUCTION BEATS THE TABLE'S. `promptLabel` comes with the card and
+               says what THIS one wants -- "Type the romaji reading to see kanji options" -- where
+               `ROUND_COPY` only knows the mode. Printed only when it is not the kicker again. */
+            note={said ? null : (
+              roundState.promptLabel && roundState.promptLabel.toUpperCase() !== copy.ask
+                ? roundState.promptLabel
+                : copy.note
+            )}
+            slab={slab}
+            after={said ? (
+              <RoundVerdict
+                message={roundFeedback ?? ''}
+                tone={roundFeedbackTone}
+                comboBonus={roundComboBonus}
+                milestoneStreak={roundMilestoneStreak}
+                livesEnabled={livesEnabled}
+                yours={chosen}
+                yoursLabel={formatFeedbackAnswerLabel(roundState.mode)}
+                answer={roundFeedbackTone === 'error' || roundState.mode === 'handwriting'
+                  ? formatExpectedAnswer(correct)
+                  : null}
+                /* the slips already say both, so only a typed or drawn round needs them spelled out */
+                showAnswers={fill !== 'choice'}
+                responseMs={roundResponseMs}
+                nextReviewDays={roundSrsResult?.interval ?? null}
+                example={roundExampleSentence}
+                note={roundState.dictionaryNote
+                  ? { title: roundState.dictionaryNote.title, copy: roundState.dictionaryNote.copy }
+                  : null}
+                saving={roundAdvancePending}
+                saveFailed={roundAdvanceError}
+                savingCopy={FEEDBACK_COPY.REVIEW_SAVING}
+                saveFailedCopy={FEEDBACK_COPY.REVIEW_SAVE_FAILURE}
+              />
+            ) : confidenceCaptureEnabled ? (
+              <RoundConfidence
+                scores={CONFIDENCE_SCORES}
+                labels={CONFIDENCE_LEVEL_LABELS}
+                value={roundConfidenceScore}
+                disabled={isRoundResolving}
+                onSet={setRoundConfidence}
+              />
+            ) : null}
+          >
+            {fill === 'choice' ? (
+              <RoundSlips
+                options={roundState.options}
+                activeIndex={activeChoiceIndex}
+                disabled={isRoundResolving}
+                answer={said ? correct : null}
+                chose={chosen}
+                jp={roundState.mode === 'character_match' || roundState.mode === 'particle_cloze'}
+                onActiveIndexChange={setActiveChoiceIndex}
+                onSelect={(label) => { setChose(label); submitAnswer(label) }}
+              />
+            ) : fill === 'typed' ? (
+              <RoundTyped
+                inputRef={answerInputRef}
+                value={roundInput}
+                placeholder={
+                  roundState.mode === 'romaji_sprint'
+                    ? 'Enter romaji'
+                    : roundState.mode === 'dictation' || roundState.mode === 'conjugation_drill'
+                      ? 'Type here — it becomes kana'
+                      : 'Type the meaning'
+                }
+                disabled={isRoundResolving}
+                onChange={(value) =>
+                  setRoundInput(roundState.mode === 'romaji_sprint' ? sanitizeRomajiInput(value) : value)
+                }
+                onSubmit={(value) => {
+                  const answer = roundState.mode === 'romaji_sprint' ? sanitizeRomajiInput(value) : value
+                  setChose(answer)
+                  submitAnswer(answer)
                 }}
-                onRevealMoreHint={advanceHintStep}
+                wanakanaMode={
+                  roundState.mode === 'conjugation_drill'
+                    ? 'hiragana'
+                    : roundState.mode === 'dictation'
+                      ? (activeScript === 'katakana' ? 'katakana' : 'hiragana')
+                      : undefined
+                }
               />
-            ) : null}
-            {sessionActive ? (
-              <QueuePreview
-                upcomingCards={upcomingCards}
-                open={queueOpen}
-                triggerRef={queueButtonRef}
-                onClose={() => setQueueOpen(false)}
-              />
-            ) : null}
-          </section>
-
-          <div className="hub-deck-badge hub-deck-badge--right minigame-focus-optional" aria-hidden="true">
-            <span>TYPE II · HIGH BIAS</span>
-          </div>
-        </div>
-      </div>
-    </div>
+            ) : (
+              /* THE FOUR THAT BRING A BOARD OF THEIR OWN. Hosted in the cell rather than redrawn —
+                 a canvas, a stroke grid, a drag-to-order strip and a microphone are four screens of
+                 their own and are the next thing to port, not a detail of this one. */
+              <div className="rd-panel">
+                {roundState.mode === 'handwriting' ? (
+                  <HandwritingAnswerPanel
+                    character={roundState.answer}
+                    disabled={isRoundResolving}
+                    externalHintUsed={handwritingHintUsed}
+                    onComplete={onHandwritingOutcome}
+                  />
+                ) : roundState.mode === 'stroke_order' ? (
+                  <StrokeOrderAnswerPanel
+                    activeBlockCards={activeBlockCards}
+                    answerInputRef={answerInputRef}
+                    roundInput={roundInput}
+                    disabled={isRoundResolving}
+                    onInputChange={setRoundInput}
+                    onSelect={(label) => { setChose(label); submitAnswer(label) }}
+                  />
+                ) : roundState.mode === 'sentence_assembly' ? (
+                  <SentenceAssemblyAnswerPanel
+                    options={roundState.options}
+                    disabled={isRoundResolving}
+                    onSubmit={(label) => { setChose(label); submitAnswer(label) }}
+                  />
+                ) : (
+                  <SpeechAnswerPanel
+                    expectedAnswer={roundState.answer}
+                    disabled={isRoundResolving}
+                    onResult={({ transcript }) => { setChose(transcript); submitAnswer(transcript) }}
+                    onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
+                  />
+                )}
+              </div>
+            )}
+          </RoundWork>
+        }
+      />
+      {back}
+    </>
   )
 }

@@ -1,0 +1,456 @@
+/* ==================================================================================================
+   THE ROUND — the screen the app is mostly made of, on the stage every other screen stands on.
+
+   IT WAS THE LAST OF THE OLD LANGUAGE AND THE MOST USED. A character floating in a brown void over a
+   boxed answer panel, inside a cassette deck with a Dolby badge, the run's numbers set in 9px
+   monospace between the title and the card. The front door is beautiful and you look at it for four
+   seconds; this is where the twenty minutes go.
+
+   IT IS A SHEET OF PAPER ON THE DESK, and that is the one real decision in this file. Every other
+   screen in the menu paints type onto the world with a keyline or a ground under it; a round is
+   twenty minutes of reading small type over a lit, MOVING valley, and `legibility.html` is explicit
+   that dark on light is the arrangement that needs neither. So the stage carries one washi plate and
+   you read ink on paper. The world keeps the moat, the crown and the foot band -- where you can
+   still see it and never have to read across it.
+
+   ONE SHEET, SIX FILLS. The design card this is built from (`design-system/components/past-three.html`)
+   makes the same object carry a drill, a crossword, an exam question, a passage, settings and the
+   key sheet. Here it carries the first: a PROMPT cell on the left at 322, a WORK cell on the right,
+   a hairline between them and the action slab bled to the sheet's own floor. Two plates would put a
+   shadow between the character and its answers, and they are one act.
+
+   THE TOKENS AND THE BOARD COME FROM `stage.css` VIA `.mn-open` AND `.mn-frame`, deliberately: this
+   is a menu screen that happens to be a session, not a third styling system. `body.in-flight` fades
+   its heading with everything else's, the frame contract's zoom scales it, and the crown's brand is
+   the menu's own component.
+   ================================================================================================== */
+
+/* ==================================================================================================
+   THE CROWN'S RIGHT-HAND CHIPS ARE THE RUN'S, NOT THE APP'S.
+
+   `.stats` keeps the hour, the day, the streak and the level, and none of those is a fact about the
+   round you are in. This is the same bar in the same corner in the same object -- `.stat-chip`, so
+   there is one chip in this app and not two -- carrying position, streak and accuracy instead. The
+   old screen set those in a row of four look-alike counters between the title and the card, which is
+   the one place on the screen the eye has to cross on every single answer. */
+.rd-run {
+  position: fixed;
+  zoom: var(--lk-u, 1);
+  top: 30px; right: 40px;
+  display: flex; gap: 8px; align-items: flex-start;
+  pointer-events: auto;
+}
+.rd-run .stat-chip { cursor: default; }
+.rd-run b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+  letter-spacing: 0; color: var(--ink);
+}
+.rd-run s { text-decoration: none; color: rgba(20, 17, 13, 0.34); }
+/* the one chip that is allowed to be loud, and only when it is about to matter */
+.rd-run .stat-chip.duty { background: var(--hi); color: #ffd9a1; }
+.rd-run .stat-chip.duty b { color: #fff; }
+.rd-run .stat-chip.duty s { color: rgba(255, 217, 161, 0.6); }
+
+/* ==================================================================================================
+   THE SHEET. Authored 184 rather than 160, and the 24 is arithmetic rather than taste: skew is
+   PAINT, not layout, so a 384-tall plate at -8deg bleeds 0.0598 x 384 = 23px past each of its own
+   edges, and the moat is the one zone of the frame contract where nothing may stand. Measured on
+   the running build at 174 -- which is what the design plate was drawn at -- the sheet painted from
+   x 150, ten pixels into it. At 184 it paints 161 to 1119 inside a 160-to-1120 stage.
+   See `foundations/frame-contract.html`, which has the table this comes out of. */
+.rd-sheet {
+  position: absolute; left: 184px; top: 192px; width: 912px; height: 384px;
+  display: flex;
+  background: var(--washi);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  box-shadow: 8px 11px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+}
+
+/* ---- the prompt cell -------------------------------------------------------------------------- */
+.rd-ask {
+  flex: none; width: 322px;
+  display: flex; flex-direction: column;
+  padding: 18px 22px 0;
+  box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.16);
+}
+/* the exam's stem needs a line length rather than a specimen's width -- the one dimension any of
+   the six fills changes */
+.rd-sheet.wide .rd-ask { width: 392px; }
+.rd-kick {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+  color: var(--hi-deep);
+}
+.rd-kick em {
+  font-style: normal; font-family: var(--jp-go); font-size: 9px; letter-spacing: 0.06em;
+  color: rgba(20, 17, 13, 0.4);
+}
+/* ANSWERED, THE KICKER STOPS ASKING. A question mark over a revealed answer is the screen still
+   pretending not to know. */
+.rd-sheet.said .rd-kick { color: rgba(20, 17, 13, 0.45); }
+
+.rd-focus {
+  flex: 1; min-height: 0;
+  display: grid; place-items: center;
+  padding-bottom: 6px;
+  font-family: var(--jp); font-weight: 400; line-height: 1.18;
+  color: var(--ink); text-align: center;
+  /* long prompts wrap; nothing here ever scrolls */
+  overflow: hidden; word-break: break-word;
+}
+.rd-sheet.wide .rd-focus { place-items: center start; text-align: left; line-height: 1.9; }
+/* the gap a cloze leaves, drawn rather than typed as underscores */
+.rd-focus .rd-gap {
+  display: inline-block; min-width: 62px;
+  box-shadow: inset 0 -3px 0 var(--hi);
+}
+/* the specimen has a reading over it when furigana are on */
+.rd-focus rt { font-family: var(--jp-go); font-size: 0.26em; color: rgba(20, 17, 13, 0.5); }
+
+.rd-src {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 0 0 15px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.45);
+}
+.rd-src i { font-style: normal; color: var(--ink); letter-spacing: 0.1em; }
+
+/* ---- what the prompt cell says once you have answered ------------------------------------------
+   A WRONG ANSWER IS THE ONLY MOMENT IN A DRILL THAT CAN TEACH ANYTHING, and the old screen spent it
+   recolouring the tile you pressed. The character shrinks, the answer opens under it, and the slab
+   changes colour and sentence. Nothing moves and nothing appears over anything. */
+.rd-gloss { padding: 0 0 14px; }
+.rd-gloss b {
+  display: block;
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px; line-height: 1.15;
+  color: var(--hi-deep);
+}
+.rd-gloss b.jp { font-family: var(--jp); font-style: normal; font-size: 30px; }
+.rd-gloss i {
+  display: block; margin-top: 2px;
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55);
+}
+.rd-gloss p {
+  margin-top: 6px;
+  font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px; line-height: 1.5;
+  letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.66);
+  /* four lines and then it stops -- a note that pushes the slab off the sheet is not a note */
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ---- the work cell ----------------------------------------------------------------------------- */
+.rd-work {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  padding: 18px 22px 0;
+}
+.rd-work > .rd-kick { color: rgba(20, 17, 13, 0.45); margin-bottom: 12px; }
+.rd-note {
+  margin: -8px 0 12px;
+  font-family: var(--lat-ui); font-weight: 600; font-size: 10px; letter-spacing: 0.04em;
+  color: rgba(20, 17, 13, 0.42);
+}
+.rd-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* ---- the four slips ---------------------------------------------------------------------------- */
+.rd-slips {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 11px;
+  padding-bottom: 16px;
+}
+/* two options are a pair, not a short grid with a hole in it; five or more go to one column each */
+.rd-slips.two { grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; }
+.rd-slips.many { grid-template-columns: 1fr 1fr; grid-auto-rows: minmax(0, 1fr); }
+.rd-slip {
+  display: flex; align-items: center; gap: 14px;
+  min-width: 0; padding: 0 16px;
+  border: 0; text-align: left; cursor: pointer;
+  background: var(--washi-dim);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  transition: background 0.14s ease, box-shadow 0.14s ease;
+}
+.rd-slip u {
+  text-decoration: none; flex: none;
+  width: 26px; height: 26px; display: grid; place-items: center;
+  background: var(--gold); color: var(--ink);
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
+}
+.rd-slip b {
+  min-width: 0;
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 25px; line-height: 1.1;
+  letter-spacing: 0.01em; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* a slip whose answer is Japanese is set in the Japanese face, upright */
+.rd-slip b.jp { font-family: var(--jp); font-style: normal; font-size: 30px; }
+.rd-slip:disabled { cursor: default; }
+
+.rd-slip.hot {
+  background: var(--washi);
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--hi),
+    inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.rd-slip.hot u { background: var(--hi); color: #ffe9c9; }
+.rd-slip.right {
+  background: var(--washi);
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--gold),
+    inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.rd-slip.wrong b { color: rgba(20, 17, 13, 0.34); text-decoration: line-through 2px var(--hi); }
+.rd-slip.wrong u { background: var(--hi-deep); color: #ffd9a1; }
+/* NOT AN ALPHA ON THE WHOLE THING -- see `legibility.html`. Dim the type, keep the object. */
+.rd-slip.dead b { color: rgba(20, 17, 13, 0.34); }
+.rd-slip.dead u { background: rgba(20, 17, 13, 0.14); color: rgba(20, 17, 13, 0.4); }
+
+/* ---- the typed answer, which is a line ruled on the sheet rather than a box on it --------------- */
+.rd-type { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px;
+  padding-bottom: 16px; }
+.rd-type-row { display: flex; align-items: stretch; gap: 10px; }
+.rd-type input {
+  flex: 1; min-width: 0;
+  background: transparent; border: 0; outline: 0;
+  padding: 6px 2px 8px;
+  box-shadow: inset 0 -2px 0 rgba(20, 17, 13, 0.28);
+  font-family: var(--jp); font-size: 34px; line-height: 1.2; color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.rd-type input::placeholder {
+  font-family: var(--lat-ui); font-weight: 600; font-size: 15px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.3);
+}
+.rd-type input:focus { box-shadow: inset 0 -2px 0 var(--hi); }
+.rd-type input:disabled { color: rgba(20, 17, 13, 0.45); }
+.rd-type-go {
+  flex: none; padding: 0 18px; border: 0; cursor: pointer;
+  background: var(--gold); color: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+}
+.rd-type-go:disabled { background: rgba(20, 17, 13, 0.12); color: rgba(20, 17, 13, 0.4); cursor: default; }
+/* an empty submit knocks rather than doing nothing, the same refusal the menu's slabs make */
+@keyframes rdKnock {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+.rd-type.knock { animation: rdKnock 0.22s ease; }
+
+/* ---- a mode that brings its own board sits in the cell rather than replacing the sheet ---------- */
+.rd-panel {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center;
+  padding-bottom: 14px; overflow: hidden;
+}
+
+/* ---- the slab, bled to the sheet's own floor ---------------------------------------------------- */
+.rd-slab {
+  margin: auto -1px -1px;
+  min-height: 40px; padding: 0 18px;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  border: 0; width: calc(100% + 2px); cursor: default;
+  background: var(--hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px; letter-spacing: 0.18em;
+  color: #ffd9a1; text-align: center;
+}
+/* VERMILION IS WHAT YOU OWE, INK IS WHAT COMES NEXT -- the same law the menu's action slab obeys. */
+.rd-slab.calm { background: var(--ink); color: var(--gold-hi); }
+.rd-slab.go { cursor: pointer; }
+.rd-slab.go:hover { background: var(--hi-deep); }
+.rd-slab.calm.go:hover { background: #2a231a; }
+.rd-slab em {
+  font-style: normal; font-family: var(--jp-go); font-size: 10px; letter-spacing: 0.06em;
+  color: rgba(255, 217, 161, 0.66);
+}
+
+/* ==================================================================================================
+   THE FOOT BAND — the whole run, which is what the contract's foot band is for.
+
+   GROUND, NOT CREAM ON NOTHING. A twenty-mark strip laid over a lit valley is the definition of the
+   case `legibility.html` names: anything small or measured gets a dark ground, a cream hairline and
+   the house shadow. Gold answered, vermilion missed, cream where you are. */
+.rd-foot {
+  position: absolute; left: 184px; top: 598px; width: 912px;
+  display: flex; align-items: center; gap: 15px;
+  padding: 6px 14px 7px;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  background: rgba(10, 9, 6, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.2), 2px 3px 0 rgba(0, 0, 0, 0.45);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+}
+.rd-foot > b { flex: none; color: var(--washi); }
+.rd-foot > s { flex: none; margin-left: auto; text-decoration: none; color: rgba(242, 234, 216, 0.56); }
+.rd-ticks { flex: 1; display: flex; gap: 3px; height: 15px; min-width: 0; }
+.rd-ticks i {
+  flex: 1; min-width: 0;
+  background: rgba(242, 234, 216, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.3);
+}
+.rd-ticks i.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.3); }
+.rd-ticks i.bad { background: var(--hi); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.3); }
+.rd-ticks i.here { background: var(--washi); box-shadow: inset 0 0 0 2px var(--ink); }
+/* past the cap the strip is a texture rather than a count, so the band says the figure instead */
+.rd-foot .rd-fold { flex: 1; text-align: center; color: rgba(242, 234, 216, 0.7); }
+
+/* ==================================================================================================
+   THE THREE STATES THAT ARE NOT A QUESTION — ready, loading, and the run you have just finished.
+   All three are the same sheet, because a screen that changes shape between its own states is two
+   screens sharing a route. */
+.rd-plain {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 22px 30px 0; text-align: center;
+}
+.rd-plain h2 {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px; line-height: 1.1;
+  color: var(--ink); margin: 0;
+}
+.rd-plain p {
+  margin-top: 8px;
+  font-family: var(--lat-ui); font-weight: 600; font-size: 12px; letter-spacing: 0.04em;
+  color: rgba(20, 17, 13, 0.6);
+}
+.rd-plain .rd-err { color: var(--hi-deep); font-weight: 700; letter-spacing: 0.1em; }
+
+/* the finished run: the figure in the prompt cell, what it was made of in the work cell */
+.rd-score {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding-bottom: 8px;
+}
+.rd-score b {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 92px; line-height: 1;
+  color: var(--ink);
+}
+.rd-score b sup {
+  font-size: 30px; vertical-align: super; color: var(--hi-deep);
+}
+.rd-score i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.45);
+}
+.rd-tally { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; padding-bottom: 12px; }
+.rd-tally-row {
+  display: flex; align-items: baseline; gap: 12px; padding: 7px 0 8px;
+  box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
+  font-family: var(--lat-ui); font-weight: 600; font-size: 12px; color: var(--ink);
+}
+.rd-tally-row s {
+  text-decoration: none; margin-left: auto;
+  font-weight: 700; font-size: 9px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45);
+}
+.rd-tally-row b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; }
+.rd-acts { display: flex; gap: 0; margin: auto -1px -1px; }
+.rd-acts .rd-slab { margin: 0; flex: 1; width: auto; }
+.rd-acts .rd-slab + .rd-slab { box-shadow: inset 1px 0 0 rgba(242, 234, 216, 0.22); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-type.knock { animation: none; }
+  .rd-slip { transition: none; }
+}
+
+/* ==================================================================================================
+   THE PROMPT'S OWN TOOLS — the hint bulb and the speaker, which the old prompt card kept and the
+   first cut of this screen dropped for a keycap in the hint row. A key is not an affordance for
+   somebody using a mouse, and `H` and `P` are not written anywhere on the sheet. They live in the
+   kicker's line because that is the line that asks the question they answer. */
+.rd-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.rd-tools button {
+  width: 22px; height: 22px; display: grid; place-items: center;
+  border: 0; cursor: pointer; padding: 0;
+  background: rgba(20, 17, 13, 0.08); color: rgba(20, 17, 13, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rd-tools button:hover:not(:disabled) { background: var(--gold); color: var(--ink); }
+.rd-tools button.is-active { background: var(--hi); color: #ffe9c9; }
+.rd-tools button:disabled { opacity: 0.45; cursor: default; }
+
+/* what a card is tagged as — grammar, N5, a chapter. Quiet, and above the specimen. */
+.rd-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.rd-tags span {
+  padding: 2px 7px 3px;
+  background: rgba(20, 17, 13, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.5);
+}
+
+/* LISTENING HIDES ITS PROMPT UNTIL THE ANSWER IS IN. Not `display: none` — the box keeps its place,
+   so the reveal does not move the cell it is in. */
+.rd-focus.is-hidden { visibility: hidden; }
+
+/* the big listen button that stands in for a prompt you are meant to hear rather than read */
+.rd-listen {
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  border: 0; cursor: pointer; padding: 18px 22px;
+  background: var(--washi-dim); color: var(--ink);
+  box-shadow: 4px 5px 0 rgba(20, 17, 13, 0.24), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+}
+.rd-listen:hover:not(:disabled) { background: var(--washi); }
+.rd-listen:disabled { color: rgba(20, 17, 13, 0.4); cursor: default; }
+
+/* ==================================================================================================
+   THE VERDICT — see `RoundVerdict`. Between the work and the slab, never over either. */
+.rd-verdict {
+  flex: none; margin-top: 10px; padding: 9px 12px 10px;
+  background: rgba(20, 17, 13, 0.05);
+  box-shadow: inset 3px 0 0 rgba(20, 17, 13, 0.3);
+}
+.rd-verdict.is-success { box-shadow: inset 3px 0 0 var(--gold); }
+.rd-verdict.is-error { box-shadow: inset 3px 0 0 var(--hi); }
+.rd-verdict-msg {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; line-height: 1.2;
+  color: var(--ink);
+}
+.rd-verdict-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.5);
+}
+.rd-verdict-meta .cost { color: var(--hi-deep); }
+.rd-verdict-answers {
+  display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 6px;
+  font-family: var(--lat-ui); font-size: 11px; color: var(--ink);
+}
+.rd-verdict-answers s {
+  text-decoration: none; font-weight: 700; font-size: 8.5px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.45);
+}
+.rd-verdict-answers b { font-weight: 700; }
+.rd-verdict-answers .right b { color: var(--hi-deep); }
+.rd-verdict-eg {
+  margin-top: 6px;
+  font-family: var(--lat-ui); font-weight: 600; font-size: 10px; line-height: 1.45;
+  color: rgba(20, 17, 13, 0.62);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.rd-verdict-eg b { font-family: var(--jp); font-weight: 400; font-size: 13px; color: var(--ink); }
+.rd-verdict-save {
+  margin-top: 5px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.45);
+}
+.rd-verdict-save.is-bad { color: var(--hi-deep); }
+
+/* ---- how sure were you, when the setting asks ---------------------------------------------------- */
+.rd-conf {
+  flex: none; display: flex; align-items: center; gap: 6px; padding: 0 0 12px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.45);
+}
+.rd-conf button {
+  border: 0; cursor: pointer; padding: 4px 10px 5px;
+  background: rgba(20, 17, 13, 0.07); color: rgba(20, 17, 13, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.12em;
+}
+.rd-conf button.is-on { background: var(--gold); color: var(--ink); }
+.rd-conf button:disabled { opacity: 0.5; cursor: default; }
+
+/* THE TWO TABS SIT SIDE BY SIDE, AND THE RULE IS SCOPED, which is not fussiness: `.back-tab` is the
+   menu's own class on thirteen other screens, and an unscoped `display: flex` here would relay every
+   one of them the moment a round had ever been on screen. `.rd-round` is on this screen's root for
+   exactly this. The second tab is quieter, because leaving is the ordinary move and starting over
+   throws a run away. */
+.rd-round .back-tab { display: flex; gap: 8px; align-items: flex-start; }
+.rd-round .back-tab button + button { background: rgba(242, 234, 216, 0.7); }
+.rd-round .back-tab button + button .bt-en { color: rgba(20, 17, 13, 0.66); }

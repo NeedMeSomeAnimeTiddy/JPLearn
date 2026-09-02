@@ -30,6 +30,9 @@ const SHEET_PATHS = {
   'stage.css': '../../styles/stage.css',
   'menu.css': './menu.css',
   'lookup.css': '../lookup/lookup.css',
+  /* the round is a menu screen that happens to be a session -- it reads the same tokens off the same
+     stage roots, so it is guarded by the same checks */
+  'round.css': '../round/round.css',
 }
 
 /** each sheet on its own, for the checks that are about one file's own source order */

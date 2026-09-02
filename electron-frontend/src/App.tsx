@@ -2836,6 +2836,11 @@ function App() {
           activeScript={activeScript}
           activeGame={explicitReviewItems ? 'romaji_sprint' : activeGame}
           activeSectionName={activeSectionName}
+          /* WHERE THE ROUND WAS ENTERED FROM, for the heading slab's trail. The menu path does not
+             move when a round starts -- `startBlockDrill` and `launchDrill` both change `view` and
+             leave `menuPath` where it stood -- so it still knows which section's door you came
+             through, and the round's heading can carry the same mark on the same accent. */
+          menuSection={menuPath.section}
           gameLoading={gameLoading}
           gameError={gameError}
           activeRunCardsLength={explicitReviewItems?.length ?? activeRunCards.length}
@@ -2932,10 +2937,17 @@ function App() {
     </>
   )
 
+  /* THE ROUND STANDS ON THE VALLEY TOO, so the shell has to stop painting a ground over it.
+     `mn-showing` is the one line that makes the app's own panel transparent -- see `menu.css` -- and
+     the round is now a menu screen that happens to be a session. */
   return (
-    <main className={view === 'home' ? 'app-shell mn-showing' : 'app-shell'}>
+    <main className={view === 'home' || view === 'minigame' ? 'app-shell mn-showing' : 'app-shell'}>
       <AppTitlebar
-        bare={view === 'home'}
+        /* BARE OVER A MENU SCREEN, AND THE ROUND IS ONE NOW. The full titlebar is 40px of dark
+           chrome at the top of the window, and the heading slab is authored at y 20 of a board that
+           starts at the window's own top edge -- so a round with the ordinary titlebar had the bar
+           drawn straight through its heading. Every other screen on this stage is already bare. */
+        bare={view === 'home' || view === 'minigame'}
         windowDrag={windowDrag}
         shortcutMenuRef={shortcutMenuRef}
         shortcutMenuOpen={shortcutMenuOpen}

@@ -191,8 +191,8 @@ describe('the block a session draws from', () => {
     await revisit('Vowels')
     fireEvent.click(document.querySelector('.dk-here') as Element)
 
-    await waitFor(() => expect(document.querySelector('.game-prompt-main')).not.toBeNull())
-    const shown = document.querySelector('.game-prompt-main')?.textContent?.trim() ?? ''
+    await waitFor(() => expect(document.querySelector('.rd-focus')).not.toBeNull())
+    const shown = document.querySelector('.rd-focus')?.textContent?.trim() ?? ''
     expect(['char0', 'char1']).toContain(shown)
   })
 
