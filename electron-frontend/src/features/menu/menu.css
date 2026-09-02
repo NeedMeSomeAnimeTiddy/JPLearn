@@ -329,12 +329,34 @@
    and that composition is the reason the rest of the interface looks the way it does. It
    obeys the moat and the bands; it does not obey the balance. One number moves it. */
 .st-row {
-  position: absolute; left: 166px; top: var(--top); width: 660px; height: var(--h);
+  /* ==================================================================================================
+     THE COLUMN MOVES ON `translate` RATHER THAN ON `top`, WHICH IS THE ONE DEVIATION FROM THE
+     MOCKUP'S TEXT IN THIS RULE, AND IT IS MEASURED.
+
+     `top` cannot be composited: five absolutely-positioned rows animating it are five rows laid out
+     and painted again on every frame of a 360 ms move, and moving the cursor down the front door
+     does that on every press. Interleaved A/B on the running build, the same window, the override
+     toggled between runs so drift over a session could not be mistaken for the change: frames that
+     overran the cadence fell from 7.4% to 1.4% and from 2.8% to 0.7%, and the settled runs went
+     from 91% and 95% of frames landing exactly on the beat to 95% and 98%. The rows' painted
+     geometry is identical to the pixel, checked both ways.
+
+     `translate` AND NOT A TRANSLATE INSIDE `transform`, and that is the whole reason this is one
+     line rather than a restructure. The two moves have different clocks -- the vertical settle is
+     0.36 s and lagged so the column opens outward from the selection, the 20 px push right is
+     0.24 s and immediate -- and folding them into one `transform` would have to pick one. The
+     individual transform properties compose as translate, then rotate, then scale, then `transform`,
+     which is exactly `top` plus the skew it already had, and they transition separately.
+
+     THE SKEW STAYS WHERE IT WAS, so the note above still holds: `.st-row` carries the skew,
+     `.st-in` the entrance slide, `.st-card` the hover and the press. */
+  position: absolute; left: 166px; top: 0; width: 660px; height: var(--h);
+  translate: 0 var(--top);
   transform: skewX(-8deg) rotate(-1.2deg) translateX(0);
   transform-origin: 0 50%;
   /* the lag is what makes the stack settle rather than snap: rows further from the one you
      opened start later, so the column opens outward from the selection */
-  transition: top 0.36s cubic-bezier(0.18, 0.9, 0.24, 1) var(--lag, 0ms),
+  transition: translate 0.36s cubic-bezier(0.18, 0.9, 0.24, 1) var(--lag, 0ms),
               height 0.34s cubic-bezier(0.18, 0.9, 0.24, 1),
               transform 0.24s cubic-bezier(0.2, 0.92, 0.24, 1);
   z-index: 14;

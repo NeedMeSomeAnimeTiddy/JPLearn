@@ -55,6 +55,18 @@ export interface BurstOptions {
  * Silent and harmless when either element is missing, when motion is reduced, or when the browser
  * has no Web Animations — this is decoration, and decoration that can throw is worse than none.
  */
+/* ...AND THE ONE THING AN OFFSET DOES NOT SEE. `.st-row` is placed down the column by `translate`
+   rather than by `top` -- see the note on the rule in `menu.css`, which is there for the frame
+   budget -- and `offsetTop` is a layout figure, so it reads 0 for every row. Without this the paper
+   came off the top of the board whichever row you pressed. `translate` is a length pair in the same
+   design pixels as the offsets, so it simply adds; `transform` is deliberately NOT read, because
+   what is in there is the skew and the skew is about the row's own shape rather than its place. */
+function slid(el: HTMLElement, axis: 0 | 1): number {
+  const value = getComputedStyle(el).translate
+  if (!value || value === 'none') return 0
+  return Number.parseFloat(value.split(' ')[axis] ?? '0') || 0
+}
+
 export function burstPetals({ target, frame }: BurstOptions): void {
   if (!target || !frame) return
   /* THE SAME GUARD THE MOCKUP OPENS WITH. Fourteen things thrown across the screen is exactly what
@@ -66,12 +78,12 @@ export function burstPetals({ target, frame }: BurstOptions): void {
      `zoom` scales what is PAINTED rather than what is laid out -- so the offsets are already in the
      design pixels this file's numbers are written in, and a rect would need dividing by a scale
      factor that is only readable as a computed style. */
-  let x = target.offsetLeft + target.offsetWidth / 2
-  let y = target.offsetTop + target.offsetHeight / 2
+  let x = target.offsetLeft + target.offsetWidth / 2 + slid(target, 0)
+  let y = target.offsetTop + target.offsetHeight / 2 + slid(target, 1)
   for (let node = target.offsetParent as HTMLElement | null;
     node && node !== frame; node = node.offsetParent as HTMLElement | null) {
-    x += node.offsetLeft
-    y += node.offsetTop
+    x += node.offsetLeft + slid(node, 0)
+    y += node.offsetTop + slid(node, 1)
   }
 
   const layer = document.createElement('div')
