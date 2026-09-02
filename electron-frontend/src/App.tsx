@@ -2190,6 +2190,27 @@ function App() {
     setXpDetailsOpen((open) => !open)
   }, [])
 
+  /* THE THREE CSV EXPORTS, WHICH USED TO LIVE IN THE STUDY OVERVIEW AND NOWHERE ELSE.
+     `exportAnalyticsCSV` had exactly one call site in the renderer -- the Overview's Export Data
+     panel -- so retiring that modal would have taken review history, accuracy trends and the
+     mastery snapshot out of the app entirely. They belong beside the JSON backup and import, which
+     are the same act at a different granularity and already sit in Settings. */
+  const exportCsv = useCallback(async (type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot') => {
+    if (!window.jplearnDesktop.exportAnalyticsCSV) return
+    setBackupLoading(true)
+    setBackupMessage(null)
+    try {
+      const result = await window.jplearnDesktop.exportAnalyticsCSV(type)
+      if (result.cancelled) setBackupMessage(null)
+      else if (result.ok) setBackupMessage(`Saved: ${result.path ?? 'file'}`)
+      else setBackupMessage('Export failed.')
+    } catch {
+      setBackupMessage('Export failed.')
+    } finally {
+      setBackupLoading(false)
+    }
+  }, [])
+
   const exportBackup = useCallback(async () => {
     setBackupLoading(true)
     setBackupMessage(null)
@@ -3122,6 +3143,7 @@ function App() {
           backupLoading={backupLoading}
           backupMessage={backupMessage}
           exportBackup={exportBackup}
+          exportCsv={exportCsv}
           importBackup={importBackup}
           optimizingFSRS={optimizingFSRS}
           optimizeFSRSWeights={optimizeFSRSWeights}

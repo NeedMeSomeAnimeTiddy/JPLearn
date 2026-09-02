@@ -104,9 +104,102 @@ describe('what the ledger is made of', () => {
   })
 
   it('draws an unmeasured figure as an absence rather than a zero', () => {
+    /* all six now, not two: an account with nothing in it has nothing to say on any row, and each
+       says its own absence rather than a shared zero */
     const L = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 25 })
-    expect(L.rows.map((r) => r.value)).toEqual([null, null])
+    expect(L.rows.map((r) => r.value)).toEqual([null, null, null, null, null, null])
     expect(L.rows[0].absent).toMatch(/NOTHING REVIEWED/)
+    expect(new Set(L.rows.map((r) => r.absent)).size).toBe(L.rows.length)
+  })
+
+  /* ================================================================================================
+     THE FOUR ROWS THE STUDY OVERVIEW USED TO OWN.
+
+     `App.tsx` had always handed this screen the whole `StudySummaryPayload` and `buildLedger` read
+     one field of it. `decks`, `mistakes`, `minigame_performance` and `session_history` were in the
+     same object, unread, and a modal on top of the menu drew them instead — which is why four of
+     these five sections cost no plumbing at all to move.
+
+     None of the four had ANY test before this: the strings did not appear anywhere in the repo.
+     ================================================================================================ */
+  describe('the four that moved off the Study Overview', () => {
+    const full = (over: Record<string, unknown> = {}) => ({
+      streak: { current_days: 4, best_days: 9, freezes_available: 2 },
+      decks: [
+        { slug: 'a', name: 'A', total: 100, mastered: 40, due_today: 5, completed_today: 2 },
+        { slug: 'b', name: 'B', total: 60, mastered: 12, due_today: 0, completed_today: 0 },
+      ],
+      mistakes: [
+        { key: 'kanji_n5', attempts: 340, mistakes: 75, error_rate: 22 },
+        { key: 'hiragana', attempts: 120, mistakes: 6, error_rate: 5 },
+      ],
+      minigame_performance: [
+        { minigame: 'romaji_sprint', attempts: 200, correct: 150, accuracy: 75 },
+        { minigame: 'meaning_match', attempts: 100, correct: 90, accuracy: 90 },
+      ],
+      session_history: [
+        { session_id: 's1', started_at_utc: '2026-09-01T10:00:00Z', target_items: 20, reviewed: 24, correct: 21, accuracy: 0.875, goal_met: true },
+        { session_id: 's2', started_at_utc: '2026-08-30T10:00:00Z', target_items: 20, reviewed: 8, correct: 4, accuracy: 0.5, goal_met: false },
+      ],
+      activity: { month: { reviewed: 310, accuracy: 0.74 } },
+      ...over,
+    } as unknown as StudySummaryPayload)
+
+    const built = (over: Record<string, unknown> = {}) =>
+      buildLedger(full(over), xp({}), ledgerYear([], TODAY), { earned: 2, total: 25 })
+
+    it('shows the worst script on the plate, and does not re-sort what the backend ordered', () => {
+      /* the query returns these worst-first; sorting again here is how the plate and the sheet
+         come apart, and the plate would then name a script the sheet does not lead with */
+      const L = built()
+      const row = L.rows.find((r) => r.key === 'mistakes')!
+      expect(row.value).toBe('22')
+      expect(ledgerSheet('mistakes', L)!.lines[0].k).toBe('KANJI N5')
+    })
+
+    it('puts every attempt behind the drills figure, not a mean of the modes', () => {
+      /* 150 + 90 correct of 200 + 100 attempts is 80%, where the mean of 75 and 90 would be 82.5 —
+         the difference is the weight, and a mode you played twice should not count as much as one
+         you played two hundred times */
+      expect(built().rows.find((r) => r.key === 'drills')!.value).toBe('80')
+    })
+
+    it('orders the drills sheet by how much you have played, not by how well', () => {
+      const lines = ledgerSheet('drills', built())!.lines
+      expect(lines[0].k).toBe('ROMAJI SPRINT')
+      expect(lines[0].v).toBe('75% OF 200')
+    })
+
+    it('sets a session that missed its target faint, and keeps the target it was set', () => {
+      const lines = ledgerSheet('sessions', built())!.lines
+      expect(lines[0].off).toBeFalsy()
+      expect(lines[1].off).toBe(true)
+      expect(lines[0].v).toBe('88%')
+    })
+
+    it('sums the decks rather than listing twenty of them', () => {
+      /* the plate holds one figure and the sheet holds four lines; a deck-by-deck breakdown is a
+         screen, and the one that has it is THE PATH */
+      const L = built()
+      expect(L.rows.find((r) => r.key === 'decks')!.value).toBe('52')
+      const lines = ledgerSheet('decks', L)!.lines
+      expect(lines[0].v).toBe('52 OF 160')
+      expect(lines[1].v).toBe('2 DECKS')
+      expect(lines[2].v).toBe('5')
+    })
+
+    it('carries the thirty-day window, which neither the week chip nor the year strip shows', () => {
+      expect(ledgerSheet('decks', built())!.lines[4].v).toBe('310 REVIEWS · 74%')
+    })
+
+    it('says the absence in each sheet rather than drawing an empty list', () => {
+      const L = built({ mistakes: [], minigame_performance: [], session_history: [] })
+      for (const key of ['mistakes', 'drills', 'sessions'] as const) {
+        const lines = ledgerSheet(key, L)!.lines
+        expect(lines).toHaveLength(1)
+        expect(lines[0].off).toBe(true)
+      }
+    })
   })
 
   it('does not carry a rank or a study-time figure at all', () => {

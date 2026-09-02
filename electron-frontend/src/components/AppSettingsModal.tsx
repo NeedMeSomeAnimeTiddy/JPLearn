@@ -43,6 +43,8 @@ export interface AppSettingsModalProps {
   backupLoading: boolean
   backupMessage: string | null
   exportBackup: () => void | Promise<void>
+  /** the three CSV exports, which have no other home in the app */
+  exportCsv: (type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot') => void | Promise<void>
   importBackup: () => void | Promise<void>
   optimizingFSRS: boolean
   optimizeFSRSWeights: () => void | Promise<void>
@@ -76,6 +78,7 @@ export function AppSettingsModal({
   backupLoading,
   backupMessage,
   exportBackup,
+  exportCsv,
   importBackup,
   optimizingFSRS,
   optimizeFSRSWeights,
@@ -894,6 +897,32 @@ export function AppSettingsModal({
                             </button>
                           ) : null}
                         </div>
+                        {/* AND THE SAME DATA AS SPREADSHEETS. The JSON backup above is everything,
+                            for putting back; these three are one table each, for reading elsewhere.
+                            They moved here from the Study Overview, which was their only home. */}
+                        {window.jplearnDesktop.exportAnalyticsCSV ? (
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            {(
+                              [
+                                { type: 'review_history', label: 'Review History' },
+                                { type: 'accuracy_trends', label: 'Accuracy Trends' },
+                                { type: 'mastery_snapshot', label: 'Mastery Snapshot' },
+                              ] as const
+                            ).map(({ type, label }) => (
+                              <button
+                                key={type}
+                                type="button"
+                                className="jlpt-action-btn"
+                                onClick={() => { void exportCsv(type) }}
+                                disabled={backupLoading}
+                                aria-label={`Export ${label} as CSV`}
+                              >
+                                <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                         {backupMessage ? (
                           <p className="status-line">{backupMessage}</p>
                         ) : null}

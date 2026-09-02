@@ -120,12 +120,25 @@ export interface LedgerRow {
   absent: string
 }
 
+/* the lists behind the four rows above, kept WHOLE rather than pre-flattened into lines: the plate
+   shows one figure and the sheet takes it apart, and only the sheet knows how many lines it has
+   room for */
+export interface LedgerDetail {
+  mistakes: NonNullable<StudySummaryPayload>['mistakes']
+  drills: NonNullable<StudySummaryPayload>['minigame_performance']
+  sessions: NonNullable<StudySummaryPayload>['session_history']
+  decks: { count: number; total: number; mastered: number; due: number; done: number }
+  /** the thirty-day window, which the year strip cannot show and the week chip does not cover */
+  month: NonNullable<StudySummaryPayload>['activity']['month'] | null
+}
+
 export interface Ledger {
   streak: { now: number; best: number; freezes: number }
   year: LedgerYear
   rows: LedgerRow[]
   level: { level: number; xpIn: number; xpOf: number } | null
   badges: { earned: number; total: number }
+  detail: LedgerDetail
 }
 
 export function buildLedger(
@@ -135,6 +148,30 @@ export function buildLedger(
   badges: { earned: number; total: number },
 ): Ledger {
   const streak = summary?.streak
+
+  /* THE FOUR DERIVATIONS THE ROWS ABOVE NEED, and each is a summary of a list rather than a list:
+     the plate has room for one figure, and the sheet behind it has the rows. */
+  const mistakes = summary?.mistakes ?? []
+  /* the backend already orders these by error rate descending, so the worst is simply the first --
+     re-sorting here is how the plate and the sheet come apart */
+  const worst = mistakes[0] ?? null
+  const drills = summary?.minigame_performance ?? []
+  const drillTried = drills.reduce((a, d) => a + d.attempts, 0)
+  const drillAcc = drillTried
+    ? Math.round((drills.reduce((a, d) => a + d.correct, 0) / drillTried) * 100)
+    : null
+  const sessions = summary?.session_history ?? []
+  const decks = summary?.decks ?? []
+  const deckTotals = decks.reduce(
+    (a, d) => ({
+      total: a.total + d.total,
+      mastered: a.mastered + d.mastered,
+      due: a.due + d.due_today,
+      done: a.done + d.completed_today,
+    }),
+    { total: 0, mastered: 0, due: 0, done: 0 },
+  )
+
   return {
     streak: {
       now: streak?.current_days ?? 0,
@@ -153,6 +190,35 @@ export function buildLedger(
         value: year.reviews ? year.reviews.toLocaleString() : null, unit: '',
         absent: 'NONE YET',
       },
+      /* ==========================================================================================
+         AND FOUR THAT THE STUDY OVERVIEW USED TO OWN.
+
+         None of this is new data. `App.tsx` has always handed the WHOLE `StudySummaryPayload` to
+         this screen and `buildLedger` read one field of it -- `summary.streak` -- while `decks`,
+         `mistakes`, `minigame_performance` and `session_history` sat in the same object, unread,
+         and were drawn instead by a modal on top of the menu that said many of the same things a
+         second time. Four rows and four sheets, and not one new bridge call.
+         ========================================================================================== */
+      {
+        key: 'mistakes', en: 'WEAK SPOTS', jp: '弱点',
+        value: worst ? String(worst.error_rate) : null, unit: '%',
+        absent: 'NOTHING GOT WRONG YET',
+      },
+      {
+        key: 'drills', en: 'DRILLS', jp: '訓練',
+        value: drillAcc === null ? null : String(drillAcc), unit: '%',
+        absent: 'NONE PLAYED',
+      },
+      {
+        key: 'sessions', en: 'SESSIONS', jp: '稽古',
+        value: sessions.length ? String(sessions.length) : null, unit: '',
+        absent: 'NONE FINISHED',
+      },
+      {
+        key: 'decks', en: 'MASTERED', jp: '習得',
+        value: deckTotals.total ? n(deckTotals.mastered) : null, unit: '',
+        absent: 'NO DECKS LOADED',
+      },
     ],
     /* THE XP FIGURE, AND THE ONE ARITHMETIC TRAP IN IT. `xp_for_current_level` is the SIZE of this
        level and `xp_to_next_level` is what is left of it, so what you have done inside it is the
@@ -166,6 +232,11 @@ export function buildLedger(
       }
       : null,
     badges,
+    detail: {
+      mistakes, drills, sessions,
+      decks: { count: decks.length, ...deckTotals },
+      month: summary?.activity?.month ?? null,
+    },
   }
 }
 
@@ -195,7 +266,10 @@ export function buildLedger(
    window this file already builds.
    ================================================================================================== */
 
-export type SheetKey = 'streak' | 'accuracy' | 'reviews' | 'year' | 'level'
+export type SheetKey =
+  | 'streak' | 'accuracy' | 'reviews' | 'year' | 'level'
+  /* the four the Study Overview used to draw as its own panels — see `buildLedger` */
+  | 'mistakes' | 'drills' | 'sessions' | 'decks'
 
 export interface SheetLine {
   k: string
@@ -236,6 +310,15 @@ export function yearShape(year: LedgerYear): {
 }
 
 const n = (v: number) => v.toLocaleString()
+
+/* "3 SEP" — the sheet's lines are a fixed-width column and a full date does not fit beside a
+   review count. The year is left off deliberately: the history is the last eight sittings. */
+const sessionDay = (iso: string): string => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : `${d.getDate()} ${d.toLocaleString('en', { month: 'short' }).toUpperCase()}`
+}
 
 /**
  * What is behind one plate.
@@ -285,6 +368,73 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
       ],
       note: 'THE LAST LINE IS A MEAN OVER THE DAYS YOU TURNED UP, NOT OVER THE YEAR — DIVIDING BY '
         + '364 WOULD MEASURE HOW OFTEN YOU STUDY RATHER THAN HOW MUCH.',
+    }
+  }
+  /* ============================================================================================
+     THE FOUR SHEETS THAT USED TO BE PANELS IN THE STUDY OVERVIEW.
+     Same figures, same derivations, read off the same `summary` — drawn here because this screen
+     is already the one whose subject is "what have I actually done".
+     ============================================================================================ */
+  if (key === 'mistakes') {
+    const rows = L.detail.mistakes
+    return {
+      jp: '弱点', en: 'WEAK SPOTS', strip: false, acc: false,
+      lines: rows.length
+        ? rows.slice(0, 6).map((r) => ({
+          k: r.key.replace(/_/g, ' ').toUpperCase(),
+          v: `${r.error_rate}% OF ${n(r.attempts)}`,
+        }))
+        : [{ k: 'NOTHING GOT WRONG YET', v: '—', off: true }],
+      note: 'GROUPED BY SCRIPT RATHER THAN BY DECK, AND COUNTED OVER EVERYTHING YOU HAVE EVER '
+        + 'GRADED — NOT A WINDOW. WORST FIRST, IN THE ORDER THE BACKEND RETURNS THEM.',
+    }
+  }
+  if (key === 'drills') {
+    const rows = [...L.detail.drills].sort((a, b) => b.attempts - a.attempts)
+    return {
+      jp: '訓練', en: 'DRILLS', strip: false, acc: false,
+      lines: rows.length
+        ? rows.slice(0, 6).map((r) => ({
+          k: r.minigame.replace(/_/g, ' ').toUpperCase(),
+          v: `${r.accuracy}% OF ${n(r.attempts)}`,
+        }))
+        : [{ k: 'NONE PLAYED YET', v: '—', off: true }],
+      note: rows.length > 6
+        ? `THE SIX YOU HAVE PLAYED MOST, OF ${n(rows.length)}. THE FIGURE ON THE PLATE IS EVERY `
+          + 'ATTEMPT ACROSS ALL OF THEM, NOT A MEAN OF THESE SIX.'
+        : 'THE FIGURE ON THE PLATE IS EVERY ATTEMPT ACROSS ALL OF THEM, NOT A MEAN OF THESE ROWS.',
+    }
+  }
+  if (key === 'sessions') {
+    const rows = L.detail.sessions
+    return {
+      jp: '稽古', en: 'SESSIONS', strip: false, acc: false,
+      lines: rows.length
+        ? rows.slice(0, 6).map((r) => ({
+          k: `${sessionDay(r.started_at_utc)} · ${n(r.reviewed)} REVIEWS`,
+          v: `${Math.round(r.accuracy * 100)}%`,
+          off: !r.goal_met,
+        }))
+        : [{ k: 'NONE FINISHED YET', v: '—', off: true }],
+      note: 'A ROW SET FAINT IS ONE THAT DID NOT REACH ITS TARGET. THE TARGET IS THE ONE THAT WAS '
+        + 'SET WHEN THAT SESSION STARTED, NOT THE ONE IN FORCE NOW.',
+    }
+  }
+  if (key === 'decks') {
+    const d = L.detail.decks
+    const m = L.detail.month
+    return {
+      jp: '習得', en: 'MASTERED', strip: false, acc: false,
+      lines: [
+        { k: 'CARDS MASTERED', v: `${n(d.mastered)} OF ${n(d.total)}`, off: d.total === 0 },
+        { k: 'ACROSS', v: `${n(d.count)} DECK${d.count === 1 ? '' : 'S'}`, off: d.count === 0 },
+        { k: 'DUE TODAY', v: n(d.due), off: d.due === 0 },
+        { k: 'DONE TODAY', v: n(d.done), off: d.done === 0 },
+        { k: 'LAST 30 DAYS', v: m ? `${n(m.reviewed)} REVIEWS · ${Math.round(m.accuracy * 100)}%` : '—',
+          off: !m || m.reviewed === 0 },
+      ],
+      note: 'MASTERED IS WHAT THE SCHEDULER CALLS MASTERED — THREE CORRECT REVIEWS AND A TWENTY-ONE DAY '
+        + 'INTERVAL — WHICH IS A DIFFERENT FIGURE FROM THE PER-BLOCK PERCENTAGES ON THE PATH.',
     }
   }
   if (key === 'year') {

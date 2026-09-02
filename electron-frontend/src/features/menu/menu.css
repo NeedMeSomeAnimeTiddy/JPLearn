@@ -2503,26 +2503,39 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-row:hover { background: rgba(20, 17, 13, 0.05); }
 .lg-plate:active, .lg-row:active { transform: skewX(-8deg) rotate(-1.2deg) translate(2px, 3px); }
 
-.lg-row { position: relative; flex: 1; display: flex; align-items: center;
-  justify-content: space-between; padding: 0 20px;
+.lg-row { position: relative; flex: 1; min-height: 0; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; padding: 0 18px;
   box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.22); background: none; }
 
 .lg-row:last-child { box-shadow: none; }
 
 .lg-row::after { left: 0; top: 0; right: 0; bottom: 0; }
 
-.lg-rowlab { display: flex; flex-direction: column; gap: 4px; }
+/* ==================================================================================================
+   SIX ROWS IN THE PLATE THAT WAS DRAWN FOR TWO.
 
-.lg-rowlab b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.52); white-space: nowrap; }
+   `.lg-rest` is 210px with the year band immediately under it, so it cannot grow -- and four more
+   rows arrived when the Study Overview's panels moved onto this screen. At the old proportions the
+   six needed 348px: three and a half fitted and DRILLS was cut through the middle.
+
+   The label was two stacked lines and the figure was 50px, which is a plate that says two things
+   loudly. Six things cannot all be loud. On one baseline the label costs 16px instead of 33 and the
+   figure reads at 26 -- still the largest thing in the row, still the thing the eye lands on, but a
+   list rather than a pair of headlines. THIS IS A DELIBERATE CHANGE TO THE PLATE'S CHARACTER and it
+   is the only one the arithmetic allows without moving the year band. */
+.lg-rowlab { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+
+.lg-rowlab b { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.52); white-space: nowrap; }
 
 .lg-rowlab i { font-style: normal; font-family: var(--jp-go); font-weight: 700;
-  font-size: 15px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.72); }
+  font-size: 12px; letter-spacing: 0.08em; color: rgba(20, 17, 13, 0.72);
+  white-space: nowrap; }
 
 .lg-figure { font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 50px; line-height: 1; color: var(--ink); }
+  font-size: 26px; line-height: 1; color: var(--ink); }
 
-.lg-figure em { font-style: inherit; font-size: 22px; }
+.lg-figure em { font-style: inherit; font-size: 13px; }
 
 .lg-rank { display: flex; align-items: baseline; gap: 10px; }
 
