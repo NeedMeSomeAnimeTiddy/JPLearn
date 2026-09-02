@@ -6,7 +6,7 @@ import { baseDesktopApi } from '../test-fixtures/desktopApi'
 // The titlebar was extracted from App.tsx in issue #69. The prop passing itself is
 // mechanically generated and checked by tsc, but the handlers that were lifted out of
 // inline JSX closures are hand-written bodies tsc cannot verify. The shortcut-menu
-// tests in App.minigame.test.tsx already drive jumpToScriptHub* and toggleAllMapsFlyout;
+// tests in App.minigame.test.tsx already drive openDeckScreen/launchDrill and the maps tree;
 // these cover the rest.
 
 vi.mock('react-type-animation', () => ({

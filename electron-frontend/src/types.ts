@@ -124,7 +124,7 @@ export type FeedbackTone = 'success' | 'error' | null
 
 export type NavDirection = 'forward' | 'back'
 
-export type AppView = 'home' | 'script_hub' | 'minigame' | 'jlpt_prep' | 'passage_hub' | 'daily_games'
+export type AppView = 'home' | 'minigame' | 'jlpt_prep' | 'passage_hub' | 'daily_games'
 
 export interface RoundOption {
   id: string

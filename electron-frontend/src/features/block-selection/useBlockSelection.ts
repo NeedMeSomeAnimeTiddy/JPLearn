@@ -3,41 +3,37 @@ import { useCallback, useMemo, useState } from 'react'
 import { loadSessionPrefs, mergeSessionPrefs } from '../../lib/appStorage'
 import type { BlockInfo, ScriptDeck } from '../../types'
 import type { BlockSelectionBySlug } from './types'
-import {
-  defaultSelection,
-  normalizeSelection,
-  selectAllUnlocked,
-  toggleBlock,
-  unionBlockCards,
-} from './utils'
+import { defaultSelection, normalizeSelection, unionBlockCards } from './utils'
 
 export interface BlockSelection {
   /** Selected block indices, ascending, already filtered to unlocked blocks. */
   selected: number[]
   /** The cards a session should draw from, given the selection. */
   cards: ScriptDeck['cards']
-  isSelected: (index: number) => boolean
-  toggle: (index: number) => void
   /**
    * Study exactly one block, replacing whatever was selected.
    *
-   * The verb the hook was missing: it could add, add-all and clear, but not *set*.
-   * `clear()` then `toggle()` is not the same thing — both read `selected`, which is
-   * memoised from state, so the second call in a tick sees the pre-clear selection.
-   * The menu's deck screen hands a specific block over and needs that to be the one.
+   * IT USED TO BE THE ODD ONE OUT and now it is the only one. The hook could add, add-all and
+   * clear but not *set*, because it was built for a strip of chips you toggled; the menu's deck
+   * screen hands ONE block over and needs that to be the one. `clear()` then `toggle()` is not
+   * the same thing — both read `selected`, which is memoised from state, so the second call in a
+   * tick sees the pre-clear selection.
    */
   select: (index: number) => void
-  selectAll: () => void
   /** Clear the selection, which studies the whole deck. */
   clear: () => void
 }
 
 /**
- * Which blocks of the active deck are being studied.
+ * Which block of the active deck is being studied.
  *
- * Replaces the single `activeBlockIndex` that `App.tsx` used to hold: kana blocks
- * are five cards, too thin for most minigames, and issue #78 gave vocabulary and
- * kanji blocks for the first time.
+ * ONE AT A TIME AGAIN, AND THE STORAGE IS STILL A LIST. Issue #78 made this a multi-select over
+ * the script hub's tracklist strip, because kana blocks are five cards and that is too thin for
+ * most minigames. The hub is gone and the deck screen offers one block — which is what the chain
+ * says anyway: `compute_unlocked_count` stops at the first block under the gate, so exactly one is
+ * open and everything before it is revisitable one at a time. `blockSelectionV2` stays an array
+ * per deck, and `unionBlockCards` stays a union, because both are on disk in every existing
+ * install; what went is the interface that could put more than one thing in it.
  *
  * The selection is *derived*, not synchronised by an effect — a deck with no
  * stored choice reads as the furthest unlocked block, which is exactly where
@@ -88,27 +84,12 @@ export function useBlockSelection(
     [deckCards, blocks, selected],
   )
 
-  const isSelected = useCallback(
-    (index: number) => selected.includes(index),
-    [selected],
-  )
-
-  const toggle = useCallback(
-    (index: number) => commit(normalizeSelection(toggleBlock(selected, index), blocks)),
-    [commit, selected, blocks],
-  )
-
   const select = useCallback(
     (index: number) => commit(normalizeSelection([index], blocks)),
     [commit, blocks],
   )
 
-  const selectAll = useCallback(
-    () => commit(selectAllUnlocked(blocks)),
-    [commit, blocks],
-  )
-
   const clear = useCallback(() => commit([]), [commit])
 
-  return { selected, cards, isSelected, toggle, select, selectAll, clear }
+  return { selected, cards, select, clear }
 }

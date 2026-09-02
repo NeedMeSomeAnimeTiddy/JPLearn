@@ -1,9 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { VocabFeedPanel } from './components/VocabFeedPanel'
 import { isFedDeck, useVocabFeed } from './useVocabFeed'
-import type { VocabFeed } from './types'
 
 const WORD = {
   card_id: 1, word: '二十日', reading: 'hatsuka', meaning: 'twenty days',
@@ -89,33 +87,9 @@ describe('useVocabFeed', () => {
   })
 })
 
-describe('VocabFeedPanel', () => {
-  const base: VocabFeed = {
-    words: [WORD], budget: 10, total: 744, readable: 291, knownKanji: 67, started: 3,
-    loading: false, error: null, setBudget: () => {},
-  }
-
-  it('shows the word with its denominator', () => {
-    render(<VocabFeedPanel feed={base} />)
-    expect(screen.getByText('二十日')).toBeTruthy()
-    expect(screen.getByText(/291 of 744 readable/)).toBeTruthy()
-    expect(screen.getByText(/67 kanji known/)).toBeTruthy()
-  })
-
-  it('a budget of zero reads as a choice, not an empty state', () => {
-    render(<VocabFeedPanel feed={{ ...base, words: [], budget: 0 }} />)
-    expect(screen.getByText(/reviews only/i)).toBeTruthy()
-  })
-
-  it('a finished level says so instead', () => {
-    render(<VocabFeedPanel feed={{ ...base, words: [], started: 744 }} />)
-    expect(screen.getByText(/every word in this level/i)).toBeTruthy()
-  })
-
-  it('changing the budget goes through the hook rather than the list', () => {
-    const setBudget = vi.fn()
-    render(<VocabFeedPanel feed={{ ...base, setBudget }} />)
-    screen.getByRole('button', { name: /20 new words a day/i }).click()
-    expect(setBudget).toHaveBeenCalledWith(20)
-  })
-})
+/* `VocabFeedPanel` HAD FOUR TESTS HERE AND IS GONE. It was the script hub's rail for the five
+   vocabulary levels -- the deck-shaped panel that drew today's words -- and the hub was its only
+   consumer. The menu's own TODAY screen draws the feed now, with its own plates, and every claim
+   the panel's tests made is made there instead: `DeckFeed.test.tsx` covers the word and its
+   denominators, a budget of zero reading as a choice rather than as an empty queue, and the budget
+   steps going through the hook. What is left in this file is the hook, which both screens share. */

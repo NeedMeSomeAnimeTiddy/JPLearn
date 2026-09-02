@@ -12,7 +12,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { openDeck } from './test-entry'
+import { openGame } from './test-entry'
+import { PREFS_STORAGE_KEY } from './lib/appStorage'
 import App from './App'
 import { POINT_COMBO_THRESHOLDS } from './constants'
 
@@ -130,14 +131,10 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-// The cassette carousel needs two clicks: the first focuses the cassette, the
+// KEPT AS A COMMENT ONLY WHERE IT STILL EXPLAINS SOMETHING: the cassette carousel needed two clicks, the
 // second launches it. Mirrors the helpers in App.minigame.test.tsx.
 
-function clickTilePrimaryAction(tileButton: HTMLElement): void {
-  const cassette = (tileButton.closest('.cassette') ?? tileButton) as HTMLElement
-  fireEvent.click(cassette)
-  fireEvent.click(cassette)
-}
+
 
 /** Reads the "<correct>/<rounds>" HUD stat. */
 function readScore(): { correct: number; rounds: number } | null {
@@ -206,10 +203,7 @@ async function answerRound(correct: boolean): Promise<void> {
 
 async function startMeaningMatch(): Promise<void> {
   render(<App />)
-  await screen.findByRole('button', { name: /open shortcuts/i })
-  openDeck('Hiragana')
-  const tiles = await screen.findAllByRole('button', { name: /Meaning Match/i })
-  clickTilePrimaryAction(tiles[0])
+  await openGame('Hiragana', 'Meaning Match')
   await waitFor(() => expect(readScore()).not.toBeNull())
 }
 
@@ -258,13 +252,12 @@ describe('session scoring state machine', () => {
 
 describe('lives mode', () => {
   async function startWithLives(): Promise<void> {
+    /* LIVES IS A PERSISTED PREFERENCE, and its switch moved with the other three from the script
+       hub to the drills road (`L3.test.tsx` pins the switch itself). This suite is about what a
+       run does with hearts, so it starts from the pref rather than walking two screens to set it. */
+    window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ livesEnabled: true }))
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Hiragana')
-    fireEvent.click(await screen.findByRole('button', { name: /lives mode off/i }))
-    await screen.findByRole('button', { name: /lives mode on/i })
-    const tiles = await screen.findAllByRole('button', { name: /Meaning Match/i })
-    clickTilePrimaryAction(tiles[0])
+    await openGame('Hiragana', 'Meaning Match')
     await waitFor(() => expect(readScore()).not.toBeNull())
   }
 

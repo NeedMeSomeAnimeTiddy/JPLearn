@@ -17,18 +17,6 @@ export function normalizeSelection(selected: BlockIndices, blocks: BlockInfo[]):
   return [...new Set(selected)].filter((index) => selectable.has(index)).sort((a, b) => a - b)
 }
 
-/** Add a block to the selection, or remove it if it is already there. */
-export function toggleBlock(selected: BlockIndices, index: number): number[] {
-  return selected.includes(index)
-    ? selected.filter((entry) => entry !== index)
-    : [...selected, index].sort((a, b) => a - b)
-}
-
-/** Every block the learner is allowed to pick. */
-export function selectAllUnlocked(blocks: BlockInfo[]): number[] {
-  return blocks.filter((block) => block.unlocked).map((block) => block.index)
-}
-
 /**
  * The default selection for a deck the learner has no stored choice for.
  *
@@ -67,16 +55,4 @@ export function unionBlockCards(
 
   const matching = deckCards.filter((card) => wanted.has(card.id))
   return matching.length > 0 ? matching : deckCards
-}
-
-/** Summarise a selection for a label, e.g. `"3 of 12 blocks · 47 cards"`. */
-export function describeSelection(
-  blocks: BlockInfo[],
-  selected: BlockIndices,
-  cardCount: number,
-): string {
-  if (blocks.length === 0) return ''
-  const unlocked = blocks.filter((block) => block.unlocked).length
-  const count = selected.length === 0 ? unlocked : selected.length
-  return `${count}/${unlocked} selected · ${cardCount} cards`
 }

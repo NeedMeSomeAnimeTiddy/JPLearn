@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { MinigameKey, ScriptKey } from '../../../types'
+import type { MinigameKey, MinigameStats, ScriptKey } from '../../../types'
 import { SESSION_LENGTH_PRESETS } from '../../../constants'
 import {
   CHAPTER_NUM, TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, groupCopy,
@@ -42,6 +42,10 @@ export interface DrillsProps {
      nothing at all, so retiring the hub without them would leave seventeen modes that all look
      runnable and four that quietly fail. Keyed by mode; absent means it can run. */
   lockReasons: Partial<Record<MinigameKey, string>>
+  /* WHAT YOU HAVE DONE WITH EACH MODE ON THIS DECK. `minigameStats` is written after every round
+     and the script hub's cassettes were the only thing that ever read it -- so without this the
+     figure would still be kept and never shown again. */
+  stats: Record<MinigameKey, MinigameStats>
   onDeck: (deck: ScriptKey) => void
   onStart: (deck: ScriptKey, mode: MinigameKey) => void
   onUp: () => void
@@ -61,7 +65,7 @@ export interface DrillsProps {
 const STRIP_MID = 474
 
 export function Drills({
-  deck, slug, session, lockReasons, onDeck, onStart, onUp,
+  deck, slug, session, lockReasons, stats, onDeck, onStart, onUp,
 }: DrillsProps) {
   const entered = useEntered()
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -75,6 +79,8 @@ export function Drills({
   const layout = railLayout(modes, deckKey, sel)
   const here = modes[sel]
   const shut = here ? lockReasons[here.key] ?? null : null
+  const record = here ? stats[here.key] : undefined
+  const played = record && record.attempted > 0
 
   /* the three lengths answer to their number and the three switches to their letter, both printed
      on the chip -- the same rule level one's rows and the study screens' level row follow */
@@ -265,6 +271,19 @@ export function Drills({
                 <span className="dr-hglyph">{copy.glyph}</span>
                 <span className="dr-hen" style={{ fontSize: `${nameSize}px` }}>{here.title}</span>
                 <span className="dr-hd">{here.description}</span>
+                {/* THE RECORD, WHICH IS THE ONE THING A CATALOGUE CANNOT TELL YOU. Not played is
+                    drawn as not played rather than as nought per cent -- a mode you have never
+                    run is not a mode you are bad at. */}
+                <span className="dr-rec">
+                  {played ? (
+                    <>
+                      <b>{Math.round((record.correct / record.attempted) * 100)}%</b>
+                      <i>RIGHT</i>
+                      <b>{record.bestStreak}</b>
+                      <i>BEST RUN</i>
+                    </>
+                  ) : <i>NOT PLAYED ON THIS DECK</i>}
+                </span>
                 {/* WHICH DECKS OFFER IT, which is the map read the other way and the one fact a
                     learner picking a drill cannot get anywhere else. */}
                 <span className="dr-cells">

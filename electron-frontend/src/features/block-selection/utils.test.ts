@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BlockInfo, ScriptDeck } from '../../types'
-import {
-  defaultSelection,
-  describeSelection,
-  normalizeSelection,
-  selectAllUnlocked,
-  toggleBlock,
-  unionBlockCards,
-} from './utils'
+import { defaultSelection, normalizeSelection, unionBlockCards } from './utils'
 
 function block(index: number, cardIds: number[], unlocked = true): BlockInfo {
   return {
@@ -51,26 +44,6 @@ describe('normalizeSelection', () => {
   })
 })
 
-describe('toggleBlock', () => {
-  it('adds a block and keeps the order ascending', () => {
-    expect(toggleBlock([2], 0)).toEqual([0, 2])
-  })
-
-  it('removes a block that is already selected', () => {
-    expect(toggleBlock([0, 1], 1)).toEqual([0])
-  })
-
-  it('can empty the selection', () => {
-    expect(toggleBlock([0], 0)).toEqual([])
-  })
-})
-
-describe('selectAllUnlocked', () => {
-  it('never selects a locked block', () => {
-    expect(selectAllUnlocked(BLOCKS)).toEqual([0, 1])
-  })
-})
-
 describe('defaultSelection', () => {
   it('is the furthest unlocked block, matching pre-#78 single-select', () => {
     expect(defaultSelection(BLOCKS)).toEqual([1])
@@ -109,16 +82,3 @@ describe('unionBlockCards', () => {
   })
 })
 
-describe('describeSelection', () => {
-  it('counts against unlocked blocks only', () => {
-    expect(describeSelection(BLOCKS, [0], 3)).toBe('1/2 selected · 3 cards')
-  })
-
-  it('reads an empty selection as everything, matching the fallback', () => {
-    expect(describeSelection(BLOCKS, [], 7)).toBe('2/2 selected · 7 cards')
-  })
-
-  it('is blank when there are no blocks', () => {
-    expect(describeSelection([], [], 0)).toBe('')
-  })
-})

@@ -29,8 +29,10 @@ export interface AppTitlebarProps {
   jumpToPassageHub: () => void
   openDailyGames: () => void
   toggleAllMapsFlyout: () => void
-  jumpToScriptHub: (script: ScriptKey) => void
-  jumpToScriptHubMinigame: (script: ScriptKey, minigame: MinigameKey) => void
+  /** put me in front of this deck: the menu's own block chain, or its daily feed */
+  openDeckScreen: (script: ScriptKey) => void
+  /** run this drill on this deck, with no screen in between */
+  launchDrill: (script: ScriptKey, minigame: MinigameKey) => void
   toggleDevToolsFlyout: () => void
   toggleDevChecksFlyout: () => void
   openSettingsFromMenu: () => void
@@ -92,8 +94,8 @@ export function AppTitlebar({
   jumpToPassageHub,
   openDailyGames,
   toggleAllMapsFlyout,
-  jumpToScriptHub,
-  jumpToScriptHubMinigame,
+  openDeckScreen,
+  launchDrill,
   toggleDevToolsFlyout,
   toggleDevChecksFlyout,
   openSettingsFromMenu,
@@ -234,7 +236,7 @@ export function AppTitlebar({
                                   type="button"
                                   role="menuitem"
                                   className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                                  onClick={() => jumpToScriptHub(script)}
+                                  onClick={() => openDeckScreen(script)}
                                 >
                                   <span className="titlebar-shortcut-glyph" aria-hidden="true">↗</span>
                                   Open Map
@@ -247,7 +249,7 @@ export function AppTitlebar({
                                       type="button"
                                       role="menuitem"
                                       className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                                      onClick={() => jumpToScriptHubMinigame(script, gameKey)}
+                                      onClick={() => launchDrill(script, gameKey)}
                                     >
                                       <MinigameIcon game={gameKey} />
                                       {gameTitle}

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { openDeck } from './test-entry'
+import { openGame } from './test-entry'
+import { PREFS_STORAGE_KEY } from './lib/appStorage'
 import App from './App'
 
 // Mock TypeAnimation to render text immediately instead of character-by-character.
@@ -56,20 +57,48 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-function clickTilePrimaryAction(tileButton: HTMLElement): void {
-  // Cassette carousel: first click focuses/selects the cassette, second click
-  // launches the now-focused minigame.
-  const cassette = (tileButton.closest('.cassette') ?? tileButton) as HTMLElement
-  fireEvent.click(cassette)
-  fireEvent.click(cassette)
+/* THE TWO SURFACES THAT REPLACED THE SCRIPT HUB, for the tests that were about the hub itself
+   rather than about a round. `openGame` is one drill on one deck through the titlebar's map tree;
+   these two reach the other half -- the list of what a deck offers, and the road where a mode that
+   cannot run says so. */
+
+/** Every mode the titlebar's map tree lists under one deck. */
+async function deckModes(label: string): Promise<string[]> {
+  fireEvent.click(await screen.findByRole('button', { name: /open shortcuts/i }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: /^All Maps/ }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${label} Map`, 'i') }))
+  const tree = await screen.findByRole('group', { name: new RegExp(`^${label} minigames`, 'i') })
+  return Array.from(tree.querySelectorAll('[role="menuitem"]'))
+    .map((item) => item.textContent?.trim() ?? '')
+    .filter((name) => name !== 'Open Map')
+}
+
+/** PRACTICE -> DRILLS: the road, which is where a mode is chosen and where a lock is drawn. */
+async function openDrillsRoad(): Promise<void> {
+  const root = () => document.querySelector('.mn-open') as Element
+  await screen.findByRole('button', { name: /open shortcuts/i })
+  await waitFor(() => expect(root()).not.toBeNull())
+  fireEvent.keyDown(root(), { key: 'ArrowDown' })
+  fireEvent.keyDown(root(), { key: 'ArrowDown' })
+  fireEvent.keyDown(root(), { key: 'Enter' })
+  await waitFor(() => expect(document.querySelectorAll('.pr-lane')).toHaveLength(3))
+  fireEvent.click(document.querySelectorAll('.pr-lane')[1])
+  await waitFor(() => expect(document.querySelector('.dr-strip')).not.toBeNull())
+}
+
+/** Walk the road to a named mode. Bounded: seventeen is the whole catalogue. */
+function selectDrill(title: string): void {
+  for (let step = 0; step < 20; step++) {
+    if (document.querySelector('.dr-hen')?.textContent?.trim() === title) return
+    fireEvent.keyDown(document.querySelector('.mn-open') as Element, { key: 'ArrowRight' })
+  }
+  throw new Error(`The road never reached ${title}. It stopped on `
+    + `${document.querySelector('.dr-hen')?.textContent}`)
 }
 
 async function openHandwritingRound(): Promise<void> {
   render(<App />)
-  await screen.findByRole('button', { name: /open shortcuts/i })
-  openDeck('Hiragana')
-  const handwritingTiles = await screen.findAllByRole('button', { name: /Handwriting/i })
-  clickTilePrimaryAction(handwritingTiles[0])
+  await openGame('Hiragana', 'Handwriting')
 }
 
 Object.defineProperty(window, 'matchMedia', {
@@ -403,44 +432,39 @@ function buildStudyPlanDesktopApi() {
   }
 }
 
-describe('Minigame menu', () => {
-  it('includes grammar gameplay modes for alphabet tracks', async () => {
+/* WHICH MODES A DECK OFFERS, asked of the surface that still lists them.
+   These four read the script hub's cassette shelf. The hub is gone, and the titlebar's map tree is
+   now the one place in the app that names every mode of every deck -- the drills road draws the
+   same set, but folds what a deck does not offer to width zero rather than removing it, so a text
+   query there would find a stone that is not on the road. */
+describe('what each deck offers', () => {
+  it('includes the grammar-shaped modes on the alphabet tracks', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Hiragana')
+    const modes = await deckModes('Hiragana')
 
-    expect((await screen.findAllByText(/Romaji Sprint/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Character Match/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Sentence Assembly/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
+    for (const name of ['Romaji Sprint', 'Meaning Match', 'Character Match', 'Sentence Assembly',
+      'Particle Cloze', 'Imposter', 'Interleave Mix']) {
+      expect(modes).toContain(name)
+    }
   })
 
-  it('removes romaji sprint for words track', async () => {
+  it('drops romaji sprint from the words track', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Vocabulary')
+    const modes = await deckModes('Vocabulary')
 
-    expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
+    expect(modes).toEqual(expect.arrayContaining(['Particle Cloze', 'Imposter', 'Interleave Mix']))
+    expect(modes).not.toContain('Romaji Sprint')
   })
 
-  it('shows dictation mode in vocabulary track', async () => {
+  it('offers dictation on the words track', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Vocabulary')
-
-    expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
+    expect(await deckModes('Vocabulary')).toContain('Dictation')
   })
 
   it('starts a fresh run when launching a minigame from the shortcuts menu', async () => {
@@ -536,14 +560,14 @@ describe('Minigame menu', () => {
       recordGameResult,
     }
 
+    /* CONFIDENCE CAPTURE IS A PERSISTED PREFERENCE, and its switch moved with the other three from
+       the script hub to the drills road (`L3.test.tsx` pins the switch itself). This test is about
+       what reaches the record payload, so it starts from the pref rather than walking two screens
+       to set it. */
+    window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ confidenceCaptureEnabled: true }))
+
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Vocabulary')
-
-    fireEvent.click(await screen.findByRole('button', { name: /toggle answer confidence capture/i }))
-
-    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    clickTilePrimaryAction(typedTiles[0])
+    await openGame('Vocabulary', 'Typed Recall')
 
     const typedInput = await screen.findByPlaceholderText(/Type meaning/i)
     fireEvent.click(screen.getByRole('button', { name: /confidence high/i }))
@@ -586,22 +610,21 @@ describe('Minigame menu', () => {
     expect(hero.textContent).toMatch(/REVIEW THESE|START THIS/)
     fireEvent.click(hero)
 
-    expect(await screen.findByRole('heading', { name: /Mini Game Map/i })).toBeTruthy()
-    expect((await screen.findAllByText(/Meaning Match/i)).length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: /back to map/i })).toBeNull()
+    /* AND NOW IT ACTUALLY DOES IT. Until the script hub was retired this press landed on the hub,
+       which drew the deck's seventeen cassettes and asked the learner to choose one -- so the card
+       promised a named drill and delivered a menu. It runs the drill. */
+    await waitFor(() => expect(document.querySelector('.minigame-shell')).not.toBeNull())
+    expect(document.body.textContent).toContain('Meaning Match')
   })
 
-  it('removes romaji sprint for grammar track', async () => {
+  it('drops romaji sprint from the grammar track too', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Grammar')
+    const modes = await deckModes('Grammar')
 
-    expect((await screen.findAllByText(/Particle Cloze/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Imposter/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Interleave Mix/i)).length).toBeGreaterThan(0)
-    expect(screen.queryByText(/Romaji Sprint/i)).toBeNull()
+    expect(modes).toEqual(expect.arrayContaining(['Particle Cloze', 'Imposter', 'Interleave Mix']))
+    expect(modes).not.toContain('Romaji Sprint')
   })
 
   it('plays both target words and example sentence in grammar rounds', async () => {
@@ -659,11 +682,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Grammar')
-
-    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    clickTilePrimaryAction(typedTiles[0])
+    await openGame('Grammar', 'Typed Recall')
 
     fireEvent.click(await screen.findByRole('button', { name: /play target words/i }))
     fireEvent.click(await screen.findByRole('button', { name: /play example sentence/i }))
@@ -684,10 +703,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Vocabulary')
-    const contextTiles = await screen.findAllByRole('button', { name: /Particle Cloze/i })
-    clickTilePrimaryAction(contextTiles[0])
+    await openGame('Vocabulary', 'Particle Cloze')
 
     // Wait for the round to render, then check .game-prompt-main text
     await waitFor(() => {
@@ -702,10 +718,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Vocabulary')
-    const storyTiles = await screen.findAllByRole('button', { name: /Imposter/i })
-    clickTilePrimaryAction(storyTiles[0])
+    await openGame('Vocabulary', 'Imposter')
 
     await waitFor(() => {
       const storyPassage = document.querySelector('.game-prompt-main')
@@ -732,10 +745,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Kanji')
-    const matchTiles = await screen.findAllByRole('button', { name: /Character Match/i })
-    clickTilePrimaryAction(matchTiles[0])
+    await openGame('Kanji', 'Character Match')
 
     fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
     await waitFor(() => {
@@ -801,11 +811,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Kanji')
-
-    const typedTiles = await screen.findAllByRole('button', { name: /Typed Recall/i })
-    clickTilePrimaryAction(typedTiles[0])
+    await openGame('Kanji', 'Typed Recall')
 
     fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
 
@@ -858,10 +864,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Kanji')
-    const strokeTiles = await screen.findAllByRole('button', { name: /Stroke Order/i })
-    clickTilePrimaryAction(strokeTiles[0])
+    await openGame('Kanji', 'Stroke Order')
 
     expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
     expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
@@ -1063,11 +1066,7 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Grammar')
-
-    const assemblyTiles = await screen.findAllByRole('button', { name: /Sentence Assembly/i })
-    clickTilePrimaryAction(assemblyTiles[0])
+    await openGame('Grammar', 'Sentence Assembly')
 
     fireEvent.click(await screen.findByRole('button', { name: /move 学生です。 later/i }))
     fireEvent.click(screen.getByRole('button', { name: /submit order/i }))
@@ -1084,17 +1083,12 @@ describe('Minigame menu', () => {
     }))
   })
 
-  it('shows listening modes for hiragana and katakana tracks', async () => {
+  it('offers both listening modes on both alphabet tracks', async () => {
     window.jplearnDesktop = baseDesktopApi
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-
-    // Hiragana: listening modes should appear
-    openDeck('Hiragana')
-    await screen.findAllByText(/Romaji Sprint/i)
-    expect((await screen.findAllByText(/Recognition/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
+    const hiragana = await deckModes('Hiragana')
+    expect(hiragana).toEqual(expect.arrayContaining(['Recognition', 'Dictation']))
 
     cleanup()
     window.localStorage.clear()
@@ -1102,12 +1096,8 @@ describe('Minigame menu', () => {
 
     window.jplearnDesktop = baseDesktopApi
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-
-    // Katakana: both listening modes must appear
-    openDeck('Katakana')
-    expect((await screen.findAllByText(/Recognition/i)).length).toBeGreaterThan(0)
-    expect((await screen.findAllByText(/Dictation/i)).length).toBeGreaterThan(0)
+    const katakana = await deckModes('Katakana')
+    expect(katakana).toEqual(expect.arrayContaining(['Recognition', 'Dictation']))
   })
 
   it('listening audio first mode hides character prompt and records correct minigame key', async () => {
@@ -1122,11 +1112,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Vocabulary')
-
-    const audioTiles = await screen.findAllByRole('button', { name: /Recognition/i })
-    clickTilePrimaryAction(audioTiles[0])
+    await openGame('Vocabulary', 'Recognition')
 
     // Play audio prompt button must be present (it replaces the character display)
     await screen.findByRole('button', { name: /replay audio/i })
@@ -1166,11 +1152,7 @@ describe('Minigame menu', () => {
     window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Hiragana')
-
-    const dictationTiles = await screen.findAllByRole('button', { name: /Dictation/i })
-    clickTilePrimaryAction(dictationTiles[0])
+    await openGame('Hiragana', 'Dictation')
 
     // Play audio prompt button must be present (it replaces the character display)
     await screen.findByRole('button', { name: /replay audio/i })
@@ -1212,20 +1194,20 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Hiragana')
+    await openDrillsRoad()
 
-    const lockedCassette = await screen.findByRole('button', { name: /recognition is locked/i })
-    expect(lockedCassette.className).toContain('is-locked')
+    /* both audio modes carry the runtime's own words, not a generic "locked" */
+    selectDrill('Recognition')
+    expect(document.querySelector('.dr-slab')?.className).toContain('shut')
+    expect(document.querySelector('.dr-slab')?.textContent)
+      .toContain('VOICEVOX RUNTIME IS NOT RUNNING')
 
-    // Dictation should also be locked when VOICEVOX is unavailable
-    const lockedDictation = screen.getByRole('button', { name: /dictation is locked/i })
-    expect(lockedDictation.className).toContain('is-locked')
+    selectDrill('Dictation')
+    expect(document.querySelector('.dr-slab')?.className).toContain('shut')
 
-    // Clicking a locked cassette must never start a session.
-    fireEvent.click(lockedCassette)
-    fireEvent.click(lockedCassette)
-    expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
+    // and the press is refused rather than starting a round that has no audio to play
+    fireEvent.click(document.querySelector('.dr-hero') as Element)
+    expect(document.querySelector('.minigame-shell')).toBeNull()
     expect(screen.queryByRole('heading', { name: /recognition/i })).toBeNull()
   })
 
@@ -1268,20 +1250,17 @@ describe('Minigame menu', () => {
     }
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    openDeck('Hiragana')
+    await openDrillsRoad()
+    selectDrill('Speech Recall')
 
-    const lockedCassette = await screen.findByRole('button', { name: /speech recall is locked/i })
-    expect(lockedCassette.className).toContain('is-locked')
+    expect(document.querySelector('.dr-slab')?.className).toContain('shut')
+    expect(document.querySelector('.dr-slab')?.textContent).toContain('SPEECH RECOGNITION MODEL')
 
-    // Clicking a locked cassette must never start a session.
-    fireEvent.click(lockedCassette)
-    fireEvent.click(lockedCassette)
-    expect(await screen.findByRole('heading', { name: /mini game map/i })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: /speech recall/i })).toBeNull()
+    fireEvent.click(document.querySelector('.dr-hero') as Element)
+    expect(document.querySelector('.minigame-shell')).toBeNull()
   })
 
-  it('keeps minigame controls available when reduced motion preference is enabled', async () => {
+  it('keeps the drills road walkable when reduced motion is on', async () => {
     const originalMatchMedia = window.matchMedia
     window.matchMedia = (query: string) => ({
       matches: query.includes('prefers-reduced-motion'),
@@ -1298,16 +1277,16 @@ describe('Minigame menu', () => {
       window.jplearnDesktop = baseDesktopApi
 
       render(<App />)
-      await screen.findByRole('button', { name: /open shortcuts/i })
-      openDeck('Hiragana')
+      await openDrillsRoad()
 
-      const cassettes = await screen.findAllByRole('button', { name: /focus |launch |is locked/i })
-      expect(cassettes.length).toBeGreaterThan(0)
-
-      // Verify the first non-locked cassette is enabled (no separate Launch button exists)
-      const enabledCassette = cassettes.find((btn) => !(btn as HTMLButtonElement).disabled)
-      expect(enabledCassette).toBeTruthy()
-      expect((enabledCassette as HTMLButtonElement).disabled).toBe(false)
+      /* the road is built out of transforms and a masked strip; with animation off it still has
+         to be a road you can walk and a card you can press */
+      expect(document.querySelectorAll('.dr-tab').length).toBeGreaterThan(0)
+      const hero = document.querySelector('.dr-hero') as HTMLButtonElement
+      expect(hero).not.toBeNull()
+      expect(hero.disabled).toBe(false)
+      selectDrill('Meaning Match')
+      expect(document.querySelector('.dr-hen')?.textContent).toBe('Meaning Match')
     } finally {
       window.matchMedia = originalMatchMedia
     }

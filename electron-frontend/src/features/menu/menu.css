@@ -3513,6 +3513,21 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .dr-hd { padding: 6px 16px 0; text-align: center; font-family: var(--lat-ui); font-weight: 600;
   font-size: 10.5px; letter-spacing: 0.04em; line-height: 1.5; color: rgba(20, 17, 13, 0.66); }
 
+/* WHAT YOU HAVE DONE WITH THIS MODE ON THIS DECK, which the hub's cassettes carried and the road
+   did not. Set at the card's own quiet size: it is a record, not a claim, and a mode you have
+   never run says so rather than reading nought per cent. */
+.dr-rec { padding: 7px 14px 0; display: flex; align-items: baseline; justify-content: center;
+  gap: 5px; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45); white-space: nowrap; }
+
+.dr-rec b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px;
+  letter-spacing: 0; color: var(--ink); }
+
+.dr-rec i { font-style: normal; }
+
+/* a seam between the two figures, so "62% RIGHT 14 BEST RUN" reads as two facts and not four */
+.dr-rec i + b { margin-left: 8px; }
+
 /* WHICH SIX, NOT HOW MANY. The count is in the line beside it; these say WHICH decks offer this
    mode, with the one you are standing on ringed -- that is the fact the fold is made of. */
 .dr-cells { margin-top: auto; padding: 0 15px 11px; display: flex; align-items: center;

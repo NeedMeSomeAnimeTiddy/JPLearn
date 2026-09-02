@@ -25,7 +25,6 @@ import type {
   SettingsTabKey,
   ShortcutSubmenuKey,
   StatsByScript,
-  StudyPlanCoverageRow,
   StudyQueueResponse,
   StudySummaryPayload,
   VocabCategory,
@@ -39,7 +38,6 @@ import { CloseConfirmDialog } from './components/CloseConfirmDialog'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AppTitlebar } from './components/AppTitlebar'
 import { AppSettingsModal } from './components/AppSettingsModal'
-import { ScriptHubView } from './views/ScriptHubView'
 import { MinigameView } from './views/MinigameView'
 import { OverviewView } from './views/OverviewView'
 import { JLPTPrepView } from './views/JLPTPrepView'
@@ -94,10 +92,6 @@ import {
   buildJlptLevelProgressFromLevelDecks,
   buildCategoryProgress,
 } from './lib/progressAggregation'
-import {
-  buildStudyPlan,
-} from './lib/studyPlan'
-import { categoryLevelOf } from './lib/categoryLevels'
 import { CARD_MASTERY_MAX } from './constants'
 import {
   buildRound as buildRoundImpl,
@@ -106,7 +100,7 @@ import {
   useStudySession,
 } from './features/study-session'
 import './App.css'
-import { useBlockSelection, describeSelection } from './features/block-selection'
+import { useBlockSelection } from './features/block-selection'
 import { useVocabFeed, isFedDeck } from './features/vocab-feed'
 import { useProgression, LOCKED_NODE_REASON } from './features/progression'
 import type { ProgressionNodeView } from './features/progression'
@@ -224,7 +218,6 @@ function App() {
     reason: string
   } | null>(null)
   const warnedSectionsRef = useRef<Set<string>>(new Set())
-  const [learningPathExpanded, setLearningPathExpanded] = useState(false)
 
   interface SelectedChar {
     character: string
@@ -320,12 +313,12 @@ function App() {
     const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
     const commands: Command[] = [
       { id: 'nav-home', label: 'Go to Home', category: 'navigation', action: () => { navigate('home', 'back') } },
-      { id: 'nav-script-hub', label: 'Go to Script Hub', category: 'navigation', action: () => { navigate('script_hub', 'forward') } },
+      { id: 'nav-study', label: 'Go to Study', category: 'navigation', action: () => { openDeckScreenRef.current(activeScriptRef.current) } },
       { id: 'nav-jlpt', label: 'Go to JLPT Prep', category: 'navigation', action: () => { openExamLadderRef.current() } },
       { id: 'nav-daily-games', label: DAILY_GAMES_COPY.title, category: 'navigation', keywords: ['daily', 'games', 'practice'], action: openDailyGames },
       { id: 'nav-overview', label: 'Open Study Overview', category: 'navigation', action: () => { closeKanjiDetail(); setShowOverview(true); void loadSummary() } },
-      { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { setActiveScript('hiragana'); navigate('script_hub', 'forward') } },
-      { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { setActiveScript('katakana'); navigate('script_hub', 'forward') } },
+      { id: 'script-hiragana', label: 'Hiragana', category: 'navigation', keywords: ['hiragana', 'script'], action: () => { openDeckScreenRef.current('hiragana') } },
+      { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { openDeckScreenRef.current('katakana') } },
       { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { closeKanjiDetail(); setShowSettings(true) } },
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
       { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu'], action: () => tutor.openTutorPanel() },
@@ -370,7 +363,7 @@ function App() {
   useEffect(() => {
     const cleanup = window.jplearnDesktop?.onTrayAction?.((action: string) => {
       if (action === 'start-session') {
-        navigate('script_hub', 'forward')
+        openDeckScreenRef.current(activeScriptRef.current)
       } else if (action === 'view-overview') {
         closeKanjiDetail()
         setShowOverview(true)
@@ -607,6 +600,15 @@ function App() {
      do not have to move, and the palette does not re-register on every render. */
   const openExamLadderRef = useRef<() => void>(() => {})
   const openLibraryRef = useRef<() => void>(() => {})
+  /* AND THE TWO THE SCRIPT HUB LEFT BEHIND. Every route that used to navigate to it means one of
+     exactly two things -- put me in front of this deck, or run this drill -- and both of those are
+     built from `menuPath`, which is declared six hundred lines below the curriculum's destination
+     switch and the palette's one-time registration. */
+  const openDeckScreenRef = useRef<(script: ScriptKey) => void>(() => {})
+  const launchDrillRef = useRef<(script: ScriptKey, minigame: MinigameKey) => void>(() => {})
+  /* the palette registers once, so the deck it opens has to be read at press time, not at mount */
+  const activeScriptRef = useRef<ScriptKey>(activeScript)
+  activeScriptRef.current = activeScript
 
   const session = useStudySession({
     view,
@@ -698,9 +700,14 @@ function App() {
     switch (destination.kind) {
       case 'script':
         tutor.closeTutorPanel()
-        setActiveScript(destination.script)
-        if (destination.minigame) setActiveGame(destination.minigame)
-        navigate('script_hub', 'forward')
+        /* A MILESTONE ABOUT A MODE RUNS THE MODE. LISTENING names hiragana AND a minigame: it is
+           about the drill, not about hiragana's blocks, which the HIRAGANA milestone two rows above
+           already draws. Every other script milestone opens its deck. */
+        if (destination.minigame) {
+          launchDrillRef.current(destination.script, destination.minigame)
+          return
+        }
+        openDeckScreenRef.current(destination.script)
         return
       case 'jlpt':
         openExamLadderRef.current()
@@ -752,7 +759,11 @@ function App() {
 
   // oxlint-disable react-hooks/exhaustive-deps — voice from useVoice hook is not a stable ref
   useEffect(() => {
-    if (view !== 'script_hub') return
+    /* THE MENU IS WHERE A LISTENING MODE IS CHOSEN NOW. The script hub was the one screen that
+       needed the voice runtime's status -- it drew a lock reason on the cassettes that need audio
+       -- and the drills road draws those now. Keyed on the menu being up rather than on the road
+       itself, because `menuPath` is built five hundred lines below this. */
+    if (view !== 'home') return
     void voice.refreshVoiceStatus()
   }, [voice.refreshVoiceStatus, view])
 
@@ -1250,12 +1261,15 @@ function App() {
     setShowOverview(false)
     setShowSettings(false)
     tutor.closeTutorPanel()
-    if (key === 'STUDY') { navigate('script_hub', 'forward'); return }
+    /* dead while every section has a level two, and kept for the same reason `useMenuPath`
+       keeps the mechanism: it is what a section without one falls through to. STUDY's is the deck
+       screen for whichever deck you are standing on. */
+    if (key === 'STUDY') { openDeckScreenRef.current(activeScript); return }
     if (key === 'DRILLS') { openDailyGames(); return }
     if (key === 'READING') { navigate('passage_hub', 'forward'); return }
     if (key === 'JLPT') { navigate('jlpt_prep', 'forward'); return }
     setShowOverview(true)
-  }, [navigate, openDailyGames, tutor])
+  }, [activeScript, navigate, openDailyGames, tutor])
 
   /* THE TREE, WITH THE OLD BEHAVIOUR AS ITS PASSTHROUGH. `enterSection` stops at L2 for any
      section that has an L2 screen, and goes straight to the flat view for any that does not.
@@ -1296,6 +1310,7 @@ function App() {
   }, [navigate, menuPath, tutor])
   openExamLadderRef.current = openExamLadder
   openLibraryRef.current = openLibrary
+
 
   /* ==================================================================================================
      THE UNLOCK MOMENT, WHICH IS AN EVENT AND NOT A PLACE.
@@ -1393,14 +1408,50 @@ function App() {
   /* the feed itself is `vocabFeed` above -- App already holds one for the deck under study, and a
      second instance would be a second round trip answering the same question */
 
+
+  /* ONE DOOR ONTO A DECK, and seven routes now share it: the six digit shortcuts, the titlebar's
+     map tree, the command palette, the curriculum's script destinations, the readiness warning, the
+     hero card with nothing to recommend, and STUDY's own passthrough.
+
+     ALL SEVEN USED TO OPEN THE SCRIPT HUB, which drew the deck's blocks a second time, its five
+     levels, seventeen cassettes and four session switches -- and asked, four screens in, the
+     questions the menu had already answered. They land on the deck's own screen instead: its block
+     chain, or its daily feed for the five levels that are fed rather than unlocked.
+
+     THE MILESTONE COMES WITH IT because the screen names one. `menuNode` is what the heading reads,
+     and a deck opened by a digit rather than by walking the path would otherwise arrive under an
+     empty one. The lookup is the curriculum's own: the node whose destination IS this deck and is
+     not about a single mode -- LISTENING names hiragana too, and it is not hiragana's screen. */
+  const openDeckScreen = useCallback((script: ScriptKey) => {
+    closeKanjiDetail()
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    const owner = progression.nodes.find((node) => (
+      node.destination.kind === 'script'
+      && node.destination.script === script
+      && !node.destination.minigame
+    ))
+    setMenuNode(owner?.node_id ?? null)
+    setActiveScript(script)
+    navigate('home', 'back')
+    menuPath.enterSection('STUDY')
+    /* `enterScreen` reads the path through an updater, so it sees the level two the line above
+       queued -- the same two-call move `openLibrary` makes. */
+    menuPath.enterScreen(isFedDeck(script) ? 'feed' : 'deck')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
+  }, [closeKanjiDetail, menuPath, navigate, progression.nodes, setActiveScript, tutor])
+  openDeckScreenRef.current = openDeckScreen
+
   const routeMilestone = useCallback((node: ProgressionNodeView) => {
     const destination = node.destination
     /* a mode, or one of the nine milestones that is not a deck at all: the app's own door */
     if (destination.kind !== 'script' || destination.minigame) { openProgressionNode(node); return }
-    setMenuNode(node.node_id)
-    setActiveScript(destination.script)
-    menuPath.enterScreen(isFedDeck(destination.script) ? 'feed' : 'deck')
-  }, [menuPath, openProgressionNode, setActiveScript])
+    openDeckScreen(destination.script)
+  }, [openDeckScreen, openProgressionNode])
 
   /* WHO ASKED, WHICH THE CONFIRMATION DOES NOT OTHERWISE KNOW. `progression.pending` is one piece
      of shared state raised by three call sites — this screen, the L1 map and the flat one — and its
@@ -1584,38 +1635,21 @@ function App() {
 
       if (view === 'home') {
         /* 1 THROUGH 5 REACH THE MENU FIRST, AND ONLY GET HERE IF IT DID NOT WANT THEM.
-           These five jumped straight into a script hub, which was right when home was the flat deck
+           These six jumped straight into a script hub, which was right when home was the flat deck
            grid. Home is the menu now, every row carries a printed 01..05, and `MenuL1` reads those
            numbers to move its cursor -- but its listener is on its own subtree while this one is on
            the window, so the menu selected a row and this fired immediately after and left the menu
            entirely. Pressing 2 on the front door landed you in Katakana.
            `preventDefault` could not stop that; `stopPropagation` does, and `MenuL1` now calls it.
            The block stays because it is still the route in from anywhere the menu is not listening
-           -- a study surface, or `test-entry.ts`, which dispatches these on the window by design. */
-        if (event.key === '1') {
-          setActiveScript('hiragana')
-          navigate('script_hub', 'forward')
+           -- a study surface, or `test-entry.ts`, which dispatches these on the window by design.
+           Where they LAND has changed with the hub: the deck's own screen in the menu. */
+        const deckOf: Partial<Record<string, ScriptKey>> = {
+          1: 'hiragana', 2: 'katakana', 3: 'kanji_n5',
+          4: 'vocab_n5', 5: 'grammar_patterns', 7: 'sentence_examples',
         }
-        if (event.key === '2') {
-          setActiveScript('katakana')
-          navigate('script_hub', 'forward')
-        }
-        if (event.key === '3') {
-          setActiveScript('kanji_n5')
-          navigate('script_hub', 'forward')
-        }
-        if (event.key === '4') {
-          setActiveScript('vocab_n5')
-          navigate('script_hub', 'forward')
-        }
-        if (event.key === '5') {
-          setActiveScript('grammar_patterns')
-          navigate('script_hub', 'forward')
-        }
-        if (event.key === '7') {
-          setActiveScript('sentence_examples')
-          navigate('script_hub', 'forward')
-        }
+        const wanted = deckOf[event.key]
+        if (wanted) openDeckScreenRef.current(wanted)
       }
     }
 
@@ -1624,7 +1658,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
 
-  const decks = useMemo(() => summary?.decks ?? [], [summary])
   const streak = useMemo(
     () => summary?.streak ?? { current_days: 0, best_days: 0, freezes_available: 0 },
     [summary],
@@ -1659,20 +1692,6 @@ function App() {
     }),
     [summary, xpProgress, activity],
   )
-  const studyPlan = useMemo(
-    () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress),
-    [decks, kanjiLevelProgress, vocabLevelProgress],
-  )
-  const learningPathTrackRows = useMemo(
-    () => {
-      const trackedKeys: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5']
-      return trackedKeys
-        .map((key) => studyPlan.coverageRows.find((row) => row.key === key))
-        .filter((row): row is StudyPlanCoverageRow => row !== undefined)
-    },
-    [studyPlan.coverageRows],
-  )
-
   const activeRunCards = leechFocusEnabled && leechCards.length > 0 ? leechCards : activeBlockCards
 
   // Use backend block mastery/unlock values so script hub and overview stay consistent.
@@ -1803,25 +1822,44 @@ function App() {
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, closeShortcutMenu, loadSummary])
 
-  const jumpToScriptHub = useCallback((script: ScriptKey) => {
-    closeKanjiDetail()
-    setActiveScript(script)
-    navigate('script_hub', 'forward')
-    resetSessionCore()
-    closeShortcutMenu()
-  }, [closeKanjiDetail, closeShortcutMenu, navigate, resetSessionCore])
+  /* ONE DOOR INTO A DRILL, and every route that used to mean "put me in front of this deck's
+     modes" now goes through it. The script hub was that door: it drew the deck's blocks a second
+     time, its five levels, its seventeen cassettes and four session switches, and asked you to
+     choose again what you had just chosen. The menu answers all four questions before this point.
 
-  const jumpToScriptHubMinigame = useCallback((script: ScriptKey, minigame: MinigameKey) => {
+     `overrides` exists for the front door's hero card, which is raised by `leeches_detected` and
+     has to turn focused review on before the round it promises is built. */
+  const launchDrill = useCallback((
+    script: ScriptKey,
+    minigame: MinigameKey,
+    overrides?: SessionPrefOverrides,
+  ) => {
     closeKanjiDetail()
     const resolvedMinigame = resolveScriptMinigame(script, minigame)
     setShowOverview(false)
     setShowSettings(false)
     session.clearLastRunReport()
+    if (overrides?.leechFocusEnabled !== undefined) {
+      session.setLeechFocus(overrides.leechFocusEnabled)
+    }
     setActiveGame(resolvedMinigame)
     navigate('minigame', 'forward')
     resetSessionWithLives()
 
     if (script !== activeScript) {
+      /* THE DECK IS NOT LOADING YET, AND THE ROUND MUST NOT BE BUILT AS IF IT WERE LOADED.
+         `requestResumeSession` waits for two things: the script to match, and `gameLoading` to be
+         false. The script matches on the very next render — but the effect that fetches the deck
+         is declared BELOW `useStudySession`, so on that render it has not run and `gameLoading` is
+         still false from the deck before. Both guards pass and the round is built out of the
+         previous deck's cards. Setting it here closes the window: the request cannot be honoured
+         until the fetch this change is about to start has finished.
+
+         It was survivable while every route passed through the script hub, which put a screen and
+         a second press between changing deck and starting a round. The menu hands over both in one
+         press, so the gap became reachable: launching Stroke Order on kanji from the titlebar while
+         standing on hiragana drew a kanji round out of hiragana's cards. */
+      setGameLoading(true)
       setActiveScript(script)
       session.requestResumeSession({ script, minigame: resolvedMinigame })
       closeShortcutMenu()
@@ -1832,29 +1870,7 @@ function App() {
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
   }, [activeScript, closeKanjiDetail, closeShortcutMenu, resetSessionWithLives, resolveScriptMinigame, startSession])
-  /* LAUNCH THE DRILL THE ENGINE CHOSE, rather than landing on a hub for the learner to pick one.
-     This came back with the menu hero: `HomeView`'s "Up next" row was its only caller and retired
-     with it, which left the hero card saying REVIEW THESE over a named drill and a card count and
-     then opening a section instead. A card that promises an action has to perform it, and the
-     recommendation payload has carried the drill and the leech-focus override all along. */
-  const jumpToScriptHubSetup = useCallback((
-    script: ScriptKey,
-    minigame: MinigameKey,
-    overrides?: SessionPrefOverrides,
-  ) => {
-    closeKanjiDetail()
-    const resolvedMinigame = resolveScriptMinigame(script, minigame)
-    setActiveScript(script)
-    setActiveGame(resolvedMinigame)
-    if (overrides?.leechFocusEnabled !== undefined) {
-      session.setLeechFocus(overrides.leechFocusEnabled)
-    }
-    navigate('script_hub', 'forward')
-    resetSessionWithLives()
-    closeShortcutMenu()
-  // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
-  }, [closeKanjiDetail, closeShortcutMenu, navigate, resetSessionWithLives, resolveScriptMinigame])
-
+  launchDrillRef.current = launchDrill
   /* WHAT THE STUDY PATH'S LAST SCREEN DOES, and it is a round rather than another screen.
      Picking a block used to land on the script hub, which asked which blocks (a question the deck
      screen had just answered), which level (a row), and which drill — three questions for a press
@@ -2155,7 +2171,7 @@ function App() {
   const runMenuHero = useCallback(() => {
     const top = studyBlock?.recommendations?.[0]
     if (top?.minigame) {
-      jumpToScriptHubSetup(
+      launchDrill(
         top.section as ScriptKey,
         top.minigame as MinigameKey,
         top.leech_focus_enabled === null || top.leech_focus_enabled === undefined
@@ -2165,7 +2181,7 @@ function App() {
       return
     }
     openMenuSection(heroFromStudyBlock(studyBlock).section ?? 'STUDY')
-  }, [jumpToScriptHubSetup, openMenuSection, studyBlock])
+  }, [launchDrill, openMenuSection, studyBlock])
 
   // Titlebar callbacks: named here rather than inlined in the titlebar JSX so the
   // titlebar component receives bare handlers instead of raw state setters.
@@ -2483,7 +2499,8 @@ function App() {
             /* three genuinely different destinations, all of them places the app already has */
             if (key === 'games') { openDailyGames(); return }
             if (key === 'drills') { menuPath.enterScreen('drills'); return }
-            jumpToScriptHub(activeScript)
+            /* REVIEW is the deck you are on, and it is the deck screen that opens it */
+            openDeckScreen(activeScript)
           }}
           onUp={leaveMenuLevel}
         />
@@ -2526,6 +2543,10 @@ function App() {
             toggleConfidence: session.slice.toggleConfidence,
           }}
           lockReasons={minigameLockReasons}
+          /* WHAT THE CASSETTES CARRIED AND THE ROAD DID NOT. Per-mode accuracy and best run are
+             the one fact the hub showed that nothing else in the app does; `minigameStats` is
+             still written after every round, and this is the only thing that reads it. */
+          stats={minigameStats[activeScript]}
           onDeck={(deck) => {
             /* THE ROAD'S DECK IS THE APP'S DECK. It used to be local state that committed only on
                start -- fine while the hero's one claim was a name, wrong now the slab draws a
@@ -2533,9 +2554,7 @@ function App() {
             setActiveScript(deck)
             resetSessionWithLives()
           }}
-          onStart={(deck, mode) => {
-            jumpToScriptHubMinigame(deck, mode)
-          }}
+          onStart={launchDrill}
           onUp={leaveMenuLevel}
         />
       ) : null}
@@ -2799,80 +2818,10 @@ function App() {
               return
             }
 
-            setActiveScript(sectionId)
-            navigate('script_hub', 'forward')
+            openDeckScreenRef.current(sectionId)
           }}
         />
       )}
-
-      {/* ScriptHub uses a full view so setup content has enough space. */}
-      {view === 'script_hub' ? (
-        <ScriptHubView
-          vocabFeed={vocabFeed}
-          activeDeckSlug={activeDeckSlug}
-          navDirection={navDirection}
-          activeScript={activeScript}
-          activeGame={activeGame}
-          selectedBlockIndices={blockSelection.selected}
-          blockSelectionSummary={describeSelection(
-            blockProgressWithMastery, blockSelection.selected, activeBlockCards.length,
-          )}
-          gameLoading={gameLoading}
-          gameError={gameError}
-          blockProgressWithMastery={blockProgressWithMastery}
-          activeBlockCards={activeBlockCards}
-          kanjiLevelProgress={kanjiLevelProgress}
-          vocabLevelProgress={vocabLevelProgress}
-          activeKanjiLevel={activeKanjiLevel}
-          activeVocabLevel={activeVocabLevel}
-          kanjiCategoryProgress={[]}
-          vocabCategoryProgress={vocabCategoryProgress}
-          activeVocabCategory={activeVocabCategory}
-          learningPathExpanded={learningPathExpanded}
-          learningPathTrackRows={learningPathTrackRows}
-          minigameStats={minigameStats}
-          availableMinigames={availableMinigames}
-          activeSectionName={activeSectionName}
-          minigameLockReasons={minigameLockReasons}
-          onBack={goHome}
-          onToggleBlock={(index) => {
-            blockSelection.toggle(index)
-            resetSessionWithLives()
-          }}
-          onSelectAllBlocks={() => {
-            blockSelection.selectAll()
-            resetSessionWithLives()
-          }}
-          onClearBlocks={() => {
-            blockSelection.clear()
-            resetSessionWithLives()
-          }}
-          onSelectKanjiLevel={(level) => {
-            setActiveKanjiLevel(level)
-            resetSessionWithLives()
-          }}
-          onSelectVocabLevel={(level) => {
-            setActiveVocabLevel(level)
-            resetSessionWithLives()
-          }}
-          onSelectVocabCategory={(cat) => {
-            setActiveVocabCategory(cat)
-            setActiveVocabLevel(categoryLevelOf(cat))
-            resetSessionWithLives()
-          }}
-          onToggleLearningPath={() => setLearningPathExpanded((expanded) => !expanded)}
-          onSelectGame={(game) => {
-            setActiveGame(game)
-            resetSessionWithLives()
-          }}
-          onPlayGame={(game) => {
-            setActiveGame(game)
-            navigate('minigame', 'forward')
-            resetSessionWithLives()
-            void startSession(game)
-          }}
-        />
-      ) : null}
 
       {view === 'minigame' ? (
         <MinigameView
@@ -2896,7 +2845,7 @@ function App() {
               returnToDailyGamesHub()
               return
             }
-            navigate('script_hub', 'back')
+            navigate('home', 'back')
           }}
           onOpenDictionary={(seedQuery) => openDictionary(seedQuery ?? '')}
           onOpenSettings={openSettingsFromMenu}
@@ -2992,8 +2941,8 @@ function App() {
         jumpToPassageHub={jumpToPassageHub}
         openDailyGames={openDailyGames}
         toggleAllMapsFlyout={toggleAllMapsFlyout}
-        jumpToScriptHub={jumpToScriptHub}
-        jumpToScriptHubMinigame={jumpToScriptHubMinigame}
+        openDeckScreen={openDeckScreen}
+        launchDrill={launchDrill}
         toggleDevToolsFlyout={toggleDevToolsFlyout}
         toggleDevChecksFlyout={toggleDevChecksFlyout}
         openSettingsFromMenu={openSettingsFromMenu}
