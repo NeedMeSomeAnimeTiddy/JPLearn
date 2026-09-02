@@ -50,7 +50,7 @@ describe('the streak', () => {
 })
 
 describe('the week', () => {
-  it('reads the same seven days the overview does', () => {
+  it('reads the seven days that used to be a card in the Study Overview', () => {
     const p = statPanelsFrom({
       ...bare, week: { reviewed: 1240, correct: 992, accuracy: 0.8, activeDays: 5, points: 3400 },
     }).week!

@@ -1,22 +1,6 @@
 import type { CSSProperties } from 'react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import {
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  CalendarDays,
-  CheckCircle2,
-  Download,
-  Flame,
-  Languages,
-  ListChecks,
-  PlayCircle,
-  RefreshCw,
-  Search,
-  Target,
-  X,
-} from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
+import { Languages, RefreshCw, Search, X } from 'lucide-react'
 import type { CardScores, JlptLevel, JlptLevelProgress } from '../types'
 import { CARD_MASTERY_MAX, KANJI_OVERVIEW_PAGE_SIZE } from '../constants'
 import { jlptTagFromCard } from '../utils'
@@ -28,35 +12,6 @@ import {
   type MasteryFilter,
   type ScoreMap,
 } from '../lib/kanjiBrowse'
-import { useHeatmap } from '../features/heatmap'
-import { useAchievements, AchievementsPanel } from '../features/achievements'
-import { ActivityCalendar } from 'react-activity-calendar'
-
-export type OverviewSectionKey = 'studyActivity' | 'sessionHistory' | 'mistakeBreakdown' | 'minigamePerformance' | 'deckSnapshot' | 'achievements'
-
-interface DeckSummary {
-  slug: string
-  name: string
-  total: number
-  mastered: number
-  due_today: number
-  completed_today: number
-}
-
-interface ActivityWindow {
-  days: number
-  reviewed: number
-  correct: number
-  incorrect: number
-  accuracy: number
-  points_earned: number
-  active_days: number
-}
-
-interface ActivityData {
-  week: ActivityWindow
-  month: ActivityWindow
-}
 
 interface BlockInfo {
   index: number
@@ -80,30 +35,6 @@ interface KanjiCard {
   theme: string
 }
 
-interface MistakeRow {
-  key: string
-  attempts: number
-  mistakes: number
-  error_rate: number
-}
-
-interface MinigamePerfRow {
-  minigame: string
-  attempts: number
-  correct: number
-  accuracy: number
-}
-
-interface SessionHistoryRow {
-  session_id: string
-  started_at_utc: string
-  target_items: number
-  reviewed: number
-  correct: number
-  accuracy: number
-  goal_met: boolean
-}
-
 interface SelectedChar {
   character: string
   romaji: string
@@ -117,30 +48,19 @@ interface OverviewViewProps {
   error: string | null
   lastUpdated: string | null
   streak: { current_days: number; best_days: number }
-  decks: DeckSummary[]
-  activity: ActivityData
   overviewBlocks: Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>
   overviewCategoryBlocks: Record<'vocab_n5' | 'grammar_patterns', BlockInfo[]>
   overviewKanjiDeck: KanjiCard[]
   overviewKanjiLevelProgress: JlptLevelProgress[]
   overviewBlocksLoading: boolean
-  mistakes: MistakeRow[]
-  minigamePerf: MinigamePerfRow[]
-  sessionHistory: SessionHistoryRow[]
-  hasAnyActivity: boolean
-  hasMistakeData: boolean
-  hasMinigamePerfData: boolean
-  hasSessionHistory: boolean
   charMasteryExpanded: boolean
   expandedBlocks: string | null
-  overviewSectionExpanded: Record<OverviewSectionKey, boolean>
   cardScores: CardScores
   kanjiOverviewPage: Partial<Record<JlptLevel, number>>
   onClose: () => void
   onRefresh: () => void
   onToggleCharMastery: () => void
   onSetExpandedBlocks: (key: string | null) => void
-  onToggleSection: (section: OverviewSectionKey) => void
   onSetKanjiOverviewPage: (
     updater: (prev: Partial<Record<JlptLevel, number>>) => Partial<Record<JlptLevel, number>>,
   ) => void
@@ -316,36 +236,23 @@ function KanjiLevelBrowser({
 export function OverviewView({
   loading,
   error,
-  decks,
-  activity,
   overviewBlocks,
   overviewCategoryBlocks,
   overviewKanjiDeck,
   overviewKanjiLevelProgress,
   overviewBlocksLoading,
-  mistakes,
-  minigamePerf,
-  sessionHistory,
-  hasAnyActivity,
-  hasMistakeData,
-  hasMinigamePerfData,
-  hasSessionHistory,
   charMasteryExpanded,
   expandedBlocks,
-  overviewSectionExpanded,
   cardScores,
   kanjiOverviewPage,
   onClose,
   onRefresh,
   onToggleCharMastery,
   onSetExpandedBlocks,
-  onToggleSection,
   onSetKanjiOverviewPage,
   onOpenKanjiDetail,
   onSetSelectedChar,
 }: OverviewViewProps) {
-  const [exportMessage, setExportMessage] = useState<string | null>(null)
-  const [exportLoading, setExportLoading] = useState(false)
   const [kanjiQuery, setKanjiQuery] = useState('')
   const [kanjiMasteryFilter, setKanjiMasteryFilter] = useState<MasteryFilter>('all')
   const [kanjiTheme, setKanjiTheme] = useState<string>(ALL_THEMES)
@@ -375,109 +282,13 @@ export function OverviewView({
     onSetKanjiOverviewPage(() => ({}))
   }
 
-  const handleExport = async (type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot') => {
-    if (!window.jplearnDesktop.exportAnalyticsCSV) return
-    setExportLoading(true)
-    setExportMessage(null)
-    try {
-      const result = await window.jplearnDesktop.exportAnalyticsCSV(type)
-      if (result.cancelled) {
-        setExportMessage(null)
-      } else if (result.ok) {
-        setExportMessage(`Saved: ${result.path ?? 'file'}`)
-      } else {
-        setExportMessage('Export failed.')
-      }
-    } catch {
-      setExportMessage('Export failed.')
-    } finally {
-      setExportLoading(false)
-    }
-  }
-
-  const heatmap = useHeatmap()
-  const achievements = useAchievements()
-
-  const calendarRef = useRef<HTMLDivElement>(null)
-  const tooltipRef = useRef<HTMLDivElement>(null)
-  const [activeCell, setActiveCell] = useState<{
-    count: number
-    accuracy: number | undefined
-    date: string
-    x: number
-    y: number
-  } | null>(null)
-
-  useEffect(() => {
-    const wrap = calendarRef.current
-    if (!wrap) return
-
-    function handlePointerOver(e: PointerEvent) {
-      const rect = (e.target as Element).closest('rect[data-date]') as SVGRectElement | null
-      if (!rect) return
-      wrap!.querySelectorAll('rect[data-date]').forEach((r) => {
-        ;(r as SVGRectElement).style.strokeWidth = ''
-        ;(r as SVGRectElement).style.stroke = ''
-      })
-      rect.style.stroke = 'var(--tone-amber)'
-      rect.style.strokeWidth = '2'
-    }
-
-    function handlePointerOut(e: PointerEvent) {
-      const rect = (e.target as Element).closest('rect[data-date]') as SVGRectElement | null
-      if (!rect) return
-      rect.style.strokeWidth = ''
-      rect.style.stroke = ''
-    }
-
-    function handleClick(e: MouseEvent) {
-      const rect = (e.target as Element).closest('rect[data-date]') as SVGRectElement | null
-      if (!rect) return
-      const date = rect.getAttribute('data-date')
-      if (!date) return
-      const hit = heatmap.data.find((d) => d.date === date)
-      if (!hit) return
-      const bounds = rect.getBoundingClientRect()
-      setActiveCell({
-        count: hit.count,
-        accuracy: heatmap.accuracyByDate.get(date),
-        date,
-        x: bounds.left + bounds.width / 2,
-        y: bounds.bottom + 8,
-      })
-    }
-
-    wrap.addEventListener('pointerover', handlePointerOver)
-    wrap.addEventListener('pointerout', handlePointerOut)
-    wrap.addEventListener('click', handleClick)
-    return () => {
-      wrap.removeEventListener('pointerover', handlePointerOver)
-      wrap.removeEventListener('pointerout', handlePointerOut)
-      wrap.removeEventListener('click', handleClick)
-    }
-  }, [heatmap.data, heatmap.accuracyByDate])
-
-  useEffect(() => {
-    if (!activeCell) return
-
-    function handleDismiss(e: MouseEvent) {
-      const target = e.target as Element
-      if (target.closest('rect[data-date]')) return
-      if (target.closest('.heatmap-tooltip')) return
-      setActiveCell(null)
-    }
-
-    document.addEventListener('mousedown', handleDismiss)
-    return () => document.removeEventListener('mousedown', handleDismiss)
-  }, [activeCell])
-
   return (
     <div className="overview-popup-content">
       <header className="overview-popup-header cassette-panel-header">
         <div />
         <div className="cassette-panel-header-center">
-          <span className="cassette-panel-header-catalog">DECK STATUS</span>
-          <h2 className="cassette-panel-header-title">Study Overview</h2>
+          <span className="cassette-panel-header-catalog">EVERY CHARACTER</span>
+          <h2 className="cassette-panel-header-title">Character Mastery</h2>
         </div>
         <div className="overview-popup-actions">
           <button
@@ -727,403 +538,6 @@ export function OverviewView({
         </div>
       </section>
 
-      {/* ── Study Activity ───────────────────────────────────────────── */}
-      <section className="panel-glass activity-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('studyActivity')}
-          aria-expanded={overviewSectionExpanded.studyActivity}
-          aria-controls="overview-study-activity-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Study Activity</h2>
-            <div className="panel-actions">
-              <span>Rolling windows for consistency and momentum</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-study-activity-body" className={`overview-panel-body ${overviewSectionExpanded.studyActivity ? 'is-open' : ''}`}>
-          <div ref={calendarRef} style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
-            {heatmap.data.length > 0 ? (
-              <ActivityCalendar
-                data={heatmap.data}
-                theme={heatmap.theme}
-                loading={heatmap.loading}
-                weekStart={1}
-                blockSize={12}
-                blockMargin={3}
-                fontSize={13}
-                labels={{ totalCount: '{{count}} reviews' }}
-              />
-            ) : (
-              <p className="status-line">Loading activity data...</p>
-            )}
-            {activeCell &&
-              createPortal(
-                <div
-                  ref={tooltipRef}
-                  className="heatmap-tooltip"
-                  style={{
-                    position: 'fixed',
-                    left: activeCell.x,
-                    top: activeCell.y,
-                    transform: 'translateX(-50%)',
-                  }}
-                >
-                  <strong>{activeCell.count} review{activeCell.count !== 1 ? 's' : ''}</strong>
-                  {activeCell.accuracy !== undefined && (
-                    <span> · {activeCell.accuracy}% correct</span>
-                  )}
-                  <span className="heatmap-tooltip-date">{activeCell.date}</span>
-                </div>,
-                document.body,
-              )}
-          </div>
-          {heatmap.error && <p className="heatmap-error">{heatmap.error}</p>}
-          {!hasAnyActivity ? (
-            <p className="status-line">No recent activity yet. Complete a round to populate weekly and monthly summaries.</p>
-          ) : (
-            <div className="activity-window-grid">
-              {[activity.week, activity.month].map((windowData, index) => (
-                <article
-                  key={windowData.days}
-                  className="activity-window-card"
-                  style={{ animationDelay: `${140 + index * 80}ms` }}
-                >
-                  <h3>Last {windowData.days} Days</h3>
-                  <div className="activity-window-metrics">
-                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`reviewed-${windowData.days}-${windowData.reviewed}`} className="live-value">{windowData.reviewed}</strong> reviewed</span>
-                    <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`correct-${windowData.days}-${windowData.correct}`} className="live-value">{windowData.correct}</strong> correct</span>
-                    <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`incorrect-${windowData.days}-${windowData.incorrect}`} className="live-value">{windowData.incorrect}</strong> incorrect</span>
-                    <span className="metric-accent-ocean"><Activity aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`accuracy-${windowData.days}-${windowData.accuracy}`} className="live-value">{windowData.accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`earned-${windowData.days}-${windowData.points_earned}`} className="live-value">{windowData.points_earned}</strong> points</span>
-                    <span className="metric-accent-warning"><CalendarDays aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`days-${windowData.days}-${windowData.active_days}`} className="live-value">{windowData.active_days}</strong> active days</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── Session History ─────────────────────────────────────────── */}
-      <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('sessionHistory')}
-          aria-expanded={overviewSectionExpanded.sessionHistory}
-          aria-controls="overview-session-history-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><CalendarDays aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Session History</h2>
-            <div className="panel-actions">
-              <span>Recent completed study sessions</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.sessionHistory ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-session-history-body" className={`overview-panel-body ${overviewSectionExpanded.sessionHistory ? 'is-open' : ''}`}>
-          {!hasSessionHistory ? (
-            <p className="status-line">No completed sessions yet. Finish a study session to see it here.</p>
-          ) : (
-            <div className="mistake-grid">
-              {sessionHistory.map((row, index) => (
-                <article
-                  key={row.session_id}
-                  className="mistake-card"
-                  style={{ animationDelay: `${140 + index * 60}ms` }}
-                >
-                  <h3>{new Date(row.started_at_utc).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</h3>
-                  <div className="mistake-card-metrics">
-                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rev-${row.session_id}-${row.reviewed}`} className="live-value">{row.reviewed}</strong> reviewed</span>
-                    <span className="metric-accent-skill"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`acc-${row.session_id}-${row.accuracy}`} className="live-value">{row.accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`cor-${row.session_id}-${row.correct}`} className="live-value">{row.correct}</strong> correct</span>
-                    <span className={`metric-accent-${row.goal_met ? 'success' : 'danger'}`}><CheckCircle2 aria-hidden="true" className="chip-icon" strokeWidth={2.2} />{row.goal_met ? 'Goal met' : `Target: ${row.target_items}`}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── Mistake Breakdown ─────────────────────────────────────────── */}
-      <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('mistakeBreakdown')}
-          aria-expanded={overviewSectionExpanded.mistakeBreakdown}
-          aria-controls="overview-mistake-breakdown-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><AlertTriangle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Mistake Breakdown</h2>
-            <div className="panel-actions">
-              <span>Top weak areas by error rate</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.mistakeBreakdown ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-mistake-breakdown-body" className={`overview-panel-body ${overviewSectionExpanded.mistakeBreakdown ? 'is-open' : ''}`}>
-          {!hasMistakeData ? (
-            <p className="status-line">No mistake data yet. Incorrect answers will populate script/tag breakdowns here.</p>
-          ) : (
-            <div className="mistake-grid">
-              {mistakes.map((row, index) => (
-                <article
-                  key={row.key}
-                  className="mistake-card"
-                  style={{ animationDelay: `${140 + index * 60}ms` }}
-                >
-                  <h3>{row.key}</h3>
-                  <div className="mistake-card-metrics">
-                    <span className="metric-accent-danger"><AlertTriangle aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`rate-${row.key}-${row.error_rate}`} className="live-value">{row.error_rate}%</strong> error rate</span>
-                    <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`mistakes-${row.key}-${row.mistakes}`} className="live-value">{row.mistakes}</strong> mistakes</span>
-                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`attempts-${row.key}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── Minigame Performance ─────────────────────────────────────────── */}
-      <section className="panel-glass mistakes-summary-panel overview-collapsible-panel">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('minigamePerformance')}
-          aria-expanded={overviewSectionExpanded.minigamePerformance}
-          aria-controls="overview-minigame-performance-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><PlayCircle aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Minigame Performance</h2>
-            <div className="panel-actions">
-              <span>Accuracy and attempts per game type</span>
-            </div>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.minigamePerformance ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-minigame-performance-body" className={`overview-panel-body ${overviewSectionExpanded.minigamePerformance ? 'is-open' : ''}`}>
-          {!hasMinigamePerfData ? (
-            <p className="status-line">No minigame data yet. Play some minigames to see performance breakdowns here.</p>
-          ) : (
-            <div className="mistake-grid">
-              {minigamePerf.map((row, index) => (
-                <article
-                  key={row.minigame}
-                  className="mistake-card"
-                  style={{ animationDelay: `${140 + index * 60}ms` }}
-                >
-                  <h3>{row.minigame.replace(/_/g, ' ')}</h3>
-                  <div className="mistake-card-metrics">
-                    <span className="metric-accent-danger"><Target aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`acc-${row.minigame}-${row.accuracy}`} className="live-value">{row.accuracy}%</strong> accuracy</span>
-                    <span className="metric-accent-insight"><BarChart3 aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`att-${row.minigame}-${row.attempts}`} className="live-value">{row.attempts}</strong> attempts</span>
-                    <span className="metric-accent-streak"><Flame aria-hidden="true" className="chip-icon" strokeWidth={2.2} /><strong key={`cor-${row.minigame}-${row.correct}`} className="live-value">{row.correct}</strong> correct</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── Deck Snapshot ─────────────────────────────────────────── */}
-      {decks.length > 0 ? (
-        <section className="panel-glass deck-panel overview-deck-panel overview-collapsible-panel">
-          <button
-            type="button"
-            className="overview-panel-toggle"
-            onClick={() => onToggleSection('deckSnapshot')}
-            aria-expanded={overviewSectionExpanded.deckSnapshot}
-            aria-controls="overview-deck-snapshot-body"
-          >
-            <div className="panel-head">
-              <h2 className="panel-title-with-icon"><ListChecks aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Deck Snapshot</h2>
-              <div className="panel-actions">
-                <span>Mastery and daily completion per deck</span>
-              </div>
-              <span className={`overview-panel-chevron ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-            </div>
-          </button>
-
-          <div id="overview-deck-snapshot-body" className={`overview-panel-body ${overviewSectionExpanded.deckSnapshot ? 'is-open' : ''}`}>
-            <div className="deck-grid">
-              {decks.map((deck, index) => {
-                const mastery = deck.total > 0 ? Math.round((deck.mastered / deck.total) * 100) : 0
-                const todayProgress = deck.due_today > 0
-                  ? Math.min(100, Math.round((deck.completed_today / deck.due_today) * 100))
-                  : 0
-                return (
-                  <article
-                    key={deck.slug}
-                    className="deck-card"
-                    style={{ animationDelay: `${180 + index * 70}ms` }}
-                  >
-                    <div className="deck-card-head">
-                      <h3>{deck.name}</h3>
-                      <span>{deck.total} cards</span>
-                    </div>
-                    <div className="meter">
-                      <div className="meter-label">
-                        <span>Mastery</span>
-                        <strong>{mastery}%</strong>
-                      </div>
-                      <div className="meter-track">
-                        <div className="meter-fill" style={{ width: `${mastery}%` }} />
-                      </div>
-                    </div>
-                    <div className="meter">
-                      <div className="meter-label">
-                        <span>Today</span>
-                        <strong>{deck.completed_today}/{deck.due_today}</strong>
-                      </div>
-                      <div className="meter-track">
-                        <div className="meter-fill meter-fill-alt" style={{ width: `${todayProgress}%` }} />
-                      </div>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ── Achievements ────────────────────────────────────────────── */}
-      <section className="panel-glass overview-collapsible-panel achievements-section">
-        <button
-          type="button"
-          className="overview-panel-toggle"
-          onClick={() => onToggleSection('achievements')}
-          aria-expanded={overviewSectionExpanded.achievements}
-          aria-controls="overview-achievements-body"
-        >
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon"><BarChart3 aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />Achievements</h2>
-            <span className={`overview-panel-chevron ${overviewSectionExpanded.achievements ? 'is-open' : ''}`} aria-hidden="true">▾</span>
-          </div>
-        </button>
-
-        <div id="overview-achievements-body" className={`overview-panel-body ${overviewSectionExpanded.achievements ? 'is-open' : ''}`}>
-          {achievements.loading ? (
-            <p className="status-line">Loading achievements...</p>
-          ) : achievements.error ? (
-            <p className="status-line">{achievements.error}</p>
-          ) : (
-            <AchievementsPanel
-              badges={achievements.badges}
-              earnedCount={achievements.earnedCount}
-              totalCount={achievements.totalCount}
-            />
-          )}
-        </div>
-      </section>
-
-      {window.jplearnDesktop.exportAnalyticsCSV ? (
-        <section className="panel-glass activity-summary-panel" aria-label="Export data">
-          <div className="panel-head">
-            <h2 className="panel-title-with-icon">
-              <Download aria-hidden="true" className="panel-title-icon" strokeWidth={2.3} />
-              Export Data
-            </h2>
-            <div className="panel-actions">
-              <span>Download study data as CSV</span>
-            </div>
-          </div>
-          <div className="jlpt-results-actions" style={{ marginTop: '14px' }}>
-            {(
-              [
-                { type: 'review_history', label: 'Review History' },
-                { type: 'accuracy_trends', label: 'Accuracy Trends' },
-                { type: 'mastery_snapshot', label: 'Mastery Snapshot' },
-              ] as const
-            ).map(({ type, label }) => (
-              <button
-                key={type}
-                type="button"
-                className="jlpt-action-btn"
-                onClick={() => { void handleExport(type) }}
-                disabled={exportLoading}
-                aria-label={`Export ${label} as CSV`}
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="jlpt-action-btn"
-              onClick={async () => {
-                if (!window.jplearnDesktop.exportAnalyticsJSON) return
-                setExportLoading(true)
-                setExportMessage(null)
-                try {
-                  const result = await window.jplearnDesktop.exportAnalyticsJSON()
-                  if (result.cancelled) {
-                    setExportMessage(null)
-                  } else if (result.ok) {
-                    setExportMessage(`Saved: ${result.path ?? 'file'}`)
-                  } else {
-                    setExportMessage('Export failed.')
-                  }
-                } catch {
-                  setExportMessage('Export failed.')
-                } finally {
-                  setExportLoading(false)
-                }
-              }}
-              disabled={exportLoading}
-              aria-label="Export full backup as JSON"
-            >
-              Full Backup (JSON)
-            </button>
-            {window.jplearnDesktop.importAnalyticsJSON ? (
-              <button
-                type="button"
-                className="jlpt-action-btn"
-                onClick={async () => {
-                  setExportLoading(true)
-                  setExportMessage(null)
-                  try {
-                    const result = await window.jplearnDesktop.importAnalyticsJSON!()
-                    if (result.cancelled) {
-                      setExportMessage(null)
-                    } else if (result.ok) {
-                      const counts = result.imported ?? {}
-                      const parts = Object.entries(counts)
-                        .filter(([, v]) => v > 0)
-                        .map(([k, v]) => `${v} ${k}`)
-                      setExportMessage(`Imported: ${parts.join(', ') || 'no changes'}`)
-                      if (typeof onRefresh === 'function') onRefresh()
-                    } else {
-                      setExportMessage('Import failed.')
-                    }
-                  } catch {
-                    setExportMessage('Import failed.')
-                  } finally {
-                    setExportLoading(false)
-                  }
-                }}
-                disabled={exportLoading}
-                aria-label="Import backup from JSON file"
-              >
-                Import Backup
-              </button>
-            ) : null}
-          </div>
-          {exportMessage ? (
-            <p className="status-line" style={{ marginTop: '10px' }}>{exportMessage}</p>
-          ) : null}
-        </section>
-      ) : null}
     </div>
   )
 }

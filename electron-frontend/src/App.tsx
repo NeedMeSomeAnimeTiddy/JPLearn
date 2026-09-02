@@ -16,7 +16,6 @@ import type {
   MinigameStatsByScript,
   OverviewCategoryBlocks,
   OverviewKanjiCard,
-  OverviewSectionKey,
   PlayableMinigame,
   RoundState,
   ScriptDeck,
@@ -226,14 +225,6 @@ function App() {
   } | null>(null)
   const warnedSectionsRef = useRef<Set<string>>(new Set())
   const [learningPathExpanded, setLearningPathExpanded] = useState(false)
-  const [overviewSectionExpanded, setOverviewSectionExpanded] = useState<Record<OverviewSectionKey, boolean>>({
-    studyActivity: false,
-    sessionHistory: false,
-    mistakeBreakdown: false,
-    minigamePerformance: false,
-    deckSnapshot: false,
-    achievements: false,
-  })
 
   interface SelectedChar {
     character: string
@@ -785,13 +776,6 @@ function App() {
 
   // Do not warm voice runtime automatically in the background.
   // Keep startup and menu-open flows quiet; runtime initializes on first use.
-
-  const toggleOverviewSection = useCallback((section: OverviewSectionKey) => {
-    setOverviewSectionExpanded((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }))
-  }, [])
 
   const advanceFontSize = useCallback(() => {
     const currentIndex = FONT_SIZE_ORDER.indexOf(settings.fontSize)
@@ -1675,9 +1659,6 @@ function App() {
     }),
     [summary, xpProgress, activity],
   )
-  const mistakes = useMemo(() => summary?.mistakes ?? [], [summary])
-  const minigamePerf = useMemo(() => summary?.minigame_performance ?? [], [summary])
-  const sessionHistory = useMemo(() => summary?.session_history ?? [], [summary])
   const studyPlan = useMemo(
     () => buildStudyPlan(decks, kanjiLevelProgress, vocabLevelProgress),
     [decks, kanjiLevelProgress, vocabLevelProgress],
@@ -1765,10 +1746,6 @@ function App() {
     const scores = cardScores[activeScript]
     return activeBlockCards.every((c) => (scores[c.id] ?? 0) >= CARD_MASTERY_MAX)
   }, [sessionActive, sessionRounds, activeBlockCards, cardScores, activeScript])
-  const hasAnyActivity = activity.week.reviewed > 0 || activity.month.reviewed > 0
-  const hasMistakeData = mistakes.length > 0
-  const hasMinigamePerfData = minigamePerf.length > 0
-  const hasSessionHistory = sessionHistory.length > 0
 
   useEffect(() => {
     if (activeScript !== 'vocab_n5' || blockProgress.length > 0) return
@@ -3063,30 +3040,19 @@ function App() {
               error={error}
               lastUpdated={lastUpdated}
               streak={streak}
-              decks={decks}
-              activity={activity}
               overviewBlocks={overviewBlocks}
               overviewCategoryBlocks={overviewCategoryBlocks}
               overviewKanjiDeck={overviewKanjiDeck}
               overviewKanjiLevelProgress={overviewKanjiLevelProgress}
               overviewBlocksLoading={overviewBlocksLoading}
-              mistakes={mistakes}
-              minigamePerf={minigamePerf}
-              sessionHistory={sessionHistory}
-              hasAnyActivity={hasAnyActivity}
-              hasMistakeData={hasMistakeData}
-              hasMinigamePerfData={hasMinigamePerfData}
-              hasSessionHistory={hasSessionHistory}
               charMasteryExpanded={charMasteryExpanded}
               expandedBlocks={expandedBlocks}
-              overviewSectionExpanded={overviewSectionExpanded}
               cardScores={cardScores}
               kanjiOverviewPage={kanjiOverviewPage}
               onClose={() => setShowOverview(false)}
               onRefresh={() => void loadSummary()}
               onToggleCharMastery={() => setCharMasteryExpanded((v) => !v)}
               onSetExpandedBlocks={setExpandedBlocks}
-              onToggleSection={toggleOverviewSection}
               onSetKanjiOverviewPage={setKanjiOverviewPage}
               onOpenKanjiDetail={openKanjiDetail}
               onSetSelectedChar={setSelectedChar}
