@@ -997,6 +997,20 @@ body.mn-leaving .mn-open.on {
 
 .as-col.here .as-pct { font-size: 50px; }
 
+/* ==================================================================================================
+   THE FIGURE IS INK BECAUSE IT STANDS ON THE GOLD FILL — AND WHEN THERE IS NO FILL IT DOES NOT.
+
+   A DROPPED LINE, NOT A DESIGN CHOICE. The mockup writes the colour inline for exactly this case:
+   `'bottom:' + (fill + 10) + 'px;color:var(--washi)'`. The port kept the position and lost the
+   colour, so every column whose fill is too short to hold the number drew it in `--ink` on a track
+   that is 70% black over the valley. Invisible.
+
+   IT NEVER SHOWED IN THE DESIGN because the mockup's fixture stands a learner partway up N3: four
+   of its five columns are filled and the figure is on gold every time. On a fresh account every
+   column is at 0%, so every figure was on the track and the ascent read as a screen that had not
+   finished loading. The one state the design never drew is the one every new account opens on. */
+.as-pct.above { color: var(--washi); }
+
 .as-col.locked .as-pct { color: rgba(242, 234, 216, 0.5); font-size: 22px; }
 
 .as-mark { position: absolute; left: 0; right: 0; top: 22px; text-align: center;
@@ -1232,10 +1246,14 @@ body.mn-leaving .mn-open.on {
    face, 1.45x the 11px heading directly above it and 2x the 8px label beside it. Three lines of it
    at that size needs 116px in a 98px card, so DIAGNOSTIC's last line printed on the world below.
    Clamped at three, because the copy belongs to the backend and a fourth line would do it again. */
+/* TWO LINES, NOT THREE, SINCE THE MARK CAME BACK. Glyph 13 + name 19 + three lines of this 41 +
+   the purpose 11 + 21 of padding is 105 in a 98px card. At two it is 93. Measured against the
+   longest of the four descriptions at this card's 192px of text width, two lines is what they all
+   need anyway -- the third was slack. */
 .lv-mode em { margin-top: 5px; font-style: normal; font-family: var(--lat-ui);
   font-weight: 600; font-size: 9px; line-height: 1.35; letter-spacing: 0.02em;
   color: rgba(20, 17, 13, 0.6);
-  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 .lv-mode.moves u { color: rgba(20, 17, 13, 0.62); }
 
@@ -1518,6 +1536,21 @@ body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
    card when this was fixed at 46px. */
 .dk-name { font-family: var(--lat); font-style: italic; font-weight: 900; line-height: 0.94;
   color: var(--ink); }
+
+/* ==================================================================================================
+   A JAPANESE NAME IS NOT ITALIC, AND `font-style: italic` ON A FACE WITH NO ITALIC IS THE ONE
+   TYPOGRAPHIC MISTAKE THIS PROJECT HAS ALREADY RULED ON.
+
+   `foundations/type.html`: "A real italic, not a synthetic oblique. Arial Black has no italic, so
+   every heavy italic in this project used to be the roman sheared over by the browser." That was
+   fixed for the Latin display face by moving to Segoe UI Black, which has a drawn italic. Yu Mincho
+   has none — so the rule above, inherited by the course's step names, sheared ひらがな over by
+   about eleven degrees ON TOP of the card's own eight. Measured against the design's own plate, the
+   name leaned more than twice as far as the card it sits on.
+
+   Japanese has no italic at all. The lean is not a style here, it is a rendering artefact.
+   ================================================================================================== */
+.dk-name[data-wide="1"] { font-family: var(--jp); font-style: normal; }
 
 .dk-sub { margin-top: 9px; display: flex; align-items: baseline; gap: 14px;
   font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;

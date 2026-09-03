@@ -43,6 +43,10 @@ export interface ExamMode {
      Two of the four move the readiness figure, one measures it, one finds which level to aim at —
      and the app's own descriptions, which are about mechanics, never say which is which. */
   purpose: string
+  /** the mode's own mark, in the design's own words */
+  mark: string
+  /** true for the one mode that is an obligation rather than a choice */
+  duty: boolean
 }
 
 const PURPOSE: Record<JlptExamMode, string> = {
@@ -52,6 +56,21 @@ const PURPOSE: Record<JlptExamMode, string> = {
   weak_area_drill: 'MOVES THE NUMBER',
 }
 
+/* THE MARK EACH MODE WEARS, which is the design's own and not an invention: the four are authored
+   in the mockup's `AS_MODES` beside the same four English names. The port dropped them and the card
+   became a box of Latin type on a screen where every other card leads with a Japanese mark. */
+const MARK: Record<JlptExamMode, string> = {
+  diagnostic: '診断',
+  mock_exam: '模試',
+  adaptive_review: '復習',
+  weak_area_drill: '弱点',
+}
+
+/* AND WHICH ONE IS THE OBLIGATION. Adaptive Review is this level's SRS queue, so it carries the
+   one vermilion on the screen -- the same law PRACTICE's lanes obey and the same one `.lv-mode.duty`
+   has been written for since the screen landed, with nothing ever setting the class. */
+const DUTY: JlptExamMode = 'adaptive_review'
+
 export const EXAM_MODES: ExamMode[] = (
   ['diagnostic', 'mock_exam', 'adaptive_review', 'weak_area_drill'] as JlptExamMode[]
 ).map((key) => ({
@@ -59,6 +78,8 @@ export const EXAM_MODES: ExamMode[] = (
   label: JLPT_MODE_META[key].label,
   description: JLPT_MODE_META[key].description,
   purpose: PURPOSE[key],
+  mark: MARK[key],
+  duty: key === DUTY,
 }))
 
 export interface LastMock {

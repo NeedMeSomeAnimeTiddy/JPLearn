@@ -125,15 +125,28 @@ export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
             <button
               key={m.key}
               type="button"
-              className={i === at ? 'lv-mode on' : 'lv-mode'}
+              /* THREE STATES THE STYLESHEET HAS ALWAYS DRAWN AND NOTHING EVER SET. `.lv-mode.duty`
+                 puts the vermilion on the one mode that is an obligation, `.lv-mode.shut` greys a
+                 locked level's cards, and both were written, commented and dead. */
+              className={[
+                'lv-mode',
+                i === at ? 'on' : '',
+                m.duty ? 'duty' : '',
+                level.locked ? 'shut' : '',
+              ].filter(Boolean).join(' ')}
               onFocus={() => setAt(i)}
               onClick={() => (level.locked ? refuse() : onStart(m.key))}
               aria-disabled={level.locked}
               aria-label={`${m.label} — ${m.description}`}
             >
+              <span className="g" aria-hidden="true">{m.mark}</span>
               <b>{m.label.toUpperCase()}</b>
-              <i>{m.purpose}</i>
               <em>{m.description}</em>
+              {/* THE PURPOSE SITS AT THE FOOT, in `u`, which is where its rules are: `margin-top:
+                  auto` pins it to the bottom of the card and `.lv-mode.duty u` is what turns it
+                  vermilion. It was in `i` -- the slot for a cost line this screen has no source for
+                  -- so it neither sat at the foot nor could ever be the one red thing. */}
+              <u>{m.purpose}</u>
             </button>
           ))}
         </div>

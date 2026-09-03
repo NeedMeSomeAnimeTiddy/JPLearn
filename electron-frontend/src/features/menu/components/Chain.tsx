@@ -78,13 +78,14 @@ export function Chain({ view, at, onAt, shown, onScrub, onOpen, onPile, enabled 
             <i>{hero.capRight}</i>
           </span>
           <span className="dk-body">
+            {/* THE FACE IS A DATA ATTRIBUTE, NOT AN INLINE FAMILY, because it carries two changes
+                and not one: a Japanese name takes the mincho AND loses the italic. Only the size
+                is per-name, so only the size is written here. */}
             <span
               className="dk-name"
+              data-wide={hero.nameWide ? '1' : '0'}
               lang={hero.nameWide ? 'ja' : undefined}
-              style={{
-                fontSize: chainNameSize(hero.name, hero.nameWide, hero.nameWide ? 66 : 46),
-                fontFamily: hero.nameWide ? 'var(--jp)' : undefined,
-              }}
+              style={{ fontSize: chainNameSize(hero.name, hero.nameWide, hero.nameWide ? 66 : 46) }}
             >
               {hero.name}
             </span>
