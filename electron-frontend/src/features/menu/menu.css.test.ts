@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ASCENT_BADGE_TOP, ASCENT_BOT, ASCENT_TOP } from './ascent'
+import { ASCENT_BOT, ASCENT_TOP } from './ascent'
 
 /* ==================================================================================================
    EVERY TOKEN THE MENU ASKS FOR IS ONE THE MENU DEFINES.
@@ -197,6 +197,9 @@ const CROWN_BOT = 192
 const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
   /* the front door */
   '.st-hero': 'stage',
+  /* THE PATH, as a ledger: the run on the left, the step on the world beside it, the whole
+     course once in the band */
+  '.pa-run': 'stage', '.pa-here': 'stage', '.pa-strip': 'foot',
   /* RECORDS -- two cards and the year on the stage, the level bar and the badges in the foot */
   '.lg-streak': 'stage', '.lg-rest': 'stage', '.lg-year': 'stage',
   '.lg-lv': 'foot', '.lg-ach': 'foot', '.lg-sheet': 'stage',
@@ -213,9 +216,10 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
   /* the drills: deck axis, road, the two arrows, and a foot band carrying two rows */
   '.dr-decks': 'stage', '.dr-strip': 'stage', '.dr-side': 'stage',
   '.dr-mini': 'foot', '.dr-set': 'foot',
-  /* JLPT: the ascent and the level */
-  '.as-col': 'stage', '.as-cur': 'span', '.as-plinth': 'foot', '.as-note': 'foot',
-  '.lv-head': 'stage', '.lv-pair': 'stage', '.lv-modes': 'stage',
+  /* JLPT: the ascent is five tracks and one line under them; the level is a column of
+     mode rows and one reading plate */
+  '.as-law': 'foot',
+  '.lv-modes': 'stage', '.lv-read': 'stage',
   /* the moment something opens */
   '.un-stamp': 'stage', '.un-lead': 'stage', '.un-list': 'stage', '.un-slab': 'stage',
   /* the conversations */
@@ -225,6 +229,11 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
 }
 /* THE PATH IS NOT IN THIS TABLE AND THAT IS CORRECT: it is the chain, so it stands on `.dk-behind`,
    `.dk-here`, `.dk-ahead` and `.dk-rail`, which are already here under the deck. */
+
+/** is this selector declared at all? */
+function menuHas(selector: string): boolean {
+  return SHEETS['menu.css'].split('\n').some((line) => line.startsWith(selector))
+}
 
 /** the declared `top` and `height` of one rule, read out of the stylesheet by its own selector */
 function boxOf(selector: string): { top: number, height: number | null } | null {
@@ -271,7 +280,9 @@ describe('the frame contract', () => {
        stylesheet cannot see are checked against the same two lines */
     expect(ASCENT_TOP).toBeGreaterThanOrEqual(STAGE_TOP)
     expect(ASCENT_BOT).toBeLessThanOrEqual(STAGE_BOT)
-    /* and the badge hangs above the column without leaving the stage */
-    expect(ASCENT_BADGE_TOP).toBeGreaterThanOrEqual(STAGE_TOP)
+    /* every level's name, count and state ride INSIDE its own column now, so there is nothing
+       left to hang off the ladder and drift out of line with it */
+    expect(menuHas('.as-plinth')).toBe(false)
+    expect(menuHas('.as-lockbox')).toBe(false)
   })
 })

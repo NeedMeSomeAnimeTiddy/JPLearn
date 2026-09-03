@@ -140,7 +140,7 @@ async function openThePath(): Promise<void> {
   const path = await screen.findByRole('button', { name: /THE PATH —/i })
   fireEvent.click(path)
   fireEvent.click(path)
-  await waitFor(() => expect(document.querySelector('.dk-here')).not.toBeNull())
+  await waitFor(() => expect(document.querySelector('.pa-here')).not.toBeNull())
 }
 
 const confirmModal = () => document.querySelector('.readiness-warning-modal')
@@ -148,20 +148,20 @@ const confirmModal = () => document.querySelector('.readiness-warning-modal')
 describe('the path offers the frontier and nothing else', () => {
   it('stands on the step the curriculum put the learner on', async () => {
     await openThePath()
-    expect(document.querySelector('.dk-here .dk-cap b')?.textContent)
-      .toBe('YOU ARE HERE · STEP 02 OF 4')
-    expect(document.querySelector('.dk-here .dk-name')?.textContent).toBe('ひらがな')
+    expect(document.querySelector('.pa-kick')?.textContent).toBe('YOU ARE HERE · STEP 02 OF 4')
+    expect(document.querySelector('.pa-name')?.textContent).toBe('ひらがな')
   })
 
-  it('names the next one on the AHEAD card without offering it', async () => {
+  it('draws what is shut without offering it', async () => {
     await openThePath()
-    expect(document.querySelector('.dk-ahead .dk-next b')?.textContent).toBe('漢字')
-    expect(document.querySelector('.dk-ahead button')).toBeNull()
+    const rows = [...document.querySelectorAll('.pa-row')]
+    expect(rows[2].querySelector('.s')?.textContent).toBe('SHUT')
+    expect(rows[2].getAttribute('aria-disabled')).toBe('true')
   })
 
   it('opens the frontier onto its own level three, with no confirmation in the way', async () => {
     await openThePath()
-    fireEvent.click(document.querySelector('.dk-here') as HTMLElement)
+    fireEvent.click(document.querySelector('.pa-go') as HTMLElement)
 
     /* THE SCREEN'S OWN LABEL, not a caption: a deck the fixture gives no blocks draws no cards to
        carry one, and this test is about WHERE a step sends you. */
@@ -173,23 +173,21 @@ describe('the path offers the frontier and nothing else', () => {
   it('has no way to press a step that is still shut', async () => {
     await openThePath()
     const root = document.querySelector('.mn-open') as HTMLElement
-    /* the arrows move between the two cards, not along the sixteen -- so however many times they
-       are pressed, Enter can only reach the open one */
-    for (let i = 0; i < 6; i += 1) fireEvent.keyDown(root, { key: 'ArrowRight' })
+    /* the arrows walk the run, but they stop at the frontier -- so however many times they are
+       pressed, Enter can only reach what is genuinely choosable */
+    for (let i = 0; i < 6; i += 1) fireEvent.keyDown(root, { key: 'ArrowDown' })
     fireEvent.keyDown(root, { key: 'Enter' })
 
-    await waitFor(() => expect(document.querySelector('.dk-here')).toBeNull())
+    await waitFor(() => expect(document.querySelector('.pa-here')).toBeNull())
     expect(document.querySelector('.mn-open')?.getAttribute('aria-label')).toContain('HIRAGANA')
     expect(confirmModal()).toBeNull()
   })
 
-  it('revisits a finished step out of the pile behind you', async () => {
+  it('walks back over a finished step, which the run keeps visible', async () => {
     await openThePath()
-    fireEvent.click(document.querySelector('.dk-behind') as HTMLElement)
-    await waitFor(() => expect(document.querySelector('.dk-cell')).not.toBeNull())
-    fireEvent.click(document.querySelector('.dk-cell') as HTMLElement)
-    await waitFor(() => expect(document.querySelector('.dk-here .dk-cap b')?.textContent)
-      .toBe('REVISITING · STEP 01 OF 4'))
+    fireEvent.keyDown(document.querySelector('.mn-open') as HTMLElement, { key: 'ArrowUp' })
+    await waitFor(() => expect(document.querySelector('.pa-kick')?.textContent)
+      .toBe('ALREADY DONE · STEP 01 OF 4'))
   })
 })
 
@@ -202,6 +200,6 @@ describe('when progression data is unavailable', () => {
 
     /* the menu still stands; the path simply has nothing to walk */
     await waitFor(() => expect(document.querySelector('.mn-frame')).not.toBeNull())
-    expect(document.querySelector('.dk-here')).toBeNull()
+    expect(document.querySelector('.pa-here')).toBeNull()
   })
 })

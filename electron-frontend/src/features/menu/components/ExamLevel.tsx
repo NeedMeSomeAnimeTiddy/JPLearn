@@ -52,106 +52,95 @@ export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
           note="WHAT THIS LEVEL ASKS OF YOU"
         />
 
-        <div className="lv-head">
-          <b>{level.id}</b>
-          <span className={`lv-state ${level.locked ? 'shut' : level.isReady ? 'ready' : ''}`}>
-            {level.state}
-          </span>
+        {/* ─── the four ways in, as lines. See the note above `.lv-modes` for why a mode
+             stopped being a 220x98 card carrying 9px labels. ─────────────────────────────── */}
+        <div className="lv-modes">
+          <span className="lv-lead">FOUR WAYS TO WORK THIS LEVEL</span>
+          <div className="lv-list">
+            {EXAM_MODES.map((m, i) => (
+              <button
+                key={m.key}
+                type="button"
+                /* THREE STATES THE STYLESHEET HAS ALWAYS DRAWN. `.duty` puts the one vermilion on
+                   the mode that is an obligation, `.shut` greys a locked level's rows. */
+                className={[
+                  'lv-mode',
+                  i === at ? 'on' : '',
+                  m.duty ? 'duty' : '',
+                  level.locked ? 'shut' : '',
+                ].filter(Boolean).join(' ')}
+                onFocus={() => setAt(i)}
+                onClick={() => (level.locked ? refuse() : onStart(m.key))}
+                aria-disabled={level.locked}
+                aria-label={`${m.label} — ${m.description}`}
+              >
+                <span className="g" aria-hidden="true">{m.mark}</span>
+                <span className="t">
+                  <b>{m.label.toUpperCase()}</b>
+                  <i>{m.description}</i>
+                </span>
+                <u>{m.purpose}</u>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ─── and the reading, on one plate ────────────────────────────────────────────── */}
+        <div className="lv-read">
+          <span className="lv-cap"><s>手応え</s>  HOW READY YOU ARE</span>
           <span className="lv-figs">
             <em>{level.pct}%</em>
             <s>
               <b>READY AT {JLPT_READY_PCT}%</b>
               {/* the headline reads what is LEFT, not what is done */}
-              {level.locked ? 'AND SHUT UNTIL THE GATE'
-                : level.shortBy ? `${level.shortBy} POINTS SHORT` : 'PAST THE LINE'}
+              <i>{level.locked ? 'AND SHUT UNTIL THE GATE'
+                : level.shortBy ? `${level.shortBy} POINTS SHORT` : 'PAST THE LINE'}</i>
             </s>
           </span>
-        </div>
 
-        <div className="lv-pair">
-          <div className="lv-panel">
-            <span className="lv-ph">何を覚えたか · WHAT YOU HAVE MASTERED</span>
+          <span className="lv-bars">
             {[
               { jp: '漢字', en: 'KANJI', v: level.kanji },
               { jp: '語彙', en: 'VOCABULARY', v: level.vocab },
             ].map((r) => (
-              <span key={r.en} className="lv-srow">
-                <span className="lv-shead">
-                  <span>{r.jp}</span><em>{r.en}</em><b>{r.v.pct}%</b>
+              <span key={r.en} className="lv-bar">
+                <span>
+                  <span className="jp">{r.jp}</span>
+                  <span className="en">{r.en}</span>
+                  <b>{r.v.done.toLocaleString()} <s>/ {r.v.total.toLocaleString()}</s></b>
                 </span>
                 <span className="lv-track"><i style={{ width: `${Math.min(100, r.v.pct)}%` }} /></span>
-                <span className="lv-count">{r.v.done.toLocaleString()} / {r.v.total.toLocaleString()}</span>
               </span>
             ))}
-          </div>
-
-          <div className="lv-panel">
-            <span className="lv-ph">試験が求めるもの · WHAT THE EXAM DEMANDS</span>
 
             {/* THE SECTION IS A SEPARATE GATE, which is the fact this screen exists to carry. */}
-            <span className="lv-srow">
-              <span className="lv-shead">
-                <span>文字語彙・文法</span><em>THE SECTION</em>
+            <span className="lv-bar">
+              <span>
+                <span className="jp">文字語彙・文法</span>
+                <span className="en">THE SECTION</span>
                 <b>{sectionPct === null ? '—' : `${sectionPct}%`}</b>
               </span>
               <span className={sectionPct === null ? 'lv-track none' : 'lv-track'}>
                 {sectionPct === null ? null : <i style={{ width: `${Math.min(100, sectionPct)}%` }} />}
                 <u className="mark" style={{ left: `${markPct}%` }} />
               </span>
-              <span className="lv-count">{sectionLine(level)}</span>
+              <span className="lv-mock">{sectionLine(level)}</span>
             </span>
+          </span>
 
-            {/* AND THE TOTAL IS HATCHED, because the app has no content for the rest of it. */}
-            <span className="lv-srow">
-              <span className="lv-shead">
-                <span>合計</span><em>THE WHOLE EXAM</em><b>—</b>
-              </span>
-              <span className="lv-track none" />
-              <span className="lv-count">
-                PASS MARK {level.passMark} OF 180 · {level.unscored.points} POINTS OF IT ARE{' '}
-                {level.unscored.papers}, WHICH THIS APP HAS NO CONTENT FOR
-              </span>
-            </span>
-
-            <span className="lv-gate">
-              BOTH GATES, NOT ONE — A TOTAL OVER {level.passMark} WITH THE SECTION UNDER{' '}
-              {level.section.passMark} IS STILL A FAIL
-            </span>
-          </div>
+          <span className="lv-foot">
+            <b>BOTH GATES, NOT ONE</b>
+            {/* TWO SENTENCES, NOT THREE. The plate has to fit the band, and the third was the
+                mock line -- which the section bar above already carries as a figure. */}
+            <i>
+              A total over {level.passMark} with the section under {level.section.passMark} is
+              still a fail. {level.unscored.points} of the 180 are {level.unscored.papers.toLowerCase()},
+              which this app has no content for.
+            </i>
+          </span>
         </div>
 
-        <div className="lv-modes">
-          {EXAM_MODES.map((m, i) => (
-            <button
-              key={m.key}
-              type="button"
-              /* THREE STATES THE STYLESHEET HAS ALWAYS DRAWN AND NOTHING EVER SET. `.lv-mode.duty`
-                 puts the vermilion on the one mode that is an obligation, `.lv-mode.shut` greys a
-                 locked level's cards, and both were written, commented and dead. */
-              className={[
-                'lv-mode',
-                i === at ? 'on' : '',
-                m.duty ? 'duty' : '',
-                level.locked ? 'shut' : '',
-              ].filter(Boolean).join(' ')}
-              onFocus={() => setAt(i)}
-              onClick={() => (level.locked ? refuse() : onStart(m.key))}
-              aria-disabled={level.locked}
-              aria-label={`${m.label} — ${m.description}`}
-            >
-              <span className="g" aria-hidden="true">{m.mark}</span>
-              <b>{m.label.toUpperCase()}</b>
-              <em>{m.description}</em>
-              {/* THE PURPOSE SITS AT THE FOOT, in `u`, which is where its rules are: `margin-top:
-                  auto` pins it to the bottom of the card and `.lv-mode.duty u` is what turns it
-                  vermilion. It was in `i` -- the slot for a cost line this screen has no source for
-                  -- so it neither sat at the foot nor could ever be the one red thing. */}
-              <u>{m.purpose}</u>
-            </button>
-          ))}
-        </div>
-
-                <div className="back-tab">
+        <div className="back-tab">
           <button type="button" onClick={onUp}>
             <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
           </button>

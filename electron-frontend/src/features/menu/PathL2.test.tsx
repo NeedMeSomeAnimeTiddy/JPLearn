@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import axe from 'axe-core'
 import type { ProgressionNodeView } from '../progression'
 import { PathL2 } from './components/PathL2'
-import { hereIndex, pathChain, pathRows } from './pathL2'
+import { hereIndex, pathRows, reachIndex, runWindow, RUN_WINDOW } from './pathL2'
 
 const onOpenNode = vi.fn()
 const onUp = vi.fn()
@@ -84,106 +84,115 @@ describe('the path, built from the live curriculum', () => {
   })
 })
 
-describe('the course as a chain', () => {
-  it('splits the sixteen into behind you, here and ahead', () => {
+describe('the window onto the run', () => {
+  it('shows six of the sixteen and counts the rest at either end', () => {
     const rows = pathRows(curriculum())
-    const view = pathChain(rows, hereIndex(rows), hereIndex(rows))
-    expect(view.cleared).toBe(1)
-    expect(view.here).toBe(1)
-    /* the tail counted is the one AFTER the step the AHEAD card names */
-    expect(view.beyond).toBe(rows.length - 3)
-    expect(view.ahead.name).toBe('カタカナ')
-    expect(view.ahead.meta).toBe('KATAKANA')
+    const win = runWindow(rows, 4)
+    expect(win.rows).toHaveLength(RUN_WINDOW)
+    expect(win.behind + win.rows.length + win.ahead).toBe(rows.length)
+    expect(win.rows[win.at].id).toBe(rows[4].id)
   })
 
-  it('says what the open step wants, with the figure carrying the emphasis', () => {
+  it('stands the cursor second, so one step of history shows', () => {
     const rows = pathRows(curriculum())
-    const view = pathChain(rows, 1, 1)
-    expect(view.hero.cap).toBe('YOU ARE HERE · STEP 02 OF 10')
-    expect(view.hero.gate).toBe('WANTS ')
-    expect(view.hero.gateEm).toBe('ALL 46 CHARACTERS')
-    expect(view.hero.slabB).toBe('OPEN ITS BLOCKS')
-    expect(view.hero.capRight).toBe('STUDIED HERE')
+    expect(runWindow(rows, 4).at).toBe(1)
   })
 
-  it('names the section a hand-off lives in rather than pretending it is a deck', () => {
+  it('keeps the window on the list at either end', () => {
     const rows = pathRows(curriculum())
-    const view = pathChain(rows, 8, 8)
-    expect(view.hero.capRight).toBe('LIVES IN THE WORLD')
-    expect(view.hero.slabB).toBe('GO TO THE WORLD')
+    expect(runWindow(rows, 0).behind).toBe(0)
+    const last = runWindow(rows, rows.length - 1)
+    expect(last.ahead).toBe(0)
+    expect(last.rows).toHaveLength(RUN_WINDOW)
   })
 
-  it('says NOT BUILT YET rather than offering a step with nowhere to go', () => {
-    const rows = pathRows(curriculum())
-    const view = pathChain(rows, 7, 7)
-    expect(view.hero.slabB).toBe('NOT BUILT YET')
-    expect(view.hero.live).toBe(false)
+  it('does not fold at all when the whole run fits', () => {
+    const rows = pathRows(curriculum().slice(0, 3))
+    const win = runWindow(rows, 1)
+    expect(win.behind).toBe(0)
+    expect(win.ahead).toBe(0)
   })
 
-  it('re-labels the card when a cleared step is being revisited', () => {
+  it('reaches past the frontier where the course forks', () => {
+    /* `grammar_n5` opens both of its children at once, so two steps are open and the cursor has
+       to be able to get to the second -- see `reachIndex`. */
     const rows = pathRows(curriculum())
-    const view = pathChain(rows, 1, 0)
-    expect(view.hero.cap).toBe('REVISITING · STEP 01 OF 10')
-    expect(view.hero.pct).toBe(100)
-    expect(view.hero.gate).toBe('ALREADY DONE · NOTHING AHEAD MOVES')
-    expect(view.hero.slabB).toBe('STUDY IT AGAIN')
-  })
-
-  it('counts the whole course on the rail', () => {
-    const rows = pathRows(curriculum())
-    const view = pathChain(rows, 1, 1)
-    expect(view.rail.mid).toBe('10 STEPS · 1 DONE · 10% OF THE COURSE')
-    expect(view.rail.right).toBe('STEP 10')
+    expect(reachIndex(rows)).toBe(1)
+    const forked = curriculum().map((n, i) => (i <= 1 ? { ...n, status: 'mastered' as const }
+      : i <= 3 ? { ...n, status: 'active' as const } : n))
+    expect(reachIndex(pathRows(forked))).toBe(3)
+    expect(hereIndex(pathRows(forked))).toBe(2)
   })
 })
 
 describe('the path screen', () => {
-  it('opens on the step the learner is on', async () => {
+  it('opens on the step the learner is on, set at poster size beside the run', async () => {
     draw()
-    await waitFor(() => expect(document.querySelector('.dk-here')).not.toBeNull())
-    expect(document.querySelector('.dk-here .dk-name')?.textContent).toBe('ひらがな')
-    expect(document.querySelector('.dk-here .dk-sub span')?.textContent).toBe('HIRAGANA')
+    await waitFor(() => expect(document.querySelector('.pa-here')).not.toBeNull())
+    expect(document.querySelector('.pa-name')?.textContent).toBe('ひらがな')
+    expect(document.querySelector('.pa-sub b')?.textContent).toBe('HIRAGANA')
+    expect(document.querySelector('.pa-kick')?.textContent).toBe('YOU ARE HERE · STEP 02 OF 10')
   })
 
-  it('counts what is behind you on its own card', () => {
+  it('draws the run as rows, with the open one inverted', () => {
     draw()
-    expect(document.querySelector('.dk-behind .dk-bignum b')?.textContent).toBe('1')
-    expect(document.querySelector('.dk-behind .dk-bignum i')?.textContent).toBe('STEP DONE')
+    const rows = [...document.querySelectorAll('.pa-row')]
+    expect(rows).toHaveLength(6)
+    expect(rows[1].className).toContain('on')
+    expect(rows[0].className).toContain('done')
+    expect(rows[0].querySelector('.s')?.textContent).toBe('済 DONE')
+    expect(rows[2].querySelector('.s')?.textContent).toBe('SHUT')
   })
 
-  it('names the next one without offering it', () => {
+  it('counts what will not fit rather than cutting a row off', () => {
     draw()
-    expect(document.querySelector('.dk-ahead .dk-next b')?.textContent).toBe('カタカナ')
-    /* it is a statement, not a choice — nothing inside it is focusable */
-    expect(document.querySelector('.dk-ahead button')).toBeNull()
+    expect(document.querySelector('.pa-fold b')?.textContent).toBe('4')
+    expect(document.querySelector('.pa-fold i')?.textContent).toBe('MORE STEPS AHEAD OF YOU')
+  })
+
+  it('says what the open step wants, with the figure carrying the emphasis', () => {
+    draw()
+    expect(document.querySelector('.pa-gate')?.textContent)
+      .toBe('WANTS ALL 46 CHARACTERS BEFORE THE NEXT STEP OPENS')
+    expect(document.querySelector('.pa-gate em')?.textContent).toBe('ALL 46 CHARACTERS')
+    expect(document.querySelector('.pa-go b')?.textContent).toBe('OPEN ITS BLOCKS ▸')
   })
 
   it('opens the step with Enter', async () => {
     draw()
-    await waitFor(() => expect(document.querySelector('.dk-here')).not.toBeNull())
+    await waitFor(() => expect(document.querySelector('.pa-here')).not.toBeNull())
     fireEvent.keyDown(document.querySelector('.mn-open') as HTMLElement, { key: 'Enter' })
     expect(onOpenNode).toHaveBeenCalledWith('hiragana')
   })
 
-  it('moves between the two cards with the arrows, and the pile is the other one', async () => {
+  it('walks back over what is finished, and the window follows', async () => {
     draw()
     const root = document.querySelector('.mn-open') as HTMLElement
-    fireEvent.keyDown(root, { key: 'ArrowLeft' })
-    await waitFor(() => expect(document.querySelector('.dk-behind.on')).not.toBeNull())
-    fireEvent.keyDown(root, { key: 'Enter' })
-    await waitFor(() => expect(document.querySelector('.dk-sheet')).not.toBeNull())
-    expect(document.querySelector('.dk-sheet .dk-cap b')?.textContent).toBe('STEPS DONE · 1 OF 10')
+    fireEvent.keyDown(root, { key: 'ArrowUp' })
+    await waitFor(() => expect(document.querySelector('.pa-kick')?.textContent)
+      .toBe('ALREADY DONE · STEP 01 OF 10'))
+    /* the tutorial is the one step the app deliberately has no door back into, so the slab says
+       so rather than promising a revisit it cannot perform */
+    expect(document.querySelector('.pa-go b')?.textContent).toBe('NOT BUILT YET ▸')
+    expect(document.querySelector('.pa-go')?.getAttribute('data-live')).toBe('0')
   })
 
-  it('revisits a cleared step out of the pile', async () => {
+  it('will not walk past the frontier, which is the whole of the chain rule', async () => {
     draw()
     const root = document.querySelector('.mn-open') as HTMLElement
-    fireEvent.keyDown(root, { key: 'ArrowLeft' })
+    for (let i = 0; i < 6; i += 1) fireEvent.keyDown(root, { key: 'ArrowDown' })
+    await waitFor(() => expect(document.querySelector('.pa-kick')?.textContent)
+      .toBe('YOU ARE HERE · STEP 02 OF 10'))
     fireEvent.keyDown(root, { key: 'Enter' })
-    await waitFor(() => expect(document.querySelector('.dk-cell')).not.toBeNull())
-    fireEvent.click(document.querySelector('.dk-cell') as HTMLElement)
-    await waitFor(() => expect(document.querySelector('.dk-here .dk-cap b')?.textContent)
-      .toBe('REVISITING · STEP 01 OF 10'))
+    expect(onOpenNode).toHaveBeenCalledWith('hiragana')
+    expect(onOpenNode).not.toHaveBeenCalledWith('vocabulary_n5')
+  })
+
+  it('shows the whole course once, in the foot band', () => {
+    draw()
+    expect([...document.querySelectorAll('.pa-ticks i')]).toHaveLength(10)
+    expect(document.querySelectorAll('.pa-strip .cap')[1]?.textContent)
+      .toBe('10 STEPS · 1 DONE · 10%')
   })
 
   it('says so when the curriculum answered with nothing', () => {
@@ -199,23 +208,19 @@ describe('the path screen', () => {
 
   it('goes back up a level', () => {
     draw()
-    /* the back control is the mockup's washi tab in the corner now, not a gold line at the top */
     fireEvent.click(screen.getByRole('button', { name: /Back/ }))
     expect(onUp).toHaveBeenCalled()
   })
 
   it('has no accessibility violations', async () => {
     draw()
-    await waitFor(() => expect(document.querySelector('.dk-here')).not.toBeNull())
-
+    await waitFor(() => expect(document.querySelector('.pa-here')).not.toBeNull())
     const results = await (axe as {
       run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
     }).run(document.querySelector('.mn-open') as Element)
     expect(results.violations).toEqual([])
   })
-})
 
-describe('the chain says no where it cannot go', () => {
   it('refuses a step with no destination, which is the genuinely silent case', () => {
     /* the slab beside it already reads NOT BUILT YET; the refusal is what sends you to read it */
     const nodes = [node({ node_id: 'listening', name: 'Listening', status: 'active', isOpen: true, destination: { kind: 'none' } })]
@@ -223,16 +228,5 @@ describe('the chain says no where it cannot go', () => {
     fireEvent.keyDown(document.querySelector('.mn-open') as HTMLElement, { key: 'Enter' })
     expect(onOpenNode).not.toHaveBeenCalled()
     expect(document.querySelector('.mn-flash')).not.toBeNull()
-  })
-
-  it('does not offer a step that is still shut, which is the whole of the chain shape', () => {
-    /* the road let you walk to any of the sixteen and press it. Ten of those could only throw you
-       at another section, and the design retired that: only the open one acts. */
-    draw()
-    const root = document.querySelector('.mn-open') as HTMLElement
-    for (let i = 0; i < 4; i++) fireEvent.keyDown(root, { key: 'ArrowRight' })
-    fireEvent.keyDown(root, { key: 'Enter' })
-    expect(onOpenNode).toHaveBeenCalledWith('hiragana')
-    expect(onOpenNode).not.toHaveBeenCalledWith('vocabulary_n5')
   })
 })

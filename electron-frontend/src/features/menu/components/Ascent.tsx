@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ASCENT_BADGE_TOP, ASCENT_BOT, ASCENT_H, ASCENT_TOP, JLPT_READY_PCT, JLPT_UNLOCK_PCT,
-  badgeFor, pctY, stateWord, type Rung,
+  ASCENT_BOT, ASCENT_H, ASCENT_TOP, JLPT_READY_PCT, JLPT_UNLOCK_PCT,
+  pctY, stateWord, type Rung,
 } from '../ascent'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
@@ -54,8 +54,6 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
     return () => node.removeEventListener('keydown', onKey)
   }, [at, rungs, onOpen])
 
-  const cursor = rungs[Math.min(at, Math.max(rungs.length - 1, 0))]
-
   return (
     <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
@@ -69,15 +67,18 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
             WINDOW -- correct where it sat, wrong inside a centred 1280x720 board, where it would
             run off whichever edge the letterboxing put it nearest. `.as-wrap` is the absolute
             inset-0 container the mockup's own ascent markup emits. */}
+        {/* THE LADDER. Every level is ONE box carrying its own fill, figure, name, count and
+            state — see the note above `.as-col`. Nothing hangs off a column any more, so nothing
+            can drift out of line with it. */}
         <div className="as-wrap">
           <span className="as-tick" style={{ top: ASCENT_TOP }}>100</span>
           <span className="as-tick" style={{ top: ASCENT_BOT }}>0</span>
 
           {rungs.map((rung, index) => {
             const fill = Math.round((ASCENT_H * rung.pct) / 100)
-            /* the number rides ON the fill when there is room above it and above the fill when
-               there is not — a 94% column has 18px of track left and a figure set in it is cut */
-            const inFill = fill > 120
+            /* the figure rides ON the fill when there is room for it, and stands on the track
+               above it when there is not — cream there, ink on the gold */
+            const inFill = fill > (rung.isTarget ? 150 : 74)
             const classes = ['as-col']
             if (rung.state === 'locked') classes.push('locked')
             if (rung.isTarget) classes.push('here')
@@ -95,73 +96,41 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
                   ? `${rung.id} — locked, opens at ${rung.opensAt.need}% on ${rung.opensAt.id}, which is at ${rung.opensAt.at}%`
                   : `${rung.id} — ${rung.pct}% ready, ${rung.done} of ${rung.total} cards mastered`}
               >
-                {rung.opensAt ? (
-                  <span className="as-lockbox">
-                    <b>OPENS AT</b>
-                    <i>{rung.opensAt.id} · {rung.opensAt.need}%</i>
-                    <u>{rung.opensAt.id} AT {rung.opensAt.at}%</u>
-                  </span>
-                ) : (
-                  <>
-                    <span className="as-fill" style={{ height: fill }} />
-                    {rung.isTarget ? <span className="as-mark" aria-hidden="true">検定</span> : null}
-                  </>
-                )}
-                <span
-                  className={rung.opensAt ? 'as-pct' : inFill ? 'as-pct' : 'as-pct above'}
-                  style={{ bottom: rung.opensAt ? 8 : inFill ? fill - (rung.isTarget ? 62 : 44) : fill + 10 }}
-                >
-                  {rung.pct}%
+                {fill > 0 ? <span className="as-fill" style={{ height: fill }} /> : null}
+                <span className="as-base" />
+                <span className="as-body">
+                  <b className={inFill ? 'as-pct infill' : 'as-pct'}>{rung.pct}%</b>
+                  {rung.isTarget ? (
+                    <i className="as-count">
+                      {rung.done.toLocaleString()} / {rung.total.toLocaleString()} MASTERED
+                    </i>
+                  ) : null}
+                  <b className="as-id">{rung.id}</b>
+                  <i className="as-state">{stateWord(rung)}</i>
                 </span>
               </button>
-            )
-          })}
-
-          {rungs.map((rung) => {
-            const classes = ['as-plinth']
-            if (rung.state === 'locked') classes.push('locked')
-            if (rung.isTarget) classes.push('here')
-            return (
-              <span key={rung.level} className={classes.join(' ')} style={{ left: rung.x, width: rung.w }}>
-                <b>{rung.id}</b><i>{stateWord(rung)}</i>
-                <u>{rung.done.toLocaleString()} / {rung.total.toLocaleString()} MASTERED</u>
-              </span>
-            )
-          })}
-
-          {rungs.map((rung) => {
-            const badge = badgeFor(rung)
-            if (!badge) return null
-            return (
-              <span
-                key={rung.level}
-                className={rung.state === 'target' ? 'as-you' : 'as-ready'}
-                style={{ left: rung.x, width: rung.w, top: ASCENT_BADGE_TOP }}
-              >
-                {badge}
-              </span>
             )
           })}
 
           {/* after the columns, so both thresholds run across all five rather than between them */}
           <span className="as-rule ready" style={{ top: pctY(JLPT_READY_PCT) }} />
           <span className="as-chip ready" style={{ top: pctY(JLPT_READY_PCT) }}>
-            <b>{JLPT_READY_PCT}%</b><i>READY</i>
+            <b>{JLPT_READY_PCT}%</b><i>READY TO SIT</i>
           </span>
           <span className="as-rule gate" style={{ top: pctY(JLPT_UNLOCK_PCT) }} />
           <span className="as-chip gate" style={{ top: pctY(JLPT_UNLOCK_PCT) }}>
-            <b>{JLPT_UNLOCK_PCT}%</b><i>GATE</i>
+            <b>{JLPT_UNLOCK_PCT}%</b><i>OPENS THE NEXT</i>
           </span>
-
-          {cursor ? <span className="as-cur" style={{ left: cursor.x, width: cursor.w }} /> : null}
         </div>
 
-        {/* WHAT A BAR MEASURES, which nothing in the app has ever said. Without it a learner who
-            has studied every day for a fortnight reads five empty columns as a broken screen. */}
-        <div className="as-note">
-          検定 · A BAR IS MASTERY, NOT STUDY — THREE CORRECT REVIEWS AND A 21-DAY INTERVAL, PER CARD
+        {/* WHAT THE FOUR SHUT COLUMNS USED TO SAY ONE AT A TIME, and what a bar actually measures.
+            One line, on a ground, in the band the contract leaves for a whole-set statement. */}
+        <div className="as-law">
+          <b>EACH LEVEL OPENS WHEN THE ONE BELOW IT REACHES {JLPT_UNLOCK_PCT}%</b>
+          <i>A BAR IS MASTERY, NOT STUDY — THREE CORRECT REVIEWS AND A 21-DAY INTERVAL, PER CARD</i>
         </div>
-                <div className="back-tab">
+
+        <div className="back-tab">
           <button type="button" onClick={onUp}>
             <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
           </button>

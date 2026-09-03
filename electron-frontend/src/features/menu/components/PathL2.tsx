@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProgressionNodeView } from '../../progression'
-import { hereIndex, pathChain, pathRows } from '../pathL2'
-import { chainPage } from '../chain'
-import { Chain, ChainPile } from './Chain'
+import { hereIndex, pathRows, reachIndex, runWindow, stepNameSize } from '../pathL2'
+import type { PathRow } from '../pathL2'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { refuse } from '../refuse'
@@ -19,144 +18,207 @@ export interface PathL2Props {
 }
 
 /* ==================================================================================================
-   THE PATH, LEVEL TWO — THE CHAIN, which is what the design draws and what this screen was not.
+   THE PATH, LEVEL TWO — THE RUN AS A LEDGER. See the note above `.pa-run` in `menu.css` for why
+   this shape and not the two before it.
 
-   IT WAS A ROAD OF SIXTEEN DOORS, and that is the shape the design system retired: "The road is no
-   longer the shape of everything. It now carries the daily puzzles and nothing else, which is the
-   one thing it is the right shape for." The plate for this screen -- `assets/screen-path.png`,
-   filed as THE CHAIN -- is behind you / here / ahead with a proportional rail underneath, and its
-   caption says why: "This replaced a browsable road of sixteen doors. Ten of those sixteen could
-   only throw you at another section — a curriculum node is a milestone, not a door."
+   ONE COLUMN OF THIN ROWS AND ONE VERY LARGE THING, which is the front door's composition and the
+   only one in this app that has never been sent back. The rows are the run — six of the sixteen,
+   travelling with the cursor — and the step you are on is set at 104px on the open valley beside
+   them, with the gauge, the gate and the action hanging off it.
 
-   WHAT THAT COSTS, STATED PLAINLY. You can no longer walk to step fourteen and press it. The
-   sixteen were never sixteen choices: fifteen of them are either finished or shut, and the one
-   that is neither is the frontier the curriculum put you on. The cleared ones come back through the
-   pile, which is a grid and reaches any of them in two keys; the shut ones are named on the rail
-   and by the AHEAD card, which is all a shut milestone has ever been able to say.
-
-   THE DRAWING IS NOT HERE. It is `components/Chain.tsx`, shared with a deck's blocks, which is what
-   the design system means by "Classes are `.dk-*`, shared with the deck screen through
-   `chainMarkup`". This file is the curriculum's half: which sixteen, which one is open, and the
-   words this screen puts in the shapes.
+   BROWSING CAME BACK, WITHIN THE RULE. The chain offered exactly one thing and nothing else; the
+   road offered all sixteen including ten that could only refuse. This offers what is genuinely
+   choosable: everything up to `reachIndex` — the finished steps, revisitable, and the open one or
+   two at the frontier. The arrows walk that range and the window follows them.
    ================================================================================================== */
+
+/** what a row's right-hand word says, which is the only place a step's state is named */
+function stateWord(row: PathRow, open: boolean): string {
+  if (row.state === 'done') return '済 DONE'
+  return open ? 'OPEN NOW' : 'SHUT'
+}
 
 export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
   const entered = useEntered()
   const frameRef = useFrameFit()
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const rows = useMemo(() => pathRows(nodes), [nodes])
-  const here = hereIndex(rows)
+  const run = useMemo(() => pathRows(nodes), [nodes])
+  const here = useMemo(() => hereIndex(run), [run])
+  const reach = useMemo(() => Math.max(here, reachIndex(run)), [run, here])
 
-  /* two focusable cards: 0 is the open step, 1 is the pile of cleared ones */
-  const [at, setAt] = useState<0 | 1>(0)
-  /* -1 is "the open one"; anything else is a cleared step being revisited */
-  const [pick, setPick] = useState(-1)
-  const [pile, setPile] = useState(false)
-  const [page, setPage] = useState(0)
-  const [cell, setCell] = useState(0)
+  const [cursor, setCursor] = useState<number | null>(null)
+  const at = Math.max(0, Math.min(cursor ?? here, reach))
+  const view = useMemo(() => runWindow(run, at), [run, at])
+  const sel = run[at]
 
-  const shown = pick >= 0 ? pick : here
-  const view = useMemo(() => pathChain(rows, here, shown), [rows, here, shown])
-  const shelf = chainPage(view.cleared, page)
+  /* the walk lives in a ref for the same reason the door does: the listener is bound once and
+     must not be re-subscribed on every keypress */
+  const walkRef = useRef({ at: 0, reach: 0 })
+  walkRef.current = { at, reach }
 
-  /* THE RAIL IS CLAMPED AT THE FURTHEST OPEN STEP — scrubbing past it would let the pointer reach
-     steps the chain does not offer. `reach` is not always `here`: the course forks once, and both
-     children of Grammar N5 open together. See `reachIndex`. */
-  const scrub = (i: number) => {
-    const want = Math.max(0, Math.min(i, view.reach))
-    setPick(want === here ? -1 : want)
-    setPile(false)
-    setAt(0)
-  }
-
-  const sel = rows[shown]
   const openRef = useRef<() => void>(() => {})
   openRef.current = () => {
     if (!sel) return
     /* A STEP WITH NOWHERE TO GO IS THE GENUINELY SILENT CASE, and the slab beside it already reads
-       NOT BUILT YET. The refusal is what sends you to read it. Everything else goes through
-       `onOpenNode`, which owns the curriculum's own soft gate and its confirmation. */
+       NOT BUILT YET. Everything else goes through `onOpenNode`, which owns the curriculum's own
+       soft gate and its confirmation. */
     if (!sel.goesTo) { refuse(); return }
     onOpenNode(sel.id)
   }
 
-  useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
-
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
+    node.focus({ preventScroll: true })
     const onKey = (event: KeyboardEvent) => {
-      /* THE PILE OWNS THE KEYS WHILE IT IS OPEN, and its Escape must not reach App's window
-         listener — otherwise closing it would leave the screen as well, which is one Escape doing
-         two things. Same arrangement as the deck's. */
-      if (pile) {
+      const walk = (d: 1 | -1) => {
         event.preventDefault()
-        event.stopPropagation()
-        if (event.key === 'Escape') { setPile(false); return }
-        if (event.key === 'ArrowRight') { setCell((c) => Math.min(c + 1, shelf.cells.length - 1)); return }
-        if (event.key === 'ArrowLeft') { setCell((c) => Math.max(c - 1, 0)); return }
-        if (event.key === 'ArrowDown') { setPage((p) => Math.min(p + 1, shelf.pages - 1)); setCell(0); return }
-        if (event.key === 'ArrowUp') { setPage((p) => Math.max(p - 1, 0)); setCell(0); return }
-        if (event.key === 'Enter') {
-          const index = shelf.cells[cell]
-          if (index !== undefined) { setPick(index); setPile(false); setAt(0) }
-        }
-        return
+        const { at: from, reach: last } = walkRef.current
+        setCursor(Math.max(0, Math.min(from + d, last)))
       }
-      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft'
-        || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        event.preventDefault()
-        setAt((i) => (i === 0 ? 1 : 0))
-        return
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        if (at === 1) { if (view.cleared > 0) { setPile(true); setCell(0) } return }
-        openRef.current()
-      }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') walk(1)
+      else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') walk(-1)
+      else if (event.key === 'Enter') { event.preventDefault(); openRef.current() }
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, cell, pile, shelf.cells, shelf.pages, view.cleared])
+  }, [])
+
+  const done = run.filter((row) => row.state === 'done').length
+  const name = sel ? (sel.jp || sel.en) : ''
+  const dest = sel?.goesTo ?? ''
+  const revisiting = sel?.state === 'done'
+  const pct = revisiting ? 100 : Math.max(0, sel?.pct ?? 0)
+  const want = sel?.want ? sel.want.toUpperCase() : ''
 
   return (
-    /* THE ROOT SAYS WHICH CHAIN THIS IS. The course and a deck's blocks are the same drawing in the
-       same classes, so without this the two screens are indistinguishable from the outside -- to a
-       test, to a stylesheet, and to anything measuring the running app. */
+    /* the root says which chain this is -- the deck screen wears `dk-blocks` for the same reason */
     <div className={screenClass(entered, 'pa-course')} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
         <ScreenHead head={screenHead('STUDY', null)} />
 
         {/* an absence is drawn as an absence, and "still reading" is not the same absence as
             "answered with nothing" — a course with no steps in it must say which */}
-        {!rows.length ? (
+        {!run.length ? (
           <div className="pj-empty">
             {loading
               ? 'READING THE CURRICULUM…'
               : 'THE CURRICULUM DID NOT ANSWER · NOTHING TO WALK YET'}
           </div>
-        ) : (
-          <Chain
-            view={view}
-            at={at}
-            onAt={setAt}
-            shown={shown}
-            onScrub={scrub}
-            onOpen={() => openRef.current()}
-            onPile={() => { setPile(true); setCell(0) }}
-            enabled={!pile}
-          />
-        )}
+        ) : null}
 
-        {pile ? (
-          <ChainPile
-            view={view}
-            page={shelf.page}
-            cell={cell}
-            onCell={setCell}
-            onPick={(index) => { setPick(index); setPile(false); setAt(0) }}
-            onClose={() => setPile(false)}
-          />
+        {run.length ? (
+          <>
+            <div className="pa-run">
+              {view.behind ? (
+                <div className="pa-fold">
+                  <b>{view.behind}</b>
+                  <i>{view.behind === 1 ? 'STEP BEHIND THESE' : 'STEPS BEHIND THESE'}</i>
+                </div>
+              ) : null}
+
+              {view.rows.map((row, i) => {
+                const index = view.behind + i
+                const open = index <= reach
+                const classes = ['pa-row']
+                if (row.state === 'done') classes.push('done')
+                if (index === at) classes.push('on')
+                return (
+                  <button
+                    key={row.id}
+                    type="button"
+                    className={classes.join(' ')}
+                    onFocus={() => setCursor(Math.min(index, reach))}
+                    onClick={() => (index === at ? openRef.current() : setCursor(Math.min(index, reach)))}
+                    aria-disabled={!open}
+                    aria-label={`${row.no} ${row.en} — ${stateWord(row, open).replace('済 ', '')}`}
+                  >
+                    <span className="n">{row.no}</span>
+                    <span className="t">
+                      <b lang="ja">{row.jp || row.en}</b>
+                      <i>{row.en}</i>
+                    </span>
+                    <span className="s">{stateWord(row, open)}</span>
+                  </button>
+                )
+              })}
+
+              {view.ahead ? (
+                <div className="pa-fold">
+                  <b>{view.ahead}</b>
+                  <i>{view.ahead === 1 ? 'MORE STEP AHEAD OF YOU' : 'MORE STEPS AHEAD OF YOU'}</i>
+                </div>
+              ) : null}
+            </div>
+
+            {sel ? (
+              <div className="pa-here">
+                <span className="pa-kick">
+                  {revisiting ? 'ALREADY DONE' : at === here ? 'YOU ARE HERE' : 'ALSO OPEN'}
+                  {` · STEP ${sel.no} OF ${run.length}`}
+                </span>
+                <span className="pa-name" lang="ja" style={{ fontSize: stepNameSize(name) }}>
+                  {name}
+                </span>
+                <span className="pa-sub">
+                  <b>{sel.en}</b>
+                  <i>{dest === 'A DECK' ? 'STUDIED HERE, IN BLOCKS'
+                    : dest ? `LIVES IN ${dest}` : 'NOT BUILT YET'}</i>
+                </span>
+
+                {/* TWELVE COUNTED STEPS, not a smooth bar: a gate is a count and a bar invites
+                    reading a precision off it that nobody promised. */}
+                <span className="pa-gauge">
+                  <span className="pa-segs">
+                    {Array.from({ length: 12 }, (_, k) => (
+                      <i key={k} className={k < Math.round((pct / 100) * 12) ? 'got' : ''} />
+                    ))}
+                  </span>
+                  <b>{pct}%</b>
+                </span>
+
+                <span className="pa-gate">
+                  {revisiting ? 'ALREADY DONE · NOTHING AHEAD MOVES'
+                    : want ? <>WANTS <em>{want}</em> BEFORE THE NEXT STEP OPENS</>
+                      : 'NOTHING TO CLEAR'}
+                </span>
+
+                <button
+                  type="button"
+                  className="pa-go"
+                  data-live={dest ? '1' : '0'}
+                  onClick={() => openRef.current()}
+                >
+                  {/* NOWHERE TO GO IS CHECKED FIRST. A finished step with no destination read
+                      STUDY IT AGAIN and then refused the press -- the slab has to say the true
+                      thing before it says the encouraging one. */}
+                  <em>{!dest ? 'NOTHING TO OPEN'
+                    : revisiting ? `STEP ${sel.no}` : 'THE ONLY WAY ON'}</em>
+                  <b>
+                    {!dest ? 'NOT BUILT YET'
+                      : revisiting ? 'STUDY IT AGAIN'
+                        : dest === 'A DECK' ? 'OPEN ITS BLOCKS' : `GO TO ${dest}`} ▸
+                  </b>
+                </button>
+              </div>
+            ) : null}
+
+            <div className="pa-strip">
+              <span className="cap">STEP 01</span>
+              <span className="pa-ticks">
+                {run.map((row) => (
+                  <i
+                    key={row.id}
+                    className={row.state === 'done' ? 'done' : row.state === 'here' ? 'here' : ''}
+                    title={`${row.no} ${row.en}`}
+                  />
+                ))}
+              </span>
+              <span className="cap">
+                {run.length} STEPS · {done} DONE · {Math.round((done / run.length) * 100)}%
+              </span>
+            </div>
+          </>
         ) : null}
 
         <div className="back-tab">
@@ -165,7 +227,7 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
           </button>
         </div>
         <div className="hints">
-          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>↑ ↓</b>Walk<em>歩く</em></span>
           <span><b>ENTER</b>Open<em>決定</em></span>
           <span><b>ESC</b>Back<em>戻る</em></span>
         </div>

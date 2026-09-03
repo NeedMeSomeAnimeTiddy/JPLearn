@@ -971,310 +971,197 @@ body.mn-leaving .mn-open.on {
 /* 0.72 AND 0.70, NOT 0.88 AND 0.86. An empty track is the part of the column that is not
    the drawing, and at 118 wide there is half as much again of it as there was at 84 --
    the same alpha over a bigger area reads as a wall rather than as a chart. */
-.as-col { position: absolute; top: 220px; height: 352px; transform: skewX(-8deg);
+/* ==================================================================================================
+   THE LADDER — ONE SKEWED BOX PER LEVEL, CARRYING EVERYTHING IT SAYS.
+
+   THIS IS THE FIX FOR THE BOX THAT WOULD NOT LINE UP. The column, its name-plate and the selection
+   ring were three elements skewed about three different centres: skewX(-8deg) shifts a point by
+   0.1405 times its distance from its own box's centre, so a 40-tall plinth centred at y596 and a
+   352-tall column centred at y396 were 28px apart where they met. The plinth hung out of the ring
+   and past the column, on every level, and the design's own plate has the same defect.
+
+   A COLUMN THAT CARRIES ITS OWN NAME CANNOT COME APART FROM IT. One transform, one origin, and the
+   name, the count, the figure and the state all ride inside the bar they describe.
+
+   AND THE FOUR REPEATED "OPENS AT" PANELS ARE ONE LINE. Every shut level said the same sentence in
+   its own three-line box; on a fresh account that is four identical panels and nothing else on the
+   screen. The rule belongs to the ladder, so it is stated once underneath it — see `.as-law`.
+   ================================================================================================== */
+.as-col { position: absolute; bottom: 0; border: 0; padding: 0; cursor: pointer;
+  display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+  transform: skewX(-8deg);
   background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.05) 0 7px,
-    rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.72);
+    rgba(0, 0, 0, 0) 7px 14px), rgba(12, 10, 8, 0.78);
   box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
-  border: 0; padding: 0; cursor: pointer; }
+  transition: box-shadow 0.2s ease; }
 
-.as-col.here { background: rgba(10, 9, 6, 0.70);
-  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.4); }
+/* the one you are aiming at: firmer paper, a cream keyline, and it is the widest bar on the run */
+.as-col.here { background: rgba(10, 9, 6, 0.84);
+  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 2px var(--washi); }
 
-.as-col.locked { background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.06) 0 7px,
-    rgba(0, 0, 0, 0) 7px 14px), linear-gradient(rgba(17, 19, 28, 0.9), rgba(11, 13, 20, 0.94));
+.as-col.locked { cursor: not-allowed;
+  background: repeating-linear-gradient(135deg, rgba(242, 234, 216, 0.06) 0 7px,
+    rgba(0, 0, 0, 0) 7px 14px), rgba(14, 16, 24, 0.94);
   box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
+
+.as-col.sel { box-shadow: 8px 11px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 2px var(--gold-hi); }
 
 .as-fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--gold);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28); }
-
 .as-col.here .as-fill { background: var(--gold-hi);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4); }
 
-/* SET FOR THE COLUMN THEY STAND IN. 38px reads "94%" at 75px wide, which fitted a 136
-   column and runs out of an 84 -- the number is the drawing here, so it tracks the width. */
-.as-pct { position: absolute; left: 0; right: 0; text-align: center; font-family: var(--lat);
-  font-style: italic; font-weight: 900; font-size: 34px; line-height: 1; color: var(--ink); }
+/* A BAR AT ZERO IS STILL A BAR. With no fill at all the column read as an empty box rather than as
+   a measurement standing at nothing, which is what every level looks like on a fresh account. */
+.as-base { position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: rgba(242, 234, 216, 0.3); }
+.as-col.here .as-base { height: 4px; background: var(--gold-hi); }
 
-.as-col.here .as-pct { font-size: 50px; }
+.as-body { position: relative; z-index: 2; padding: 0 12px 18px; text-align: left; }
+.as-col.here .as-body { padding: 0 14px 20px; }
+
+.as-pct { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+  font-size: 26px; line-height: 0.9; color: rgba(242, 234, 216, 0.42); }
+.as-col.here .as-pct { font-size: 74px; color: var(--washi); }
+/* ON THE FILL IT IS INK; OFF IT, CREAM. The mockup writes that colour inline and the port dropped
+   it, so every column whose fill was too short to hold the figure drew ink on a dark track. */
+.as-pct.infill { color: var(--ink); }
+
+.as-count { display: block; margin-top: 8px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.62); }
+
+.as-id { display: block; margin-top: 14px; font-family: var(--lat); font-style: italic;
+  font-weight: 900; font-size: 26px; line-height: 1; color: rgba(242, 234, 216, 0.55); }
+.as-col.here .as-id { margin-top: 16px; font-size: 30px; color: var(--gold-hi); }
+
+.as-state { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.38); }
+.as-col.here .as-state { font-size: 10px; color: var(--washi); }
+
+/* THE RULE THE FOUR BOXES USED TO REPEAT, ON A GROUND. Gold at 12px over a lit festival ground is
+   the exact failure `foundations/legibility.html` draws; small and measured type takes a plate. */
+.as-law { position: absolute; left: 264px; top: 586px; width: 840px; padding: 9px 18px 10px;
+  display: flex; align-items: baseline; gap: 14px; white-space: nowrap;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
+.as-law b { font-family: var(--lat-ui); font-weight: 700; font-size: 12px; letter-spacing: 0.14em;
+  color: var(--gold-hi); }
+.as-law i { margin-left: auto; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.13em; color: rgba(242, 234, 216, 0.6); }
+
+/* THE READINESS BARS WENT WITH THE PANEL THEY LIVED IN. `.as-split` and its rows drew three
+   tracks inside `.lv-panel`; the level screen is one plate with `.lv-bar` now, and nothing has
+   rendered these since. They also carried a second `.as-count` and a second `.lv-track`, which
+   is how two of this file's silent property collisions got in. */
+
 
 /* ==================================================================================================
-   THE FIGURE IS INK BECAUSE IT STANDS ON THE GOLD FILL — AND WHEN THERE IS NO FILL IT DOES NOT.
+   ONE LEVEL — A COLUMN OF LINES AND ONE PLATE.
 
-   A DROPPED LINE, NOT A DESIGN CHOICE. The mockup writes the colour inline for exactly this case:
-   `'bottom:' + (fill + 10) + 'px;color:var(--washi)'`. The port kept the position and lost the
-   colour, so every column whose fill is too short to hold the number drew it in `--ink` on a track
-   that is 70% black over the valley. Invisible.
+   FOUR 220x98 CARDS CARRYING 9px LABELS IS A PHONE'S SHAPE AT A DESKTOP'S TYPE SIZE, which is the
+   whole of what was wrong with this screen: mobile-button proportions with the type ramp of a
+   dense desktop UI, so nothing was the right size for anything. A mode is a LINE now — 46px tall,
+   the width of the column, with the mark on its leading edge and the name at 18px — and the one
+   you are on inverts to paper, grows to 56 and runs past the column's right edge.
 
-   IT NEVER SHOWED IN THE DESIGN because the mockup's fixture stands a learner partway up N3: four
-   of its five columns are filled and the figure is on gold every time. On a fresh account every
-   column is at 0%, so every figure was on the track and the ascent read as a screen that had not
-   finished loading. The one state the design never drew is the one every new account opens on. */
-.as-pct.above { color: var(--washi); }
+   AND THE TWO HALF-EMPTY PANELS BECOME ONE. The readings floated as cream type over the brightest
+   backdrop in the app; `foundations/backdrops.html` says outright that JLPT is one of the two
+   extremes. They stand on a plate, anchored by the readiness figure at 96px, which also gives the
+   screen two masses instead of type scattered over a picture.
+   ================================================================================================== */
+.lv-modes { position: absolute; left: 160px; top: 192px; width: 476px; }
 
-.as-col.locked .as-pct { color: rgba(242, 234, 216, 0.5); font-size: 22px; }
+.lv-lead { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.26em; color: rgba(242, 234, 216, 0.8); }
 
-.as-mark { position: absolute; left: 0; right: 0; top: 22px; text-align: center;
-  font-family: var(--jp); font-size: 40px; line-height: 1; color: var(--washi); }
+.lv-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 
-.as-lockbox { position: absolute; left: 11px; right: 11px; top: 118px; text-align: center; }
+.lv-mode { display: flex; align-items: stretch; height: 46px; width: 430px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  background: rgba(12, 10, 8, 0.84); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.4);
+  transition: background 0.2s ease; }
+.lv-mode:hover { background: rgba(20, 17, 13, 0.9); }
 
-.as-lockbox b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
-  letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.5); }
+.lv-mode .g { width: 52px; flex: none; display: grid; place-items: center;
+  background: rgba(242, 234, 216, 0.1); font-family: var(--jp); font-weight: 700; font-size: 20px;
+  color: rgba(232, 196, 124, 0.8); }
 
-.as-lockbox i { display: block; margin-top: 5px; font-style: normal; font-family: var(--lat);
-  font-weight: 900; font-size: 15px; color: rgba(242, 234, 216, 0.46); }
+.lv-mode .t { flex: 1; min-width: 0; display: flex; flex-direction: column;
+  justify-content: center; padding-left: 16px; overflow: hidden; }
+.lv-mode .t b { font-family: var(--lat-ui); font-weight: 700; font-size: 18px;
+  letter-spacing: 0.06em; color: var(--washi); white-space: nowrap; }
+.lv-mode .t i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.5); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
 
-.as-lockbox u { display: block; margin-top: 9px; padding: 4px 0 5px; text-decoration: none;
-  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8px; letter-spacing: 0.1em; color: rgba(242, 234, 216, 0.44); }
+.lv-mode u { flex: none; display: grid; place-items: center; padding-right: 16px;
+  text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.45); white-space: nowrap; }
 
-/* TWO LINES, NOT THREE FACTS IN A ROW. Level and state on the first, the count on the
-   second -- which is what lets the column be 118 wide instead of the 150 a single row of
-   all three demanded, and the gaps between the columns are worth more than the row. */
-.as-plinth { position: absolute; top: 576px; height: 40px; transform: skewX(-8deg);
-  display: flex; flex-wrap: wrap; align-items: baseline; align-content: center;
-  gap: 0 8px; padding: 0 11px;
-  background: var(--ink); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34); }
-
-.as-plinth.here { background: var(--gold); box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); }
-
-.as-plinth.locked { background: rgba(12, 10, 8, 0.6);
-  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.16); }
-
-.as-plinth b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
-  color: var(--gold-hi); }
-
-.as-plinth.here b { font-size: 17px; color: var(--ink); }
-
-.as-plinth.locked b { color: rgba(242, 234, 216, 0.5); }
-
-/* 9px, NOT 7.5. The state was set small enough to survive an 84px plinth; at 150 there is
-   no reason to whisper it. */
-.as-plinth i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.1em; line-height: 1.35;
-  color: rgba(242, 234, 216, 0.58); }
-
-.as-plinth.here i { color: rgba(20, 17, 13, 0.7); }
-
-.as-plinth u { flex-basis: 100%; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8.5px; letter-spacing: 0.08em; line-height: 1.3;
-  color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
-
-.as-plinth.here u { color: rgba(20, 17, 13, 0.62); }
-
-.as-plinth.locked u { color: rgba(242, 234, 216, 0.3); }
-
-/* THE READY BADGE IS GOLD BECAUSE GOLD IS EARNED. It is the only thing on this screen that
-   says a level is finished rather than in progress. */
-.as-ready { position: absolute; transform: skewX(-8deg); height: 22px; display: grid;
-  place-items: center; background: var(--gold-hi); color: var(--ink);
-  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42); font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.2em; }
-
-.as-you { position: absolute; transform: skewX(-8deg); height: 22px; display: grid;
-  place-items: center; background: #5b86c4; color: var(--washi);
-  box-shadow: 6px 9px 0 rgba(0, 0, 0, 0.5); font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.2em; }
-
-.as-cur { position: absolute; top: 214px; height: 406px; pointer-events: none;
-  transform: skewX(-8deg); box-shadow: inset 0 0 0 2px var(--washi);
-  transition: left 0.3s cubic-bezier(0.2, 0.92, 0.24, 1), width 0.3s cubic-bezier(0.2, 0.92, 0.24, 1); }
-
-/* THE PANEL THAT HELD THESE IS GONE. It was a level three inside a level two, and it
-   cost this screen 288px of stage for the privilege -- see the note by `.level`. The
-   bars themselves were never the problem, so they moved to the screen that is now
-   level three and the shell around them was deleted. */
-.as-split { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 9px; }
-
-.as-srow { display: flex; flex-direction: column; gap: 5px; }
-
-.as-shead { display: flex; align-items: baseline; gap: 9px; }
-
-.as-shead span { font-family: var(--jp-go); font-weight: 700; font-size: 14px;
-  letter-spacing: 0.06em; color: var(--ink); }
-
-.as-shead em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55); }
-
-.as-shead b { margin-left: auto; font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 17px; color: var(--ink); }
-
-.as-track { position: relative; display: block; height: 12px;
-  background: rgba(20, 17, 13, 0.12); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2); }
-
-.as-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
-
-.as-count { font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
-  color: rgba(20, 17, 13, 0.5); }
-
-/* the two thresholds again, on the level's own bar, drawn the same two ways */
-.as-track u { position: absolute; top: -4px; bottom: -4px; width: 2px; text-decoration: none; }
-
-.as-track u.gate { background: #b23320; }
-
-.as-track u.ready { background: var(--ink); }
-
-
-/* 32/48, 90/206, 308/98 -- the three bands were first laid at 56/176/104 and the panels
-   overflowed onto the modes: a caption, three rows and a foot come to 247px of demand in a
-   176px box. The rows were tightened (track 12 to 10, gaps 5 to 4) and the band gave up
-   8px, which bought the panels the 206 they actually need. */
-.lv-head { position: absolute; left: 168px; top: 198px; width: 944px; height: 48px;
-  display: flex; align-items: center; gap: 14px; padding: 0 20px;
-  transform: skewX(-8deg);
+/* the one you are on inverts and overhangs, the same move the path's open step makes */
+.lv-mode.on { height: 56px; width: 476px;
   background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(233,227,212,var(--paper)) 100%);
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
-
-.lv-head > b { font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 28px; line-height: 1; color: var(--ink); }
-
-.lv-head > i { font-style: normal; font-family: var(--jp); font-weight: 700;
-  font-size: 17px; color: rgba(20, 17, 13, 0.5); }
-
-/* the state chip is the plinth's word, in the plinth's colours -- one level, one label,
-   whichever screen you read it on */
-.lv-state { padding: 4px 11px 5px; background: var(--gold); font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: var(--ink); }
-
-.lv-state.here { background: #5b86c4; color: var(--washi); }
-
-.lv-state.shut { background: var(--ink); color: rgba(242, 234, 216, 0.6); }
-
-.lv-state.ready { background: var(--washi); color: var(--ink); }
-
-.lv-figs { margin-left: auto; display: flex; align-items: baseline; gap: 11px; }
-
-.lv-figs em { font-style: italic; font-family: var(--lat); font-weight: 900;
-  font-size: 30px; line-height: 1; color: #b23320; }
-
-.lv-figs s { text-decoration: none; text-align: right; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9px; letter-spacing: 0.14em; line-height: 1.5;
-  color: rgba(20, 17, 13, 0.55); }
-
-.lv-figs s b { display: block; color: var(--ink); }
-
-/* ---- the two readings ---- */
-.lv-pair { position: absolute; left: 176px; top: 256px; width: 924px; height: 206px;
-  display: flex; gap: 20px; }
-
-/* `overflow: hidden` IS THE CONTRACT'S OWN RULE APPLIED LOCALLY. The stage never grows,
-   so neither does a plate on it -- content that does not fit must be cut before it is
-   drawn, not allowed to paint over the row below. */
-.lv-panel { flex: 1; min-width: 0; display: flex; flex-direction: column;
-  overflow: hidden;
-  background: linear-gradient(178deg, rgba(240,234,217,var(--paper)) 0%,
-    rgba(215,207,183,var(--paper)) 100%);
-  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transform: skewX(-8deg) rotate(-1.2deg); }
-
-.lv-panel:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
-
-.lv-cap { flex: none; display: flex; align-items: baseline; gap: 10px;
-  padding: 6px 16px 6px; background: var(--ink); white-space: nowrap; }
-
-.lv-cap b { font-family: var(--jp); font-weight: 700; font-size: 12px;
-  color: var(--gold-hi); }
-
-.lv-cap i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.17em; color: rgba(232, 196, 124, 0.62); }
-
-/* THE DEFINITION MOVED INTO THE CAPTION when the readiness panel lost its foot to the
-   three rows. It is the bar the whole app measures by and it belongs beside the word. */
-.lv-cap s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8px; letter-spacing: 0.13em;
-  color: rgba(242, 234, 216, 0.42); }
-
-/* the ascent's own split, unchanged -- tighter only because two of these sit where one
-   288-wide panel used to */
-.lv-panel .as-split { padding: 8px 16px 0; gap: 5px; }
-
-.lv-panel .as-srow { gap: 4px; }
-
-.lv-panel .as-track { height: 10px; }
-
-.lv-panel .as-count { color: rgba(20, 17, 13, 0.55); }
-
-.lv-foot { margin-top: auto; padding: 8px 16px 10px; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8.5px; letter-spacing: 0.12em; line-height: 1.55;
-  color: rgba(20, 17, 13, 0.5); }
-
-/* THE ONE SENTENCE THIS SCREEN EXISTS TO SAY. A total over the pass mark with the
-   vocab-and-grammar section under its own mark is still a fail, and nothing anywhere in
-   this app said so before. It gets the vermilion because it is the thing that catches
-   people out, not because it is an action. */
-.lv-foot u { display: block; text-decoration: none; color: #b23320; }
-
-/* ---- the four modes ---- */
-.lv-modes { position: absolute; left: 170px; top: 474px; width: 940px; height: 98px;
-  display: flex; gap: 16px; }
-
-.lv-mode { flex: 1; min-width: 0; border: 0; padding: 11px 14px 10px; font: inherit;
-  text-align: left; cursor: pointer; display: flex; flex-direction: column;
-  transform: skewX(-8deg);
-  background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
-    rgba(203,193,164,var(--paper)) 100%);
-  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transition: background 0.24s ease, box-shadow 0.24s ease; }
-
-.lv-mode.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
     rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px rgba(20, 17, 13, 0.4); }
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.lv-mode.on:hover { background: linear-gradient(178deg, rgba(255,253,247,var(--paper)) 0%,
+    rgba(240,235,222,var(--paper)) 100%); }
+.lv-mode.on .g { background: var(--ink); font-size: 22px; color: var(--gold-hi); }
+.lv-mode.on .t b { font-size: 20px; color: var(--ink); }
+.lv-mode.on .t i { color: rgba(20, 17, 13, 0.55); }
+.lv-mode.on u { padding: 0 16px; background: rgba(20, 17, 13, 0.1); color: rgba(20, 17, 13, 0.6); }
 
-.lv-mode .g { font-family: var(--jp); font-weight: 700; font-size: 13px; line-height: 1;
-  color: rgba(20, 17, 13, 0.4); }
+/* REVIEWS ARE THE OBLIGATION, so Adaptive Review carries the one vermilion on the screen -- the
+   same law PRACTICE's lanes obey, and the reason `u` sits at the row's end rather than in it. */
+.lv-mode.duty u { color: #ff7a63; }
+.lv-mode.duty.on u { background: var(--hi); color: var(--washi); }
 
-.lv-mode b { margin-top: 5px; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 11px; letter-spacing: 0.11em; line-height: 1.25; color: var(--ink); }
+/* a locked level still reads; it just cannot be acted on */
+.lv-mode.shut { background: rgba(12, 10, 8, 0.62); cursor: not-allowed; }
+.lv-mode.shut .t b { color: rgba(242, 234, 216, 0.5); }
+.lv-mode.shut .g { color: rgba(232, 196, 124, 0.45); }
+.lv-mode.shut u, .lv-mode.shut.duty u { color: rgba(242, 234, 216, 0.3); }
 
-.lv-mode i { margin-top: 4px; font-style: normal; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8.5px; letter-spacing: 0.12em;
-  color: rgba(20, 17, 13, 0.55); }
+/* ---- the reading, on one plate --------------------------------------------------------------- */
+.lv-read { position: absolute; left: 690px; top: 192px; width: 430px; padding: 18px 22px 16px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.5),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.18); }
 
-/* WHAT EACH MODE IS FOR, not just what it costs. Two of the four move the readiness
-   figure, one measures it and one finds which level to aim at -- and a learner deciding
-   what to press needs that difference more than it needs a card count. */
-.lv-mode u { margin-top: auto; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8px; letter-spacing: 0.15em;
-  color: rgba(20, 17, 13, 0.4); }
+.lv-cap { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.26em; color: rgba(242, 234, 216, 0.6); }
+.lv-cap s { text-decoration: none; font-family: var(--jp); font-weight: 700; letter-spacing: 0.1em; }
 
-/* AND THE SENTENCE UNDER IT, WHICH HAD NO RULE AT ALL.
-   The mockup's card was a glyph, a name, a purpose and a `<u>` label. The real one drops the glyph
-   and adds `<em>{m.description}</em>` -- the app's own copy for each mode, out of `JLPT_MODE_META`
-   -- and nothing in this file has ever mentioned `em` inside `.lv-mode`. So it inherited: `.lv-mode`
-   sets `font: inherit` to reset the button, which lands the description on the page's 16px body
-   face, 1.45x the 11px heading directly above it and 2x the 8px label beside it. Three lines of it
-   at that size needs 116px in a 98px card, so DIAGNOSTIC's last line printed on the world below.
-   Clamped at three, because the copy belongs to the backend and a fourth line would do it again. */
-/* TWO LINES, NOT THREE, SINCE THE MARK CAME BACK. Glyph 13 + name 19 + three lines of this 41 +
-   the purpose 11 + 21 of padding is 105 in a 98px card. At two it is 93. Measured against the
-   longest of the four descriptions at this card's 192px of text width, two lines is what they all
-   need anyway -- the third was slack. */
-.lv-mode em { margin-top: 5px; font-style: normal; font-family: var(--lat-ui);
-  font-weight: 600; font-size: 9px; line-height: 1.35; letter-spacing: 0.02em;
-  color: rgba(20, 17, 13, 0.6);
-  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.lv-figs { display: flex; align-items: baseline; gap: 18px; margin-top: 2px; }
+.lv-figs > em { font-style: italic; font-family: var(--lat); font-weight: 900; font-size: 84px;
+  line-height: 0.94; color: var(--washi); }
+.lv-figs > s { text-decoration: none; display: flex; flex-direction: column; gap: 3px;
+  padding-bottom: 12px; }
+.lv-figs b { font-family: var(--lat-ui); font-weight: 700; font-size: 15px; letter-spacing: 0.14em;
+  color: var(--gold-hi); }
+.lv-figs i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.6); }
 
-.lv-mode.moves u { color: rgba(20, 17, 13, 0.62); }
+.lv-bars { display: flex; flex-direction: column; gap: 13px; margin-top: 14px; }
+.lv-bar > span { display: flex; align-items: baseline; gap: 12px; }
+.lv-bar .jp { font-family: var(--jp); font-weight: 700; font-size: 19px; color: var(--washi); }
+.lv-bar .en { font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.2em;
+  color: rgba(242, 234, 216, 0.5); }
+.lv-bar b { margin-left: auto; font-family: var(--lat); font-style: italic; font-weight: 900;
+  font-size: 22px; color: var(--washi); }
+.lv-bar b s { text-decoration: none; font-size: 12px; color: rgba(242, 234, 216, 0.5); }
+.lv-track { display: block; margin-top: 6px; height: 11px; position: relative;
+  background: rgba(242, 234, 216, 0.12); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); }
 
-/* REVIEWS ARE THE OBLIGATION HERE TOO. Adaptive Review is the SRS queue for this level,
-   so it carries the one vermilion on the screen -- the same law PRACTICE's lanes obey. */
-.lv-mode.duty.on { box-shadow: 7px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 2px var(--hi); }
-
-/* NOT `.duty.on u`. Which of the four you owe is a fact about the queue, not about where
-   the cursor happens to be -- hidden until selection, it told you only what you had
-   already chosen to look at. */
-.lv-mode.duty u { color: var(--hi); }
-
-.lv-mode.shut.duty u { color: rgba(20, 17, 13, 0.4); }
-
-/* a locked level still opens and still reads -- it just cannot be acted on */
-.lv-mode.shut { background: linear-gradient(178deg, rgba(196,188,166,var(--paper)) 0%,
-    rgba(170,163,142,var(--paper)) 100%); }
-
-.lv-mode.shut b, .lv-mode.shut .g { color: rgba(20, 17, 13, 0.45); }
-
-
+/* THE ONE SENTENCE THIS SCREEN EXISTS TO SAY. A total over the pass mark with the section under
+   its own mark is still a fail, and nothing anywhere in this app said so before. */
+.lv-foot { display: block; margin-top: 15px; padding-top: 12px;
+  box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.18); }
+.lv-foot b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.14em; color: #ff7a63; }
+.lv-foot i { display: block; margin-top: 5px; font-style: normal; font-family: var(--lat-ui);
+  font-weight: 700; font-size: 11px; letter-spacing: 0.08em; line-height: 1.55;
+  color: rgba(242, 234, 216, 0.74); }
 
 /* ---- 三 FUDA -- 千社札, a drift of votive slips ----
    A shrine gate is not a list. It is decades of pilgrims slips pasted over one another, and what
@@ -1722,8 +1609,8 @@ body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
    `listening_projected: None` and `overall_passes: False` always, because the app has no
    listening content -- so the track is hatched rather than empty. An empty gold track
    would read as "you scored nothing", which is a different and untrue claim. */
-.as-track.none { background: repeating-linear-gradient(135deg,
-    rgba(20, 17, 13, 0.13) 0 5px, rgba(20, 17, 13, 0.04) 5px 10px); }
+.lv-track.none { background: repeating-linear-gradient(135deg,
+    rgba(242, 234, 216, 0.16) 0 5px, rgba(242, 234, 216, 0.05) 5px 10px); }
 
 
 
@@ -1747,6 +1634,142 @@ body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
    SO THE PATH USES `.dk-*`, WHICH IS WHAT THE DESIGN SYSTEM SAYS IT DOES: "Classes are `.dk-*`,
    shared with the deck screen through `chainMarkup`." One drawing, two chains. See `chain.ts`.
    ================================================================================================== */
+
+
+/* ==================================================================================================
+   THE PATH, LEVEL TWO — THE RUN AS A LEDGER.
+
+   THE THIRD SHAPE THIS SCREEN HAS HAD, AND THE FIRST ONE DRAWN FROM REFERENCE. It was a reel of
+   sixteen tablets; then it was the chain, three cards in a row; and a row of equal cards carrying
+   nine-pixel labels is a phone's shape at a desktop's type size, which is what got it thrown out.
+
+   WHAT REPLACED IT IS THE FRONT DOOR'S OWN COMPOSITION, which is the one screen in this app nobody
+   has ever complained about: a column of thin rows on the left, one object far larger than anything
+   else on the right, and the valley left open between them. Persona's menus are built the same way
+   and it is worth naming why it works — a selection there is a FILLED SLAB THAT OVERHANGS ITS
+   COLUMN, not an outline and not a shadow, so the eye finds it before it reads anything.
+
+   THE TYPE RAMP IS THE FIX, NOT THE COLOURS. 104 / 46 / 27 / 17 / 11 / 10, and the smallest sizes
+   only ever appear ON a ground or hanging off something large. The old screen ran 26 / 11 / 9 with
+   the 9 doing most of the work.
+   ================================================================================================== */
+/* 197, NOT 192: a 452-wide row rolled -1.2deg lifts 4.7px at its leading end, so a run laid on
+   the stage's own top line paints five pixels above it. The frame contract's own skew arithmetic. */
+.pa-run { position: absolute; left: 164px; top: 197px; width: 452px;
+  display: flex; flex-direction: column; gap: 3px; }
+
+.pa-row { display: flex; align-items: center; height: 34px; width: 452px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  background: rgba(12, 10, 8, 0.6); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  transition: background 0.2s ease, box-shadow 0.2s ease; }
+
+.pa-row.done { background: rgba(12, 10, 8, 0.72); }
+.pa-row:hover { background: rgba(20, 17, 13, 0.82); }
+
+.pa-row .n { width: 40px; text-align: center; font-family: var(--lat); font-style: italic;
+  font-weight: 900; font-size: 14px; color: rgba(242, 234, 216, 0.4); }
+.pa-row.done .n { color: var(--gold); }
+
+.pa-row .t { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 13px;
+  overflow: hidden; }
+.pa-row .t b { font-family: var(--jp); font-weight: 400; font-size: 17px;
+  color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
+.pa-row.done .t b { color: rgba(242, 234, 216, 0.72); }
+.pa-row .t i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.32); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.pa-row.done .t i { color: rgba(242, 234, 216, 0.45); }
+
+.pa-row .s { width: 78px; text-align: right; padding-right: 14px; font-family: var(--lat-ui);
+  font-weight: 700; font-size: 10px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.34);
+  white-space: nowrap; }
+.pa-row.done .s { color: var(--gold); }
+
+/* THE OPEN ROW INVERTS AND OVERHANGS. Paper against ink, 58 tall against 34, and 44px past the
+   column's right edge -- the only light object on the left half and the only one that acts. */
+.pa-row.on { height: 58px; width: 496px; align-items: stretch;
+  background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
+    rgba(235,230,217,var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.pa-row.on:hover { background: linear-gradient(178deg, rgba(255,253,247,var(--paper)) 0%,
+    rgba(240,235,222,var(--paper)) 100%); }
+.pa-row.on .n { display: grid; place-items: center; background: var(--ink); font-size: 17px;
+  color: var(--gold-hi); }
+.pa-row.on .t { align-items: center; gap: 15px; padding-left: 16px; }
+.pa-row.on .t b { font-size: 27px; color: var(--ink); }
+.pa-row.on .t i { font-size: 11px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.5); }
+.pa-row.on .s { width: auto; display: grid; place-items: center; padding: 0 16px;
+  background: var(--hi); font-size: 11px; color: var(--washi); }
+
+/* the ends of the run are counts, not cut-off rows -- the same rule the library's fold obeys */
+.pa-fold { display: flex; align-items: baseline; gap: 10px; padding: 9px 0 0 40px; }
+.pa-fold b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
+  color: var(--gold-hi); text-shadow: var(--ftShadow); }
+.pa-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.2em; color: var(--washi); text-shadow: var(--ftShadow); }
+
+/* ---- and the step itself, on the world ------------------------------------------------------ */
+/* 456 wide, not 470: the action slab is skewed and right-aligned inside this box, so it bleeds
+   past the box's own right edge -- at 470 it reached x1134, fourteen into the moat. */
+.pa-here { position: absolute; left: 656px; top: 196px; width: 456px; }
+
+.pa-kick { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); font-family: var(--lat-ui); font-weight: 700;
+  font-size: 11px; letter-spacing: 0.26em; color: var(--gold-hi); }
+
+/* SIZED FROM ITS OWN LENGTH, and set upright: `--jp` has no italic and shearing it is the
+   synthetic oblique `foundations/type.html` rules against. */
+.pa-name { display: block; margin-top: 4px; font-family: var(--jp); font-weight: 400;
+  font-style: normal; line-height: 1.02; letter-spacing: 0.02em; color: var(--washi);
+  text-shadow: var(--ftShadow); white-space: nowrap; }
+
+.pa-sub { display: flex; align-items: baseline; gap: 16px; margin-top: 2px; }
+.pa-sub b { font-family: var(--lat-ui); font-weight: 700; font-size: 17px; letter-spacing: 0.22em;
+  color: var(--washi); text-shadow: var(--ftShadow); }
+.pa-sub i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.7); text-shadow: var(--ftShadow); }
+
+.pa-gauge { display: flex; align-items: center; gap: 16px; margin-top: 34px; }
+.pa-segs { flex: 1; display: flex; gap: 3px; }
+.pa-segs i { flex: 1; height: 15px; background: rgba(242, 234, 216, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.4); }
+.pa-segs i.got { background: var(--gold); box-shadow: none; }
+.pa-gauge > b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 46px;
+  line-height: 1; color: var(--washi); text-shadow: var(--ftShadow); }
+
+/* A MEASURED LINE TAKES A GROUND, NOT A HALO -- `foundations/legibility.html`, and it is the one
+   rule this screen broke twice: vermilion at 11px on an open valley is unreadable at any shadow. */
+.pa-gate { display: inline-block; margin-top: 10px; padding: 7px 14px 8px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.16); font-family: var(--lat-ui); font-weight: 700;
+  font-size: 11px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.82); }
+.pa-gate em { font-style: normal; color: #ff7a63; }
+
+.pa-go { display: block; margin: 30px 0 0 auto; width: 306px; border: 0; cursor: pointer;
+  text-align: left; padding: 12px 20px 13px; background: var(--hi);
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5); transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease; }
+.pa-go:hover { filter: brightness(1.06); }
+/* the colour law: vermilion is the one thing to press, so a step with nowhere to go does not wear it */
+.pa-go[data-live="0"] { background: rgba(12, 10, 8, 0.78); cursor: not-allowed; }
+.pa-go em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 11px; letter-spacing: 0.18em; color: #ffd9a1; }
+.pa-go[data-live="0"] em { color: rgba(242, 234, 216, 0.55); }
+.pa-go b { display: block; margin-top: 3px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 21px; letter-spacing: 0.08em; color: var(--washi); }
+
+/* the whole run, once, in the band the contract leaves for exactly that */
+.pa-strip { position: absolute; left: 160px; top: 588px; width: 960px; display: flex;
+  align-items: center; gap: 18px; }
+.pa-strip .cap { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.75); text-shadow: var(--ftShadow);
+  white-space: nowrap; }
+.pa-ticks { flex: 1; display: flex; gap: 4px; }
+.pa-ticks i { flex: 1; height: 10px; background: rgba(242, 234, 216, 0.2); }
+.pa-ticks i.done { background: var(--gold); }
+.pa-ticks i.here { background: var(--hi); }
+
 
 
 /* A BESPOKE SCREEN COUNTS ITSELF. The deck screen is STUDY but not the road, so it fell
@@ -3872,12 +3895,9 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    and no translated title, and setting a Japanese name in a Latin UI face is how you get tofu */
 .wd-item.en-jp em { font-family: var(--jp); font-weight: 600; font-size: 11px; letter-spacing: 0; }
 
-.as-note {
-  position: absolute; left: 160px; top: 622px; width: 960px; text-align: center;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
-  color: var(--gold-hi); paint-order: stroke fill;
-  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78);
-}
+/* `.as-note` became `.as-law`, which says the same thing on a ground and in the band
+   the contract leaves for a whole-set statement. */
+
 
 /* AN ABSENCE IS DRAWN AS ONE — an em dash and the reason, never a zero. A ledger that prints 0%
    accuracy for an account that has never reviewed is stating a result it does not have. */
@@ -3892,59 +3912,17 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.45); white-space: nowrap;
 }
 
-.lv-ph {
-  padding: 6px 16px 7px; background: var(--ink); color: var(--gold-hi); font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9px; letter-spacing: 0.18em; white-space: nowrap;
-}
-
-.lv-srow { display: flex; flex-direction: column; gap: 5px; padding: 0 16px; }
-
-.lv-shead { display: flex; align-items: baseline; gap: 9px; }
-
-.lv-shead span {
-  font-family: var(--jp); font-weight: 700; font-size: 14px; letter-spacing: 0.06em; color: var(--ink);
-}
-
-.lv-shead em {
-  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55);
-}
-
-.lv-shead b {
-  margin-left: auto; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
-  color: var(--ink);
-}
-
-.lv-track {
-  position: relative; display: block; height: 12px; background: rgba(20, 17, 13, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-}
-
+/* THE LEVEL SCREEN'S PANELS WENT THE SAME WAY -- two half-empty plates became one. `.lv-track`
+   keeps only its two parts, which the reading still uses: the gold fill, and the pass mark drawn
+   ON the track it belongs to rather than named beside it. */
 .lv-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
 
-/* A NEGATIVE PERCENTAGE IS THE HATCH, NOT A NUMBER. There is no figure for a thing the app cannot
-   measure, so the head is an em dash and the track is hatched rather than empty -- an empty track
-   reads as "you scored nothing", which is a prediction, and this is the absence of one. */
-.lv-track.none {
-  background: repeating-linear-gradient(135deg, rgba(20, 17, 13, 0.16) 0 5px,
-    rgba(20, 17, 13, 0.05) 5px 10px);
-}
+.lv-track u.mark { position: absolute; top: -3px; bottom: -3px; width: 2px;
+  text-decoration: none; background: var(--hi); }
 
-/* the section's own pass mark, standing on its own bar */
-.lv-track u.mark {
-  position: absolute; top: -4px; bottom: -4px; width: 2px; text-decoration: none;
-  background: #b23320;
-}
-
-.lv-count {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.1em;
-  line-height: 1.45; color: rgba(20, 17, 13, 0.55);
-}
-
-.lv-gate {
-  margin-top: auto; padding: 8px 16px 0; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.1em; line-height: 1.45; color: #b23320;
-}
+/* the mock's own line, under the bar it belongs to */
+.lv-mock { display: block; margin-top: 5px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9px; letter-spacing: 0.12em; color: rgba(242, 234, 216, 0.5); }
 
 /* the moment darkens the valley on its own, because it is not somewhere you walked to */
 .un-open::after {

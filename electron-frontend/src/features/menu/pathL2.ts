@@ -1,5 +1,4 @@
 import type { ProgressionNodeView } from '../progression'
-import type { ChainView } from './chain'
 
 /* ==================================================================================================
    THE PATH, LEVEL TWO — the journey, sixteen milestones.
@@ -117,100 +116,51 @@ export function hereIndex(rows: readonly PathRow[]): number {
 
 
 /* ==================================================================================================
-   THE COURSE, AS A CHAIN — the words this screen puts in the shared shapes. See `chain.ts`.
+   THE WINDOW ONTO THE RUN. Sixteen rows do not fit the stage and the frame contract forbids a
+   scrollbar, so six travel with the cursor and the two ends say how many are folded away. A count
+   is a fact; a row cut off by the edge of a panel is an accident.
 
-   A CURRICULUM IS A CHAIN BY CONSTRUCTION, the same way a deck's blocks are: `progression_curriculum`
-   opens each node when the one before it is mastered, so `done` is a prefix, there is exactly one
-   frontier, and everything after it is shut. That is the whole reason this drawing fits — it is not
-   a list rendered three ways, it is three genuinely different populations.
+   THE CURSOR SITS SECOND WHERE IT CAN. Standing it in the middle would hide most of what is behind
+   you, and at the top it would hide the step you just finished -- one row of history and four of
+   what is coming is the shape of a run you are walking forwards.
    ================================================================================================== */
+export const RUN_WINDOW = 6
 
-/** does this string carry kana or kanji, and so want the Japanese face and a wider advance */
-const isCjk = (text: string): boolean => /[\u3040-\u30ff\u3400-\u9fff]/.test(text)
+export interface RunWindow {
+  rows: PathRow[]
+  /** how many are folded above and below */
+  behind: number
+  ahead: number
+  /** index of the cursor within `rows` */
+  at: number
+}
+
+export function runWindow(rows: readonly PathRow[], cursor: number): RunWindow {
+  if (rows.length <= RUN_WINDOW) {
+    return { rows: [...rows], behind: 0, ahead: 0, at: cursor }
+  }
+  const start = Math.min(Math.max(0, cursor - 1), rows.length - RUN_WINDOW)
+  return {
+    rows: rows.slice(start, start + RUN_WINDOW),
+    behind: start,
+    ahead: rows.length - (start + RUN_WINDOW),
+    at: cursor - start,
+  }
+}
 
 /* THE FURTHEST STEP THAT IS ACTUALLY CHOOSABLE, WHICH IS NOT ALWAYS THE ONE YOU ARE ON. The course
    is a line with one fork in it: `grammar_n5` names two children, so mastering it opens Sentence
    Examples AND Scripted Conversation at once. `hereIndex` picks the first of those -- correctly,
-   because it is where the walk continues -- and the rail then has to let you reach the other, or
-   the screen would draw a step as NOT YET CHOOSABLE while it is sitting there choosable. */
+   because it is where the walk continues -- and the cursor then has to be able to reach the other,
+   or the screen would draw a step as shut while it is sitting there open. */
 export function reachIndex(rows: readonly PathRow[]): number {
   let reach = -1
   rows.forEach((row, index) => { if (row.state !== 'ahead') reach = index })
   return reach
 }
 
-export function pathChain(
-  rows: readonly PathRow[], here: number, shown: number,
-): ChainView {
-  const n = rows.length
-  const cleared = rows.filter((row) => row.state === 'done').length
-  const reach = Math.max(here, reachIndex(rows))
-  const sel = rows[shown]
-  /* the AHEAD card names the first step that is genuinely shut, not merely the next in the list */
-  const next = rows[reach + 1]
-  /* REVISITING IS A FACT ABOUT THE STEP, NOT ABOUT THE CURSOR. Off the frontier the card can be
-     showing either a step you finished or -- at the fork -- the other one that is open, and those
-     are different sentences: one is already done, the other is a second way on. */
-  const revisiting = sel?.state === 'done'
-  const alsoOpen = !!sel && shown !== here && sel.state === 'here'
-  const ways = rows.filter((row) => row.state === 'here').length
-  const name = sel ? (sel.jp || sel.en) : ''
-  /* `goesTo` is the destination in the menu's own words: 'A DECK' for a script node, a section name
-     for a hand-off, and empty for a milestone the app cannot open yet. */
-  const dest = sel?.goesTo ?? ''
-  const deck = dest === 'A DECK'
-  const want = sel?.want ? sel.want.toUpperCase() : ''
-
-  return {
-    items: rows.map((row) => ({
-      key: row.id, no: row.no, name: row.en, note: row.count, state: row.state,
-    })),
-    here,
-    reach,
-    cleared,
-    /* the tail AFTER the one the AHEAD card names, which is what "LOCKED BEHIND IT" counts —
-       counted rather than subtracted, so the fork cannot make it one too many */
-    beyond: rows.slice(reach + 2).filter((row) => row.state === 'ahead').length,
-    behindLabel: cleared === 1 ? 'STEP DONE' : 'STEPS DONE',
-    hero: {
-      cap: sel
-        ? `${revisiting ? 'REVISITING' : alsoOpen ? 'ALSO OPEN' : 'YOU ARE HERE'}`
-          + ` · STEP ${sel.no} OF ${n}`
-        : 'THE COURSE',
-      /* WHERE A STEP LIVES BELONGS IN THE CAP. The mockup learned this the hard way: at the right
-         of the gate row it is drawn underneath the action slab and never once seen. */
-      capRight: deck ? 'STUDIED HERE' : dest ? `LIVES IN ${dest}` : 'NOT BUILT YET',
-      name,
-      nameWide: isCjk(name),
-      under: null,
-      subLeft: sel?.en ?? '',
-      subRight: revisiting ? 'DONE' : 'IN PROGRESS',
-      pct: revisiting ? 100 : Math.max(0, sel?.pct ?? 0),
-      /* THE GATE IS THE CURRICULUM'S OWN WORDS -- `MasteryRequirement` said plainly, which is the
-         course's equivalent of a block's 70%. The figure carries the vermilion because it is the
-         one thing on the card that is a target rather than a state. */
-      gate: revisiting ? 'ALREADY DONE · NOTHING AHEAD MOVES' : want ? 'WANTS ' : 'NOTHING TO CLEAR',
-      gateEm: revisiting || !want ? null : want,
-      /* AND THE SLAB'S SMALL LINE CANNOT CLAIM TO BE THE ONLY WAY ON WHILE TWO ARE OPEN, which is
-         exactly what the fork makes true for four steps of the sixteen. */
-      slabEm: revisiting ? `STEP ${sel?.no ?? ''}`.trim()
-        : ways > 1 ? `ONE OF ${ways} WAYS ON` : 'THE ONLY WAY ON',
-      slabB: revisiting ? 'STUDY IT AGAIN'
-        : deck ? 'OPEN ITS BLOCKS'
-          : dest ? `GO TO ${dest}` : 'NOT BUILT YET',
-      live: !!dest,
-    },
-    ahead: {
-      kicker: ways > 1 ? 'NEXT, WHEN BOTH ARE DONE' : 'NEXT, WHEN THIS ONE IS DONE',
-      name: next ? (next.jp || next.en) : 'THE COURSE IS DONE',
-      meta: next ? next.en : 'NOTHING LOCKED',
-      tailLabel: 'LOCKED BEHIND IT',
-    },
-    rail: {
-      left: 'STEP 01',
-      mid: `${n} STEPS · ${cleared} DONE · ${n ? Math.round((cleared / n) * 100) : 0}% OF THE COURSE`,
-      right: `STEP ${String(n).padStart(2, '0')}`,
-    },
-    pile: { cap: 'STEPS DONE', act: 'OPEN THEM', empty: 'NOTHING BEHIND YOU YET' },
-  }
+/** the step name, sized from its own length -- 470px of card, one em per CJK glyph */
+export function stepNameSize(name: string): number {
+  const n = Math.max(1, [...name].length)
+  return Math.max(38, Math.min(104, Math.floor(470 / (n * 1.06))))
 }
