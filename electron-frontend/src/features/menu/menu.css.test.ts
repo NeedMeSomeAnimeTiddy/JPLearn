@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { ASCENT_BADGE_TOP, ASCENT_BOT, ASCENT_TOP } from './ascent'
 
 /* ==================================================================================================
    EVERY TOKEN THE MENU ASKS FOR IS ONE THE MENU DEFINES.
@@ -167,5 +168,110 @@ describe('the menu stylesheet', () => {
        screen that shows them together and it is the reason the pair has to exist. */
     expect(CSS).toMatch(/--gold:\s*#cfa45c/)
     expect(CSS).toMatch(/--gold-hi:\s*#e8c47c/)
+  })
+})
+
+/* ==================================================================================================
+   EVERY BOX THAT STANDS ON THE BOARD STANDS ON THE STAGE.
+
+   THIS EXISTS BECAUSE TWELVE SCREENS DID NOT, AND THE ONLY WAY TO SEE IT WAS TO LOOK. The screens
+   were transplanted out of the mockup, where each one is a block inside `.hud-panel` whose own space
+   begins at frame y166 -- so `top: 34px` there means y200 on the board, and here it meant y34: in
+   the crown, under the heading, with the whole bottom half of the picture empty. Nothing failed. The
+   build was clean, the lint was clean, fifteen hundred tests were clean, and every screen but two
+   was drawn a hundred and sixty-six pixels too high for three phases.
+
+   A COORDINATE CANNOT BE CHECKED BY READING IT, so the table below is the check. It names every rule
+   whose `top` is a BOARD coordinate -- the containing block is `.mn-frame` or a wrapper that fills
+   it -- and the band that rule belongs to. Anything not named here is positioned inside something
+   else and its `top` means something different; `.as-lockbox` at 118 is 118 from the top of its
+   column, `.sc-free` at 294 is inside `.scenes`.
+   ================================================================================================== */
+const STAGE_TOP = 192
+const STAGE_BOT = 576
+/* the foot band's "~640" -- a band that carries two thin rows (the drills) runs a little past it */
+const FOOT_BOT = 646
+const CROWN_BOT = 192
+
+/** every rule whose `top` is a coordinate on the 1280x720 board, and where it is allowed to stand */
+const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
+  /* the front door */
+  '.st-hero': 'stage',
+  /* RECORDS -- two cards and the year on the stage, the level bar and the badges in the foot */
+  '.lg-streak': 'stage', '.lg-rest': 'stage', '.lg-year': 'stage',
+  '.lg-lv': 'foot', '.lg-ach': 'foot', '.lg-sheet': 'stage',
+  /* the badge wall */
+  '.bw-rows': 'stage', '.bw-detail': 'stage',
+  /* a deck's blocks, and the vocabulary rail that replaces them for the five vocab decks */
+  '.dk-behind': 'stage', '.dk-here': 'stage', '.dk-ahead': 'stage', '.dk-rail': 'stage',
+  '.dk-sheet': 'stage',
+  '.fd-hero': 'stage', '.fd-today': 'stage', '.fd-rail': 'stage',
+  /* PRACTICE and THE WORLD, which are the same screen filled twice */
+  '.lanes': 'stage', '.lanes.two': 'stage', '.pr-note': 'stage',
+  /* the library */
+  '.lb-view': 'stage', '.lb-heads': 'span', '.lb-mini': 'foot',
+  /* the drills: deck axis, road, the two arrows, and a foot band carrying two rows */
+  '.dr-decks': 'stage', '.dr-strip': 'stage', '.dr-side': 'stage',
+  '.dr-mini': 'foot', '.dr-set': 'foot',
+  /* JLPT: the ascent and the level */
+  '.as-col': 'stage', '.as-cur': 'span', '.as-plinth': 'foot', '.as-note': 'foot',
+  '.lv-head': 'stage', '.lv-pair': 'stage', '.lv-modes': 'stage',
+  /* the moment something opens */
+  '.un-stamp': 'stage', '.un-lead': 'stage', '.un-list': 'stage', '.un-slab': 'stage',
+  /* the conversations */
+  '.scenes': 'stage',
+  /* shared furniture */
+  '.pj-empty': 'stage', '.pj-back': 'crown',
+  /* the road, which is the one screen the contract argues with */
+  '.cs-strip': 'stage', '.cs-mini': 'foot', '.cs-chapline': 'crown', '.cs-side': 'crown',
+}
+
+/** the declared `top` and `height` of one rule, read out of the stylesheet by its own selector */
+function boxOf(selector: string): { top: number, height: number | null } | null {
+  const menu = SHEETS['menu.css']
+  const pattern = new RegExp(
+    `(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s,{])[^{]*\\{([^}]*)\\}`,
+    'g',
+  )
+  for (const match of menu.matchAll(pattern)) {
+    const body = match[2]
+    const top = /(?<![\w-])top:\s*(-?[\d.]+)px/.exec(body)
+    if (!top) continue
+    const height = /(?<![\w-])height:\s*(-?[\d.]+)px/.exec(body)
+    return { top: Number(top[1]), height: height ? Number(height[1]) : null }
+  }
+  return null
+}
+
+describe('the frame contract', () => {
+  it('stands every board-level box on the stage or in a band', () => {
+    const wrong: string[] = []
+    for (const [selector, band] of Object.entries(BOARD_BOXES)) {
+      const box = boxOf(selector)
+      if (!box) { wrong.push(`${selector} has no rule with a top -- did it move or get renamed?`); continue }
+      const foot = box.height === null ? box.top : box.top + box.height
+      if (band === 'crown') {
+        if (box.top >= CROWN_BOT) wrong.push(`${selector} is crown furniture but sits at y${box.top}`)
+        continue
+      }
+      /* `span` is the third case and there are exactly two of it: a box that starts on the stage and
+         is MEANT to reach into the band under it. The ascent's cursor outlines a column and the
+         plinth that names it, which are one object read as one; the library's heading layer is the
+         same 384-tall plate as its rail, two pixels down, so it ends two into the band. */
+      const floor = band === 'foot' ? STAGE_BOT : STAGE_TOP
+      const ceiling = band === 'stage' ? STAGE_BOT : FOOT_BOT
+      if (box.top < floor) wrong.push(`${selector} starts at y${box.top}, above the ${band} (y${floor})`)
+      if (foot > ceiling) wrong.push(`${selector} runs to y${foot}, past the ${band} (y${ceiling})`)
+    }
+    expect(wrong).toEqual([])
+  })
+
+  it('keeps the ascent inside the stage, which its own module sizes rather than the stylesheet', () => {
+    /* the columns' box is solved in TypeScript because the wide one moves -- so the numbers the
+       stylesheet cannot see are checked against the same two lines */
+    expect(ASCENT_TOP).toBeGreaterThanOrEqual(STAGE_TOP)
+    expect(ASCENT_BOT).toBeLessThanOrEqual(STAGE_BOT)
+    /* and the badge hangs above the column without leaving the stage */
+    expect(ASCENT_BADGE_TOP).toBeGreaterThanOrEqual(STAGE_TOP)
   })
 })

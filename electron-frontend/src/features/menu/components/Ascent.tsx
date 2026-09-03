@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ASCENT_BOT, ASCENT_H, ASCENT_TOP, JLPT_READY_PCT, JLPT_UNLOCK_PCT,
+  ASCENT_BADGE_TOP, ASCENT_BOT, ASCENT_H, ASCENT_TOP, JLPT_READY_PCT, JLPT_UNLOCK_PCT,
   badgeFor, pctY, stateWord, type Rung,
 } from '../ascent'
 import { screenHead } from '../chrome'
@@ -136,7 +136,7 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
               <span
                 key={rung.level}
                 className={rung.state === 'target' ? 'as-you' : 'as-ready'}
-                style={{ left: rung.x, width: rung.w }}
+                style={{ left: rung.x, width: rung.w, top: ASCENT_BADGE_TOP }}
               >
                 {badge}
               </span>

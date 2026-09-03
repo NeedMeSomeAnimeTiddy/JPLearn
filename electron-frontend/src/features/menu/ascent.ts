@@ -73,10 +73,16 @@ export const ASCENT_GAP = 50
 export const COL_W = 118
 export const COL_W_WIDE = 150
 
-/* the drawing's own box, in stage coordinates */
-export const ASCENT_TOP = 228
-export const ASCENT_H = 300
+/* THE DRAWING'S OWN BOX, IN BOARD COORDINATES — and it is the mockup's, not a second opinion.
+   `AS_TOP = 54, AS_H = 352` there, in the panel's space, which begins at board y166: a badge that
+   hangs 26 above the column lands on the stage's own top line at y192, the columns run 220 to 572,
+   and the plinths take the foot band underneath. The port had 228/300, which is neither — it left
+   the plinths (still authored at the mockup's 410) painting across the columns' feet. */
+export const ASCENT_TOP = 220
+export const ASCENT_H = 352
 export const ASCENT_BOT = ASCENT_TOP + ASCENT_H
+/** the READY / YOU badge hangs above the column it belongs to */
+export const ASCENT_BADGE_TOP = ASCENT_TOP - 26
 
 /** y for a percentage, on the column track */
 export function pctY(pct: number): number {
