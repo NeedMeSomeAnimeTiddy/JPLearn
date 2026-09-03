@@ -9,7 +9,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
-import { PROGRESSION_OVERRIDES_STORAGE_KEY } from './features/progression'
 
 vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => (
@@ -113,140 +112,89 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-/** One index mark, found by its accessible name. */
-/* THE CURRICULUM BELONGS TO THE MENU NOW. HomeView's course rail and its expanded list retired
-   with phase 6's toggle, and `PathL2.test.tsx` covers what replaced them. What is NOT covered
-   anywhere else, and is the reason this file survives, is the soft gate: a locked step asks once,
-   then opens. That crosses the feature hook, the shared warning modal and App's routing, so it is
-   tested against the real App rather than a component. */
-/* THE PATH IS A ROAD NOW, so a step is a tablet on it rather than a row in a list -- and reaching
-   one is the mockup's two-step: the first press selects the stone, the second walks through it. */
-function step(name: string): HTMLButtonElement {
-  const rows = Array.from(document.querySelectorAll('.cs-tab')) as HTMLButtonElement[]
-  const match = rows.find((r) => (r.getAttribute('aria-label') ?? '').includes(name.toUpperCase()))
-  if (!match) {
-    throw new Error(`No path tablet for "${name}". Have: ${rows.map((r) => r.getAttribute('aria-label')).join(' | ')}`)
-  }
-  return match
-}
+/* ==================================================================================================
+   WHAT THE PATH OFFERS, END TO END — and what stopped being offered when it became the chain.
 
-/* SELECT THE TABLET, THEN PRESS IT -- pointing is not choosing on this road. But the road OPENS on
-   the step the learner is standing on, so that one is already selected and the first press walks
-   straight through it. Pressing blind a second time then throws, because there is no road left to
-   find a tablet on. So: press, and press again only if we are still standing on it. */
-function walkTo(name: string): void {
-  fireEvent.click(step(name))
-  if (document.querySelector('.cs-strip')) fireEvent.click(step(name))
-}
+   THIS FILE USED TO BE THE SOFT GATE'S ONLY COVERAGE, because the path was the soft gate's only
+   surface: sixteen tablets on a road, any of which could be walked to and pressed, with a locked
+   one raising a confirmation that was remembered per node. The design system retired that road --
+   "This replaced a browsable road of sixteen doors. Ten of those sixteen could only throw you at
+   another section; a curriculum node is a milestone, not a door" -- so a shut step is no longer
+   pressable from anywhere, and `progression.pending` has nothing left to raise it.
+
+   THE MACHINERY IS STILL THERE and is still tested where it lives (`features/progression`). What is
+   gone is a way for a learner to reach it, and that is a product decision rather than a bug: if the
+   soft gate is to survive it needs a new surface, and if it is not, `requestOpen`'s pending branch
+   and one of App's two readiness modals go with it. Stated here rather than left as a passing test
+   that no longer tests the thing it is named after.
+
+   WHAT IS STILL TRUE, AND IS WHAT THIS FILE CHECKS: the frontier opens, it lands on its own level
+   three, and nothing shut is reachable from the screen.
+   ================================================================================================== */
 
 async function openThePath(): Promise<void> {
   render(<App />)
   await screen.findByRole('button', { name: /open shortcuts/i })
   /* HOVER SELECTS, A CLICK ON THE SELECTED ONE GOES -- the mockup's two-step, so a mouse never
-     enters a section it only crossed. And a hover only counts once the pointer has actually moved
-     (`useHoverPick`, which stops a moving list dragging the selection off the keyboard's choice),
-     so a synthetic `mouseEnter` with no `pointermove` behind it is correctly ignored. Two presses
-     is what a keyboard-less caller has: the first selects, the second opens. */
+     enters a section it only crossed. Two presses is what a keyboard-less caller has. */
   const path = await screen.findByRole('button', { name: /THE PATH —/i })
   fireEvent.click(path)
   fireEvent.click(path)
-  await waitFor(() => expect(document.querySelector('.cs-strip')).not.toBeNull())
+  await waitFor(() => expect(document.querySelector('.dk-here')).not.toBeNull())
 }
 
-/** the path is gone, which means the step opened something */
-async function leftThePath(): Promise<void> {
-  await waitFor(() => expect(document.querySelector('.cs-strip')).toBeNull())
-}
+const confirmModal = () => document.querySelector('.readiness-warning-modal')
 
-describe('opening a node', () => {
-  // Scoped to the modal's own class rather than role="dialog": the titlebar
-  // streak panel is also a dialog, so the role alone is ambiguous here.
-  const confirmModal = () => document.querySelector('.readiness-warning-modal')
-  const modalButton = (label: RegExp) => {
-    const buttons = Array.from(confirmModal()?.querySelectorAll('button') ?? [])
-    const match = buttons.find((b) => label.test(b.textContent ?? ''))
-    if (!match) throw new Error(`No modal button matching ${label}`)
-    return match
-  }
-
-  it('goes straight through when the step is already open', async () => {
+describe('the path offers the frontier and nothing else', () => {
+  it('stands on the step the curriculum put the learner on', async () => {
     await openThePath()
-    walkTo('Hiragana')
+    expect(document.querySelector('.dk-here .dk-cap b')?.textContent)
+      .toBe('YOU ARE HERE · STEP 02 OF 4')
+    expect(document.querySelector('.dk-here .dk-name')?.textContent).toBe('ひらがな')
+  })
 
-    await leftThePath()
+  it('names the next one on the AHEAD card without offering it', async () => {
+    await openThePath()
+    expect(document.querySelector('.dk-ahead .dk-next b')?.textContent).toBe('漢字')
+    expect(document.querySelector('.dk-ahead button')).toBeNull()
+  })
+
+  it('opens the frontier onto its own level three, with no confirmation in the way', async () => {
+    await openThePath()
+    fireEvent.click(document.querySelector('.dk-here') as HTMLElement)
+
+    /* THE SCREEN'S OWN LABEL, not a caption: a deck the fixture gives no blocks draws no cards to
+       carry one, and this test is about WHERE a step sends you. */
+    await waitFor(() => expect(document.querySelector('.mn-open')?.getAttribute('aria-label'))
+      .toContain('HIRAGANA'))
     expect(confirmModal()).toBeNull()
   })
 
-  it('asks for confirmation before opening a gated step', async () => {
+  it('has no way to press a step that is still shut', async () => {
     await openThePath()
-    walkTo('Basic Kanji (N5)')
+    const root = document.querySelector('.mn-open') as HTMLElement
+    /* the arrows move between the two cards, not along the sixteen -- so however many times they
+       are pressed, Enter can only reach the open one */
+    for (let i = 0; i < 6; i += 1) fireEvent.keyDown(root, { key: 'ArrowRight' })
+    fireEvent.keyDown(root, { key: 'Enter' })
 
-    await waitFor(() => expect(confirmModal()).not.toBeNull())
-    expect(confirmModal()?.textContent).toContain('Basic Kanji (N5)')
-    expect(modalButton(/continue anyway/i)).toBeTruthy()
-  })
-
-  it('stays on the path when the confirmation is declined', async () => {
-    await openThePath()
-    walkTo('Basic Kanji (N5)')
-    await waitFor(() => expect(confirmModal()).not.toBeNull())
-
-    fireEvent.click(modalButton(/go back/i))
-
-    await waitFor(() => expect(confirmModal()).toBeNull())
-    expect(document.querySelector('.cs-strip')).not.toBeNull()
-  })
-
-  it('remembers the choice so a step is only ever asked about once', async () => {
-    await openThePath()
-    walkTo('Basic Kanji (N5)')
-    await waitFor(() => expect(confirmModal()).not.toBeNull())
-    fireEvent.click(modalButton(/continue anyway/i))
-
-    await waitFor(() => {
-      const stored = window.localStorage.getItem(PROGRESSION_OVERRIDES_STORAGE_KEY)
-      expect(JSON.parse(stored ?? '[]')).toContain('kanji_n5')
-    })
-  })
-
-  it('opens without asking again after a remembered confirmation', async () => {
-    window.localStorage.setItem(PROGRESSION_OVERRIDES_STORAGE_KEY, JSON.stringify(['kanji_n5']))
-
-    await openThePath()
-    walkTo('Basic Kanji (N5)')
-
-    await leftThePath()
-    expect(confirmModal()).toBeNull()
-  })
-
-  it('sends a confirmed step to the same place an open one goes', async () => {
-    /* FOUND LIVE, NOT BY A TEST. `progression.pending` is one piece of shared state raised by more
-       than one call site, and its modal answered all of them by dropping straight into the flat
-       view -- so an OPEN milestone reached its level three and a GATED one, once confirmed, did
-       not. Same row, two destinations, decided by whether a dialog happened to appear. */
-    await openThePath()
-    walkTo('Hiragana')
-    await leftThePath()
-    /* THE SCREEN'S OWN LABEL, not a caption. The deck screen names itself in the open block's cap
-       -- but a deck the fixture gives no blocks draws no cards to carry one, and this test is about
-       WHERE a step sends you rather than about what the deck holds. The label is on the screen
-       itself and is there either way. */
+    await waitFor(() => expect(document.querySelector('.dk-here')).toBeNull())
     expect(document.querySelector('.mn-open')?.getAttribute('aria-label')).toContain('HIRAGANA')
+    expect(confirmModal()).toBeNull()
+  })
 
-    cleanup()
-    window.localStorage.clear()
-
+  it('revisits a finished step out of the pile behind you', async () => {
     await openThePath()
-    walkTo('Basic Kanji (N5)')
-    await waitFor(() => expect(confirmModal()).not.toBeNull())
-    fireEvent.click(modalButton(/continue anyway/i))
-    await leftThePath()
-    expect(document.querySelector('.mn-open')?.getAttribute('aria-label')).toContain('KANJI')
+    fireEvent.click(document.querySelector('.dk-behind') as HTMLElement)
+    await waitFor(() => expect(document.querySelector('.dk-cell')).not.toBeNull())
+    fireEvent.click(document.querySelector('.dk-cell') as HTMLElement)
+    await waitFor(() => expect(document.querySelector('.dk-here .dk-cap b')?.textContent)
+      .toBe('REVISITING · STEP 01 OF 4'))
   })
 })
 
 describe('when progression data is unavailable', () => {
-  it('renders Home without a map rather than failing', async () => {
+  it('renders Home without a course rather than failing', async () => {
     window.jplearnDesktop = makeApi(vi.fn(async () => { throw new Error('bridge down') }))
 
     render(<App />)
@@ -254,6 +202,6 @@ describe('when progression data is unavailable', () => {
 
     /* the menu still stands; the path simply has nothing to walk */
     await waitFor(() => expect(document.querySelector('.mn-frame')).not.toBeNull())
-    expect(document.querySelector('.cs-strip')).toBeNull()
+    expect(document.querySelector('.dk-here')).toBeNull()
   })
 })

@@ -890,36 +890,12 @@ body.mn-leaving .mn-open.on {
 .lvb-chip.on b { color: var(--gold-hi); }
 .lvb-chip.on i { color: rgba(242, 234, 216, 0.6); }
 
-/* ---- THE ROAD, LIFTED WHOLE ----------------------------------------------------------------
-   The first port drew this as a vertical list of milestone rows with a six-row window and two
-   fold counts. The mockup's is a WALKED ROAD: sixteen standing tablets on a horizontal rail that
-   compresses toward each horizon, with the card riding your place on it, a marker showing how far
-   between this step and the next you are, and a minimap of the whole sixteen underneath. None of
-   the 34 `cs-` classes had come across, which made this the widest gap of the twelve screens.
-
-   THE LAYOUT IS WRITTEN EVERY SYNC, NOT DECLARED. Every slot's width, every tablet's scale, depth
-   and opacity, the rail's translation and the marker's position are all functions of DISTANCE FROM
-   THE SELECTION, so they are computed in the component and passed as inline style -- which is what
-   the mockup does too, for the same reason. What is left here is the part that does not move. */
-
-/* THE ROAD IS THE FOURTH CONTENT BLOCK AND WAS NEVER ADDED TO THIS LIST. It was built after
-   the other three and compensated by hand instead -- `52px * var(--lk-u, 1)` here, `60px * var(--lk-u, 1)`
-   there -- which scaled where it was ANCHORED and never what it was made of. Measured at
-   1280 / 1920 / 2560: a tablet stayed 101px wide at all three, so it went from 7.9% of the
-   frame to 4.0%, the hero from 26.3% to 13.2%, and the whole road from 89.7% of the width to
-   44.8% -- a small drawing in the middle of a wide screen with the frame furniture spread out
-   around it. Every hand compensation below comes out with this line going in, or they multiply
-   twice. */
-.hud[data-t="midashi"] .hud-head,
-.hud[data-t="midashi"] .hud-list,
-.hud[data-t="midashi"] .hud-detail,
-.hud[data-t="midashi"] .course-shape,
-.hud[data-t="midashi"] .ledger,
-.hud[data-t="midashi"] .ascent,
-.hud[data-t="midashi"] .deck,
-.hud[data-t="midashi"] .feed,
-.hud[data-t="midashi"] .path,
-.hud[data-t="midashi"] .library { zoom: var(--lk-u, 1); }
+/* THE ROAD WAS DESCRIBED HERE, AND THE PANEL IT HUNG IN. Two dead things went together: the
+   prose for a walked road of sixteen tablets, which is now the chain (see the note further down),
+   and a `.hud[data-t="midashi"]` rule listing the seven content blocks that carry the board's
+   zoom. There is no `.hud` in this app -- it is the mockup's fixed panel, and here the zoom lives
+   on `.mn-frame`, which every screen is a child of. The rule matched nothing from the day it
+   landed. */
 
 /* ================================================================================
    JLPT IS A LADDER, NOT A ROAD.
@@ -1581,6 +1557,13 @@ body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
 .dk-slab b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
   line-height: 17px; letter-spacing: 0.1em; color: var(--washi); margin-top: 2px; }
 
+/* THE COLOUR LAW OUTRANKS THE SHAPE: vermilion is the one thing to press, so a slab that would do
+   nothing if pressed does not get to wear it. A deck's block always starts; a curriculum step can
+   be a milestone the app has no screen for yet, and that one says NOT BUILT YET on ink. */
+.dk-slab[data-live="0"] { background: rgba(12, 10, 8, 0.78); }
+.dk-slab[data-live="0"] em { color: rgba(242, 234, 216, 0.55); }
+.dk-slab[data-live="0"] b { color: rgba(242, 234, 216, 0.82); }
+
 /* ---- what is ahead, and cannot be pressed ---- */
 .dk-ahead { position: absolute; left: 866px; top: 202px; width: 239px; height: 236px;
   display: flex; flex-direction: column;
@@ -1608,13 +1591,11 @@ body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
 .dk-locked b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
   color: rgba(242, 234, 216, 0.78); }
 
-/* GRAB, BECAUSE IT IS DRAGGABLE. The rail scrubs the whole deck and the road pushes along;
-   both say so with the cursor rather than expecting the mouse to discover it. */
-.dk-rail, .cs-strip { cursor: grab; }
-
-body.is-dragging .dk-rail, body.is-dragging .cs-strip,
-body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
-
+/* THE RAIL'S CURSOR IS SET ONCE, further down, and this is where it used to be set twice. There
+   were two draggable surfaces and two gestures: `grab`/`grabbing` for the road, which was a reel
+   you pushed, and `ew-resize` for the rail, which is a scrubber you point at. The road is gone and
+   the rail kept both — the `grab` here and the `ew-resize` 2,400 lines below, same selector, so the
+   lower one silently won. See the note by `.dk-rail { cursor: ew-resize }`. */
 .dk-rail { position: absolute; left: 168px; top: 468px; width: 944px; height: 96px;
   display: flex; flex-direction: column;
   background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
@@ -1718,425 +1699,22 @@ body.is-dragging .dk-segrow i, body.is-dragging .cs-tab { cursor: grabbing; }
 
 
 
-.course-shape {
-  position: relative; margin-top: 6px;
-  min-height: 440px; display: flex; align-items: flex-start;
-  /* the panel's own left padding, cancelled -- and both of these are read in the block's own
-     zoomed space now, so the raw 52 lands on the panel's `52px * var(--lk-u, 1)` and the divided
-     viewport width comes back to exactly one screen */
-  margin-left: -52px; width: calc(100vw / var(--lk-u, 1));
-}
-
 /* ==================================================================================================
-   THE ROAD STANDS ON THE STAGE, WHICH IT HAD NEVER DONE.
+   THE ROAD WAS HERE, AND IT IS NOT A ROAD ANY MORE.
+
+   Four hundred and twenty lines of `.cs-*` drew a reel of sixteen standing tablets compressing
+   toward both horizons, with a card riding the selected stone and a minimap under it. The design
+   system retired that shape twice over. Once in general -- "The road is no longer the shape of
+   everything. It now carries the daily puzzles and nothing else, which is the one thing it is the
+   right shape for." And once for this screen in particular: `assets/screen-path.png` is filed as
+   THE CHAIN, "behind you / here / ahead, and a proportional rail of the whole run beneath", with a
+   caption saying why -- "This replaced a browsable road of sixteen doors. Ten of those sixteen
+   could only throw you at another section; a curriculum node is a milestone, not a door."
+
+   SO THE PATH USES `.dk-*`, WHICH IS WHAT THE DESIGN SYSTEM SAYS IT DOES: "Classes are `.dk-*`,
+   shared with the deck screen through `chainMarkup`." One drawing, two chains. See `chain.ts`.
+   ================================================================================================== */
 
-   `.course-wrap` was `position: relative` in the frame's normal flow, so its own y 0 was the BOARD's
-   y 0 -- and every offset inside it was therefore measured from the top of the window rather than
-   from the stage. Measured on the running build: the chapter line painted at board y 0, straight
-   through the brand; the strip ran y 32 to 412 when the stage starts at 192; and the minimap was
-   `position: fixed` to the window at a hard 1280 wide, so it neither scaled with the board nor sat
-   in the foot band. This screen predates the frame contract and had never been moved onto it. */
-.course-wrap { position: absolute; inset: 0; }
-
-/* ---- the chapter line, above the road ----
-   THE LAST BARE THING IN THIS CORNER. It was cream type with a heavy dark stroke around it,
-   which is the treatment for type standing on an open valley -- correct while the heading beside
-   it was the same, wrong the moment the heading took a slab. Two objects an inch apart cannot
-   answer legibility two different ways.
-
-   A CHIP RATHER THAN A SECOND SLAB, because it is a caption and the thing above it is the
-   title. It gets the `.stat-chip` treatment exactly: washi, ink, one hard offset shadow, small
-   and tracked -- the same object the four along the top of the screen already are.
-
-   AND IT LEANS THE OTHER WAY. `.upnext-item` and `.desc-line` roll opposite each other for the
-   reason the top row's chips do: two boxes stacked at the same angle read as one mis-cut sheet,
-   and at opposite angles as two things set down separately. The slab above rolls -1.2, so this
-   rolls +1. The stroke goes with the wash -- it is ink on paper now. */
-.cs-chapline {
-  /* the caption chip's own slot, which is where every other screen puts its second line */
-  position: absolute; left: 52px; top: 152px;
-  display: flex; align-items: center; gap: 9px; white-space: nowrap;
-  padding: 5px 13px 6px;
-  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
-  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  transform: skewX(-8deg) rotate(1deg); transform-origin: 0 50%;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
-  color: var(--ink);
-}
-
-.cs-chapline s { text-decoration: none; color: rgba(20, 17, 13, 0.26); }
-
-/* the road's name is the label and where you are in it is the value, so they are not the same
-   weight of ink -- the same split the state line on the menu's open card makes */
-.cs-chaplead { color: rgba(20, 17, 13, 0.5); }
-
-/* ---- THE FRAME CONTRACT, ON THE ROAD. This is the screen the contract argues with: the
-   strip was full-bleed on purpose, because a road that stops at the frame edge is not a
-   road. It is inset to the stage now, and the mask is why that still works -- the road
-   does not stop at x160, it FADES there, into open valley rather than into the glass. The
-   reading survives the move; arguably it is better, because what it runs out into is a
-   place rather than a screen edge. ---- */
-.cs-strip {
-  position: absolute; left: 160px; right: 160px; top: 192px; height: 380px; overflow: hidden;
-  /* the gutter the counted tags stand in, and where the road starts existing again.
-     SCALED WITH THE STRIP: 116/300 of 1280 became 70/190 of 960, so the fully-painted
-     middle is the same fraction of the road as it was of the frame. */
-  --gutter: 70px;
-  --solid: 190px;
-  -webkit-mask-image: linear-gradient(90deg,
-    rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter), rgba(0,0,0,1) var(--solid),
-    rgba(0,0,0,1) calc(100% - var(--solid)), rgba(0,0,0,0) calc(100% - var(--gutter)),
-    rgba(0,0,0,0) 100%);
-  mask-image: linear-gradient(90deg,
-    rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter), rgba(0,0,0,1) var(--solid),
-    rgba(0,0,0,1) calc(100% - var(--solid)), rgba(0,0,0,0) calc(100% - var(--gutter)),
-    rgba(0,0,0,0) 100%);
-}
-
-.cs-rail {
-  position: absolute; left: 0; top: 0; width: 5200px; height: 380px;
-  transition: transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); will-change: transform;
-}
-
-/* ---- the two ends of the road ----
-   THE COUNTED TAGS AND THESE ARE NOT THE SAME OBJECT, which is why they are not built the same
-   way. `.cs-side` is pinned to the frame and says how much is behind and ahead of you; these say
-   where the road STOPS, so they live in the rail and travel with it -- they come into view when
-   you are genuinely near an end, and are masked out with the rest of the road when you are not.
-   A label that is always on screen would be saying "the course has a beginning" forever; a
-   terminal you walk up to is a fact about where you are.
-
-   THIN, AND CARRYING ONE WORD. Twenty-six wide against a tablet's ninety-four: they are posts at
-   the ends of the row rather than two more steps, and nothing about them should read as
-   something you could select. `pointer-events` off for the same reason.
-
-   GOLD AT THE START, DEEP VERMILION AT THE END, which is the file's own colour law rather than
-   a traffic light: gold is what is earned and behind you, and the deep red is the one this
-   interface uses when it means a destination rather than a button -- the bright `--hi` is
-   spoken for by the slab on the selected card, and one screen gets one of those. */
-.cs-cap {
-  position: absolute; width: 26px; height: 296px;
-  display: grid; place-items: center;
-  transform: skewX(-8deg) rotate(-1.2deg);
-  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.22);
-  pointer-events: none;
-  transition: left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1);
-}
-
-.cs-cap b {
-  writing-mode: vertical-rl; white-space: nowrap;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.3em;
-}
-
-.cs-cap.start { background: var(--gold); }
-
-.cs-cap.start b { color: var(--ink); }
-
-.cs-cap.end {
-  background: var(--hi-deep);
-  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
-}
-
-.cs-cap.end b { color: #ffd9a1; }
-
-/* THE ONE SEAM THE APP'S OWN DATA AGREES ON, and it is not a third terminal -- so it is
-   narrower than the two ends and wears the section colour of the place it hands over to. Every
-   step past it is `category="jlpt"` in `domain/progression_curriculum.py`, all five at a 0.9
-   mastery ratio where the eleven before them run 0.8 or lower, and all five carry a milestone
-   reward. Nothing else in that file groups: there is no chapter, stage or tier field, `category`
-   is twelve values over fifteen nodes, and the mastery ratios do not fall in contiguous runs.
-   So this is the only divider that is a fact rather than a decoration, and there is one of it. */
-.cs-cap.seam {
-  width: 18px;
-  background: #5b86c4;
-  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(242, 234, 216, 0.26);
-}
-
-.cs-cap.seam b { color: var(--washi); font-size: 9px; letter-spacing: 0.28em; }
-
-/* ---- a standing tablet ---- */
-.cs-tab {
-  position: absolute; width: 94px; height: 296px;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 11px 6px 9px; border: 0; cursor: pointer; text-align: center; font: inherit;
-  transition: opacity 0.3s ease, transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1),
-    left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1);
-}
-
-.cs-dest {
-  flex: none; align-self: stretch; margin: -11px -6px 7px; padding: 4px 3px 5px;
-  text-align: center; white-space: nowrap; overflow: hidden;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; line-height: 10px;
-  letter-spacing: 0.1em;
-}
-
-.cs-num, .cs-lv {
-  flex: none; font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 23px; line-height: 1;
-}
-
-.cs-hair { flex: none; display: block; height: 1px; }
-
-/* STANDING TYPE. Vertical is not decoration here -- it is what fits 会話練習 into 94px. */
-.cs-vjp {
-  display: block; flex: none; white-space: nowrap; writing-mode: vertical-rl;
-  font-family: var(--jp-go); font-weight: 700; font-size: 26px; line-height: 1.06;
-  letter-spacing: 0.05em;
-}
-
-/* THE SAME SPINE IN THE OTHER SCRIPT, for a deck's blocks -- English names with no Japanese to
-   fall back on. The line turns on its side and reads down the stone like the label on a book
-   spine, which takes any length. Smaller and tracked, because rotated Latin at 26px is a plank,
-   and clipped at the stone's height so a very long name runs out rather than overflowing it. */
-.cs-vjp[data-lat="1"] {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.18em;
-  line-height: 1; text-transform: uppercase;
-  max-height: 176px; overflow: hidden;
-}
-
-/* the name in the big slot, and it WRAPS: the longest block name in the app is "Descriptions &
-   Questions" at 24 characters, and the card is 254px inside its padding. Two lines at 30px, not
-   one line shrunk until it fits -- a size that changes with the name makes the card breathe as
-   you walk it. */
-.cs-hjp[data-lat="1"] {
-  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
-  line-height: 1.12; letter-spacing: 0; white-space: normal; padding: 0 18px;
-}
-
-.cs-gate {
-  flex: none; margin-top: auto; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.1em; text-align: center; white-space: nowrap;
-}
-
-.cs-glyph { flex: none; }
-
-/* the finished stamp: a boxed character set crooked, the way a real one lands */
-.cs-glyph[data-seal="1"] {
-  position: absolute; left: 50%; top: 82%; width: 42px; height: 42px; margin: -21px 0 0 -21px;
-  color: #a8332a; font-family: var(--jp-go); font-weight: 700; font-size: 27px; line-height: 40px;
-  text-align: center; box-shadow: inset 0 0 0 3px rgba(168, 51, 42, 0.82);
-  transform: rotate(-11deg); opacity: 0.82; z-index: 4;
-}
-
-.cs-glyph[data-seal="0"] {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; line-height: 11px;
-  letter-spacing: 0.14em; white-space: nowrap;
-}
-
-/* 376 rather than 384: skewed and rolled it paints 6px taller than it is authored, and
-   the stage is 384. */
-.cs-hero {
-  position: absolute; top: 0; width: 290px; height: 376px;
-  display: flex; flex-direction: column; border: 0; padding: 0; cursor: pointer;
-  text-align: left; font: inherit; z-index: 14;
-  transform: skewX(-8deg) rotate(-1.2deg);
-  transition: left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1);
-}
-
-.cs-htab {
-  flex: none; padding: 6px 10px 7px; text-align: center; white-space: nowrap;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em;
-}
-
-/* ONE CHILD NOW, so no `space-between` pretending there is something to push apart. The
-   coloured chapter mark that used to sit at the right of this row is gone -- see below. */
-.cs-hhead { display: flex; align-items: center; padding: 13px 18px 4px; }
-
-.cs-hnum {
-  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 24px;
-  letter-spacing: 0;
-}
-
-.cs-hjp {
-  margin-top: auto; padding: 0 12px; font-family: var(--jp); font-weight: 400;
-  font-size: 66px; line-height: 1.15; white-space: nowrap; text-align: center;
-}
-
-.cs-hen {
-  padding: 2px 18px 0; font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 28px; letter-spacing: 0.01em; white-space: nowrap; text-align: center;
-}
-
-.cs-hfoot { margin-top: auto; padding: 0 18px 15px; display: flex; flex-direction: column; gap: 8px; }
-
-.cs-gaterow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-
-.cs-gatelabel {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.2em;
-  white-space: nowrap;
-}
-
-.cs-gateval {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.1em;
-  white-space: nowrap;
-}
-
-/* TWELVE SEGMENTS, NOT A BAR. A segmented gauge states a fraction you can count; a continuous bar
-   states a length you have to estimate, and this screen already has a marker doing lengths. */
-.cs-gaugerow { display: flex; align-items: center; gap: 11px; }
-
-.cs-segs { flex: 1; display: flex; gap: 3px; }
-
-.cs-segs i { flex: 1; height: 15px; display: block; transition: background 0.3s ease; }
-
-.cs-pct {
-  flex: none; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
-  line-height: 1; letter-spacing: 0;
-}
-
-.cs-hseal {
-  position: absolute; left: 50%; bottom: 56px; width: 64px; height: 64px; margin-left: -32px;
-  text-align: center; font-family: var(--jp-go); font-weight: 700; font-size: 42px;
-  line-height: 62px; color: #a8332a; box-shadow: inset 0 0 0 5px rgba(168, 51, 42, 0.72);
-  transform: rotate(-11deg); opacity: 0.78; z-index: 4; pointer-events: none;
-}
-
-.cs-slabwrap { margin: 10px -1px -1px; }
-
-.cs-slab { display: block; height: 38px; padding: 11px 14px; }
-
-.cs-slab i {
-  display: block; font-family: var(--lat-ui); font-style: normal; font-size: 12px;
-  line-height: 16px; text-align: center; white-space: nowrap; overflow: hidden;
-}
-
-/* ==================================================================================================
-   AND THE WORDS ARRIVE WITH THE FURNITURE -- see the note in `PathL2.tsx`. The three lines enter from
-   the side you walked from, staggered down the card so the eye lands on the number first. `--cs-dir`
-   is written by the component because only it knows which way you moved. */
-.cs-hero { --cs-dir: 1; }
-.cs-hero[data-dir="-1"] { --cs-dir: -1; }
-.cs-hnum, .cs-hjp, .cs-hen {
-  animation: csArrive 0.34s cubic-bezier(0.22, 0.9, 0.24, 1) both;
-}
-.cs-hjp { animation-delay: 0.045s; }
-.cs-hen { animation-delay: 0.09s; }
-@keyframes csArrive {
-  from { opacity: 0; transform: translateX(calc(var(--cs-dir) * 20px)); }
-}
-
-/* ---- the marker: how far between this step and the next ---- */
-.cs-mark {
-  position: absolute; width: 8px; height: 8px; background: var(--gold);
-  transform: rotate(45deg); animation: csMark 2.6s ease-in-out infinite;
-  transition: left 0.62s cubic-bezier(0.22, 0.9, 0.24, 1);
-}
-/* THE KEYFRAMES THIS HAS BEEN NAMING SINCE THE ROAD LANDED. An `animation` whose name resolves to
-   nothing is not an error in CSS -- the declaration is simply dropped -- so the marker sat perfectly
-   still and the only trace was a name in a stylesheet that matched nothing. It is the one thing on
-   the road that says "you are HERE rather than at the tablet you are looking at", and a still gold
-   diamond says that much less loudly than a breathing one. */
-@keyframes csMark { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-.cs-mark i {
-  position: absolute; left: 9px; top: -5px; font-family: var(--lat-ui); font-style: normal;
-  font-weight: 700; font-size: 9px; letter-spacing: 0.14em; color: var(--gold);
-  transform: rotate(-45deg); white-space: nowrap;
-}
-
-/* CENTRED ON THE ROAD, not standing on it. P13 bottom-aligns these with the tablets -- tag and
-   stone both end at the same y, as if planted in the same ground -- which put their middles 78px
-   below the middle of everything else and read as two posts that had slipped down.
-   One number does it, because the tablets and the hero share a centre: the tablets run 64..360
-   in the wrap and the hero 20..404, and both are centred on 212. Minus half the tag's 140. */
-.cs-side { position: absolute; top: 142px; width: 48px; height: 140px; z-index: 38;
-  transition: opacity 0.32s ease; }
-
-/* IN THE STRIP'S DEAD ZONE, WHICH MOVED WITH THE STRIP. 60 was eight pixels inside a
-   116 gutter measured from the frame; the gutter is 70 measured from x160 now, so these
-   sit at 168 and the whole 48-wide tag still stands on bare valley. */
-.cs-side.lo { left: 178px; }
-
-.cs-side.hi { right: 178px; }
-
-.cs-side i {
-  position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg);
-}
-
-.cs-side i:nth-child(1) { top: 14px; height: 112px; box-shadow: 2px 3px 0 rgba(0,0,0,0.4); }
-
-.cs-side i:nth-child(2) { top: 7px; height: 126px; box-shadow: 2px 3px 0 rgba(0,0,0,0.4); }
-
-.cs-side i:nth-child(3) {
-  height: 140px; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 7px;
-}
-
-.cs-side.lo i:nth-child(1) { left: 22px; background: #a9a087; }
-
-.cs-side.lo i:nth-child(2) { left: 11px; background: #c8bfa5; }
-
-.cs-side.lo i:nth-child(3) {
-  left: 0; background: #e6ddc4;
-  box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.18);
-}
-
-.cs-side.hi i:nth-child(1) { right: 22px; background: rgba(14,12,9,0.6); }
-
-.cs-side.hi i:nth-child(2) { right: 11px; background: rgba(14,12,9,0.74); }
-
-.cs-side.hi i:nth-child(3) {
-  right: 0;
-  background: repeating-linear-gradient(135deg, rgba(242,234,216,0.07) 0 7px,
-    rgba(0,0,0,0) 7px 14px), linear-gradient(rgba(16,13,9,0.9), rgba(16,13,9,0.9));
-  box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(242,234,216,0.2);
-}
-
-.cs-side b {
-  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 20px; line-height: 1;
-}
-
-.cs-side u {
-  writing-mode: vertical-rl; text-decoration: none;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.22em;
-}
-
-.cs-side.lo b { color: var(--ink); }
-
-.cs-side.lo u { color: rgba(20, 17, 13, 0.62); }
-
-.cs-side.hi b { color: var(--gold-hi); }
-
-.cs-side.hi u { color: rgba(242, 234, 216, 0.6); }
-
-/* THE FOOT BAND, like the library's strip -- at `bottom: 24` this ran to y697, which is
-   not a band, it is the bottom of the screen. */
-/* the foot band's one object, on the board rather than pinned to the window */
-.cs-mini {
-  position: absolute; left: 160px; right: 160px; top: 588px; z-index: 6;
-  display: flex; flex-direction: column; align-items: center; gap: 9px;
-}
-
-/* THE MINIMAP IS NAVIGATION, NOT DECORATION. One bar per step, and clicking one walks
-   there -- the same single move a click on a tablet makes. `courseLayout` rewrites these
-   bars' `cssText` on every sync, which clears inline styles but never CSS rules, so the
-   cursor and the hover live here rather than being written in the loop. */
-.cs-minibars { display: flex; align-items: flex-end; gap: 5px; }
-
-.cs-minibars i { cursor: pointer; }
-
-.cs-minibars i:hover { filter: brightness(1.5); }
-
-.cs-minibars i {
-  display: block; transition: width 0.34s cubic-bezier(0.2, 0.92, 0.24, 1),
-    height 0.34s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.2s ease;
-}
-
-.cs-minitext {
-  display: flex; align-items: baseline; gap: 9px; white-space: nowrap;
-  padding: 5px 13px 6px;
-  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
-  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  transform: skewX(-8deg) rotate(-1deg);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
-  color: var(--ink);
-}
-
-.cs-minitext s { text-decoration: none; color: rgba(20, 17, 13, 0.26); }
-
-/* what is behind you is the fact and what is left is the quieter half of it, which is the same
-   ink split the chapter chip and the open card's state line both make */
-.cs-minitext em { font-style: normal; color: rgba(20, 17, 13, 0.5); }
 
 /* A BESPOKE SCREEN COUNTS ITSELF. The deck screen is STUDY but not the road, so it fell
    through `body.course:not(.at-path)` and kept the course's own counter up -- a hero reading
@@ -4401,13 +3979,12 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 }
 
 /* ==================================================================================================
-   AND THE TWO SCREENS THAT SCRUB SAY SO. A surface that answers a drag has to look like one, or the
-   only people who find it are the ones who read the source. See `useTraversal.ts` for why the rail
-   is absolute and the road is relative.
+   AND THE ONE SURFACE THAT SCRUBS SAYS SO. A surface that answers a drag has to look like one, or
+   the only people who find it are the ones who read the source. `ew-resize` rather than `grab`
+   because the rail is a MAP and the gesture is absolute — the segment under the pointer is the one
+   you get, which is a scrubber, not a reel you push. See `useTraversal.ts`.
    ================================================================================================== */
 .dk-rail { cursor: ew-resize; }
-.cs-rail { cursor: grab; }
-body.is-dragging .cs-rail { cursor: grabbing; }
 /* AND NOTHING GETS SELECTED WHILE A GESTURE IS RUNNING. Dragging across a row of type otherwise
    highlights it, so the reel leaves a blue smear behind wherever it has been pushed. */
 body.is-dragging { user-select: none; }

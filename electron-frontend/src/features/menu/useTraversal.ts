@@ -18,6 +18,11 @@ import { useCallback, useEffect, useRef } from 'react'
    An absolute drag on the road would fight its own re-centring; a relative drag on the rail would
    throw away the one thing the rail has, which is that every block already has a place on it.
 
+   THE REEL CURRENTLY HAS NO CALLER, and that is stated here rather than left to be discovered. The
+   course was the road, and the course is the chain now, so `'rail'` is the only mode in use. The
+   reel is kept because the road itself is not retired -- the design system moved it onto the daily
+   puzzles -- and its behaviour is covered by `useTraversal.test.tsx` in the meantime.
+
    THE GESTURE LIVES ON `window`, NOT ON THE ELEMENT. A drag that moves the selection re-renders the
    panel it started in, so `pointermove` bound to the rail would be listening to a node React has
    already replaced. The element gets `pointerdown` and nothing else.

@@ -222,9 +222,9 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
   '.scenes': 'stage',
   /* shared furniture */
   '.pj-empty': 'stage', '.pj-back': 'crown',
-  /* the road, which is the one screen the contract argues with */
-  '.cs-strip': 'stage', '.cs-mini': 'foot', '.cs-chapline': 'crown', '.cs-side': 'crown',
 }
+/* THE PATH IS NOT IN THIS TABLE AND THAT IS CORRECT: it is the chain, so it stands on `.dk-behind`,
+   `.dk-here`, `.dk-ahead` and `.dk-rail`, which are already here under the deck. */
 
 /** the declared `top` and `height` of one rule, read out of the stylesheet by its own selector */
 function boxOf(selector: string): { top: number, height: number | null } | null {

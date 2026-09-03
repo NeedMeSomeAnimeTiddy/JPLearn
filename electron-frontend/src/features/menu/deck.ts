@@ -1,4 +1,5 @@
 import type { BlockInfo } from '../../types'
+import type { ChainView } from './chain'
 
 /* ==================================================================================================
    THE DECK SCREEN — a milestone's level three, for the decks that are still cut into blocks.
@@ -124,4 +125,66 @@ export function gateLine(chain: DeckChain, revisiting: boolean): string {
 export function railLine(chain: DeckChain): string {
   return `${chain.blocks.length} BLOCKS · ${chain.cards.toLocaleString()} CARDS · `
     + `${chain.clearedPct}% CLEARED`
+}
+
+/* ==================================================================================================
+   A DECK'S BLOCKS, AS A CHAIN — the words this screen puts in the shared shapes. See `chain.ts`,
+   and `components/screens.html`, which files this drawing and the course's under one name.
+   ================================================================================================== */
+
+export function deckChainView(
+  chain: DeckChain, slug: string, mode: string, shown: number,
+): ChainView {
+  const here = chain.blocks[shown]
+  const next = chain.blocks[chain.here + 1]
+  const revisiting = shown !== chain.here
+  return {
+    items: chain.blocks.map((block) => ({
+      key: String(block.index),
+      no: block.no,
+      name: block.name,
+      note: `${block.cards} CARDS`,
+      state: block.state,
+    })),
+    here: chain.here,
+    /* a deck's blocks are a strict line: `compute_unlocked_count` stops at the first one under the
+       gate, so the open block IS the far end of what can be reached */
+    reach: chain.here,
+    cleared: chain.cleared,
+    beyond: chain.beyond,
+    behindLabel: chain.cleared === 1 ? 'BLOCK CLEARED' : 'BLOCKS CLEARED',
+    hero: {
+      cap: here
+        ? `${revisiting ? 'REVISITING' : 'OPEN NOW'} · BLOCK ${here.no} OF ${chain.blocks.length}`
+        : 'THIS DECK',
+      capRight: slug.replace(/_/g, ' ').toUpperCase(),
+      name: here?.name ?? '',
+      nameWide: false,
+      /* the first few characters of the block, which is what a name alone does not show */
+      under: here?.sample.length ? here.sample.join(' · ') : null,
+      subLeft: here ? `${here.cards} CARDS` : '',
+      subRight: revisiting ? 'CLEARED' : 'IN PROGRESS',
+      pct: here?.pct ?? 0,
+      gate: gateLine(chain, revisiting),
+      gateEm: null,
+      /* THE SLAB NAMES THE DRILL IT IS ABOUT TO RUN. It used to say THE ONLY WAY ON, which is the
+         gate line's argument said a second time over a button that used to open a picker. The
+         picker is gone; this press starts a round, so the small line says which round. */
+      slabEm: mode.toUpperCase(),
+      slabB: revisiting ? 'STUDY IT AGAIN' : 'START THIS BLOCK',
+      live: true,
+    },
+    ahead: {
+      kicker: 'NEXT, WHEN THIS ONE OPENS IT',
+      name: next ? next.name : 'THE DECK IS DONE',
+      meta: next ? `${next.cards} CARDS` : 'NOTHING LOCKED',
+      tailLabel: 'AND MORE AFTER IT',
+    },
+    rail: {
+      left: 'BLOCK 01',
+      mid: railLine(chain),
+      right: `BLOCK ${chain.blocks[chain.blocks.length - 1]?.no ?? '01'}`,
+    },
+    pile: { cap: 'CLEARED BLOCKS', act: 'OPEN THEM', empty: 'NOTHING BEHIND YOU YET' },
+  }
 }

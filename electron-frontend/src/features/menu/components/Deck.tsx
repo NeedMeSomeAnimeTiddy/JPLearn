@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTraversal } from '../useTraversal'
 import type { BlockInfo, JlptLevel, JlptLevelProgress } from '../../../types'
-import { deckChain, deckSheet, gateLine, railLine } from '../deck'
+import { chainPage } from '../chain'
+import { deckChain, deckChainView } from '../deck'
+import { Chain, ChainPile } from './Chain'
 import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
@@ -47,7 +48,7 @@ export function Deck({
   const chain = useMemo(() => deckChain(blocks, gate), [blocks, gate])
 
   /* two focusable cards: 0 is the open block, 1 is the cleared pile */
-  const [at, setAt] = useState(0)
+  const [at, setAt] = useState<0 | 1>(0)
   /* -1 is "the open one"; anything else is a cleared block being revisited */
   const [pick, setPick] = useState(-1)
   const [sheet, setSheet] = useState(false)
@@ -55,28 +56,21 @@ export function Deck({
   const [cell, setCell] = useState(0)
 
   const shown = pick >= 0 ? pick : chain.here
+  const here = chain.blocks[shown]
+  const view = useMemo(
+    () => deckChainView(chain, slug, mode, shown), [chain, slug, mode, shown],
+  )
+  const shelf = chainPage(chain.cleared, page)
 
   /* THE RAIL IS A MAP: the block under the pointer is the block you get. See `useTraversal`.
      CLAMPED AT `here`, WHERE THE CLICK IS ALSO REFUSED -- scrubbing past the open block would let
      the pointer reach blocks neither the keyboard nor the mouse will open. */
-  const railRef = useRef<HTMLElement | null>(null)
   const scrub = (i: number) => {
     const want = Math.max(0, Math.min(i, chain.here))
     setPick(want === chain.here ? -1 : want)
     setSheet(false)
     setAt(0)
   }
-  const rail = useTraversal('rail', {
-    enabled: !sheet,
-    step: (d) => scrub(shown + d),
-    bands: () => Array.from(railRef.current?.children ?? [])
-      .map((c) => c.getBoundingClientRect().left),
-    pick: scrub,
-  })
-  const here = chain.blocks[shown]
-  const next = chain.blocks[chain.here + 1]
-  const view = deckSheet(chain.cleared, page)
-
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 
@@ -91,12 +85,12 @@ export function Deck({
         event.preventDefault()
         event.stopPropagation()
         if (event.key === 'Escape') { setSheet(false); return }
-        if (event.key === 'ArrowRight') { setCell((c) => Math.min(c + 1, view.cells.length - 1)); return }
+        if (event.key === 'ArrowRight') { setCell((c) => Math.min(c + 1, shelf.cells.length - 1)); return }
         if (event.key === 'ArrowLeft') { setCell((c) => Math.max(c - 1, 0)); return }
-        if (event.key === 'ArrowDown') { setPage((p) => Math.min(p + 1, view.pages - 1)); setCell(0); return }
+        if (event.key === 'ArrowDown') { setPage((p) => Math.min(p + 1, shelf.pages - 1)); setCell(0); return }
         if (event.key === 'ArrowUp') { setPage((p) => Math.max(p - 1, 0)); setCell(0); return }
         if (event.key === 'Enter') {
-          const index = view.cells[cell]
+          const index = shelf.cells[cell]
           if (index !== undefined) { setPick(index); setSheet(false); setAt(0) }
         }
         return
@@ -126,25 +120,13 @@ export function Deck({
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, cell, chain.cleared, here, level, levels, onLevel, onStart, sheet, view.cells, view.pages])
-
-  const revisiting = pick >= 0
-  /* THE NAME IS SET FROM ITS OWN LENGTH, which the stylesheet's own comment says and the port
-     then did not do: `.dk-name` declares family, weight and line-height and no SIZE, because the
-     size is per-name and belongs on the element. Measured live at 46px in the mockup and 16 here
-     -- the card's headline was rendering at the body's inherited size, which is why the deck card
-     had a hand's width of empty paper under it. 470 is the card's own width; 0.62 is the average
-     glyph advance of the italic black at that width, and the floor of 26 is where "Old Units &
-     Measures" stops shrinking and starts wrapping instead. */
-  const nameSize = here
-    ? Math.max(26, Math.min(46, Math.floor(470 / (here.name.length * 0.62))))
-    : 26
+  }, [at, cell, chain.cleared, here, level, levels, onLevel, onStart, sheet, shelf.cells, shelf.pages])
 
   return (
     /* the deck's name is not drawn as a heading -- the open block's cap says it -- but a screen
        reader announcing this screen has not reached that cap yet */
     <div
-      className={screenClass(entered)}
+      className={screenClass(entered, 'dk-blocks')}
       ref={rootRef}
       tabIndex={-1}
       role="group"
@@ -177,152 +159,27 @@ export function Deck({
         ) : null}
 
         {chain.blocks.length && here ? (
-          <>
-            <div className="dk-wrap">
-              {/* BEHIND YOU — a pile with a count, not a list. The list is the sheet. */}
-              <button
-                type="button"
-                className={`dk-f dk-behind${at === 1 ? ' on' : ''}`}
-                onFocus={() => setAt(1)}
-                onClick={() => { if (chain.cleared > 0) { setSheet(true); setCell(0) } }}
-                aria-disabled={chain.cleared === 0}
-                aria-label={`${chain.cleared} blocks cleared — open the pile to study one again`}
-              >
-                <span className="dk-cap"><b>BEHIND YOU</b></span>
-                <span className="dk-bignum">
-                  <b>{chain.cleared}</b>
-                  <i>{chain.cleared === 1 ? 'BLOCK CLEARED' : 'BLOCKS CLEARED'}</i>
-                </span>
-                <span className="dk-act">
-                  {chain.cleared > 0 ? 'ENTER · OPEN THEM' : 'NOTHING BEHIND YOU YET'}
-                </span>
-              </button>
-
-              {/* OPEN NOW — the one block the chain actually offers */}
-              <button
-                type="button"
-                className={`dk-f dk-here${at === 0 ? ' on' : ''}`}
-                onFocus={() => setAt(0)}
-                onClick={() => onStart(here.index)}
-                aria-label={`${here.name} — ${here.cards} cards, ${here.pct}% mastered`}
-              >
-                <span className="dk-cap">
-                  <b>{revisiting ? 'REVISITING' : 'OPEN NOW'} · BLOCK {here.no} OF {chain.blocks.length}</b>
-                  <i>{slug.replace(/_/g, ' ').toUpperCase()}</i>
-                </span>
-                <span className="dk-body">
-                  <span className="dk-name" style={{ fontSize: nameSize }}>{here.name}</span>
-                  <span className="dk-chars" lang="ja">{here.sample.join(' · ')}</span>
-                  <span className="dk-sub">
-                    <span>{here.cards} CARDS</span>
-                    <span>{revisiting ? 'CLEARED' : 'IN PROGRESS'}</span>
-                  </span>
-                  {/* TWELVE SEGMENTS, not a bar: a gate is a count of steps, and a smooth bar
-                      invites reading a percentage off it that nobody promised. */}
-                  <span className="dk-gauge">
-                    <span className="dk-segs">
-                      {Array.from({ length: 12 }, (_, k) => (
-                        <i key={k} className={k < Math.round((here.pct / 100) * 12) ? 'got' : ''} />
-                      ))}
-                    </span>
-                    <b>{here.pct}%</b>
-                  </span>
-                </span>
-                {/* WHAT THE PERCENTAGE IS FOR. Not a score — a key, and the gate says what it opens. */}
-                <span className="dk-gate">{gateLine(chain, revisiting)}</span>
-                {/* THE SLAB NAMES THE DRILL IT IS ABOUT TO RUN. It said THE ONLY WAY ON, which is
-                    the gate line's argument said a second time, and it said it over a button that
-                    used to open a picker. The picker is gone; this press starts a round, so the
-                    small line is the one fact you could not otherwise get: which round. */}
-                <span className="dk-slab">
-                  <em>{mode.toUpperCase()}</em>
-                  <b>{revisiting ? 'STUDY IT AGAIN' : 'START THIS BLOCK'} ▸</b>
-                </span>
-              </button>
-
-              {/* AHEAD — named, and deliberately not focusable: it is not a choice */}
-              <div className="dk-ahead">
-                <span className="dk-cap"><b>AHEAD</b><i>NOT YET CHOOSABLE</i></span>
-                <span className="dk-next">
-                  <span>NEXT, WHEN THIS ONE OPENS IT</span>
-                  <b>{next ? next.name : 'THE DECK IS DONE'}</b>
-                  <i>{next ? `${next.cards} CARDS` : 'NOTHING LOCKED'}</i>
-                </span>
-                <span className="dk-locked">
-                  <span>AND MORE AFTER IT</span>
-                  <b>{chain.beyond}</b>
-                </span>
-              </div>
-            </div>
-
-            {/* THE RAIL IS A MAP — every block at once, at a scale that fits six or forty-four
-                by construction. It is not focusable: it says where you are, it is not a way to go. */}
-            <div
-              className="dk-rail"
-              ref={rail.ref}
-              onPointerDown={rail.onPointerDown}
-            >
-              <span
-                className="dk-segrow"
-                aria-hidden="true"
-                ref={(n) => { railRef.current = n }}
-              >
-                {chain.blocks.map((block) => (
-                  <i
-                    key={block.index}
-                    className={block.index === shown && revisiting ? 'pick' : block.state}
-                    title={`${block.no} ${block.name} — ${block.state === 'ahead' ? 'locked'
-                      : block.state === 'here' ? 'open now' : 'done'}`}
-                  />
-                ))}
-              </span>
-              <span className="dk-railcap">
-                <span>BLOCK 01</span>
-                <span>{railLine(chain)}</span>
-                <span>BLOCK {chain.blocks[chain.blocks.length - 1].no}</span>
-              </span>
-            </div>
-          </>
+          <Chain
+            view={view}
+            at={at}
+            onAt={setAt}
+            shown={shown}
+            onScrub={scrub}
+            onOpen={() => onStart(here.index)}
+            onPile={() => { setSheet(true); setCell(0) }}
+            enabled={!sheet}
+          />
         ) : null}
 
         {sheet ? (
-          <div className="dk-open">
-            <button
-              type="button"
-              className="dk-scrim"
-              aria-label="Close the cleared blocks"
-              onClick={() => setSheet(false)}
-            />
-            <div className="dk-sheet">
-              <span className="dk-cap">
-                <b>CLEARED BLOCKS · {chain.cleared} OF {chain.blocks.length}</b>
-                <i>ENTER STUDIES ONE AGAIN</i>
-              </span>
-              <div className="dk-grid">
-                {view.cells.map((index, k) => {
-                  const block = chain.blocks[index]
-                  return (
-                    <button
-                      key={index}
-                      type="button"
-                      className={`dk-cell${k === cell ? ' on' : ''}`}
-                      onClick={() => { setPick(index); setSheet(false); setAt(0) }}
-                      onFocus={() => setCell(k)}
-                      aria-label={`${block.no} ${block.name} — ${block.cards} cards`}
-                    >
-                      <b>{block.no}</b>
-                      <em>{block.name}</em>
-                      <i>{block.cards} CARDS</i>
-                    </button>
-                  )
-                })}
-              </div>
-              <span className="dk-pager">
-                <span>PAGE {view.page + 1} / {view.pages}</span>
-                <span>← → MOVE · ↑ ↓ PAGE · ESC CLOSES</span>
-              </span>
-            </div>
-          </div>
+          <ChainPile
+            view={view}
+            page={shelf.page}
+            cell={cell}
+            onCell={setCell}
+            onPick={(index) => { setPick(index); setSheet(false); setAt(0) }}
+            onClose={() => setSheet(false)}
+          />
         ) : null}
 
                 <div className="back-tab">

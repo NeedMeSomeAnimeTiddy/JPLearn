@@ -1,4 +1,5 @@
 import type { ProgressionNodeView } from '../progression'
+import type { ChainView } from './chain'
 
 /* ==================================================================================================
    THE PATH, LEVEL TWO — the journey, sixteen milestones.
@@ -114,151 +115,102 @@ export function hereIndex(rows: readonly PathRow[]): number {
   return firstAhead >= 0 ? firstAhead : Math.max(0, rows.length - 1)
 }
 
-/* NOTHING SCROLLS; OVERFLOW FOLDS. Sixteen rows do not fit the stage, and the frame contract
-   forbids a scrollbar — so a window of rows moves around the cursor and the two ends say how many
-   are folded away behind them. A count is a fact; a cut-off row is an accident. */
-export const PATH_WINDOW = 6
-
-export interface PathWindow {
-  rows: PathRow[]
-  /** how many are folded above and below, for the two band labels */
-  behind: number
-  ahead: number
-  /** index within `rows` of the cursor */
-  cursorInWindow: number
-}
-
-export function pathWindow(rows: readonly PathRow[], cursor: number): PathWindow {
-  if (rows.length <= PATH_WINDOW) {
-    return { rows: [...rows], behind: 0, ahead: 0, cursorInWindow: cursor }
-  }
-  const half = Math.floor(PATH_WINDOW / 2)
-  const start = Math.min(Math.max(0, cursor - half), rows.length - PATH_WINDOW)
-  return {
-    rows: rows.slice(start, start + PATH_WINDOW),
-    behind: start,
-    ahead: rows.length - (start + PATH_WINDOW),
-    cursorInWindow: cursor - start,
-  }
-}
 
 /* ==================================================================================================
-   THE ROAD — the geometry the mockup's course is drawn on, and the reason it is here rather than in
-   the component.
+   THE COURSE, AS A CHAIN — the words this screen puts in the shared shapes. See `chain.ts`.
 
-   Every slot's width, every tablet's scale, depth and opacity, the rail's translation and the
-   marker's position are all functions of DISTANCE FROM THE SELECTION, which changes on every
-   keypress. That makes them arithmetic, not markup, and arithmetic that is wrong by a few pixels
-   is exactly the kind of thing an eye passes and a test catches.
-
-   THE ROAD COMPRESSES TOWARD EACH HORIZON. A slot shrinks with distance -- `csScale` -- so sixteen
-   steps fit a 960-wide strip while the stone you are standing on stays a whole stone. The selected
-   slot is a different width again (`WSEL`), because the card rides in it.
+   A CURRICULUM IS A CHAIN BY CONSTRUCTION, the same way a deck's blocks are: `progression_curriculum`
+   opens each node when the one before it is mastered, so `done` is a prefix, there is exactly one
+   frontier, and everything after it is shut. That is the whole reason this drawing fits — it is not
+   a list rendered three ways, it is three genuinely different populations.
    ================================================================================================== */
-export const CS = {
-  /** where the first slot starts, inside the rail's own coordinate space */
-  X0: 320,
-  /** an ordinary slot, the selected slot, and the space between two of them */
-  W: 94,
-  WSEL: 290,
-  GAP: 18,
-  /** the tablets sit lower than the card; the rule the marker rides is at the card's foot */
-  TABY: 44,
-  RULE: 373,
-  /** the certification seam, and the two END/START posts */
-  SEAM_W: 18,
-  CAP_W: 26,
-} as const
 
-/* THE STRIP IS INSET TO THE STAGE, and the focus is the middle of the STRIP rather than of the
-   board. The mockup measured `clientWidth / 2` and carries a note about exactly this: measured
-   against the whole frame the selected tablet landed at board 800 instead of 640, and the road sat
-   160px right of the screen it is drawn on. The board is a fixed 1280 here, so the same number is
-   arithmetic rather than a layout read. */
-export const CS_STRIP_INSET = 160
-export const CS_FOCUS = (1280 - 2 * CS_STRIP_INSET) / 2
+/** does this string carry kana or kanji, and so want the Japanese face and a wider advance */
+const isCjk = (text: string): boolean => /[\u3040-\u30ff\u3400-\u9fff]/.test(text)
 
-export const csScale = (d: number): number => Math.max(0.78, 1 - Math.min(d, 5) * 0.055)
-
-/* FOUR CHAPTERS, contiguous, in the course's own order. The boundaries are real: the two scripts,
-   then words and the patterns that join them, then everything you do WITH the language, then the
-   exams -- which are a different kind of thing from a lesson. */
-export const CS_CHAPTERS = [
-  { jp: '基礎', en: 'FOUNDATIONS', from: 0, to: 2 },
-  { jp: '言葉', en: 'WORDS & GRAMMAR', from: 3, to: 5 },
-  { jp: '実践', en: 'IN PRACTICE', from: 6, to: 10 },
-  { jp: '検定', en: 'CERTIFICATION', from: 11, to: 15 },
-] as const
-export const CS_CHNUM = ['一', '二', '三', '四'] as const
-export const csChapter = (i: number): number =>
-  CS_CHAPTERS.findIndex((c) => i >= c.from && i <= c.to)
-
-export const CS_BACK = 'repeating-linear-gradient(135deg, rgba(242,234,216,0.06) 0 7px,'
-  + ' rgba(0,0,0,0) 7px 14px), linear-gradient(rgba(17,19,28,0.9), rgba(11,13,20,0.94))'
-export const CS_FACE = 'linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%)'
-
-/* A TABLET HAS ROOM FOR A TOKEN, NOT A SENTENCE. The gate is authored as plain words ("all 46
-   characters", "80% of it") because that is what the card says; ninety-four pixels wants the short
-   form of the same fact, so it is DERIVED rather than authored twice and cannot drift. */
-export function csToken(meta: string): string {
-  const m = String(meta || '').toUpperCase()
-  let x = m.match(/(\d+)\s*%/)
-  if (x) return `${x[1]}%`
-  x = m.match(/(\d+)\s+CHARACTERS/)
-  if (x) return `${x[1]} CHARS`
-  x = m.match(/(\d+)\s+WORDS/)
-  if (x) return `${x[1]} WORDS`
-  if (/ONCE/.test(m)) return 'ONCE'
-  if (/EVERY SCENE/.test(m)) return 'ALL SCENES'
-  const seg = m.split('·').map((t) => t.trim()).filter(Boolean)
-  const pick = seg.find((t) => /\d/.test(t)) || seg[seg.length - 1] || m
-  return pick.split(' ').slice(0, 3).join(' ')
+/* THE FURTHEST STEP THAT IS ACTUALLY CHOOSABLE, WHICH IS NOT ALWAYS THE ONE YOU ARE ON. The course
+   is a line with one fork in it: `grammar_n5` names two children, so mastering it opens Sentence
+   Examples AND Scripted Conversation at once. `hereIndex` picks the first of those -- correctly,
+   because it is where the walk continues -- and the rail then has to let you reach the other, or
+   the screen would draw a step as NOT YET CHOOSABLE while it is sitting there choosable. */
+export function reachIndex(rows: readonly PathRow[]): number {
+  let reach = -1
+  rows.forEach((row, index) => { if (row.state !== 'ahead') reach = index })
+  return reach
 }
 
-/* the exams carry their level as a figure of its own, so the tablet reads N5 under the number
-   rather than squeezing "JLPT N5" into a vertical column */
-export interface CsBits { lv: string; en: string; vjp: string; tok: string }
-export function csBits(row: PathRow): CsBits {
-  const lv = (row.en.match(/^JLPT\s+(N[1-5])$/) || [])[1] || ''
-  return { lv, en: lv ? 'JLPT' : row.en, vjp: lv ? '検定' : row.jp, tok: csToken(row.want) }
-}
-
-export interface CourseSlots {
-  lefts: number[]
-  centers: number[]
-  /** where the certification post stands, or null when the road has no such boundary */
-  seamX: number | null
-  /** the far end of the road, where the END post goes */
-  end: number
-}
-
-/** every slot's place along the rail, given which one is selected */
-export function courseSlots(rows: readonly PathRow[], sel: number): CourseSlots {
+export function pathChain(
+  rows: readonly PathRow[], here: number, shown: number,
+): ChainView {
   const n = rows.length
-  /* the seam is DERIVED rather than counted -- the first exam is where certification starts */
-  const certAt = rows.findIndex((r) => /^jlpt/.test(r.id))
-  const lefts: number[] = []
-  const centers: number[] = []
-  let seamX: number | null = null
-  let x = CS.X0
-  for (let i = 0; i < n; i++) {
-    if (i) x += CS.GAP
-    if (i === certAt && i > 0) { seamX = x; x += CS.SEAM_W + CS.GAP }
-    const w = i === sel ? CS.WSEL : Math.round(CS.W * csScale(Math.abs(i - sel)))
-    lefts.push(x)
-    centers.push(x + w / 2)
-    x += w
-  }
-  return { lefts, centers, seamX, end: x }
-}
+  const cleared = rows.filter((row) => row.state === 'done').length
+  const reach = Math.max(here, reachIndex(rows))
+  const sel = rows[shown]
+  /* the AHEAD card names the first step that is genuinely shut, not merely the next in the list */
+  const next = rows[reach + 1]
+  /* REVISITING IS A FACT ABOUT THE STEP, NOT ABOUT THE CURSOR. Off the frontier the card can be
+     showing either a step you finished or -- at the fork -- the other one that is open, and those
+     are different sentences: one is already done, the other is a second way on. */
+  const revisiting = sel?.state === 'done'
+  const alsoOpen = !!sel && shown !== here && sel.state === 'here'
+  const ways = rows.filter((row) => row.state === 'here').length
+  const name = sel ? (sel.jp || sel.en) : ''
+  /* `goesTo` is the destination in the menu's own words: 'A DECK' for a script node, a section name
+     for a hand-off, and empty for a milestone the app cannot open yet. */
+  const dest = sel?.goesTo ?? ''
+  const deck = dest === 'A DECK'
+  const want = sel?.want ? sel.want.toUpperCase() : ''
 
-/** how far along the road the learner actually stands, between this step and the next */
-export function courseMark(
-  rows: readonly PathRow[], centers: readonly number[],
-): { x: number; pct: number } {
-  const cur = Math.max(0, rows.findIndex((r) => r.state === 'here'))
-  const next = centers[Math.min(cur + 1, rows.length - 1)] ?? centers[cur] ?? 0
-  const here = centers[cur] ?? 0
-  const pct = Math.max(0, rows[cur]?.pct ?? 0)
-  return { x: here + (next - here) * (pct / 100), pct }
+  return {
+    items: rows.map((row) => ({
+      key: row.id, no: row.no, name: row.en, note: row.count, state: row.state,
+    })),
+    here,
+    reach,
+    cleared,
+    /* the tail AFTER the one the AHEAD card names, which is what "LOCKED BEHIND IT" counts —
+       counted rather than subtracted, so the fork cannot make it one too many */
+    beyond: rows.slice(reach + 2).filter((row) => row.state === 'ahead').length,
+    behindLabel: cleared === 1 ? 'STEP DONE' : 'STEPS DONE',
+    hero: {
+      cap: sel
+        ? `${revisiting ? 'REVISITING' : alsoOpen ? 'ALSO OPEN' : 'YOU ARE HERE'}`
+          + ` · STEP ${sel.no} OF ${n}`
+        : 'THE COURSE',
+      /* WHERE A STEP LIVES BELONGS IN THE CAP. The mockup learned this the hard way: at the right
+         of the gate row it is drawn underneath the action slab and never once seen. */
+      capRight: deck ? 'STUDIED HERE' : dest ? `LIVES IN ${dest}` : 'NOT BUILT YET',
+      name,
+      nameWide: isCjk(name),
+      under: null,
+      subLeft: sel?.en ?? '',
+      subRight: revisiting ? 'DONE' : 'IN PROGRESS',
+      pct: revisiting ? 100 : Math.max(0, sel?.pct ?? 0),
+      /* THE GATE IS THE CURRICULUM'S OWN WORDS -- `MasteryRequirement` said plainly, which is the
+         course's equivalent of a block's 70%. The figure carries the vermilion because it is the
+         one thing on the card that is a target rather than a state. */
+      gate: revisiting ? 'ALREADY DONE · NOTHING AHEAD MOVES' : want ? 'WANTS ' : 'NOTHING TO CLEAR',
+      gateEm: revisiting || !want ? null : want,
+      /* AND THE SLAB'S SMALL LINE CANNOT CLAIM TO BE THE ONLY WAY ON WHILE TWO ARE OPEN, which is
+         exactly what the fork makes true for four steps of the sixteen. */
+      slabEm: revisiting ? `STEP ${sel?.no ?? ''}`.trim()
+        : ways > 1 ? `ONE OF ${ways} WAYS ON` : 'THE ONLY WAY ON',
+      slabB: revisiting ? 'STUDY IT AGAIN'
+        : deck ? 'OPEN ITS BLOCKS'
+          : dest ? `GO TO ${dest}` : 'NOT BUILT YET',
+      live: !!dest,
+    },
+    ahead: {
+      kicker: ways > 1 ? 'NEXT, WHEN BOTH ARE DONE' : 'NEXT, WHEN THIS ONE IS DONE',
+      name: next ? (next.jp || next.en) : 'THE COURSE IS DONE',
+      meta: next ? next.en : 'NOTHING LOCKED',
+      tailLabel: 'LOCKED BEHIND IT',
+    },
+    rail: {
+      left: 'STEP 01',
+      mid: `${n} STEPS · ${cleared} DONE · ${n ? Math.round((cleared / n) * 100) : 0}% OF THE COURSE`,
+      right: `STEP ${String(n).padStart(2, '0')}`,
+    },
+    pile: { cap: 'STEPS DONE', act: 'OPEN THEM', empty: 'NOTHING BEHIND YOU YET' },
+  }
 }
