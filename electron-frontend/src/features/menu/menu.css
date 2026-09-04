@@ -3461,8 +3461,10 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
     rgba(231,224,206,var(--paper)) 100%);
   box-shadow: 8px 11px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2); }
 
-.un-stamp .k { font-family: var(--jp); font-weight: 700; font-size: 132px; line-height: 0.9;
-  color: var(--ink); }
+/* NO SIZE HERE ON PURPOSE: the stamp's name is set from its own length in `stampSize`, because
+   the design's plate holds one glyph and a milestone can be called ひらがな. */
+.un-stamp .k { font-family: var(--jp); font-weight: 700; line-height: 0.9;
+  text-align: center; color: var(--ink); }
 
 /* THE RULE IS THE STAMP'S EDGE, and it is the one gold thing on this screen -- the
    section accent belongs to the milestone, not to what the milestone opened. */

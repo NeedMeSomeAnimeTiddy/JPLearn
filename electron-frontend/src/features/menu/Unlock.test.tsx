@@ -6,7 +6,7 @@ import type { ProgressionNodeView } from '../progression'
 import { Unlock } from './components/Unlock'
 import { useMenuL1 } from './useMenuL1'
 import {
-  UNLOCK_SEEN_KEY, highWater, newlyUnlocked, stampNode, statusWord, unlockMoment,
+  UNLOCK_SEEN_KEY, highWater, newlyUnlocked, stampNode, stampSize, statusWord, unlockMoment,
 } from './unlock'
 
 const T1 = '2026-08-01T10:00:00+00:00'
@@ -114,6 +114,20 @@ describe('what the stamp names', () => {
     expect(statusWord('mastered')).toBe('MASTERED')
     expect(statusWord('unlocked')).toBe('REACHED')
   })
+
+  it('sets the stamp from its own length, because the plate was drawn for one glyph', () => {
+    /* THE DESIGN STAMPS 文 AT 132 ON A 250-WIDE SHEET. The app does not pass a mark, it passes the
+       milestone's whole Japanese name -- and ひらがな at 132 wrapped to four lines and ran four
+       hundred and forty pixels down a three-hundred pixel plate, out through the paper. */
+    expect(stampSize('文')).toBe(132)
+    expect(stampSize('文法')).toBeLessThan(132)
+    /* two lines of two rather than four of one, and inside the plate on both axes */
+    const four = stampSize('ひらがな')
+    expect(four * 2).toBeLessThanOrEqual(226)
+    expect(four * 2 * 0.9).toBeLessThanOrEqual(218)
+    /* and a name nobody has written yet still lands somewhere legible */
+    expect(stampSize('あいうえおかきく')).toBeGreaterThanOrEqual(46)
+  })
 })
 
 describe('the moment', () => {
@@ -152,6 +166,18 @@ describe('the unlock screen', () => {
     expect(container.textContent).toContain('GRAMMAR N5')
     expect(container.textContent).toContain('MASTERED')
     expect(container.textContent).toContain('2 NEW THINGS')
+  })
+
+  it('sets the stamp inline, because the stylesheet cannot know how long a name is', () => {
+    /* `.un-stamp .k` declares family, weight and line-height and deliberately no size -- a port
+       that forgot the inline one ran ひらがな out through the bottom of a 300px plate. */
+    const { container } = render(<Unlock moment={moment} onContinue={vi.fn()} />)
+    const k = container.querySelector('.un-stamp .k') as HTMLElement | null
+    if (k) {
+      const px = Number.parseFloat(k.style.fontSize)
+      expect(px).toBeGreaterThan(0)
+      expect(px).toBeLessThanOrEqual(132)
+    }
   })
 
   it('draws the badge chip only where there is a badge', () => {

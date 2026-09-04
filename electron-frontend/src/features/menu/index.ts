@@ -48,7 +48,7 @@ export { useDeckBlocks } from './useDeckBlocks'
 export type { DeckBlocks } from './useDeckBlocks'
 export { feedHead, feedNote, feedAt, kanjiOf, wordKanji, wordSize } from './feed'
 export {
-  unlockMoment, newlyUnlocked, highWater, stampNode, statusWord,
+  unlockMoment, newlyUnlocked, highWater, stampNode, statusWord, stampSize,
   UNLOCK_SEEN_KEY, UNLOCK_LEADS_TO, gateWords,
 } from './unlock'
 export type { UnlockMoment, UnlockCard, GateWords } from './unlock'

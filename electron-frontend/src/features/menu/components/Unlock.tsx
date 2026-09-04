@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { UNLOCK_GOES_TO, UNLOCK_LEADS_TO, type UnlockMoment } from '../unlock'
+import { UNLOCK_GOES_TO, UNLOCK_LEADS_TO, stampSize, type UnlockMoment } from '../unlock'
 import type { MenuSectionKey } from '../types'
 import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import { ScreenHead } from './ScreenHead'
@@ -59,7 +59,13 @@ export function Unlock({ moment, onContinue, onGo }: UnlockProps) {
             stamp rather than a guessed one. */}
         {moment.stamp ? (
           <div className="un-stamp">
-            {moment.stamp.jp ? <span className="k" lang="ja">{moment.stamp.jp}</span> : null}
+            {/* SET FROM ITS OWN LENGTH -- the design's plate holds one glyph and the app passes a
+                milestone's whole name. See `stampSize`. */}
+            {moment.stamp.jp ? (
+              <span className="k" lang="ja" style={{ fontSize: `${stampSize(moment.stamp.jp)}px` }}>
+                {moment.stamp.jp}
+              </span>
+            ) : null}
             <span className="r" aria-hidden="true" />
             <span className="n">{moment.stamp.en}</span>
             <span className="s">ON THE PATH</span>

@@ -202,3 +202,30 @@ export const UNLOCK_GOES_TO: Record<string, UnlockRoute> = {
   advanced_analytics: { section: 'RECORDS' },
   /* `themes` is in Settings, which this menu has no route into. It keeps its label. */
 }
+
+/* ==================================================================================================
+   THE STAMP'S NAME IS SET FROM ITS OWN LENGTH.
+
+   THE DESIGN'S PLATE HOLDS ONE GLYPH. `assets/screen-unlock.png` stamps 文 at 132px on a 250-wide
+   sheet, and the port hard-coded that size — but the app does not pass a mark, it passes the
+   milestone's own Japanese NAME, and ひらがな is four characters. Measured on the running build:
+   four glyphs at 132px wrapped to four lines of 119 and ran four hundred and forty pixels down a
+   three-hundred pixel plate, out through the bottom of the paper and past the foot band. The kana
+   above the sheet and the word MASTERED a hundred pixels below it were the same object.
+
+   One line while it fits the width, two after that, and never past either edge. A single glyph
+   still gets the design's 132.
+   ================================================================================================== */
+/** the plate is 250 wide and 300 tall; the rule, the name, the caption and the word take ~70 of it */
+const STAMP_W = 226
+const STAMP_H = 218
+
+export function stampSize(jp: string): number {
+  const n = Math.max(1, [...jp].length)
+  const lines = n <= 2 ? 1 : 2
+  const perLine = Math.ceil(n / lines)
+  return Math.max(46, Math.min(132, Math.floor(Math.min(
+    STAMP_W / perLine,
+    STAMP_H / (lines * 0.9),
+  ))))
+}
