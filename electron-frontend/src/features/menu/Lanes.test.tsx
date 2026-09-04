@@ -100,7 +100,9 @@ describe('the lanes screen', () => {
     }])
     fireEvent.click(document.querySelector('.pr-lane') as HTMLElement)
     expect(onPick).not.toHaveBeenCalled()
-    expect(screen.getByText(/reach GRAMMAR on the path/)).toBeTruthy()
+    /* on the row and on the slab -- the row says what it is waiting for at a glance, the slab
+       says it where the press lands */
+    expect(screen.getAllByText(/reach GRAMMAR on the path/).length).toBe(2)
   })
 
   it('goes back up a level', () => {

@@ -51,25 +51,33 @@ describe('the scenes screen', () => {
     <Scenes scenes={scenes([session(SCENARIOS[0].id)])} onPick={onPick} onUp={onUp} />,
   )
 
-  it('draws one card per scenario, plus the strip that is not one', () => {
+  it('draws one row per scenario, plus the one that is not a scenario', () => {
+    /* FREE TALK IS THE LAST ROW, NOT A DIFFERENT SHAPE. It is not authored content with a start
+       and an end -- but that is a fact about what it IS, not about how it is chosen, and it was
+       already on the same cursor as the two that are. */
     show()
-    expect(document.querySelectorAll('.sc-card')).toHaveLength(SCENARIOS.length)
-    expect(document.querySelectorAll('.sc-free')).toHaveLength(1)
+    expect(document.querySelectorAll('.sc-row')).toHaveLength(SCENARIOS.length + 1)
+    expect(document.querySelectorAll('.sc-row.on')).toHaveLength(1)
+    expect(document.querySelector('.sc-here')).not.toBeNull()
   })
 
   it('marks the optional objectives hollow and the required ones solid', () => {
+    /* the checklist is the most useful thing on this screen -- it is what the tutor marks you
+       against -- so it is the poster's, at a size you can read, rather than eleven pixels of
+       card */
     show()
-    const first = document.querySelectorAll('.sc-card')[0]
-    const opts = first.querySelectorAll('.sc-obj span.opt')
+    const opts = document.querySelectorAll('.sc-here .sc-obj span.opt')
     expect(opts.length).toBeGreaterThan(0)
-    expect(opts.length).toBeLessThan(first.querySelectorAll('.sc-obj span').length)
+    expect(opts.length).toBeLessThan(document.querySelectorAll('.sc-here .sc-obj span').length)
   })
 
   it('walks off the last card onto free talk and no further', () => {
     show()
     const root = document.querySelector('.mn-open') as HTMLElement
-    for (let i = 0; i < 6; i++) fireEvent.keyDown(root, { key: 'ArrowRight' })
-    expect(document.querySelector('.sc-free.on')).toBeTruthy()
+    for (let i = 0; i < 6; i++) fireEvent.keyDown(root, { key: 'ArrowDown' })
+    const rows = document.querySelectorAll('.sc-row')
+    expect(rows[rows.length - 1].className).toContain('on')
+    expect(document.querySelector('.sc-here')?.textContent).toContain('FREE TALK')
     fireEvent.keyDown(root, { key: 'Enter' })
     /* free talk is not a scene and never was — it hands back null rather than an id */
     expect(onPick).toHaveBeenCalledWith(null)
@@ -77,7 +85,7 @@ describe('the scenes screen', () => {
 
   it('hands back the scenario that was chosen, not the list', () => {
     show()
-    fireEvent.click(document.querySelectorAll('.sc-card')[1])
+    fireEvent.click(document.querySelectorAll('.sc-row')[1])
     expect(onPick).toHaveBeenCalledWith(SCENARIOS[1].id)
   })
 

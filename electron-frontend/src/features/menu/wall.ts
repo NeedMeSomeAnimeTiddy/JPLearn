@@ -13,12 +13,35 @@ import type { BadgeEntry } from '../achievements/types'
    `milestone`. The mockup drew its own grouping over invented badges; these are the twenty-five the
    app actually ships, in the order the app already walks them.
 
-   AND A SEAL WEARS THE BADGE'S OWN ICON. The mockup gave each of its badges a Japanese glyph, which
-   was authored for the mockup and exists nowhere in this app — `BADGE_METADATA` carries a lucide
-   icon name instead. Inventing twenty-five kanji to keep the menu's all-type vocabulary would be
-   inventing exactly the kind of thing this port refuses to invent, so the seal shows the mark the
-   badge already has. That map moved out of `AchievementsPanel` so both screens read one copy.
+   A SEAL WEARS ITS OWN FIGURE WHERE IT HAS ONE, AND ITS ICON WHERE IT DOES NOT. The mockup gave
+   each badge a Japanese glyph, authored for the mockup and existing nowhere in this app — inventing
+   twenty-five kanji is exactly what this port refuses to do, so the fallback is the lucide mark
+   `BADGE_METADATA` already carries.
+
+   BUT THIRTEEN OF THE TWENTY-FIVE ARE QUANTITIES, AND THE ICON WAS HIDING THEM. `reviews_100`,
+   `reviews_500` and `reviews_1000` all carry `icon: 'target'`, so three badges that differ only by
+   an order of magnitude drew as three identical grey rings; the five streaks all carry `flame` and
+   the five JLPT levels all carry `target` again. Reading the figure out of the descriptor is not
+   inventing anything — `streak_14` means fourteen and `jlpt_n3_passed` means N3 — and it is what
+   the design's own plate does: 100 / 500 / 1K across the volume row, N5 through N1 across the
+   milestones. See `sealMark`.
    ================================================================================================== */
+
+/* THE FIGURE A SEAL CARRIES, or null when the badge is not a quantity and keeps its pictogram.
+   Derived from the descriptor rather than from a table, so a `streak_365` added tomorrow gets its
+   own face without this file being edited. */
+export function sealMark(descriptor: string): string | null {
+  const reviews = /^reviews_(\d+)$/.exec(descriptor)
+  if (reviews) {
+    const n = Number(reviews[1])
+    return n >= 1000 ? `${n / 1000}K` : String(n)
+  }
+  const streak = /^streak_(\d+)$/.exec(descriptor)
+  if (streak) return streak[1]
+  const jlpt = /^jlpt_(n[1-5])_passed$/.exec(descriptor)
+  if (jlpt) return jlpt[1].toUpperCase()
+  return null
+}
 
 export interface Seal {
   descriptor: string

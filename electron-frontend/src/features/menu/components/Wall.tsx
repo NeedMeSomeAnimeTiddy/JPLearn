@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BADGE_ICONS, BADGE_ICON_FALLBACK, useAchievements } from '../../achievements'
-import { flatSeals, sealGroups, wallStep } from '../wall'
+import { flatSeals, sealGroups, sealMark, wallStep } from '../wall'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
 import { screenClass, useEntered, useFrameFit } from '../useScreen'
@@ -44,6 +44,11 @@ export function Wall({ onUp }: WallProps) {
   const total = flat.length
   const earned = flat.filter((s) => s.earned).length
   const Icon = here ? (BADGE_ICONS[here.icon] ?? BADGE_ICON_FALLBACK) : BADGE_ICON_FALLBACK
+  const bigMark = here ? sealMark(here.descriptor) : null
+  /* which of the three groups the selected seal came out of, which the detail bar never said */
+  const bigGroup = here
+    ? groups.find((g) => g.seals.some((x) => x.descriptor === here.descriptor))?.en ?? ''
+    : ''
 
   return (
     <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
@@ -63,7 +68,12 @@ export function Wall({ onUp }: WallProps) {
                 {g.seals.map((s) => {
                   const index = flat.indexOf(s)
                   const SealIcon = BADGE_ICONS[s.icon] ?? BADGE_ICON_FALLBACK
+                  /* the figure where the badge is one, the pictogram where it is not -- see
+                     `sealMark`, and the note at the top of `wall.ts` for why three identical
+                     grey rings was the thing worth fixing */
+                  const mark = sealMark(s.descriptor)
                   const cls = ['bw-seal']
+                  if (mark) cls.push('num')
                   if (s.earned) cls.push('got')
                   if (index === at) cls.push('on')
                   return (
@@ -75,7 +85,7 @@ export function Wall({ onUp }: WallProps) {
                       onClick={() => setAt(index)}
                       aria-label={`${s.name} — ${s.earned ? 'earned' : 'not yet'}. ${s.takes}`}
                     >
-                      <SealIcon size={17} strokeWidth={2.1} aria-hidden="true" />
+                      {mark ?? <SealIcon size={19} strokeWidth={2.4} aria-hidden="true" />}
                     </button>
                   )
                 })}
@@ -88,12 +98,17 @@ export function Wall({ onUp }: WallProps) {
             second field being invented for it. */}
         {here ? (
           <div className="bw-detail">
-            <span className={here.earned ? 'bw-big got' : 'bw-big'}>
-              <Icon size={40} strokeWidth={1.7} aria-hidden="true" />
+            <span className={[
+              'bw-big', bigMark ? 'num' : '', here.earned ? 'got' : '',
+            ].filter(Boolean).join(' ')}>
+              {bigMark ?? <Icon size={38} strokeWidth={2} aria-hidden="true" />}
             </span>
             <span className="bw-txt"><b>{here.name}</b><i>{here.takes}</i></span>
             <span className={here.earned ? 'bw-state got' : 'bw-state'}>
               <b>{here.earned ? 'EARNED' : 'NOT YET'}</b>
+              {/* WHICH OF THE THREE GROUPS IT BELONGS TO, which the detail bar never said -- so a
+                  seal picked out of the middle row had no way of telling you what row that was. */}
+              <i>{bigGroup}</i>
             </span>
           </div>
         ) : null}

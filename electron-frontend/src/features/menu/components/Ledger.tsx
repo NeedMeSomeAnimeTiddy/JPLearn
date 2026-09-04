@@ -164,16 +164,19 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
             </b>
             <i>ONE BAR IS A WEEK · HEIGHT IS VOLUME, COLOUR IS ACCURACY</i>
           </span>
+          {/* EVERY WEEK IS A SLOT, filled or not -- see the note over `.lg-bars i`. A week with
+              nothing in it drawn as nothing at all is indistinguishable from the end of the year,
+              which is exactly the reading a records screen must not give. */}
           <span className="lg-bars">
             {L.year.weeks.map((w, i) => (
-              w.n
-                ? (
-                  <i
-                    key={i}
-                    style={{ height: 4 + Math.round(68 * (w.n / maxWeek)), background: accColour(w.acc) }}
-                  />
-                )
-                : <i key={i} className="none" style={{ height: 3 }} />
+              <i key={i} className={i === L.year.weeks.length - 1 ? 'now' : undefined}>
+                {w.n ? (
+                  <u style={{
+                    height: `${Math.min(100, 6 + Math.round(94 * (w.n / maxWeek)))}%`,
+                    background: accColour(w.acc),
+                  }} />
+                ) : null}
+              </i>
             ))}
           </span>
         </button>

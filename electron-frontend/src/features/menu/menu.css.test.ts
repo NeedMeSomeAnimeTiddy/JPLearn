@@ -209,9 +209,10 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
      whole deck once in the band -- where it is also the scrubber. And the vocabulary rail that
      replaces the blocks for the five vocab decks. */
   '.dk-run': 'stage', '.dk-here': 'stage', '.dk-strip': 'foot',
-  '.fd-hero': 'stage', '.fd-today': 'stage', '.fd-rail': 'stage',
-  /* PRACTICE and THE WORLD, which are the same screen filled twice */
-  '.lanes': 'stage', '.lanes.two': 'stage', '.pr-note': 'stage',
+  '.fd-run': 'stage', '.fd-here': 'stage', '.fd-none': 'stage',
+  '.fd-mini': 'foot', '.fd-set': 'foot', '.fd-steplab': 'foot',
+  /* PRACTICE and THE WORLD, which are the same ledger filled twice */
+  '.pr-run': 'stage', '.pr-here': 'stage', '.pr-note': 'foot',
   /* the library */
   '.lb-view': 'stage', '.lb-heads': 'span', '.lb-mini': 'foot',
   /* the drills: the deck axis across the top, the catalogue as lines under it, the mode itself
@@ -225,7 +226,7 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
   /* the moment something opens */
   '.un-stamp': 'stage', '.un-lead': 'stage', '.un-list': 'stage', '.un-slab': 'stage',
   /* the conversations */
-  '.scenes': 'stage',
+  '.sc-run': 'stage', '.sc-here': 'stage',
   /* shared furniture */
   '.pj-empty': 'stage', '.pj-back': 'crown',
 }
@@ -297,7 +298,7 @@ describe('the frame contract', () => {
        both edges of the stage at 45% opacity -- a phone's grid and a phone's carousel. The rows
        reach everything both of them reached, so neither is kept as a second way to do one thing. */
     for (const gone of ['.dk-sheet', '.dk-cell', '.dk-grid', '.dk-behind', '.dk-ahead',
-      '.dr-tab', '.dr-hero', '.dr-side', '.dr-strip', '.dr-rail']) {
+      '.dr-tab', '.dr-hero', '.dr-side', '.dr-strip', '.dr-rail', '.lanes', '.scenes', '.sc-card', '.sc-free', '.fd-hero', '.fd-today', '.fd-rail']) {
       expect([gone, menuHas(gone)]).toEqual([gone, false])
     }
   })

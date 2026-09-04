@@ -1207,166 +1207,167 @@ body.mn-leaving .mn-open.on {
 /* THE FROSTED SET. Every plate that carries type and stands on the valley. `.as-col` is in
    because the ascent's columns are the one place a bright building sits directly behind a
    large flat fill. Gated on the body class so the filter is not created at all when off. */
-body.frosted .dk-here, body.frosted .dk-behind, body.frosted .dk-ahead, body.frosted .dk-rail,
+body.frosted .dk-meter, body.frosted .dk-strip, body.frosted .fd-plate,
 body.frosted .lg-plate, body.frosted .lg-rest, body.frosted .lg-lv,
-body.frosted .as-col, body.frosted .lv-head, body.frosted .lv-panel,
-body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
+body.frosted .as-col, body.frosted .lv-read, body.frosted .dr-read,
+body.frosted .pr-plate, body.frosted .sc-plate {
   backdrop-filter: blur(var(--frost)) saturate(1.15);
   -webkit-backdrop-filter: blur(var(--frost)) saturate(1.15);
 }
 
-.fd-wrap { position: absolute; inset: 0; }
+/* ==================================================================================================
+   TODAY'S WORDS — the deck screen's sibling, so it is the same ledger.
 
-.fd-f { position: absolute; border: 0; padding: 0; margin: 0; font: inherit; text-align: left;
-  cursor: pointer; color: var(--ink); }
+   ONE HERO CARD AND ONE PANEL, side by side at 532 and 380, with a rail under them. The hero showed
+   ONE word out of up to forty and the rail drew the other thirty-nine as anonymous ticks — so the
+   only way to see what today actually held was to press start and find out. The panel beside it
+   carried the budget stepper, three denominators and their labels at 8.5 and 9px.
 
-.fd-f::after { content: ''; position: absolute; left: -7px; top: -7px; right: -7px;
-  bottom: -7px; box-shadow: inset 0 0 0 3px var(--hi); opacity: 0; pointer-events: none;
-  transition: opacity 0.18s ease; }
+   THE QUEUE IS A LIST, so it is drawn as one: today's words as rows, the one you are on at poster
+   size beside them, and the day's own numbers and the budget in the foot band where the drills put
+   theirs. The rail is gone rather than kept — it was marking position in a list that is now on the
+   screen.
+   ================================================================================================== */
+.fd-run { position: absolute; left: 164px; top: 197px; width: 452px;
+  display: flex; flex-direction: column; gap: 3px; }
 
-.fd-f.on::after { opacity: 1; }
+.fd-row { display: flex; align-items: center; height: 34px; width: 452px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  background: rgba(12, 10, 8, 0.72); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: background 0.18s ease; }
+.fd-row:hover { background: rgba(22, 19, 14, 0.82); }
 
-.fd-cap { display: flex; align-items: baseline; justify-content: space-between;
-  white-space: nowrap; padding: 6px 15px 7px; background: var(--ink); color: var(--gold-hi);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em; }
+.fd-row .n { flex: none; width: 42px; padding-left: 13px; font-family: var(--lat);
+  font-style: italic; font-weight: 900; font-size: 13px; color: rgba(232, 196, 124, 0.6); }
+.fd-row .w { flex: none; max-width: 132px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: var(--jp); font-weight: 700; font-size: 17px;
+  color: var(--washi); }
+.fd-row .m { flex: 1; min-width: 0; padding-left: 13px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: var(--lat-ui); font-weight: 600; font-size: 12px;
+  color: rgba(242, 234, 216, 0.62); }
+/* HOW MANY OF ITS KANJI ARE NEW TO YOU, which is the one thing that decides whether a word is
+   readable today -- the payload says how many, never which. */
+.fd-row .s { flex: none; padding-right: 14px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9.5px; letter-spacing: 0.16em; color: rgba(232, 196, 124, 0.62); white-space: nowrap; }
 
-.fd-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
+.fd-row.on { height: 50px; width: 480px;
+  background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
+    rgba(235, 230, 217, var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.fd-row.on:hover { background: linear-gradient(178deg, rgba(255, 253, 247, var(--paper)) 0%,
+    rgba(240, 235, 222, var(--paper)) 100%); }
+.fd-row.on .n { font-size: 18px; color: var(--hi-deep); }
+.fd-row.on .w { max-width: 168px; font-size: 24px; color: var(--ink); }
+.fd-row.on .m { font-size: 13px; color: rgba(20, 17, 13, 0.62); }
+.fd-row.on .s { color: rgba(20, 17, 13, 0.55); }
 
-/* ---- THE FRAME CONTRACT, ON THE FEED. Same arithmetic as the chain: a 246-tall card
-   paints 14.7px wider each side than it is authored and the 100-tall rail 6.2, so the
-   stage's 160/1120 become 175/1105 for the cards and 168/1112 for the rail. The pair runs
-   532 + 18 + 380 = 930 and is balanced about x640. ---- */
-.fd-hero { left: 175px; top: 202px; width: 532px; height: 246px;
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-  transform: skewX(-8deg) rotate(-1.2deg); }
+.fd-fold { display: flex; align-items: baseline; gap: 9px; margin-top: 9px; padding: 5px 13px 6px;
+  align-self: flex-start; background: rgba(10, 9, 6, 0.82);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg); }
+.fd-fold b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
+  color: var(--gold-hi); }
+.fd-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.62); }
 
-.fd-body { flex: 1; display: flex; flex-direction: column; padding: 14px 24px 0; }
+/* ---- the word itself, at poster size on the valley -------------------------------------------- */
+.fd-here { position: absolute; left: 656px; top: 196px; width: 456px; }
 
-.fd-word { font-family: var(--jp); font-weight: 700; line-height: 1.04; color: var(--ink); }
+.fd-cap { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.24em;
+  color: rgba(242, 234, 216, 0.82); white-space: nowrap; }
+.fd-cap i { font-style: normal; color: rgba(232, 196, 124, 0.7); }
 
-.fd-read { margin-top: 7px; font-family: var(--lat-ui); font-weight: 700; font-size: 15px;
-  letter-spacing: 0.22em; color: #b23320; }
+/* NO SIZE HERE ON PURPOSE: a word is set from its own length, in `wordSize` */
+.fd-word { display: block; margin-top: 9px; font-family: var(--jp); font-weight: 700;
+  line-height: 1.04; color: var(--washi); text-shadow: var(--ftShadow); }
 
-.fd-gloss { margin-top: 5px; font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 22px; line-height: 1.1; color: rgba(20, 17, 13, 0.78); }
+.fd-read { display: block; margin-top: 7px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 16px; letter-spacing: 0.18em; color: var(--gold-hi); text-shadow: var(--ftShadow); }
 
-/* WHY THIS WORD IS HERE. The ordering picks the word using the MOST of what you already
-   know, so naming those characters is the difference between a list and a reason. */
-.fd-uses { margin-top: auto; display: flex; align-items: center; gap: 9px; padding-bottom: 10px; }
+.fd-gloss { display: block; margin-top: 5px; font-family: var(--lat); font-style: italic;
+  font-weight: 900; font-size: 22px; line-height: 1.15; color: var(--washi);
+  text-shadow: var(--ftShadow); }
 
-.fd-uses span { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
+/* ---- and everything measured, on one plate ---------------------------------------------------- */
+.fd-plate { display: block; margin-top: 12px; padding: 10px 18px 11px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.18); }
 
-.fd-uses i { width: 27px; height: 27px; display: grid; place-items: center;
-  font-family: var(--jp); font-style: normal; font-size: 17px;
-  background: var(--gold); color: var(--ink); }
+/* THE COUNT, NOT THE CULPRIT — the payload says how many of these are new, never which, so the
+   chips are plain and the line beside them carries the figure. */
+.fd-uses { display: flex; align-items: center; gap: 9px; }
+.fd-uses i { width: 30px; height: 30px; flex: none; display: grid; place-items: center;
+  background: rgba(242, 234, 216, 0.14); font-family: var(--jp); font-weight: 700; font-size: 19px;
+  color: var(--washi); }
+/* `<s>` IS A STRIKETHROUGH AND THIS ONE IS A CAPTION -- without `text-decoration: none` the line
+   reading "NO KANJI IN IT — READABLE ON DAY ONE" is drawn struck through, which reads as a fact
+   being retracted. */
+.fd-uses s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui);
+  font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em; text-align: right;
+  color: rgba(242, 234, 216, 0.62); }
 
-.fd-uses i.no { background: rgba(20, 17, 13, 0.12); color: rgba(20, 17, 13, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.28); }
+.fd-theme { display: block; margin-top: 10px; padding-top: 9px;
+  box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.18);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.18em;
+  color: rgba(232, 196, 124, 0.78); }
 
-.fd-theme { display: flex; align-items: center; justify-content: space-between;
-  padding: 9px 24px 11px; background: rgba(20, 17, 13, 0.06);
-  box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16); font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.6);
-  white-space: nowrap; }
-
-.fd-slab { position: absolute; right: -14px; bottom: -30px; z-index: 3; padding: 9px 15px 10px;
-  background: var(--hi); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); white-space: nowrap; }
-
+.fd-slab { display: block; margin: 14px 0 0 auto; width: 336px; border: 0; cursor: pointer;
+  font: inherit; text-align: left; padding: 8px 18px 10px; background: var(--hi);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease; }
+.fd-slab:hover { filter: brightness(1.08); }
 .fd-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 10px; line-height: 12px; letter-spacing: 0.14em; color: #ffd9a1; }
+  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+.fd-slab b { display: block; margin-top: 2px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 16px; letter-spacing: 0.05em; color: var(--washi); }
 
-.fd-slab b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
-  line-height: 17px; letter-spacing: 0.1em; color: var(--washi); margin-top: 2px; }
+/* ---- the foot band: what the level is made of, and how many words a day ----------------------- */
+/* THE DENOMINATORS. "Here are ten words" is a card trick without them, and these three are the
+   bridge's own counts — clearing a kanji block moves the first two. */
+.fd-mini { position: absolute; left: 160px; top: 578px; width: 960px;
+  display: flex; justify-content: center; }
+.fd-denom { display: flex; align-items: stretch; background: rgba(10, 9, 6, 0.82);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.42); transform: skewX(-8deg) rotate(-1.2deg); }
+.fd-denom span { display: flex; align-items: baseline; gap: 9px; padding: 5px 15px 6px;
+  white-space: nowrap; }
+.fd-denom span + span { box-shadow: inset 1px 0 0 rgba(242, 234, 216, 0.22); }
+.fd-denom b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+  color: var(--gold-hi); }
+.fd-denom i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.6); }
 
-/* ---- how much today, and what that is a fraction of ---- */
-.fd-today { position: absolute; left: 725px; top: 202px; width: 380px; height: 246px;
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
-    rgba(203,193,164,var(--paper)) 100%);
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  transform: skewX(-8deg) rotate(-1.2deg); }
+.fd-set { position: absolute; left: 160px; top: 604px; width: 960px;
+  display: flex; justify-content: center; align-items: stretch; gap: 6px; }
 
-.fd-count { display: flex; align-items: baseline; gap: 12px; padding: 12px 20px 0; }
+.fd-setlab { display: flex; align-items: center; padding: 0 12px;
+  background: rgba(20, 17, 13, 0.72); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+  color: rgba(242, 234, 216, 0.62); white-space: nowrap; }
 
-.fd-count b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 62px;
-  line-height: 0.86; color: var(--ink); }
+.fd-step { padding: 4px 15px 5px; border: 0; cursor: pointer; font: inherit; white-space: nowrap;
+  background: linear-gradient(178deg, rgba(251, 248, 241, 0.9) 0%, rgba(235, 230, 217, 0.9) 100%);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: filter 0.16s ease;
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; color: var(--ink); }
+.fd-step:hover { filter: brightness(1.06); }
+/* WHAT IS SET AND WHERE THE CURSOR IS ARE TWO DIFFERENT FACTS, and a stepper that draws them with
+   one mark cannot say "you are looking at 40 and 10 is still the budget". */
+.fd-step.set { background: var(--gold); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.5); }
+.fd-step.on { box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 2px var(--hi); }
+.fd-step.set.on { box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 2px var(--hi); }
 
-.fd-count span { display: flex; flex-direction: column; gap: 2px; }
+.fd-steplab { position: absolute; left: 160px; top: 630px; width: 960px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(242, 234, 216, 0.6); text-shadow: var(--ftShadow); }
 
-.fd-count em { font-style: normal; font-family: var(--lat); font-weight: 900; font-size: 19px;
-  color: #b23320; }
-
-.fd-count i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55); white-space: nowrap; }
-
-.fd-steps { display: flex; gap: 6px; padding: 14px 20px 0; }
-
-/* THE CONTROL. Five values, each its own focusable -- no mode, no second axis: the arrows
-   already walk the screen and Enter already picks, so the chips need no new grammar. */
-.fd-step { position: relative; flex: 1; padding: 9px 0 10px; text-align: center; border: 0;
-  cursor: pointer; background: rgba(20, 17, 13, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.22);
-  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
-  color: rgba(20, 17, 13, 0.6); }
-
-.fd-step.set { background: var(--gold); box-shadow: none; color: var(--ink); }
-
-.fd-step::after { content: ''; position: absolute; left: -4px; top: -4px; right: -4px;
-  bottom: -4px; box-shadow: inset 0 0 0 3px var(--hi); opacity: 0; pointer-events: none;
-  transition: opacity 0.18s ease; }
-
-.fd-step.on::after { opacity: 1; }
-
-.fd-steplab { padding: 7px 20px 0; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); }
-
-/* THE DENOMINATORS. "Twelve words today" is a card trick without them, and the second one
-   is the number the whole ordering turns on -- clearing a kanji block is what moves it. */
-.fd-denom { margin-top: auto; display: flex; align-items: stretch;
-  box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.2); }
-
-.fd-denom span { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 10px 20px 12px; }
-
-.fd-denom span + span { box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2); }
-
-.fd-denom b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
-  color: var(--ink); }
-
-/* `balance` rather than a hand-placed break: left to itself the wrap put "KNOW" and
-   "ORDER" alone on a second line, which reads as a mistake rather than as a caption. */
-.fd-denom i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); line-height: 1.35;
-  text-wrap: balance; }
-
-/* ---- today's list, which empties ---- */
-.fd-rail { position: absolute; left: 168px; top: 468px; width: 944px; height: 100px; 
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transform: skewX(-8deg) rotate(-1.2deg); }
-
-.fd-segrow { flex: 1; display: flex; align-items: stretch; gap: 4px; padding: 12px 16px 8px; }
-
-.fd-segrow i { flex: 1; display: block; max-width: 120px; position: relative;
-  background: rgba(20, 17, 13, 0.13); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
-
-.fd-segrow i.done { background: var(--gold); box-shadow: none; }
-
-.fd-segrow i.here { background: #b23320; box-shadow: 0 0 0 2px rgba(20, 17, 13, 0.55); }
-
-/* a budget of zero has no segments at all, and an empty rail must say which it is */
-.fd-none { flex: 1; display: grid; place-items: center; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 11px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); }
-
-.fd-railcap { display: flex; align-items: baseline; justify-content: space-between;
-  padding: 0 16px 9px; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
-
+/* an empty queue is drawn as an absence, not as a blank column */
+.fd-none { position: absolute; left: 164px; top: 197px; width: 452px; padding: 14px 18px 16px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45);
+  transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 12px; letter-spacing: 0.16em;
+  line-height: 1.5; color: rgba(242, 234, 216, 0.7); }
 
 /* ==================================================================================================
    A DECK'S BLOCKS — THE SAME LEDGER THE COURSE IS.
@@ -1778,180 +1779,164 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 /* 180/920, NOT 160/960. A 330-tall card skewed -8deg paints 19.7px wider each side than it is
    authored, so a row laid at the stage's own edges hangs 20px into the moat at both ends. */
-.lanes { position: absolute; left: 180px; top: 206px; width: 920px; height: 330px;
-  display: flex; gap: 24px; }
+/* ==================================================================================================
+   THE LANES — PRACTICE's three ways in, and THE WORLD's two, on one drawing.
 
-/* ================================================================================
-   THE WORLD'S TWO LANES -- the same card as PRACTICE's, two-up instead of three.
+   THREE 470x510 CARDS EACH HOLDING A NUMBER, ONE SENTENCE AND FOUR HUNDRED PIXELS OF EMPTY PAPER.
+   That was PRACTICE: the row of equal cards at its most literal, and the emptiest screen in the
+   app. THE WORLD filled the same card and had the opposite problem — a gate line, three items and
+   a foot crammed into a column 470 wide beside another one exactly like it.
 
-   WHY THE SAME COMPONENT. Both screens answer "which of these do you want to do",
-   nothing on either is ordered or gated against its neighbour, and a learner who has
-   learned PRACTICE's screen should not have to learn this one. So `.pr-lane` is reused
-   whole and this block adds exactly two things it did not need: a list of what is
-   inside the lane, and the milestone that opened it.
+   ONE LANE IS A ROW AND THE ONE YOU ARE ON IS A POSTER, which is what the rest of this family of
+   screens does. Two or three rows is a short column and that is honest: there ARE only three ways
+   in. The poster is where the room went — the figure at 56px on its own plate, the description as
+   a sentence rather than a caption, and THE WORLD's three items with space to be read.
+   ================================================================================================== */
+.pr-run { position: absolute; left: 168px; top: 197px; width: 448px;
+  display: flex; flex-direction: column; gap: 6px; }
 
-   THE EXTRA WIDTH IS SPENT ON THE INSIDE. Two cards across the stage are 445 wide
-   against PRACTICE's 291, and a card that just got 154px bigger without saying anything
-   more is a door with a bigger label on it. Each lane shows the three things you would
-   actually pick, which also makes level three a zoom rather than a surprise.
+.pr-lane { display: flex; align-items: stretch; height: 78px; width: 448px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  background: rgba(12, 10, 8, 0.72); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.4);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: background 0.18s ease; }
+.pr-lane:hover { background: rgba(22, 19, 14, 0.82); }
 
-   AND NOTHING HERE IS AN OBLIGATION, so nothing carries the vermilion. PRACTICE's review
-   lane owes you something; THE WORLD is the section you visit because you want to.
-   `.pr-lane.duty` is simply never set here, and the selected slab comes out in the
-   ink-and-gold that every other non-duty lane already uses.
+.pr-glyph { flex: none; width: 62px; display: grid; place-items: center;
+  background: rgba(242, 234, 216, 0.1); font-family: var(--jp); font-weight: 400; font-size: 30px;
+  color: rgba(232, 196, 124, 0.8); }
 
-   184/906, AND THE TWO CARDS DO NOT HAVE THE SAME BLEED. This was laid at 182/916 from
-   the frame contract's own rule -- half-extent = 0.5w + 0.0598h -- and the right card
-   measured 4px into the moat anyway. The rule is written for `rotate(-1.2deg)`, where
-   the lean partly CANCELS the skew; the second card in every lane row is
-   `rotate(1deg)`, where it ADDS to it:
+.pr-body { flex: 1; min-width: 0; display: flex; flex-direction: column;
+  justify-content: center; gap: 4px; padding: 0 14px 0 17px; overflow: hidden; }
 
-      card 1  skewX(-8) rotate(-1.2)  ->  [[ 1.00272, -0.11953], [-0.02094, 0.99978]]
-      card 2  skewX(-8) rotate( 1.0)  ->  [[ 0.99740, -0.15797], [ 0.01745, 0.99985]]
+.pr-cap { display: flex; align-items: baseline; gap: 10px; }
+.pr-cap b { font-family: var(--lat-ui); font-weight: 700; font-size: 19px; letter-spacing: 0.06em;
+  color: var(--washi); white-space: nowrap; }
+.pr-cap i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 13px;
+  color: rgba(232, 196, 124, 0.7); }
 
-   x half-extent is 0.5(|a|w + |c|h), so at h=330 card 1 bleeds 19.7px per side and card
-   2 bleeds 26.1 -- a third more. It never showed up on PRACTICE because its cards are
-   291 wide and the whole row had 20px of slack; at 445 it does. Any two-up or four-up
-   row must be laid against the WORSE of the two, which is what 906 is.
+.pr-sum { font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+  color: rgba(242, 234, 216, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-   Top 46 rather than PRACTICE's 40 is the same story on the other axis: a 441-wide card
-   leans 4.7px vertically where a 291-wide one leans 3.0, and the selected card lifts 6
-   on top of that.
-   ================================================================================ */
-.lanes.two { left: 184px; top: 212px; width: 906px; }
+.pr-tally { flex: none; display: flex; flex-direction: column; align-items: flex-end;
+  justify-content: center; gap: 2px; padding-right: 18px; }
+.pr-tally b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
+  line-height: 1; color: var(--gold-hi); }
+.pr-tally i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
+  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
 
+/* the one you are on inverts and overhangs, the same move every other ledger on the stage makes */
+.pr-lane.on { height: 104px; width: 470px;
+  background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
+    rgba(235, 230, 217, var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.pr-lane.on:hover { background: linear-gradient(178deg, rgba(255, 253, 247, var(--paper)) 0%,
+    rgba(240, 235, 222, var(--paper)) 100%); }
+.pr-lane.on .pr-glyph { width: 74px; background: var(--ink); font-size: 40px; color: var(--gold-hi); }
+.pr-lane.on .pr-cap b { font-size: 25px; color: var(--ink); }
+.pr-lane.on .pr-cap i { color: rgba(20, 17, 13, 0.5); }
+.pr-lane.on .pr-sum { color: rgba(20, 17, 13, 0.55); }
+.pr-lane.on .pr-tally b { font-size: 38px; color: var(--hi-deep); }
+.pr-lane.on .pr-tally i { color: rgba(20, 17, 13, 0.55); }
 
+/* REVIEWS ARE THE OBLIGATION, so the duty lane carries the one vermilion in the column */
+.pr-lane.duty .pr-tally b { color: #ff7a63; }
 
+/* A SHUT LANE IS STILL A LANE. The whole point of drawing a locked thing rather than hiding it is
+   that you can see what is in there, so it keeps its figure and loses only its brightness. */
+.pr-lane.shut { background: rgba(12, 10, 8, 0.5); cursor: not-allowed; }
+.pr-lane.shut:hover { background: rgba(12, 10, 8, 0.5); }
+.pr-lane.shut .pr-cap b { color: rgba(242, 234, 216, 0.55); }
+.pr-lane.shut .pr-glyph { color: rgba(232, 196, 124, 0.35); }
+.pr-lane.shut .pr-tally b { color: rgba(242, 234, 216, 0.45); }
+.pr-lane.on.shut { background: linear-gradient(178deg, rgba(196, 188, 166, var(--paper)) 0%,
+    rgba(170, 163, 142, var(--paper)) 100%); }
+.pr-lane.on.shut .pr-cap b { color: rgba(20, 17, 13, 0.7); }
+.pr-lane.on.shut .pr-tally b { color: rgba(20, 17, 13, 0.5); }
 
-.pr-lane { flex: 1; min-width: 0; border: 0; padding: 0; font: inherit; text-align: left;
-  cursor: pointer; display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
-    rgba(203,193,164,var(--paper)) 100%);
-  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transform: skewX(-8deg) rotate(-1.2deg);
-  transition: transform 0.26s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.26s ease,
-    background 0.26s ease; }
+/* ---- the lane itself, at poster size on the valley --------------------------------------------- */
+.pr-here { position: absolute; left: 656px; top: 196px; width: 456px; }
 
-.pr-lane:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+.pr-kick { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.24em;
+  color: rgba(242, 234, 216, 0.82); white-space: nowrap; }
+.pr-kick i { font-style: normal; font-family: var(--jp); font-weight: 700; letter-spacing: 0.1em;
+  color: rgba(232, 196, 124, 0.7); }
 
-.pr-lane.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-  transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px); }
+.pr-name { display: block; margin-top: 10px; font-family: var(--lat); font-style: italic;
+  font-weight: 900; font-size: 40px; line-height: 0.98; color: var(--washi);
+  text-shadow: var(--ftShadow); }
 
-.pr-lane.on:nth-child(2) { transform: skewX(-8deg) rotate(1deg) translateY(-6px); }
+.pr-d { display: block; margin-top: 8px; font-family: var(--lat-ui); font-weight: 600;
+  font-size: 13px; letter-spacing: 0.02em; line-height: 1.4; color: rgba(242, 234, 216, 0.86);
+  text-shadow: var(--ftShadow); }
 
-.pr-cap { flex: none; display: flex; align-items: baseline; gap: 10px; padding: 8px 15px 9px;
-  background: var(--ink); white-space: nowrap; }
+/* ---- and everything measured, on one plate ----------------------------------------------------- */
+.pr-plate { display: block; margin-top: 12px; padding: 11px 18px 12px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.18); }
 
-.pr-cap b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.2em; color: var(--gold-hi); }
+.pr-fig { display: flex; align-items: baseline; gap: 13px; }
+.pr-fig b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 44px;
+  line-height: 0.94; color: var(--washi); }
+.pr-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.6); }
+/* an absence is not a nought: a lane with nothing in it says so in words */
+.pr-fig.none b { font-size: 26px; color: rgba(242, 234, 216, 0.7); }
 
-.pr-cap i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 11px;
-  letter-spacing: 0.1em; color: rgba(232, 196, 124, 0.6); }
+.pr-foot { display: block; margin-top: 7px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10.5px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.55); }
 
-.pr-glyph { padding: 12px 15px 0; font-family: var(--jp); font-weight: 400; font-size: 46px;
-  line-height: 1; color: rgba(20, 17, 13, 0.22); }
+/* THE MILESTONE THAT OPENED THIS LANE — one element with two states, and the words are one of
+   them: a quiet credit while the lane is open, the lock while it is not. */
+.wd-gate { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 9px;
+  box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.18);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
+  color: rgba(232, 196, 124, 0.8); }
+.wd-gate i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 12px;
+  letter-spacing: 0.1em; }
+.pr-here.shut .wd-gate { color: #ff7a63; }
 
-.pr-fig { display: flex; align-items: baseline; gap: 9px; padding: 4px 15px 0; }
+/* THE THREE THINGS INSIDE THE LANE, which is what makes level three a zoom rather than a surprise */
+.wd-list { display: flex; flex-direction: column; margin-top: 9px; }
+.wd-item { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 4px 0;
+  box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.14); }
+.wd-item b { flex: none; max-width: 176px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-family: var(--jp); font-weight: 700; font-size: 14px;
+  color: var(--washi); }
+.wd-item em { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-style: normal; font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px;
+  color: rgba(242, 234, 216, 0.62); }
+.wd-item u { flex: none; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9.5px; letter-spacing: 0.16em; color: rgba(232, 196, 124, 0.7); white-space: nowrap; }
+/* one of the three has not been reached yet, and is drawn hollow rather than left out */
+.wd-item.hollow b, .wd-item.hollow em { color: rgba(242, 234, 216, 0.35); }
+.wd-item.hollow u { color: rgba(242, 234, 216, 0.3); }
 
-.pr-fig b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 40px;
-  line-height: 1; color: var(--ink); }
+/* ---- the action --------------------------------------------------------------------------------- */
+.pr-slab { display: block; margin: 14px 0 0 auto; width: 330px; border: 0; cursor: pointer;
+  font: inherit; text-align: left; padding: 8px 18px 10px; background: var(--hi);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease; }
+.pr-slab:hover { filter: brightness(1.08); }
+.pr-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+.pr-slab b { display: block; margin-top: 2px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 16px; letter-spacing: 0.05em; color: var(--washi); }
+/* a lane that is not the obligation invites in ink rather than in vermilion */
+.pr-slab.quiet { background: rgba(12, 10, 8, 0.86); }
+.pr-slab.quiet em { color: rgba(232, 196, 124, 0.8); }
+.pr-slab[data-live="0"] { background: rgba(12, 10, 8, 0.78); cursor: not-allowed; }
+.pr-slab[data-live="0"] em { color: rgba(255, 122, 99, 0.9); }
+.pr-slab[data-live="0"] b { font-size: 13px; line-height: 1.4; letter-spacing: 0.02em;
+  color: rgba(242, 234, 216, 0.82); }
 
-.pr-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.55); }
-
-.pr-d { padding: 9px 15px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 11px;
-  line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.68); }
-
-.pr-foot { margin-top: auto; padding: 0 15px 10px; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.14em; line-height: 1.4;
-  color: rgba(20, 17, 13, 0.45); }
-
-/* THE SLAB IS ALWAYS THERE, and only the selected one says ENTER -- a strip that appears on
-   selection makes the card change height, and three cards of different heights read as three
-   kinds of thing rather than three lanes. */
-.pr-slab { flex: none; height: 28px; display: grid; place-items: center;
-  background: rgba(20, 17, 13, 0.13); font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6);
-  white-space: nowrap; transition: background 0.24s ease, color 0.24s ease; }
-
-.pr-lane.on .pr-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
-
-/* REVIEWS ARE THE OBLIGATION, so they carry the one vermilion on the screen and the other two
-   do not -- the same law the action slab obeys everywhere else in this menu. */
-.pr-lane.duty.on .pr-slab { background: var(--hi); color: #ffd9a1; }
-
-.pr-note { position: absolute; left: 180px; top: 566px; width: 920px; text-align: center;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
-  color: var(--gold-hi); paint-order: stroke fill;
-  -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
-
-
-/* THE GATE IS ONE ELEMENT WITH TWO STATES, the same law the ledger's rule obeys: when the
-   milestone is reached it is a quiet credit for who opened this lane, and when it is not
-   it is the lock, naming the step. Two elements for one fact would be two places to
-   disagree about whether the lane is open. */
-.wd-gate { display: flex; align-items: center; gap: 7px; padding: 7px 15px 0;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
-  letter-spacing: 0.15em; color: rgba(20, 17, 13, 0.42); }
-
-.wd-gate i { font-style: normal; font-family: var(--jp); font-weight: 700;
-  font-size: 11px; letter-spacing: 0.06em; line-height: 1;
-  color: rgba(20, 17, 13, 0.34); }
-
-.pr-lane.shut .wd-gate { color: var(--hi); }
-
-.pr-lane.shut .wd-gate i { color: var(--hi); opacity: 0.7; }
-
-/* ---- what is inside the lane ---- */
-.wd-list { display: flex; flex-direction: column; gap: 4px;
-  padding: 9px 15px 0; min-width: 0; }
-
-.wd-item { display: flex; align-items: baseline; gap: 9px; min-width: 0;
-  padding-bottom: 4px; border-bottom: 1px solid rgba(20, 17, 13, 0.11); }
-
-.wd-item:last-child { border-bottom: 0; }
-
-/* THE JAPANESE IS THE TITLE AND THE ENGLISH IS THE GLOSS, which is the way round every
-   other list of MATERIAL in this file runs. The L1 rows are English-led because those
-   are the app's own words; these are the material's own. */
-.wd-item b { flex: none; max-width: 186px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-family: var(--jp); font-weight: 700; font-size: 12.5px;
-  line-height: 1.3; color: var(--ink); }
-
-.wd-item em { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; font-style: normal; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 10px; letter-spacing: 0.02em; color: rgba(20, 17, 13, 0.55); }
-
-.wd-item u { flex: none; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8.5px; letter-spacing: 0.12em;
-  color: rgba(20, 17, 13, 0.5); }
-
-/* THE ONE THAT IS NOT A SCENE. Free talk sits in the same list because it is a third
-   thing you can enter, and it is hollow because it is not authored content with a start
-   and an end -- see the note by `WORLD_LANES`. */
-.wd-item.open b, .wd-item.open em { color: rgba(20, 17, 13, 0.45); }
-
-.wd-item.open u { color: var(--hi); }
-
-.pr-lane.shut .pr-fig b, .pr-lane.shut .wd-item b { color: rgba(20, 17, 13, 0.45); }
+/* the section's own sentence, in the band the frame contract leaves for exactly that */
+.pr-note { position: absolute; left: 160px; top: 616px; width: 960px; text-align: center;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.18em;
+  color: rgba(242, 234, 216, 0.66); text-shadow: var(--ftShadow); }
 
 
-
-
-/* A SHUT LANE IS STILL A LANE. It keeps its figure, its list and its size -- the whole
-   point of showing a locked thing rather than hiding it is that you can see what is in
-   there -- and loses only the paper's brightness and the slab's invitation. */
-.pr-lane.shut { background: linear-gradient(178deg, rgba(196,188,166,var(--paper)) 0%,
-    rgba(170,163,142,var(--paper)) 100%); }
-
-.pr-lane.shut .pr-glyph { color: rgba(20, 17, 13, 0.14); }
-
-
-
-.pr-lane.shut.on .pr-slab { background: rgba(20, 17, 13, 0.4);
-  color: rgba(242, 234, 216, 0.6); }
 
 
 
@@ -2280,14 +2265,18 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-bars { flex: 1; display: flex; align-items: flex-end; gap: 3px;
   padding: 9px 16px 10px; }
 
-/* A WEEK IS A BAR AND ITS COLOUR IS THAT WEEK'S ACCURACY. A week with nothing in it is
-   still drawn, as a floor tick -- an absent week that renders as nothing at all is
-   indistinguishable from the end of the year, which is exactly the reading a records
-   screen must not give. */
-.lg-bars i { flex: 1; display: block; min-height: 2px;
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14); }
+/* A WEEK IS A SLOT AND ITS BAR RISES INSIDE IT. Every week was drawn as a bar and an empty one
+   as a 3px floor tick, so a year with three weeks in it was a 944x120 sheet of blank paper with
+   three marks in the far corner -- the emptiest object on the screen, and it read as a rendering
+   fault rather than as a young account. Fifty-two faint slots read as a year that has barely
+   started, which is the true thing. The bar's COLOUR is that week's accuracy. */
+.lg-bars i { flex: 1; align-self: stretch; display: flex; align-items: flex-end;
+  background: rgba(20, 17, 13, 0.06); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.1); }
 
-.lg-bars i.none { background: rgba(20, 17, 13, 0.13); box-shadow: none; }
+.lg-bars i u { display: block; width: 100%; min-height: 2px; text-decoration: none; }
+
+/* the week the cursor's own week sits in, so THIS week is findable in fifty-two */
+.lg-bars i.now { box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.34); }
 
 /* narrower than the year on purpose: it is the one plate below the stage, and at 944 its
    right end ran under the key hints in the corner */
@@ -2440,112 +2429,115 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    `tutor_chat` is an open chat gated behind `conversation_mode` -- so giving it a card
    with three empty rows would have made it look like a scene that failed to load.
    ================================================================================ */
-.scenes { position: absolute; left: 184px; top: 212px; width: 908px; height: 272px;
-  display: flex; gap: 26px; }
+/* ==================================================================================================
+   THE CONVERSATIONS — the same ledger, because a scenario is a thing you pick off a list.
 
-.sc-card { flex: 1; min-width: 0; border: 0; padding: 0; font: inherit; text-align: left;
-  cursor: pointer; display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
-    rgba(203,193,164,var(--paper)) 100%);
-  box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transform: skewX(-8deg) rotate(-1.2deg);
-  transition: transform 0.26s cubic-bezier(0.2, 0.92, 0.24, 1), box-shadow 0.26s ease,
-    background 0.26s ease; }
+   TWO 440-WIDE CARDS SIDE BY SIDE, each holding a six-line checklist at 11px and a description
+   wrapped to three lines, with a free-talk strip pinned under them. The checklist is the most
+   useful thing on this screen — it is what the tutor marks you against — and it was the smallest.
 
-.sc-card:nth-child(2) { transform: skewX(-8deg) rotate(1deg); }
+   ONE ROW PER CONVERSATION, and the one you are on at poster size beside them: the objectives on
+   their own plate at a size you can read, the person you are talking to named in the cap, and free
+   talk as the last row rather than as a strip in a different shape.
+   ================================================================================================== */
+.sc-run { position: absolute; left: 164px; top: 197px; width: 452px;
+  display: flex; flex-direction: column; gap: 6px; }
 
-.sc-card.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-  transform: skewX(-8deg) rotate(-1.2deg) translateY(-6px); }
+.sc-row { display: flex; align-items: stretch; height: 58px; width: 452px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  background: rgba(12, 10, 8, 0.72); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.4);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: background 0.18s ease; }
+.sc-row:hover { background: rgba(22, 19, 14, 0.82); }
 
-.sc-card.on:nth-child(2) { transform: skewX(-8deg) rotate(1deg) translateY(-6px); }
+.sc-row .g { flex: none; width: 54px; display: grid; place-items: center;
+  background: rgba(242, 234, 216, 0.1); font-family: var(--jp); font-weight: 400; font-size: 24px;
+  color: rgba(232, 196, 124, 0.8); }
+/* A SCENARIO HAS NO GLYPH and the app is not going to invent one, so it is numbered -- free talk
+   keeps the one mark the copy actually authored. */
+.sc-row .g.num { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px; }
+.sc-row.on .g.num { font-size: 22px; }
 
-/* THE NPC IS THE CAP, because who you are talking to is the first thing you want to know
-   about a conversation, and it is the one fact the scenario data leads with. */
-.sc-who { flex: none; display: flex; align-items: baseline; gap: 9px;
-  padding: 8px 15px 9px; background: var(--ink); white-space: nowrap; }
+.sc-row .t { flex: 1; min-width: 0; display: flex; flex-direction: column;
+  justify-content: center; gap: 3px; padding-left: 15px; overflow: hidden; }
+.sc-row .t b { font-family: var(--lat-ui); font-weight: 700; font-size: 16px; letter-spacing: 0.04em;
+  color: var(--washi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-row .t i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.5); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
 
-.sc-who b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
-  letter-spacing: 0.2em; color: var(--gold-hi); }
+.sc-row .s { flex: none; display: flex; align-items: center; padding-right: 15px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+  color: rgba(232, 196, 124, 0.66); white-space: nowrap; }
 
-.sc-who i { font-style: normal; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 9px; letter-spacing: 0.13em; color: rgba(232, 196, 124, 0.55); }
+.sc-row.on { height: 76px; width: 480px;
+  background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
+    rgba(235, 230, 217, var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.sc-row.on:hover { background: linear-gradient(178deg, rgba(255, 253, 247, var(--paper)) 0%,
+    rgba(240, 235, 222, var(--paper)) 100%); }
+.sc-row.on .g { width: 66px; background: var(--ink); font-size: 32px; color: var(--gold-hi); }
+.sc-row.on .t b { font-size: 20px; color: var(--ink); }
+.sc-row.on .t i { color: rgba(20, 17, 13, 0.55); }
+.sc-row.on .s { color: rgba(20, 17, 13, 0.6); }
 
-.sc-title { padding: 12px 15px 0; display: flex; flex-direction: column; gap: 3px; }
+/* ---- the conversation itself, at poster size on the valley ------------------------------------ */
+.sc-here { position: absolute; left: 656px; top: 196px; width: 456px; }
 
-.sc-title b { font-family: var(--jp); font-weight: 700; font-size: 21px; line-height: 1.15;
-  color: var(--ink); }
+/* WHO YOU ARE TALKING TO IS THE FIRST THING you want to know about a conversation, and it is the
+   fact the scenario data leads with. */
+.sc-who { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.24em;
+  color: rgba(242, 234, 216, 0.82); white-space: nowrap; }
+.sc-who i { font-style: normal; color: rgba(232, 196, 124, 0.7); }
 
-.sc-title i { font-style: italic; font-family: var(--lat); font-weight: 900;
-  font-size: 14px; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.62); }
+/* THE ENGLISH IS THE HANDLE and the Japanese is what you are about to say. A reader who does not
+   read Japanese cannot be given the title in it. */
+.sc-title { display: block; margin-top: 12px; }
+.sc-title i { display: block; font-style: italic; font-family: var(--lat); font-weight: 900;
+  font-size: 30px; line-height: 1.02; color: var(--washi); text-shadow: var(--ftShadow); }
+.sc-title b { display: block; margin-top: 4px; font-family: var(--jp); font-weight: 700;
+  font-size: 18px; line-height: 1.2; color: rgba(242, 234, 216, 0.8);
+  text-shadow: var(--ftShadow); }
 
-.sc-d { padding: 8px 15px 0; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 10.5px; line-height: 1.5; color: rgba(20, 17, 13, 0.62); }
+.sc-d { display: block; margin-top: 8px; font-family: var(--lat-ui); font-weight: 600;
+  font-size: 13px; letter-spacing: 0.02em; line-height: 1.4;
+  color: rgba(242, 234, 216, 0.84); text-shadow: var(--ftShadow); }
 
-/* THE OBJECTIVES ARE THE SCENARIO'S OWN, required ones solid and optional ones hollow --
-   which is the difference `required: false` makes when the tutor marks you at the end. */
-.sc-obj { display: flex; flex-direction: column; gap: 3px; padding: 9px 15px 0; }
+/* ---- what the tutor marks you against, on one plate -------------------------------------------- */
+.sc-plate { display: block; margin-top: 12px; padding: 10px 18px 11px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.18); }
 
-.sc-obj span { display: flex; align-items: baseline; gap: 8px;
-  font-family: var(--lat-ui); font-weight: 600; font-size: 9.5px; letter-spacing: 0.04em;
-  color: rgba(20, 17, 13, 0.6); }
+.sc-cap { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.24em; color: rgba(242, 234, 216, 0.6); }
 
-.sc-obj span s { flex: none; width: 6px; height: 6px; text-decoration: none;
-  background: rgba(20, 17, 13, 0.55); transform: translateY(-1px); }
+.sc-obj { display: flex; flex-direction: column; gap: 3px; margin-top: 9px; }
+.sc-obj span { display: flex; align-items: baseline; gap: 10px;
+  font-family: var(--lat-ui); font-weight: 600; font-size: 12.5px; line-height: 1.3;
+  color: var(--washi); }
+/* required ones solid and optional ones hollow, which is the difference `required: false` makes */
+.sc-obj span s { flex: none; width: 7px; height: 7px; text-decoration: none;
+  background: var(--gold-hi); }
+.sc-obj span.opt { color: rgba(242, 234, 216, 0.55); }
+.sc-obj span.opt s { background: none; box-shadow: inset 0 0 0 1.5px rgba(232, 196, 124, 0.6); }
 
-.sc-obj span.opt { color: rgba(20, 17, 13, 0.4); }
+.sc-foot { display: block; margin-top: 10px; padding-top: 8px;
+  box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.18);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
+  color: rgba(242, 234, 216, 0.6); }
 
-.sc-obj span.opt s { background: none;
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.4); }
+/* ---- the action --------------------------------------------------------------------------------- */
+.sc-slab { display: block; margin: 14px 0 0 auto; width: 336px; border: 0; cursor: pointer;
+  font: inherit; text-align: left; padding: 8px 18px 10px; background: var(--hi);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease; }
+.sc-slab:hover { filter: brightness(1.08); }
+.sc-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+.sc-slab b { display: block; margin-top: 2px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 16px; letter-spacing: 0.05em; color: var(--washi); }
 
-.sc-foot { margin-top: auto; padding: 0 15px 10px; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8.5px; letter-spacing: 0.14em;
-  color: rgba(20, 17, 13, 0.45); }
-
-.sc-slab { flex: none; height: 28px; display: grid; place-items: center;
-  background: rgba(20, 17, 13, 0.13); font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6);
-  white-space: nowrap; transition: background 0.24s ease, color 0.24s ease; }
-
-.sc-card.on .sc-slab { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
-
-/* `left: 0; right: 0` rather than a width, so the strip cannot fall out of step with
-   the row above it the next time the row is re-laid. */
-.sc-free { position: absolute; left: 0; right: 0; top: 294px; height: 54px;
-  border: 0; padding: 0 16px; font: inherit; cursor: pointer; text-align: left;
-  display: flex; align-items: center; gap: 14px;
-  background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
-    rgba(203,193,164,var(--paper)) 100%);
-  box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transform: skewX(-8deg);
-  transition: box-shadow 0.24s ease, background 0.24s ease; }
-
-.sc-free.on { background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 8px 9px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15); }
-
-.sc-free .g { flex: none; font-family: var(--jp); font-weight: 400; font-size: 30px;
-  line-height: 1; color: rgba(20, 17, 13, 0.26); }
-
-.sc-free .n { flex: none; display: flex; flex-direction: column; gap: 3px; }
-
-.sc-free .n b { font-family: var(--jp); font-weight: 700; font-size: 15px; line-height: 1;
-  color: var(--ink); }
-
-.sc-free .n i { font-style: italic; font-family: var(--lat); font-weight: 900;
-  font-size: 11px; letter-spacing: 0.04em; line-height: 1;
-  color: rgba(20, 17, 13, 0.55); }
-
-.sc-free .d { flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 10px; line-height: 1.45; color: rgba(20, 17, 13, 0.55); }
-
-.sc-free .k { flex: none; padding: 5px 11px; background: rgba(20, 17, 13, 0.13);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
-  color: rgba(20, 17, 13, 0.6); white-space: nowrap;
-  transition: background 0.24s ease, color 0.24s ease; }
-
-.sc-free.on .k { background: rgba(20, 17, 13, 0.75); color: var(--gold-hi); }
 
 
 
@@ -2593,16 +2585,16 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
     rgba(207,198,171,var(--paper)) 100%);
   box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
 
-.bw-lab { flex: none; width: 186px; display: flex; align-items: baseline; gap: 9px; }
+.bw-lab { flex: none; width: 216px; display: flex; align-items: baseline; gap: 9px; }
 
 .bw-lab b { font-family: var(--jp); font-weight: 700; font-size: 15px; line-height: 1;
   color: var(--ink); }
 
 .bw-lab i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); }
+  font-size: 10.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6); }
 
 .bw-lab u { margin-left: auto; text-decoration: none; font-family: var(--lat);
-  font-style: italic; font-weight: 900; font-size: 13px; color: rgba(20, 17, 13, 0.7); }
+  font-style: italic; font-weight: 900; font-size: 15px; color: rgba(20, 17, 13, 0.72); }
 
 /* 186 + 22 + (11 x 46 + 10 x 10) + 36 of padding = 850 in a 924 row. Laid flat on the
    row's own gap it was 970, because a flex gap is between EVERY pair. */
@@ -2614,15 +2606,15 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    computed, in `useAchievements` and in the catalog both. */
 .bw-seal { flex: none; width: 46px; height: 46px; border: 0; padding: 0; cursor: pointer;
   display: grid; place-items: center; font: inherit;
-  background: none; box-shadow: inset 0 0 0 1.5px rgba(20, 17, 13, 0.26);
+  background: rgba(20, 17, 13, 0.07); box-shadow: inset 0 0 0 1.5px rgba(20, 17, 13, 0.34);
   font-family: var(--jp); font-weight: 700; font-size: 20px; line-height: 1;
-  color: rgba(20, 17, 13, 0.32);
+  color: rgba(20, 17, 13, 0.5);
   transition: background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease; }
 
 /* the numeric ones are Latin and want their own face, and they want to be smaller --
    "100" at the kanji's 20px runs out of a 46px seal */
 .bw-seal.num { font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 15px; letter-spacing: -0.01em; }
+  font-size: 17px; letter-spacing: -0.01em; }
 
 .bw-seal.got { background: var(--ink); color: var(--gold-hi);
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4); }
@@ -2641,9 +2633,10 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .bw-big { flex: none; width: 66px; height: 66px; display: grid; place-items: center;
   font-family: var(--jp); font-weight: 700; font-size: 30px; line-height: 1;
-  box-shadow: inset 0 0 0 2px rgba(20, 17, 13, 0.26); color: rgba(20, 17, 13, 0.34); }
+  background: rgba(20, 17, 13, 0.07);
+  box-shadow: inset 0 0 0 2px rgba(20, 17, 13, 0.34); color: rgba(20, 17, 13, 0.55); }
 
-.bw-big.num { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px; }
+.bw-big.num { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px; }
 
 .bw-big.got { background: var(--ink); color: var(--gold-hi); box-shadow: none; }
 
@@ -2653,13 +2646,13 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   line-height: 1.1; color: var(--ink); }
 
 .bw-txt i { font-style: normal; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 11.5px; line-height: 1.45; color: rgba(20, 17, 13, 0.62); }
+  font-size: 13px; line-height: 1.45; color: rgba(20, 17, 13, 0.65); }
 
 .bw-state { flex: none; display: flex; flex-direction: column; align-items: flex-end;
   gap: 5px; white-space: nowrap; }
 
-.bw-state b { padding: 4px 12px 5px; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.16em;
+.bw-state b { padding: 4px 13px 5px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 11px; letter-spacing: 0.16em;
   background: rgba(20, 17, 13, 0.14); color: rgba(20, 17, 13, 0.55); }
 
 .bw-state.got b { background: var(--ink); color: var(--gold-hi); }
@@ -2668,7 +2661,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    say what opens them is a wall of questions. The descriptions are the catalog's own,
    so this costs nothing but the room to print them. */
 .bw-state i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.45); }
+  font-size: 10px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.5); }
 
 
 
@@ -3456,19 +3449,19 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .un-stamp .n { font-family: var(--lat); font-style: italic; font-weight: 900;
   font-size: 21px; letter-spacing: 0.03em; color: var(--ink); }
 
-.un-stamp .s { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.19em; color: rgba(20, 17, 13, 0.55); }
+.un-stamp .s { font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.6); }
 
 /* `MASTERED` AND `REACHED` ARE NOT THE SAME TRIGGER and the catalog is careful about it:
    eight features want a node `mastered`, and `jlpt_dashboard` wants `vocabulary_n5`
    merely `unlocked`. Saying "mastered" on that one would be a lie about when it fires. */
-.un-stamp .w { margin-top: 7px; padding: 4px 12px 5px; background: var(--ink);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.17em;
+.un-stamp .w { margin-top: 8px; padding: 5px 13px 6px; background: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
   color: var(--gold-hi); }
 
 /* ---- and what it opened ---- */
-.un-lead { position: absolute; left: 452px; top: 200px; width: 648px;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em;
+.un-lead { position: absolute; left: 452px; top: 198px; width: 648px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px; letter-spacing: 0.2em;
   color: var(--gold-hi); paint-order: stroke fill;
   -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
 
@@ -3503,9 +3496,9 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 }
 .un-card.is-door:active { transform: skewX(-8deg) translate(2px, 3px); }
 .un-card .go {
-  flex: none; align-self: stretch; display: grid; place-items: center; padding: 0 14px;
+  flex: none; align-self: stretch; display: grid; place-items: center; padding: 0 15px;
   margin: 0 -18px 0 0;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px; letter-spacing: 0.16em;
   color: var(--ink); background: var(--gold);
   box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.2);
 }
@@ -3518,10 +3511,10 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .un-card .t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 
 .un-card .t b { font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 19px; line-height: 1.1; color: var(--ink); }
+  font-size: 22px; line-height: 1.1; color: var(--ink); }
 
 .un-card .t i { font-style: normal; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 10.5px; line-height: 1.45; color: rgba(20, 17, 13, 0.6); }
+  font-size: 12.5px; line-height: 1.45; color: rgba(20, 17, 13, 0.65); }
 
 /* WHERE IT NOW LIVES, which is the half of this screen that stops it being a trophy.
    "Conversation Mode is unlocked" is a fact about a flag; "The World, the Talk lane" is
@@ -3530,7 +3523,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   gap: 3px; white-space: nowrap; }
 
 .un-card .w em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45); }
+  font-size: 10.5px; letter-spacing: 0.15em; color: rgba(20, 17, 13, 0.5); }
 
 .un-card .w s { text-decoration: none; font-family: var(--jp); font-weight: 700;
   font-size: 15px; line-height: 1; color: rgba(20, 17, 13, 0.5); }
@@ -3546,7 +3539,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   display: grid; grid-auto-flow: column; gap: 12px; place-items: center;
   transform: skewX(-8deg);
   background: var(--hi); box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.45);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.17em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.16em;
   color: #ffd9a1; white-space: nowrap; }
 
 /* the reassurance is the quieter half of the pair; the action keeps the full cream */
@@ -3704,7 +3697,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 /* the gloss is Japanese when the material carries no English — thirty Aozora texts have an author
    and no translated title, and setting a Japanese name in a Latin UI face is how you get tofu */
-.wd-item.en-jp em { font-family: var(--jp); font-weight: 600; font-size: 11px; letter-spacing: 0; }
+.wd-item.en-jp em { font-family: var(--jp); font-weight: 600; font-size: 12.5px; letter-spacing: 0; }
 
 /* `.as-note` became `.as-law`, which says the same thing on a ground and in the band
    the contract leaves for a whole-set statement. */
@@ -3744,26 +3737,12 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 /* no single milestone opened all of them, so the stamp says that rather than picking one */
 .un-nostamp { gap: 10px; }
 
-/* `<s>` IS A STRIKETHROUGH, and this one is a caption. The kanji note sits inside `.fd-uses`, whose
-   mockup rules style `span` and `i` and never met an `s` -- so the line that says "NO KANJI IN IT —
-   READABLE ON DAY ONE" was drawn with a rule through it, which reads as a fact being retracted.
-   Same face as the label it sits beside. */
-.fd-uses s {
-  text-decoration: none;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
-  color: rgba(20, 17, 13, 0.5); white-space: nowrap;
-}
 
 /* THREE DENOMINATORS, NOT THE MOCKUP'S TWO. Its feed knew how much of the level you could read and
    how many kanji you knew; this one also knows how many words you have BEGUN, which is the figure
-   that separates "readable in principle" from "actually met". Three across a block drawn for two
-   put "181 / 744" over two lines and clipped it on the panel edge -- measured on screen. The column
-   keeps its shape and the figure comes down four points, which is still the largest thing in it. */
-.fd-denom.three span { padding: 10px 14px 12px; }
-.fd-denom.three b { font-size: 17px; }
-/* the third caption is the longest of them and is the one that wraps; at 8.5/1.25 both of its
-   lines land inside the panel instead of the second sitting on its bottom edge */
-.fd-denom.three i { font-size: 8.5px; line-height: 1.25; letter-spacing: 0.13em; }
+   that separates "readable in principle" from "actually met". They were three columns of a 380px
+   panel, which put "181 / 744" over two lines and clipped it -- they are one line across the foot
+   band now, which is where the frame contract puts a whole-set statement. See `.fd-denom`. */
 
 /* ==================================================================================================
    GOLD PAPER OFF THE ROW YOU PICKED — see `petalBurst.ts` for why this is a frame child rather than

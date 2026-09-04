@@ -93,8 +93,13 @@ export const LB = {
   HEAD: 26,
 } as const
 
-/** how far into the dusk a row sits, by how far it is from the one you are on */
-export const LB_VEIL = [0, 0.14, 0.26, 0.35, 0.41, 0.45] as const
+/* HOW FAR INTO THE DUSK A ROW SITS, by how far it is from the one you are on.
+
+   THE RAMP USED TO END AT 0.45 AND THAT WAS TOO FAR. Standing on the first text -- which is where
+   this screen opens -- put every other row on the shelf at 0.26 or deeper, so five of the six were
+   a flat blue-grey and the shelf read as five disabled rows rather than five you have not walked
+   to yet. Depth is the job; disabling them is not. */
+export const LB_VEIL = [0, 0.07, 0.13, 0.18, 0.22, 0.25] as const
 export const libVeil = (d: number): number => LB_VEIL[Math.min(d, LB_VEIL.length - 1)]
 
 export interface ShelfRow { top: number; height: number }

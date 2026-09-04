@@ -232,10 +232,18 @@ describe('the ledger screen', () => {
     await waitFor(() => expect(document.querySelectorAll('.lg-bars i')).toHaveLength(LEDGER_WEEKS))
   })
 
-  it('draws an empty week as a floor tick rather than as nothing', async () => {
-    /* a week that renders as nothing at all is indistinguishable from the end of the year */
+  it('draws every week as a slot, filled or not, rather than only the ones with something in them', async () => {
+    /* A WEEK THAT RENDERS AS NOTHING AT ALL is indistinguishable from the end of the year -- and
+       fifty-two bars where forty-nine are a 3px floor tick is a blank sheet with three marks in
+       the corner, which reads as a rendering fault rather than as a young account. Every week is
+       a slot; only the ones with reviews in them carry a bar. */
     show()
-    await waitFor(() => expect(document.querySelectorAll('.lg-bars i.none').length).toBeGreaterThan(0))
+    await waitFor(() => expect(document.querySelectorAll('.lg-bars i').length).toBeGreaterThan(40))
+    const slots = [...document.querySelectorAll('.lg-bars i')]
+    /* an empty week is a slot with no bar in it, not a slot that is missing */
+    expect(slots.filter((slot) => slot.querySelector('u')).length).toBeLessThan(slots.length)
+    /* and the last slot is marked, so THIS week is findable among fifty-two */
+    expect(slots[slots.length - 1].className).toContain('now')
   })
 
   it('gives one freeze marker per freeze', async () => {

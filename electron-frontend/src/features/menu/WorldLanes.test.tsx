@@ -162,17 +162,25 @@ describe('what the world lanes are made of', () => {
 })
 
 describe('the world screen', () => {
-  it('draws two lanes on the two-up row', () => {
+  it('draws two lanes in the column, and the one you are on beside them', () => {
     show()
     expect(document.querySelectorAll('.pr-lane')).toHaveLength(2)
-    expect(document.querySelector('.lanes')?.className).toBe('lanes two')
+    expect(document.querySelectorAll('.pr-lane.on')).toHaveLength(1)
+    expect(document.querySelector('.pr-here')).not.toBeNull()
   })
 
   it('credits the milestone that opened each lane, and lists what is inside', () => {
     show()
-    expect(screen.getByText('OPENED BY READING')).toBeTruthy()
-    expect(screen.getByText('OPENED BY GRAMMAR N5')).toBeTruthy()
-    expect(document.querySelectorAll('.pr-lane')[0].querySelectorAll('.wd-item')).toHaveLength(3)
+    /* THE CREDIT IS ON BOTH THE ROW AND THE POSTER, which is why these are getAllByText: a lane's
+       provenance is the most useful thing its row can say, and the poster is not allowed to be
+       incomplete just because the row already said it. */
+    expect(screen.getAllByText('OPENED BY READING').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('OPENED BY GRAMMAR N5').length).toBeGreaterThan(0)
+    /* the three things inside are the POSTER's, because a 78px row has no room for them -- so
+       each lane's three are seen by standing on that lane, one at a time */
+    expect(document.querySelectorAll('.pr-here .wd-item')).toHaveLength(3)
+    fireEvent.keyDown(document.querySelector('.mn-open') as Element, { key: 'ArrowDown' })
+    expect(document.querySelectorAll('.pr-here .wd-item')).toHaveLength(3)
     expect(document.querySelectorAll('.wd-item.hollow')).toHaveLength(1)
   })
 
@@ -187,9 +195,12 @@ describe('the world screen', () => {
     const read = document.querySelectorAll('.pr-lane')[0]
     expect(read.classList.contains('shut')).toBe(true)
     /* it keeps its figure and its list — the point of drawing a locked thing is seeing inside */
-    expect(read.querySelector('.pr-fig b')?.textContent).toBe(String(LIBRARY.length))
-    expect(read.querySelectorAll('.wd-item')).toHaveLength(3)
-    expect(read.querySelector('.pr-slab')?.textContent).toBe('READING · MASTERED')
+    const here = document.querySelector('.pr-here') as HTMLElement
+    expect(here.classList.contains('shut')).toBe(true)
+    expect(here.querySelector('.pr-fig b')?.textContent).toBe(String(LIBRARY.length))
+    expect(here.querySelectorAll('.wd-item')).toHaveLength(3)
+    expect(here.querySelector('.pr-slab')?.textContent).toContain('READING · MASTERED')
+    expect(here.querySelector('.pr-slab')?.getAttribute('data-live')).toBe('0')
     fireEvent.click(read)
     expect(onPick).not.toHaveBeenCalled()
   })

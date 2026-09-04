@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { VOCAB_BUDGET_STEPS, type VocabFeed } from '../../vocab-feed'
 import type { JlptLevel, JlptLevelProgress } from '../../../types'
-import { feedAt, feedHead, feedNote, wordKanji, wordSize } from '../feed'
+import { feedAt, feedHead, feedNote, feedWindow, wordKanji, wordSize } from '../feed'
 import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
@@ -81,6 +81,7 @@ export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp 
   }, [at, feed, level, levels, onLevel, onStart])
 
   const kanji = here ? wordKanji(here) : null
+  const win = feedWindow(feed.words.length, word)
 
   return (
     <div
@@ -101,133 +102,134 @@ export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp 
 
         {!feed.error ? (
           <>
-            <div className="fd-wrap">
-              {/* THE WORD AT THE FRONT OF THE QUEUE */}
-              <button
-                type="button"
-                className={`fd-f fd-hero${at === 0 ? ' on' : ''}`}
-                onFocus={() => setAt(0)}
-                onClick={onStart}
-                aria-label={here
-                  ? `${here.word}, ${here.reading} — ${here.meaning}`
-                  : 'No new words queued today'}
-              >
-                <span className="fd-cap">
-                  <b>{here ? `次の語 NEXT WORD · ${word + 1} OF ${head.queued}` : '今日 TODAY'}</b>
-                  <i>NEW TODAY · NOT A REVIEW</i>
-                </span>
+            {/* ─── today's queue, as rows. See the note over `.fd-run` for why one hero card
+                 and a rail of anonymous ticks stopped being the drawing. ──────────────── */}
+            {win.list.length ? (
+              <div className="fd-run" role="group" aria-label="New words today">
+                {win.list.map((i) => {
+                  const w = feed.words[i]
+                  return (
+                    <button
+                      key={w.card_id}
+                      type="button"
+                      className={i === word ? 'fd-row on' : 'fd-row'}
+                      onMouseEnter={() => setWord(i)}
+                      onFocus={() => { setWord(i); setAt(0) }}
+                      onClick={onStart}
+                      aria-label={`${w.word}, ${w.reading} — ${w.meaning}`}
+                    >
+                      <span className="n">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="w" lang="ja">{w.word}</span>
+                      <span className="m">{w.meaning}</span>
+                      {/* HOW MANY OF ITS KANJI ARE NEW, which is what decides whether a word is
+                          readable today. The payload says how many, never which. */}
+                      <span className="s">{w.unknown_kanji ? `${w.unknown_kanji} NEW` : ''}</span>
+                    </button>
+                  )
+                })}
+                {win.behind || win.ahead ? (
+                  <span className="fd-fold">
+                    {win.behind ? <><b>{win.behind}</b><i>ABOVE</i></> : null}
+                    {win.ahead ? <><b>{win.ahead}</b><i>BELOW</i></> : null}
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              /* AN EMPTY QUEUE IS AN ABSENCE, and which absence it is matters: a budget of nought
+                 is a choice you made, and a queue that ran dry is not. */
+              <div className="fd-none">
+                {feed.budget === 0
+                  ? 'NO NEW WORDS TODAY · REVIEWS ONLY'
+                  : 'NOTHING NEW IS QUEUED · REVIEWS ARE NOT CAPPED'}
+              </div>
+            )}
 
-                {here ? (
-                  <span className="fd-body">
-                    <span className="fd-word" lang="ja" style={{ fontSize: wordSize(here.word) }}>
-                      {here.word}
-                    </span>
-                    <span className="fd-read">{here.reading.toUpperCase()}</span>
-                    <span className="fd-gloss">{here.meaning}</span>
-                    {/* THE COUNT, NOT THE CULPRIT — the payload says how many of these are new,
-                        never which, so the chips are plain and the line carries the figure. */}
+            {/* ─── and the word itself, on the valley ─────────────────────────── */}
+            <div className="fd-here">
+              <span className="fd-cap">
+                {here ? `NEXT WORD · ${word + 1} OF ${head.queued}` : 'TODAY'}
+                {' '}<i>NEW TODAY · NOT A REVIEW</i>
+              </span>
+
+              {here ? (
+                <>
+                  <b className="fd-word" lang="ja" style={{ fontSize: wordSize(here.word) }}>
+                    {here.word}
+                  </b>
+                  <span className="fd-read">{here.reading.toUpperCase()}</span>
+                  <span className="fd-gloss">{here.meaning}</span>
+                  <span className="fd-plate">
+                    {/* THE COUNT, NOT THE CULPRIT — the chips are plain and the line carries
+                        the figure, because the payload never says WHICH of them is new. */}
                     <span className="fd-uses">
                       {kanji?.chars.map((ch) => <i key={ch} lang="ja">{ch}</i>)}
                       <s>{kanji?.note}</s>
                     </span>
+                    <span className="fd-theme">{here.theme?.toUpperCase() || 'NO THEME'}</span>
                   </span>
-                ) : (
-                  <span className="fd-body">
-                    <span className="fd-word" lang="ja" style={{ fontSize: 44 }}>
-                      {feed.budget === 0 ? '休み' : 'しまい'}
-                    </span>
-                    <span className="fd-gloss">
-                      {feed.budget === 0
-                        ? 'No new words today — reviews only.'
-                        : 'Nothing new is queued. Reviews are not capped.'}
-                    </span>
+                </>
+              ) : (
+                <>
+                  <b className="fd-word" lang="ja" style={{ fontSize: 52 }}>
+                    {feed.budget === 0 ? '休み' : 'しまい'}
+                  </b>
+                  <span className="fd-gloss">
+                    {feed.budget === 0
+                      ? 'No new words today — reviews only.'
+                      : 'Nothing new is queued. Reviews are not capped.'}
                   </span>
-                )}
+                </>
+              )}
 
-                <span className="fd-theme">{here?.theme?.toUpperCase() || 'NO THEME'}</span>
-                {/* the slab names the drill it runs, for the same reason the deck screen's does */}
-                <span className="fd-slab">
-                  <em>{head.queued ? `${head.queued} QUEUED · ${mode.toUpperCase()}` : mode.toUpperCase()}</em>
-                  <b>{head.queued ? 'START TODAY’S WORDS' : 'GO TO REVIEWS'} ▸</b>
-                </span>
-              </button>
-
-              {/* THE METER THAT REPLACED THE BLOCK GATE */}
-              <div className="fd-today">
-                <span className="fd-cap"><b>今日 TODAY</b><i>NEW WORDS A DAY</i></span>
-                {/* THE PANEL'S HEADLINE FIGURE. `next_words` returns what has not been started, so
-                    this is what is queued rather than what is left of a day's ration -- the app has
-                    no "done today" to subtract. The line under it says which. */}
-                <span className="fd-count">
-                  <b>{head.queued}</b>
-                  <span>
-                    <em>{head.queued === 1 ? 'WORD QUEUED' : 'WORDS QUEUED'}</em>
-                    <i>
-                      {feed.budget === 0 ? 'NO NEW WORDS SET' : `BUDGET IS ${feed.budget} A DAY`}
-                    </i>
-                  </span>
-                </span>
-                <span className="fd-steps">
-                  {VOCAB_BUDGET_STEPS.map((step, k) => (
-                    <button
-                      key={step}
-                      type="button"
-                      className={`fd-step${step === feed.budget ? ' set' : ''}${at === k + 1 ? ' on' : ''}`}
-                      onFocus={() => setAt(k + 1)}
-                      onClick={() => feed.setBudget(step)}
-                      aria-pressed={step === feed.budget}
-                      disabled={feed.loading}
-                      aria-label={step === 0 ? 'No new words a day' : `${step} new words a day`}
-                    >
-                      {step === 0 ? 'NONE' : step}
-                    </button>
-                  ))}
-                </span>
-                <span className="fd-steplab">{feedNote(feed)}</span>
-
-                {/* THE DENOMINATORS. "Here are ten words" is a card trick without them, and these
-                    three are the bridge's own counts — clearing a kanji block moves the first two. */}
-                <span className="fd-denom three">
-                  <span>
-                    <b>{feed.readable.toLocaleString()} / {feed.total.toLocaleString()}</b>
-                    <i>READABLE WITH THE KANJI YOU KNOW</i>
-                    <u style={{ width: `${head.readablePct}%` }} />
-                  </span>
-                  <span>
-                    <b>{feed.started.toLocaleString()} / {feed.total.toLocaleString()}</b>
-                    <i>BEGUN AT ALL</i>
-                    <u style={{ width: `${head.startedPct}%` }} />
-                  </span>
-                  <span>
-                    <b>{feed.knownKanji.toLocaleString()}</b>
-                    <i>KANJI KNOWN · THIS IS THE ORDER</i>
-                  </span>
-                </span>
-              </div>
-            </div>
-
-            {/* THE RAIL MARKS POSITION, NOT PROGRESS. `next_words` returns what has NOT been
-                started, so studying a word removes it from the list rather than ticking it — the
-                queue is recomputed, never consumed, and there is no "done today" to draw. */}
-            <div className="fd-rail">
-              <span className="fd-segrow" aria-hidden="true">
-                {head.queued
-                  ? feed.words.map((entry, index) => (
-                    <i key={entry.card_id} className={index === word ? 'here' : ''} />
-                  ))
-                  : <span className="fd-none">NO NEW WORDS QUEUED TODAY</span>}
-              </span>
-              <span className="fd-railcap">
-                <span>{head.queued ? 'FIRST' : ''}</span>
-                <span>
+              {/* the slab names the drill it runs, for the same reason the deck screen's does */}
+              <button type="button" className="fd-slab" onClick={onStart}>
+                <em>
                   {head.queued
-                    ? `${head.queued} QUEUED · THE LIST IS REBUILT, NOT TICKED OFF`
-                    : 'REVIEWS ONLY'}
-                  {' · '}{head.readablePct}% OF THE LEVEL IS READABLE
+                    ? `${head.queued} QUEUED · ${mode.toUpperCase()}`
+                    : mode.toUpperCase()}
+                </em>
+                <b>{head.queued ? 'START TODAY’S WORDS' : 'GO TO REVIEWS'} ▸</b>
+              </button>
+            </div>
+
+            {/* ─── the foot band: what the level is made of, and how many words a day ─────
+                 THE DENOMINATORS. "Here are ten words" is a card trick without them, and these
+                 three are the bridge's own counts — clearing a kanji block moves the first two. */}
+            <div className="fd-mini">
+              <span className="fd-denom">
+                <span>
+                  <b>{feed.readable.toLocaleString()} / {feed.total.toLocaleString()}</b>
+                  <i>READABLE WITH THE KANJI YOU KNOW</i>
                 </span>
-                <span>{head.queued ? 'LAST' : ''}</span>
+                <span>
+                  <b>{feed.started.toLocaleString()} / {feed.total.toLocaleString()}</b>
+                  <i>BEGUN AT ALL</i>
+                </span>
+                <span>
+                  <b>{feed.knownKanji.toLocaleString()}</b>
+                  <i>KANJI KNOWN · THIS IS THE ORDER</i>
+                </span>
               </span>
             </div>
+
+            <div className="fd-set" role="group" aria-label="New words a day">
+              <span className="fd-setlab">NEW WORDS A DAY</span>
+              {VOCAB_BUDGET_STEPS.map((step, k) => (
+                <button
+                  key={step}
+                  type="button"
+                  className={`fd-step${step === feed.budget ? ' set' : ''}${at === k + 1 ? ' on' : ''}`}
+                  onFocus={() => setAt(k + 1)}
+                  onClick={() => feed.setBudget(step)}
+                  aria-pressed={step === feed.budget}
+                  disabled={feed.loading}
+                  aria-label={step === 0 ? 'No new words a day' : `${step} new words a day`}
+                >
+                  {step === 0 ? 'NONE' : step}
+                </button>
+              ))}
+            </div>
+            <div className="fd-steplab">{feedNote(feed)}</div>
           </>
         ) : null}
 

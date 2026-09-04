@@ -450,24 +450,25 @@ describe('the feed screen', () => {
     expect(setBudget).toHaveBeenCalledWith(0)
   })
 
-  it('marks position on the rail and never progress', () => {
-    /* `next_words` returns what has NOT been started, so studying a word removes it from the list
-       rather than ticking it -- there is no "done today" for the rail to draw. */
+  it('draws the whole queue rather than one word and a rail of anonymous ticks', () => {
+    /* THE RAIL MARKED POSITION IN A LIST YOU COULD NOT SEE. `next_words` returns what has NOT been
+       started, so studying a word removes it rather than ticking it -- there was never a "done
+       today" for the rail to draw, and its only remaining job was saying which of forty invisible
+       words you were on. The words are on the screen now, so it is gone. */
     const words = Array.from({ length: 4 }, (_, i) => word({ card_id: i }))
     const { container } = render(<Feed {...props} feed={feedOf({ words })} />)
-    expect(container.querySelectorAll('.fd-segrow i')).toHaveLength(4)
-    expect(container.querySelectorAll('.fd-segrow i.here')).toHaveLength(1)
-    expect(container.querySelector('.fd-railcap')?.textContent)
-      .toContain('THE LIST IS REBUILT, NOT TICKED OFF')
+    expect(container.querySelectorAll('.fd-row')).toHaveLength(4)
+    expect(container.querySelectorAll('.fd-row.on')).toHaveLength(1)
+    expect(container.querySelector('.fd-rail')).toBeNull()
   })
 
   it('reads down the queue without giving up the budget axis', () => {
     const words = [word({ card_id: 1, word: '一' }), word({ card_id: 2, word: '二' })]
     const { container } = render(<Feed {...props} feed={feedOf({ words })} />)
     const root = container.querySelector('.mn-open') as Element
-    expect(container.querySelector('.fd-cap b')?.textContent).toContain('1 OF 2')
+    expect(container.querySelector('.fd-cap')?.textContent).toContain('1 OF 2')
     fireEvent.keyDown(root, { key: 'ArrowDown' })
-    expect(container.querySelector('.fd-cap b')?.textContent).toContain('2 OF 2')
+    expect(container.querySelector('.fd-cap')?.textContent).toContain('2 OF 2')
     expect(container.querySelector('.fd-word')?.textContent).toBe('二')
   })
 
@@ -479,7 +480,10 @@ describe('the feed screen', () => {
   it('says which empty it is rather than drawing a blank queue', () => {
     const { container } = render(<Feed {...props} feed={feedOf({ words: [], budget: 0 })} />)
     expect(container.textContent).toContain('THE BUDGET IS SET TO NONE')
-    expect(container.querySelector('.fd-none')?.textContent).toBe('NO NEW WORDS QUEUED TODAY')
+    /* WHICH ABSENCE IT IS: a budget of nought is a choice you made, and a queue that ran dry is
+       not -- the column says so where the words would have been. */
+    expect(container.querySelector('.fd-none')?.textContent)
+      .toBe('NO NEW WORDS TODAY · REVIEWS ONLY')
   })
 
   it('has no accessibility violations', async () => {

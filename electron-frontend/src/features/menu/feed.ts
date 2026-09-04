@@ -117,3 +117,32 @@ export function wordKanji(word: VocabFeedWord): WordKanji {
       : `${unknown} OF ${chars.length} ${unknown === 1 ? 'IS' : 'ARE'} NEW TO YOU`
   return { chars, unknown, note }
 }
+
+
+/* ==================================================================================================
+   THE WINDOW ONTO TODAY'S QUEUE.
+
+   A budget of forty means forty words, and eight rows plus the line that counts the rest fit the
+   stage — so the column shows a run around the word being read and counts what it cannot reach,
+   which is the same window a deck's blocks and the course's steps use.
+   ================================================================================================== */
+export const FEED_WINDOW = 8
+
+export interface FeedWindow {
+  /** indices into `feed.words`, in order */
+  list: number[]
+  behind: number
+  ahead: number
+}
+
+export function feedWindow(count: number, at: number): FeedWindow {
+  if (count <= FEED_WINDOW) {
+    return { list: Array.from({ length: count }, (_, i) => i), behind: 0, ahead: 0 }
+  }
+  const start = Math.min(Math.max(0, at - 1), count - FEED_WINDOW)
+  return {
+    list: Array.from({ length: FEED_WINDOW }, (_, i) => start + i),
+    behind: start,
+    ahead: count - (start + FEED_WINDOW),
+  }
+}
