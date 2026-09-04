@@ -12,8 +12,8 @@ import { flatSeals, sealGroups, wallStep } from './wall'
 import { EXAM_MODES, levelDetail, sectionLine, unscored } from './examLevel'
 import { JLPT_UNLOCK_PCT, ascentRungs } from './ascent'
 import {
-  TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, nearestOffered, railLayout, railStep,
-  tabScale,
+  MODE_WINDOW, drillChapters, drillDecks, drillModes, modeStep, modeWindow, nearestOffered,
+  offeredList,
 } from './drills'
 import { MINIGAMES, SCRIPT_MINIGAMES, SESSION_LENGTH_PRESETS } from '../../constants'
 import type { LevelReadiness, ReadinessPayload, Rung } from './ascent'
@@ -268,7 +268,7 @@ describe('one rung of the ascent', () => {
   })
 })
 
-describe('the drills road', () => {
+describe('the drills', () => {
   const modes = drillModes()
 
   /* the four switches, and the calls the road makes when they are worked */
@@ -304,7 +304,7 @@ describe('the drills road', () => {
     expect(new Set(modes.map((m) => m.key)).size).toBe(MINIGAMES.length)
   })
 
-  it('orders them by group so the road reads as chapters', () => {
+  it('orders them by group so the list reads as chapters', () => {
     /* MINIGAMES is in catalogue order, which interleaves the groups -- this is a derived ordering
        rather than a second list to keep in step */
     const orders = modes.map((m) => m.groupOrder)
@@ -324,19 +324,19 @@ describe('the drills road', () => {
     for (const deck of first.decks) expect(SCRIPT_MINIGAMES[deck]).toContain(first.key)
   })
 
-  describe('the fold, which is in the widths', () => {
-    it('gives an unoffered mode width zero and leaves it out of the walk', () => {
+  describe('the fold, which is the list itself', () => {
+    it('leaves a mode this deck cannot run out of the list entirely', () => {
+      /* the road gave it width zero and collapsed it into its own seam; a list simply does not
+         contain it, and the foot band says how many that was */
       const deck = 'sentence_examples' as const
-      const layout = railLayout(modes, deck, nearestOffered(modes, deck, 0))
-      expect(layout.list.length).toBe(SCRIPT_MINIGAMES[deck].length)
-      expect(layout.list.length).toBeLessThan(modes.length)
-      modes.forEach((m, i) => {
-        if (!m.decks.includes(deck)) expect(layout.widths[i]).toBe(0)
-      })
+      const offered = offeredList(modes, deck)
+      expect(offered.length).toBe(SCRIPT_MINIGAMES[deck].length)
+      expect(offered.length).toBeLessThan(modes.length)
+      for (const i of offered) expect(modes[i].decks).toContain(deck)
     })
 
     it('never lets the cursor rest on a folded mode', () => {
-      /* changing deck snaps outward from where you were, so the road never focuses a gap */
+      /* changing deck snaps outward from where you were, so the list never focuses a gap */
       const deck = 'sentence_examples' as const
       for (let i = 0; i < modes.length; i++) {
         const landed = nearestOffered(modes, deck, i)
@@ -346,24 +346,46 @@ describe('the drills road', () => {
 
     it('walks the offered list and stops at both of its ends', () => {
       const deck = 'hiragana' as const
-      const start = nearestOffered(modes, deck, 0)
-      const layout = railLayout(modes, deck, start)
-      expect(railStep(layout, start, -1)).toBe(start)
-      const last = layout.list[layout.list.length - 1]
-      expect(railStep(railLayout(modes, deck, last), last, 1)).toBe(last)
+      const offered = offeredList(modes, deck)
+      const start = offered[0]
+      expect(modeStep(offered, start, -1)).toBe(start)
+      const last = offered[offered.length - 1]
+      expect(modeStep(offered, last, 1)).toBe(last)
     })
   })
 
-  it('gives the selection the wide tab and shrinks the rest with distance', () => {
+  describe('the window onto the list', () => {
     const deck = 'hiragana' as const
-    const sel = nearestOffered(modes, deck, 0)
-    const layout = railLayout(modes, deck, sel)
-    expect(layout.widths[sel]).toBe(TAB_W_SEL)
-    const others = layout.list.filter((i) => i !== sel)
-    expect(Math.max(...others.map((i) => layout.widths[i]))).toBeLessThanOrEqual(TAB_W)
-    /* floored, so the far end of the road stays readable rather than collapsing */
-    expect(tabScale(99)).toBe(tabScale(5))
-    expect(tabScale(0)).toBe(1)
+
+    it('shows eight of the twelve and counts the rest', () => {
+      const offered = offeredList(modes, deck)
+      expect(offered.length).toBeGreaterThan(MODE_WINDOW)
+      const win = modeWindow(offered, offered[5])
+      expect(win.list).toHaveLength(MODE_WINDOW)
+      expect(win.behind + win.list.length + win.ahead).toBe(offered.length)
+      expect(win.list).toContain(offered[5])
+    })
+
+    it('stands the cursor second, so one mode of the chapter above stays in view', () => {
+      const offered = offeredList(modes, deck)
+      const win = modeWindow(offered, offered[5])
+      expect(win.list.indexOf(offered[5])).toBe(1)
+    })
+
+    it('keeps the window on the list at either end', () => {
+      const offered = offeredList(modes, deck)
+      expect(modeWindow(offered, offered[0]).behind).toBe(0)
+      const last = modeWindow(offered, offered[offered.length - 1])
+      expect(last.ahead).toBe(0)
+      expect(last.list).toHaveLength(MODE_WINDOW)
+    })
+
+    it('does not fold at all when the whole catalogue fits', () => {
+      const short = offeredList(modes, deck).slice(0, 4)
+      const win = modeWindow(short, short[1])
+      expect(win.behind).toBe(0)
+      expect(win.ahead).toBe(0)
+    })
   })
 
   describe('how this run goes, which used to exist only in the hub', () => {
@@ -424,7 +446,7 @@ describe('the drills road', () => {
       const { container } = road({
         lockReasons: { [firstMode]: 'Not enough cards for this mode' }, onStart,
       })
-      fireEvent.click(container.querySelector('.dr-hero') as Element)
+      fireEvent.click(container.querySelector('.dr-slab') as Element)
       fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'Enter' })
       expect(onStart).not.toHaveBeenCalled()
     })
@@ -445,10 +467,12 @@ describe('the drills road', () => {
   })
 
   it('hands a deck change to the app rather than keeping it', () => {
-    /* it was local state that committed only on start -- which drew another deck's refusals */
+    /* it was local state that committed only on start -- which drew another deck's refusals.
+       THE AXES SWAPPED WITH THE SHAPE: the modes are a column now, so up and down walk them and
+       left and right cross the deck row they are drawn under. */
     const onDeck = vi.fn()
     const { container } = road({ onDeck })
-    fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'ArrowDown' })
+    fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'ArrowRight' })
     expect(onDeck).toHaveBeenCalledTimes(1)
     expect(onDeck.mock.calls[0][0]).not.toBe('kanji_n5')
   })

@@ -107,66 +107,73 @@ export function nearestOffered(modes: readonly DrillMode[], deck: ScriptKey, sel
   return sel
 }
 
-/* ---- the road's geometry ---- */
-export const TAB_W = 94
-export const TAB_W_SEL = 240
-export const TAB_GAP = 18
-/** how a tab shrinks with its distance from the selection, floored so the far ends stay readable */
-export const tabScale = (d: number) => Math.max(0.78, 1 - Math.min(d, 5) * 0.055)
+/* ==================================================================================================
+   THE OFFERED LIST, AND THE WINDOW ONTO IT.
 
-export interface RailLayout {
-  /** true where the chosen deck offers that mode */
-  offered: boolean[]
-  /** the indices of the offered modes, in order */
-  list: number[]
-  /** where the selection sits within `list` */
-  at: number
-  lefts: number[]
-  widths: number[]
-  centres: number[]
-  /** the whole road's width, so it can be centred on the selection */
-  span: number
+   THE FOLD IS THE LIST ITSELF NOW, not a set of zero widths. The road drew all seventeen modes and
+   collapsed the ones this deck cannot run into their own seam; a list simply does not contain them,
+   and the foot band says how many that was — so there is no special case in the drawing and no gap
+   for the cursor to land in.
+
+   EIGHT ROWS FIT THE STAGE once each chapter has its own heading, and a deck offers up to twelve —
+   so the column shows a run around the cursor and counts the rest, the same window the course's
+   ledger and a deck's blocks use.
+   ================================================================================================== */
+export const MODE_WINDOW = 8
+
+/** the indices, into the ordered modes, that this deck actually offers */
+export function offeredList(modes: readonly DrillMode[], deck: ScriptKey): number[] {
+  const list: number[] = []
+  modes.forEach((mode, index) => { if (mode.decks.includes(deck)) list.push(index) })
+  return list
 }
 
-export function railLayout(
-  modes: readonly DrillMode[], deck: ScriptKey, sel: number,
-): RailLayout {
-  const offered = modes.map((m) => m.decks.includes(deck))
-  const list: number[] = []
-  offered.forEach((ok, i) => { if (ok) list.push(i) })
-  const at = list.indexOf(sel)
+export interface ModeWindow {
+  /** indices into the ordered modes, in order */
+  list: number[]
+  behind: number
+  ahead: number
+  /** where the selection sits within the whole offered list, or -1 when it is not on it */
+  at: number
+}
 
-  const lefts: number[] = [], widths: number[] = [], centres: number[] = []
-  let x = 0, first = true
-  for (let i = 0; i < modes.length; i++) {
-    if (!offered[i]) { lefts.push(x); widths.push(0); centres.push(x); continue }
-    if (!first) x += TAB_GAP
-    first = false
-    const d = Math.abs(list.indexOf(i) - at)
-    const w = i === sel ? TAB_W_SEL : Math.round(TAB_W * tabScale(d))
-    lefts.push(x); widths.push(w); centres.push(x + w / 2)
-    x += w
+export function modeWindow(offered: readonly number[], sel: number): ModeWindow {
+  const at = offered.indexOf(sel)
+  if (offered.length <= MODE_WINDOW) {
+    return { list: [...offered], behind: 0, ahead: 0, at }
   }
-  return { offered, list, at, lefts, widths, centres, span: x }
+  const start = Math.min(Math.max(0, at - 1), offered.length - MODE_WINDOW)
+  return {
+    list: offered.slice(start, start + MODE_WINDOW),
+    behind: start,
+    ahead: offered.length - (start + MODE_WINDOW),
+    at,
+  }
 }
 
 /** walk the OFFERED list, never all seventeen */
-export function railStep(layout: RailLayout, sel: number, direction: 1 | -1): number {
-  const { list } = layout
-  if (!list.length) return sel
-  const here = list.indexOf(sel)
-  if (here < 0) return list[0]
-  return list[Math.max(0, Math.min(list.length - 1, here + direction))]
+export function modeStep(offered: readonly number[], sel: number, direction: 1 | -1): number {
+  if (!offered.length) return sel
+  const here = offered.indexOf(sel)
+  if (here < 0) return offered[0]
+  return offered[Math.max(0, Math.min(offered.length - 1, here + direction))]
+}
+
+/* A NAME IS SET FROM ITS OWN LENGTH, the same rule the deck's block name follows: the Latin italic
+   black averages 0.62em per character, and "Conjugation Challenge" cannot take "Listening"'s size. */
+export function modeNameSize(name: string): number {
+  const n = Math.max(1, name.length)
+  return Math.max(24, Math.min(46, Math.floor(440 / (n * 0.62))))
 }
 
 /* ==================================================================================================
    THE FIVE GROUPS' JAPANESE, which the app's own metadata does not carry.
 
    `MINIGAME_SKILL_GROUP_META` has a title, a helper and an order for each group and no Japanese at
-   all -- so the chapter blocks over the road, and the glyph on the hero card, have nothing to draw
-   from. The mockup authored these for the same five keys; this is that copy, keyed by the app's own
-   group id rather than by position, so the day a sixth group is added it renders with its English
-   name and no Japanese instead of taking the wrong group's.
+   all -- so a chapter heading has nothing to draw from. The mockup authored these for the same five
+   keys; this is that copy, keyed by the app's own group id rather than by position, so the day a
+   sixth group is added it renders with its English name and no Japanese instead of taking the wrong
+   group's.
 
    Same arrangement as `PATH_COPY` in `pathL2.ts`: the backend owns the list and its order, this
    table supplies only the words the backend has no field for.
@@ -181,28 +188,5 @@ const DRILL_GROUP_COPY: Record<string, DrillGroupCopy> = {
   mixed: { jp: '混合', glyph: '混' },
 }
 
-export const CHAPTER_NUM = ['一', '二', '三', '四', '五', '六', '七', '八'] as const
-
 export const groupCopy = (key: string): DrillGroupCopy =>
   DRILL_GROUP_COPY[key] ?? { jp: '', glyph: '' }
-
-/* ==================================================================================================
-   WHAT IS OFF EACH END, AND THE STRIP UNDER THE ROAD.
-
-   The road shows nine stones at most -- the one you are on and four either side -- so anything past
-   that is counted rather than drawn, the same way the course's road counts what is behind and ahead.
-   ================================================================================================== */
-export const RAIL_REACH = 4
-
-export function railEnds(layout: RailLayout): { lo: number; hi: number } {
-  return {
-    lo: Math.max(0, layout.at - RAIL_REACH),
-    hi: Math.max(0, layout.list.length - 1 - layout.at - RAIL_REACH),
-  }
-}
-
-/** how far a stone is from the selection along the OFFERED list, or null when it is folded away */
-export function railDistance(layout: RailLayout, i: number): number | null {
-  if (!layout.offered[i]) return null
-  return Math.abs(layout.list.indexOf(i) - layout.at)
-}

@@ -83,16 +83,16 @@ async function openDrillsRoad(): Promise<void> {
   fireEvent.keyDown(root(), { key: 'Enter' })
   await waitFor(() => expect(document.querySelectorAll('.pr-lane')).toHaveLength(3))
   fireEvent.click(document.querySelectorAll('.pr-lane')[1])
-  await waitFor(() => expect(document.querySelector('.dr-strip')).not.toBeNull())
+  await waitFor(() => expect(document.querySelector('.dr-run')).not.toBeNull())
 }
 
-/** Walk the road to a named mode. Bounded: seventeen is the whole catalogue. */
+/** Walk the catalogue to a named mode. Bounded: seventeen is the whole of it. */
 function selectDrill(title: string): void {
   for (let step = 0; step < 20; step++) {
     if (document.querySelector('.dr-hen')?.textContent?.trim() === title) return
-    fireEvent.keyDown(document.querySelector('.mn-open') as Element, { key: 'ArrowRight' })
+    fireEvent.keyDown(document.querySelector('.mn-open') as Element, { key: 'ArrowDown' })
   }
-  throw new Error(`The road never reached ${title}. It stopped on `
+  throw new Error(`The list never reached ${title}. It stopped on `
     + `${document.querySelector('.dr-hen')?.textContent}`)
 }
 
@@ -1208,7 +1208,7 @@ describe('what each deck offers', () => {
     expect(document.querySelector('.dr-slab')?.className).toContain('shut')
 
     // and the press is refused rather than starting a round that has no audio to play
-    fireEvent.click(document.querySelector('.dr-hero') as Element)
+    fireEvent.click(document.querySelector('.dr-slab') as Element)
     expect(document.querySelector('.rd-sheet')).toBeNull()
     expect(screen.queryByRole('heading', { name: /recognition/i })).toBeNull()
   })
@@ -1258,7 +1258,7 @@ describe('what each deck offers', () => {
     expect(document.querySelector('.dr-slab')?.className).toContain('shut')
     expect(document.querySelector('.dr-slab')?.textContent).toContain('SPEECH RECOGNITION MODEL')
 
-    fireEvent.click(document.querySelector('.dr-hero') as Element)
+    fireEvent.click(document.querySelector('.dr-slab') as Element)
     expect(document.querySelector('.rd-sheet')).toBeNull()
   })
 
@@ -1281,12 +1281,12 @@ describe('what each deck offers', () => {
       render(<App />)
       await openDrillsRoad()
 
-      /* the road is built out of transforms and a masked strip; with animation off it still has
-         to be a road you can walk and a card you can press */
-      expect(document.querySelectorAll('.dr-tab').length).toBeGreaterThan(0)
-      const hero = document.querySelector('.dr-hero') as HTMLButtonElement
-      expect(hero).not.toBeNull()
-      expect(hero.disabled).toBe(false)
+      /* the rows are skewed and the selected one overhangs its column; with animation off it
+         still has to be a list you can walk and a slab you can press */
+      expect(document.querySelectorAll('.dr-mode').length).toBeGreaterThan(0)
+      const slab = document.querySelector('.dr-slab') as HTMLButtonElement
+      expect(slab).not.toBeNull()
+      expect(slab.disabled).toBe(false)
       selectDrill('Meaning Match')
       expect(document.querySelector('.dr-hen')?.textContent).toBe('Meaning Match')
     } finally {

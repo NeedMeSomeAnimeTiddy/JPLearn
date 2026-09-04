@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BlockInfo, JlptLevel, JlptLevelProgress } from '../../../types'
-import { chainPage } from '../chain'
-import { deckChain, deckChainView } from '../deck'
-import { Chain, ChainPile } from './Chain'
+import {
+  blockNameSize, blockWindow, deckChain, gateLine, nameIsWide, railLine,
+} from '../deck'
 import { levelForKey } from '../levels'
 import { screenHead } from '../chrome'
 import { ScreenHead } from './ScreenHead'
@@ -18,7 +18,7 @@ export interface DeckProps {
      `activeDeckSlug` follows the level tab the learner last used in the hub, so a session spent on
      N3 makes the app open N3's blocks. Naming the milestone alone is how the mockup ended up
      showing kanji N1's blocks under a heading reading HIRAGANA. Two statements, not one: the
-     caption says why you are here, the card says what you are looking at. */
+     caption says why you are here, the poster says what you are looking at. */
   slug: string
   blocks: readonly BlockInfo[]
   /** the gate the backend applied, 0..1 */
@@ -39,6 +39,15 @@ export interface DeckProps {
   onUp: () => void
 }
 
+/* ==================================================================================================
+   A DECK'S BLOCKS — THE SAME LEDGER THE COURSE IS. See the note over `.dk-run` for why three cards
+   in a row stopped being the drawing.
+
+   THE ROWS ARE THE REACH. `.dk-sheet` was a paged overlay that existed only because three cards had
+   nowhere to put seventy-three cleared blocks; the column walks them, and the strip in the foot
+   band jumps to any of them for a deck too long to walk. One way to reach a block, not two.
+   ================================================================================================== */
+
 export function Deck({
   title, slug, blocks, gate, loading, error, mode, levels, level, onLevel, onStart, onUp,
 }: DeckProps) {
@@ -47,30 +56,17 @@ export function Deck({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const chain = useMemo(() => deckChain(blocks, gate), [blocks, gate])
 
-  /* two focusable cards: 0 is the open block, 1 is the cleared pile */
-  const [at, setAt] = useState<0 | 1>(0)
-  /* -1 is "the open one"; anything else is a cleared block being revisited */
-  const [pick, setPick] = useState(-1)
-  const [sheet, setSheet] = useState(false)
-  const [page, setPage] = useState(0)
-  const [cell, setCell] = useState(0)
+  /* THE CURSOR WALKS [0, here] AND NO FURTHER, which is the whole of the gate: everything behind
+     the frontier is cleared and revisitable, and nothing past it is choosable at all. */
+  const [at, setAt] = useState(-1)
+  const cursor = at < 0 ? Math.max(0, chain.here) : at
+  const here = chain.blocks[cursor]
+  const revisiting = cursor !== chain.here
+  const win = blockWindow(chain.blocks, cursor)
 
-  const shown = pick >= 0 ? pick : chain.here
-  const here = chain.blocks[shown]
-  const view = useMemo(
-    () => deckChainView(chain, slug, mode, shown), [chain, slug, mode, shown],
-  )
-  const shelf = chainPage(chain.cleared, page)
-
-  /* THE RAIL IS A MAP: the block under the pointer is the block you get. See `useTraversal`.
-     CLAMPED AT `here`, WHERE THE CLICK IS ALSO REFUSED -- scrubbing past the open block would let
-     the pointer reach blocks neither the keyboard nor the mouse will open. */
-  const scrub = (i: number) => {
-    const want = Math.max(0, Math.min(i, chain.here))
-    setPick(want === chain.here ? -1 : want)
-    setSheet(false)
-    setAt(0)
-  }
+  const wide = nameIsWide(here?.name ?? '')
+  const nameSize = blockNameSize(here?.name ?? '', wide)
+  const gateOn = Math.round(chain.gate * 100)
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 
@@ -78,23 +74,6 @@ export function Deck({
     const node = rootRef.current
     if (!node) return
     const onKey = (event: KeyboardEvent) => {
-      /* THE SHEET OWNS THE KEYS WHILE IT IS OPEN, and its Escape must not reach App's window
-         listener — otherwise closing the pile would leave the screen as well, which is one
-         Escape doing two things. */
-      if (sheet) {
-        event.preventDefault()
-        event.stopPropagation()
-        if (event.key === 'Escape') { setSheet(false); return }
-        if (event.key === 'ArrowRight') { setCell((c) => Math.min(c + 1, shelf.cells.length - 1)); return }
-        if (event.key === 'ArrowLeft') { setCell((c) => Math.max(c - 1, 0)); return }
-        if (event.key === 'ArrowDown') { setPage((p) => Math.min(p + 1, shelf.pages - 1)); setCell(0); return }
-        if (event.key === 'ArrowUp') { setPage((p) => Math.max(p - 1, 0)); setCell(0); return }
-        if (event.key === 'Enter') {
-          const index = shelf.cells[cell]
-          if (index !== undefined) { setPick(index); setSheet(false); setAt(0) }
-        }
-        return
-      }
       /* THE PRINTED DIGITS PICK THE LEVEL, and they are STOPPED rather than merely prevented:
          `App` binds 1 through 5 on the window as the way into a deck from anywhere the menu is not
          listening, so a press that bubbled would change the level and then leave the screen it had
@@ -103,15 +82,17 @@ export function Deck({
       if (wanted) {
         event.preventDefault()
         event.stopPropagation()
-        if (wanted !== level) onLevel(wanted)
+        if (wanted !== level) { onLevel(wanted); setAt(-1) }
         return
       }
-      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
         event.preventDefault()
-        setAt((i) => (i === 0 ? 1 : 0))
+        setAt(() => Math.min(cursor + 1, Math.max(0, chain.here)))
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setAt(() => Math.max(cursor - 1, 0))
       } else if (event.key === 'Enter') {
         event.preventDefault()
-        if (at === 1) { if (chain.cleared > 0) { setSheet(true); setCell(0) } return }
         /* A DECK THAT ANSWERED WITH NO BLOCKS IS STILL A DECK YOU CAN STUDY. -1 is "no block
            filter, the whole thing" -- the pool the app falls back to anyway when nothing is
            selected. Without it this screen is a dead end for a deck the bridge could not cut. */
@@ -120,10 +101,10 @@ export function Deck({
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [at, cell, chain.cleared, here, level, levels, onLevel, onStart, sheet, shelf.cells, shelf.pages])
+  }, [chain.here, cursor, here, level, levels, onLevel, onStart])
 
   return (
-    /* the deck's name is not drawn as a heading -- the open block's cap says it -- but a screen
+    /* the deck's name is not drawn as a heading -- the poster's cap says it -- but a screen
        reader announcing this screen has not reached that cap yet */
     <div
       className={screenClass(entered, 'dk-blocks')}
@@ -140,10 +121,6 @@ export function Deck({
           at={level}
           onPick={onLevel}
         />
-        {/* THE SCREEN'S OWN CAPTION IS THE HERE-CARD'S. `.dk-cap` on the open block already says
-            which deck this is and where in it you are standing, so the heading at the top of the
-            stage was the same sentence a second time -- and on this screen it landed on the cards.
-            What it uniquely carried, the deck's whole-chain line, moves to the rail cap. */}
         {/* an absence is drawn as an absence: a deck that did not answer is not an empty deck */}
         {error ? <div className="pj-empty">{error.toUpperCase()}</div> : null}
         {loading && !chain.blocks.length && !error
@@ -159,36 +136,118 @@ export function Deck({
         ) : null}
 
         {chain.blocks.length && here ? (
-          <Chain
-            view={view}
-            at={at}
-            onAt={setAt}
-            shown={shown}
-            onScrub={scrub}
-            onOpen={() => onStart(here.index)}
-            onPile={() => { setSheet(true); setCell(0) }}
-            enabled={!sheet}
-          />
+          <>
+            {/* ─── the run, as rows ──────────────────────────────────────────────────────── */}
+            <div className="dk-run" role="group" aria-label="The blocks in this deck">
+              {win.blocks.map((block) => {
+                const shut = block.state === 'ahead'
+                return (
+                  <button
+                    key={block.index}
+                    type="button"
+                    className={['dk-row', block.state, block.index === cursor ? 'on' : '']
+                      .filter(Boolean).join(' ')}
+                    onClick={() => { if (!shut) setAt(block.index) }}
+                    aria-disabled={shut}
+                    aria-label={`Block ${block.no}, ${block.name}, ${block.cards} cards`}
+                  >
+                    <span className="n">{block.no}</span>
+                    <span className="t">{block.name}</span>
+                    <span className="c">{block.cards} CARDS</span>
+                    <span className="s">
+                      {block.state === 'done' ? '済 CLEARED'
+                        : block.state === 'here' ? `${block.pct}% · OPEN` : 'SHUT'}
+                    </span>
+                  </button>
+                )
+              })}
+              {/* WHAT WILL NOT FIT, COUNTED AT BOTH ENDS. Standing on the last block of a deck
+                  puts every hidden row BEHIND the window, so a fold that only counted forwards
+                  said nothing at all on the screen that needed it most. */}
+              {win.behind || win.ahead ? (
+                <span className="dk-fold">
+                  {win.behind ? <><b>{win.behind}</b><i>ABOVE</i></> : null}
+                  {win.ahead ? <><b>{win.ahead}</b><i>BELOW</i></> : null}
+                </span>
+              ) : null}
+            </div>
+
+            {/* ─── and the block itself, on the valley ───────────────────────────────────── */}
+            <div className="dk-here">
+              <span className="dk-cap">
+                {revisiting ? 'ALREADY CLEARED' : 'OPEN NOW'} · BLOCK {here.no} OF {chain.blocks.length}
+                {' '}<i>{slug.replace(/_/g, ' ').toUpperCase()}</i>
+              </span>
+              <b
+                className="dk-name"
+                data-wide={wide ? '1' : '0'}
+                style={{ fontSize: `${nameSize}px` }}
+              >
+                {here.name}
+              </b>
+              {here.sample.length
+                ? <span className="dk-chars">{here.sample.join(' ・ ')}</span> : null}
+
+              <span className="dk-meter">
+                <span className="dk-sub">
+                  <b>{here.pct}%</b>
+                  <em>MASTERED</em>
+                  <s>{here.cards} CARDS</s>
+                </span>
+                <span className="dk-track">
+                  <i style={{ width: `${Math.min(100, here.pct)}%` }} />
+                  {/* where the gate stands, which is what makes 62% legible as "eight short" */}
+                  {revisiting ? null : <u style={{ left: `${gateOn}%` }} />}
+                </span>
+                <span className="dk-gate">
+                  {gateLine(chain, revisiting)}
+                </span>
+              </span>
+
+              <button
+                type="button"
+                className="dk-slab"
+                data-live="1"
+                onClick={() => onStart(here.index)}
+              >
+                <em>{mode.toUpperCase()}</em>
+                <b>{revisiting ? 'STUDY IT AGAIN' : 'START THIS BLOCK'} ▸</b>
+              </button>
+            </div>
+
+            {/* ─── the whole deck once, in the foot band, and it jumps ───────────────────── */}
+            <div className="dk-strip">
+              <div className="dk-segrow" role="group" aria-label="Every block in this deck">
+                {chain.blocks.map((block) => (
+                  <i
+                    key={block.index}
+                    className={[
+                      block.state === 'done' ? 'done' : '',
+                      block.state === 'here' ? 'here' : '',
+                      block.state === 'ahead' ? 'locked' : '',
+                      block.index === cursor ? 'pick' : '',
+                    ].filter(Boolean).join(' ')}
+                    title={`${block.no} · ${block.name} · ${block.cards} cards`}
+                    onClick={() => { if (block.state !== 'ahead') setAt(block.index) }}
+                  />
+                ))}
+              </div>
+              <div className="dk-railcap">
+                <span>BLOCK 01</span>
+                <span className="cap">{railLine(chain)}</span>
+                <span>BLOCK {chain.blocks[chain.blocks.length - 1]?.no ?? '01'}</span>
+              </div>
+            </div>
+          </>
         ) : null}
 
-        {sheet ? (
-          <ChainPile
-            view={view}
-            page={shelf.page}
-            cell={cell}
-            onCell={setCell}
-            onPick={(index) => { setPick(index); setSheet(false); setAt(0) }}
-            onClose={() => setSheet(false)}
-          />
-        ) : null}
-
-                <div className="back-tab">
+        <div className="back-tab">
           <button type="button" onClick={onUp}>
             <b className="bt-en">Back</b><em className="bt-jp">戻る</em>
           </button>
         </div>
         <div className="hints">
-          <span><b>← →</b>Choose<em>選択</em></span>
+          <span><b>↑ ↓</b>Choose<em>選択</em></span>
           {levels.length > 1 ? <span><b>1–{levels.length}</b>Level<em>級</em></span> : null}
           <span><b>ENTER</b>Start<em>開始</em></span>
           <span><b>ESC</b>Back<em>戻る</em></span>

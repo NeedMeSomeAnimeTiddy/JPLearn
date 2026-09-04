@@ -205,16 +205,18 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
   '.lg-lv': 'foot', '.lg-ach': 'foot', '.lg-sheet': 'stage',
   /* the badge wall */
   '.bw-rows': 'stage', '.bw-detail': 'stage',
-  /* a deck's blocks, and the vocabulary rail that replaces them for the five vocab decks */
-  '.dk-behind': 'stage', '.dk-here': 'stage', '.dk-ahead': 'stage', '.dk-rail': 'stage',
-  '.dk-sheet': 'stage',
+  /* a deck's blocks, as a ledger: the run on the left, the block on the world beside it, and the
+     whole deck once in the band -- where it is also the scrubber. And the vocabulary rail that
+     replaces the blocks for the five vocab decks. */
+  '.dk-run': 'stage', '.dk-here': 'stage', '.dk-strip': 'foot',
   '.fd-hero': 'stage', '.fd-today': 'stage', '.fd-rail': 'stage',
   /* PRACTICE and THE WORLD, which are the same screen filled twice */
   '.lanes': 'stage', '.lanes.two': 'stage', '.pr-note': 'stage',
   /* the library */
   '.lb-view': 'stage', '.lb-heads': 'span', '.lb-mini': 'foot',
-  /* the drills: deck axis, road, the two arrows, and a foot band carrying two rows */
-  '.dr-decks': 'stage', '.dr-strip': 'stage', '.dr-side': 'stage',
+  /* the drills: the deck axis across the top, the catalogue as lines under it, the mode itself
+     beside them, and a foot band carrying two thin rows */
+  '.dr-decks': 'stage', '.dr-run': 'stage', '.dr-card': 'stage',
   '.dr-mini': 'foot', '.dr-set': 'foot',
   /* JLPT: the ascent is five tracks and one line under them; the level is a column of
      mode rows and one reading plate */
@@ -227,8 +229,11 @@ const BOARD_BOXES: Record<string, 'stage' | 'foot' | 'crown' | 'span'> = {
   /* shared furniture */
   '.pj-empty': 'stage', '.pj-back': 'crown',
 }
-/* THE PATH IS NOT IN THIS TABLE AND THAT IS CORRECT: it is the chain, so it stands on `.dk-behind`,
-   `.dk-here`, `.dk-ahead` and `.dk-rail`, which are already here under the deck. */
+/* THE THREE LEDGERS ARE THE SAME THREE BOXES: a run of thin rows on the left, the one thing you
+   are about to act on at poster size beside it, and one whole-set summary in the band. The course
+   spells them `.pa-*`, a deck's blocks `.dk-*` and the drills `.dr-*`, because the three say
+   genuinely different words in the same shapes -- a block is STARTED, a step is OPENED and a mode
+   is RUN -- and one parameterised drawing would put all three screens' copy in one file. */
 
 /** is this selector declared at all? */
 function menuHas(selector: string): boolean {
@@ -284,5 +289,16 @@ describe('the frame contract', () => {
        left to hang off the ladder and drift out of line with it */
     expect(menuHas('.as-plinth')).toBe(false)
     expect(menuHas('.as-lockbox')).toBe(false)
+  })
+
+  it('has no card grid and no card fan left to come back', () => {
+    /* THE TWO SHAPES THIS FAMILY OF SCREENS DOES NOT MAKE. `.dk-sheet` was a six-across paged
+       overlay of cleared blocks and `.dr-tab`/`.dr-hero`/`.dr-side` were seventeen modes fanned off
+       both edges of the stage at 45% opacity -- a phone's grid and a phone's carousel. The rows
+       reach everything both of them reached, so neither is kept as a second way to do one thing. */
+    for (const gone of ['.dk-sheet', '.dk-cell', '.dk-grid', '.dk-behind', '.dk-ahead',
+      '.dr-tab', '.dr-hero', '.dr-side', '.dr-strip', '.dr-rail']) {
+      expect([gone, menuHas(gone)]).toEqual([gone, false])
+    }
   })
 })

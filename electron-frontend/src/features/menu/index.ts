@@ -34,12 +34,16 @@ export { scenes, FREE_TALK } from './scenes'
 export { sealGroups, flatSeals, wallStep } from './wall'
 export { libraryRows, libraryWindow, libraryNote, READING_PACE, LIBRARY_WINDOW } from './library'
 export { levelDetail, sectionLine, unscored, EXAM_MODES } from './examLevel'
-export { drillModes, drillDecks, drillChapters, nearestOffered, railLayout, railStep, tabScale } from './drills'
-export type { DrillMode, DrillDeck, DrillChapter, RailLayout } from './drills'
-export { chainNameSize, chainPage, chainSegTitle, CHAIN_PER_PAGE } from './chain'
-export type { ChainView, ChainItem, ChainHero, ChainState, ChainPage } from './chain'
-export { deckChain, deckChainView, deckSheet, gateLine, railLine, DECK_PER_PAGE, DEFAULT_GATE } from './deck'
-export type { DeckChain, DeckBlock, DeckBlockState, DeckSheet } from './deck'
+export {
+  drillModes, drillDecks, drillChapters, nearestOffered, offeredList, modeWindow, modeStep,
+  modeNameSize, groupCopy, MODE_WINDOW,
+} from './drills'
+export type { DrillMode, DrillDeck, DrillChapter, ModeWindow, DrillGroupCopy } from './drills'
+export {
+  deckChain, gateLine, railLine, blockWindow, blockNameSize, nameIsWide,
+  BLOCK_WINDOW, DEFAULT_GATE,
+} from './deck'
+export type { DeckChain, DeckBlock, DeckBlockState, BlockWindow } from './deck'
 export { useDeckBlocks } from './useDeckBlocks'
 export type { DeckBlocks } from './useDeckBlocks'
 export { feedHead, feedNote, feedAt, kanjiOf, wordKanji, wordSize } from './feed'

@@ -6,7 +6,9 @@ import type { VocabFeed, VocabFeedWord } from '../vocab-feed'
 import { VOCAB_BUDGET_STEPS } from '../vocab-feed'
 import { Deck } from './components/Deck'
 import { Feed } from './components/Feed'
-import { DECK_PER_PAGE, DEFAULT_GATE, deckChain, deckSheet, gateLine, railLine } from './deck'
+import {
+  BLOCK_WINDOW, DEFAULT_GATE, blockNameSize, blockWindow, deckChain, gateLine, nameIsWide, railLine,
+} from './deck'
 import { feedAt, feedHead, feedNote, kanjiOf, wordKanji, wordSize } from './feed'
 import { levelForKey, levelStep } from './levels'
 
@@ -108,22 +110,43 @@ describe('the gate', () => {
   })
 })
 
-describe('the cleared pile', () => {
-  it('pages rather than scrolls, so even a long deck is two pages and a grid move', () => {
-    const view = deckSheet(43, 0)
-    expect(view.pages).toBe(2)
-    expect(view.cells).toHaveLength(DECK_PER_PAGE)
-    expect(deckSheet(43, 1).cells).toHaveLength(43 - DECK_PER_PAGE)
+describe('the window onto the blocks', () => {
+  const blocks = (n: number) => deckChain(chainOf(n, Math.min(n, 5))).blocks
+
+  it('shows ten of the seventy-six and counts the rest at either end', () => {
+    const all = blocks(76)
+    const win = blockWindow(all, 40)
+    expect(win.blocks).toHaveLength(BLOCK_WINDOW)
+    expect(win.behind + win.blocks.length + win.ahead).toBe(all.length)
+    expect(win.blocks[win.at].index).toBe(40)
   })
 
-  it('clamps a page that has stopped existing', () => {
-    /* clearing fewer blocks (a level switch) must not leave the pager past its own end */
-    expect(deckSheet(5, 9).page).toBe(0)
-    expect(deckSheet(5, 9).cells).toEqual([0, 1, 2, 3, 4])
+  it('stands the cursor second, so one block of history shows', () => {
+    expect(blockWindow(blocks(76), 40).at).toBe(1)
   })
 
-  it('is one empty page rather than none when nothing is cleared', () => {
-    expect(deckSheet(0, 0)).toEqual({ cells: [], page: 0, pages: 1 })
+  it('keeps the window on the deck at either end', () => {
+    const all = blocks(76)
+    expect(blockWindow(all, 0).behind).toBe(0)
+    const last = blockWindow(all, all.length - 1)
+    expect(last.ahead).toBe(0)
+    expect(last.blocks).toHaveLength(BLOCK_WINDOW)
+  })
+
+  it('does not fold at all when the whole deck fits', () => {
+    const win = blockWindow(blocks(6), 2)
+    expect(win.behind).toBe(0)
+    expect(win.ahead).toBe(0)
+  })
+
+  it('sizes a name against its own alphabet, because the two do not share a divisor', () => {
+    /* the Latin italic black averages 0.62em per character and mincho is one full em, which is how
+       a two-glyph Japanese name once came out at the size of "Sentence Examples" */
+    expect(nameIsWide('漢字')).toBe(true)
+    expect(nameIsWide('Basic Vowels')).toBe(false)
+    /* fifteen of each, so neither hits the ceiling and the divisor is the only difference */
+    expect(blockNameSize('一二三四五六七八九十百千万上下', true)).toBe(28)
+    expect(blockNameSize('Abcdefghijklmno', false)).toBe(47)
   })
 })
 
@@ -233,22 +256,48 @@ describe('the deck screen', () => {
     expect(container.textContent).toContain('KANJI N3')
   })
 
-  it('offers two doors and draws the third', () => {
+  it('draws every block it can fit as a row, and only offers the ones it may', () => {
+    /* AHEAD IS DELIBERATELY NOT PRESSABLE: naming the next block is context, offering it is a lie.
+       It used to be a whole card saying so; it is a dimmed row now, and there are eight more of
+       them in the same space. */
     const { container } = render(<Deck {...props} />)
-    /* AHEAD is deliberately not a button: naming the next block is context, offering it is a lie */
-    expect(container.querySelectorAll('.dk-f')).toHaveLength(2)
-    expect(container.querySelector('.dk-ahead')?.tagName).toBe('DIV')
+    const rows = [...container.querySelectorAll('.dk-row')]
+    expect(rows).toHaveLength(6)
+    expect(rows[2].className).toContain('on')
+    expect(rows[0].className).toContain('done')
+    expect(rows[3].getAttribute('aria-disabled')).toBe('true')
+    expect(rows[3].querySelector('.s')?.textContent).toBe('SHUT')
   })
 
   it('hands over the block that was chosen, not the one that was open', () => {
+    /* the rows ARE the pile now -- a cleared block is reached by pressing it rather than by
+       opening a paged overlay that existed because three cards had nowhere to put it */
     const onStart = vi.fn()
     const { container } = render(<Deck {...props} onStart={onStart} />)
-    fireEvent.click(container.querySelector('.dk-behind') as Element)
-    const cells = container.querySelectorAll('.dk-cell')
-    expect(cells).toHaveLength(2)
-    fireEvent.click(cells[0])
-    fireEvent.click(container.querySelector('.dk-here') as Element)
+    fireEvent.click(container.querySelectorAll('.dk-row')[0])
+    expect(container.querySelector('.dk-cap')?.textContent).toContain('ALREADY CLEARED')
+    fireEvent.click(container.querySelector('.dk-slab') as Element)
     expect(onStart).toHaveBeenCalledWith(0)
+  })
+
+  it('will not walk past the frontier, which is the whole of the gate', () => {
+    const onStart = vi.fn()
+    const { container } = render(<Deck {...props} onStart={onStart} />)
+    const root = container.querySelector('.mn-open') as Element
+    for (let i = 0; i < 5; i += 1) fireEvent.keyDown(root, { key: 'ArrowDown' })
+    fireEvent.keyDown(root, { key: 'Enter' })
+    expect(onStart).toHaveBeenCalledWith(2)
+  })
+
+  it('jumps to any block from the strip, which is the reach a long deck needs', () => {
+    /* ten rows cannot walk seventy-six blocks, so the whole-deck strip in the foot band is the
+       scrubber the pile sheet used to be */
+    const { container } = render(<Deck {...props} blocks={chainOf(44, 12)} />)
+    fireEvent.click(container.querySelectorAll('.dk-segrow i')[3])
+    expect(container.querySelector('.dk-cap')?.textContent).toContain('BLOCK 04 OF 44')
+    /* and a shut block is not a place the strip can send you */
+    fireEvent.click(container.querySelectorAll('.dk-segrow i')[40])
+    expect(container.querySelector('.dk-cap')?.textContent).toContain('BLOCK 04 OF 44')
   })
 
   it('sets the block name from its own length, because the stylesheet cannot', () => {
@@ -256,13 +305,13 @@ describe('the deck screen', () => {
        that forgot the inline one rendered a 46px headline at the body's 16, which is what this
        card looked like until it was measured in the running app. */
     const short = render(<Deck {...props} blocks={chainOf(2, 2)} />)
-    expect((short.container.querySelector('.dk-name') as HTMLElement).style.fontSize).toBe('46px')
+    expect((short.container.querySelector('.dk-name') as HTMLElement).style.fontSize).toBe('52px')
     cleanup()
     const long = render(
       <Deck {...props} blocks={chainOf(2, 2).map((b) => ({ ...b, name: 'Old Units and Measures' }))} />,
     )
-    /* twenty-two characters is past the point where 46 fits, and it is set down rather than wrapped */
-    expect((long.container.querySelector('.dk-name') as HTMLElement).style.fontSize).toBe('34px')
+    /* twenty-two characters is past the point where 52 fits, and it is set down rather than wrapped */
+    expect((long.container.querySelector('.dk-name') as HTMLElement).style.fontSize).toBe('32px')
   })
 
   it('names the drill its one button is about to run', () => {
@@ -284,21 +333,10 @@ describe('the deck screen', () => {
     expect(onStart).toHaveBeenCalledWith(-1)
   })
 
-  it('will not open a pile that has nothing in it', () => {
+  it('has nothing behind it on the first block, and says so by having no cleared rows', () => {
     const { container } = render(<Deck {...props} blocks={chainOf(6, 1)} />)
-    fireEvent.click(container.querySelector('.dk-behind') as Element)
-    expect(container.querySelector('.dk-sheet')).toBeNull()
-    expect(container.textContent).toContain('NOTHING BEHIND YOU YET')
-  })
-
-  it('closes the pile on Escape without also leaving the screen', () => {
-    /* one Escape, one job -- App's window listener must not see this one */
-    const onUp = vi.fn()
-    const { container } = render(<Deck {...props} onUp={onUp} />)
-    fireEvent.click(container.querySelector('.dk-behind') as Element)
-    fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'Escape' })
-    expect(container.querySelector('.dk-sheet')).toBeNull()
-    expect(onUp).not.toHaveBeenCalled()
+    expect(container.querySelectorAll('.dk-row.done')).toHaveLength(0)
+    expect(container.querySelector('.dk-row')?.className).toContain('on')
   })
 
   it('puts one segment on the rail per block, whatever the deck is', () => {

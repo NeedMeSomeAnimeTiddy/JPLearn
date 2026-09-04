@@ -143,15 +143,17 @@ function openBlock(): string {
   return document.querySelector('.dk-name')?.textContent?.trim() ?? ''
 }
 
-/** Open the cleared pile and stand the card on one of them. */
+/** Stand the poster on one of the cleared blocks, which is a row in the column now. */
 async function revisit(name: string): Promise<void> {
-  fireEvent.click(document.querySelector('.dk-behind') as Element)
-  const cell = Array.from(document.querySelectorAll('.dk-cell'))
-    .find((c) => c.querySelector('em')?.textContent?.trim() === name)
-  if (!cell) throw new Error(`No cleared block called ${name}`)
-  fireEvent.click(cell)
+  const row = Array.from(document.querySelectorAll('.dk-row'))
+    .find((r) => r.querySelector('.t')?.textContent?.trim() === name)
+  if (!row) throw new Error(`No block called ${name} in the run`)
+  fireEvent.click(row)
   await waitFor(() => expect(openBlock()).toBe(name))
 }
+
+/** the one button that hands a block to a round */
+const start = () => fireEvent.click(document.querySelector('.dk-slab') as Element)
 
 function storedSelection(): unknown {
   return JSON.parse(window.localStorage.getItem(PREFS_STORAGE_KEY) ?? '{}').blockSelectionV2
@@ -161,15 +163,18 @@ describe('the block a session draws from', () => {
   it('opens on the furthest unlocked block, which is where the chain has got to', async () => {
     await openHiraganaDeck()
     expect(openBlock()).toBe('K-row')
-    expect(document.querySelector('.dk-here .dk-cap b')?.textContent).toContain('BLOCK 02 OF 3')
+    expect(document.querySelector('.dk-here .dk-cap')?.textContent).toContain('BLOCK 02 OF 3')
   })
 
   it('draws a locked block as ahead rather than as a choice', async () => {
     await openHiraganaDeck()
-    /* AHEAD is a div, not a button: naming the next block is context, offering it is a lie */
-    const ahead = document.querySelector('.dk-ahead') as HTMLElement
-    expect(ahead.tagName).toBe('DIV')
+    /* AHEAD IS NOT A CHOICE: naming the next block is context, offering it is a lie. It used to be
+       a whole card saying so and is a dimmed, refusing row now. */
+    const ahead = document.querySelector('.dk-row.ahead') as HTMLElement
+    expect(ahead.getAttribute('aria-disabled')).toBe('true')
     expect(ahead.textContent).toContain('S-row')
+    fireEvent.click(ahead)
+    expect(openBlock()).toBe('K-row')
   })
 
   it('studies the block the pile handed over, not the one that was open', async () => {
@@ -178,7 +183,7 @@ describe('the block a session draws from', () => {
     /* the pile only moves the card; START is what hands the block over */
     expect(storedSelection()).toBeUndefined()
 
-    fireEvent.click(document.querySelector('.dk-here') as Element)
+    start()
     await waitFor(() => expect(storedSelection()).toEqual({ hiragana: [0] }))
   })
 
@@ -189,7 +194,7 @@ describe('the block a session draws from', () => {
        screen opened on, is 2 and 3. */
     await openHiraganaDeck()
     await revisit('Vowels')
-    fireEvent.click(document.querySelector('.dk-here') as Element)
+    start()
 
     await waitFor(() => expect(document.querySelector('.rd-focus')).not.toBeNull())
     const shown = document.querySelector('.rd-focus')?.textContent?.trim() ?? ''
@@ -204,7 +209,7 @@ describe('the block a session draws from', () => {
        screen shows the frontier again. */
     await openHiraganaDeck()
     await revisit('Vowels')
-    fireEvent.click(document.querySelector('.dk-here') as Element)
+    start()
     await waitFor(() => expect(storedSelection()).toEqual({ hiragana: [0] }))
 
     cleanup()
@@ -216,7 +221,7 @@ describe('the block a session draws from', () => {
   it('keeps the choice out of the way of the other session prefs', async () => {
     await openHiraganaDeck()
     await revisit('Vowels')
-    fireEvent.click(document.querySelector('.dk-here') as Element)
+    start()
 
     await waitFor(() => {
       const prefs = JSON.parse(window.localStorage.getItem(PREFS_STORAGE_KEY) ?? '{}')

@@ -1368,242 +1368,160 @@ body.frosted .fd-hero, body.frosted .fd-today, body.frosted .fd-rail {
   letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
 
 
-.dk-wrap { position: absolute; inset: 0; }
-
-.dk-f { position: absolute; border: 0; padding: 0; margin: 0; font: inherit; text-align: left;
-  cursor: pointer; color: var(--ink); }
-
-.dk-f::after { content: ''; position: absolute; left: -7px; top: -7px; right: -7px;
-  bottom: -7px; box-shadow: inset 0 0 0 3px var(--hi); opacity: 0; pointer-events: none;
-  transition: opacity 0.18s ease; }
-
-.dk-f.on::after { opacity: 1; }
-
-.dk-cap {
-  display: flex; align-items: baseline; justify-content: space-between; white-space: nowrap;
-  padding: 6px 14px 7px; background: var(--ink); color: var(--gold-hi);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em; }
-
-.dk-cap i { font-style: normal; color: rgba(232, 196, 124, 0.6); }
-
-/* ---- what is behind you ---- */
-.dk-behind { left: 174px; top: 202px; width: 190px; height: 236px;
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(230,221,196,var(--paper)) 0%,
-    rgba(203,193,164,var(--paper)) 100%);
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  transform: skewX(-8deg) rotate(-1.2deg); }
-
-.dk-bignum { flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 2px; }
-
-.dk-bignum b { font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 74px; line-height: 0.86; color: var(--ink); }
-
-.dk-bignum i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 10px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.55); }
-
-.dk-act { padding: 9px 14px 10px; background: rgba(20, 17, 13, 0.08);
-  box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.18); text-align: center;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
-  color: rgba(20, 17, 13, 0.62); white-space: nowrap; }
-
-/* ---- the one you can actually study ---- */
-.dk-here { left: 380px; top: 202px; width: 470px; height: 236px;
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-  transform: skewX(-8deg) rotate(-1.2deg); }
-
-.dk-body { flex: 1; display: flex; flex-direction: column; padding: 16px 24px 0; }
-
-/* THE NAME IS SET FROM ITS OWN LENGTH. "Old Units & Measures" is twenty characters and
-   "Flowers" is seven, and one size cannot serve both across 512px -- the long one broke the
-   card when this was fixed at 46px. */
-.dk-name { font-family: var(--lat); font-style: italic; font-weight: 900; line-height: 0.94;
-  color: var(--ink); }
-
 /* ==================================================================================================
-   A JAPANESE NAME IS NOT ITALIC, AND `font-style: italic` ON A FACE WITH NO ITALIC IS THE ONE
-   TYPOGRAPHIC MISTAKE THIS PROJECT HAS ALREADY RULED ON.
+   A DECK'S BLOCKS — THE SAME LEDGER THE COURSE IS.
 
-   `foundations/type.html`: "A real italic, not a synthetic oblique. Arial Black has no italic, so
-   every heavy italic in this project used to be the roman sheared over by the browser." That was
-   fixed for the Latin display face by moving to Segoe UI Black, which has a drawn italic. Yu Mincho
-   has none — so the rule above, inherited by the course's step names, sheared ひらがな over by
-   about eleven degrees ON TOP of the card's own eight. Measured against the design's own plate, the
-   name leaned more than twice as far as the card it sits on.
+   THREE CARDS IN A ROW IS THE SHAPE A PHONE MAKES, and this screen was three: a BEHIND YOU card
+   carrying one figure, the open block, and an AHEAD card whose four lines on a finished deck all
+   said "nothing" four different ways. Every label on all three sat at 8 or 9px, and the deck's
+   progress was stated FOUR times over — the open card's segment bar, its percentage, the rail's
+   segments, and the rail's own caption.
 
-   Japanese has no italic at all. The lean is not a style here, it is a rendering artefact.
+   A DECK IS AN ORDERED RUN WITH EXACTLY ONE THING OPEN, which is what the course is, so it is drawn
+   the way the course is drawn: the blocks as thin rows down the left, the one you are on inverted
+   to paper and overhanging its column, and that block alone at poster size on the valley beside it.
+   Ten rows say what two context cards said, and say it about ten blocks rather than two.
+
+   AND THE PILE GOES WITH THEM. `.dk-sheet` was a paged six-across overlay whose only job was
+   reaching a cleared block, because three cards had nowhere to put the other seventy-three. The
+   rows are that reach now, and the strip in the foot band is the scrubber for a deck too long to
+   walk — so the grid, the cells and the pager are deleted rather than kept as a second way to do
+   one thing.
    ================================================================================================== */
+.dk-run { position: absolute; left: 164px; top: 197px; width: 452px;
+  display: flex; flex-direction: column; gap: 3px; }
+
+/* A 452-WIDE ROW ROLLED -1.2deg LIFTS ITS LEADING END 4.7px, which is why the column starts at 197
+   and not at the stage's own 192. Same arithmetic as `.pa-run`; see the frame contract. */
+.dk-row { display: flex; align-items: center; height: 32px; width: 452px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  background: rgba(12, 10, 8, 0.72); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: background 0.18s ease; }
+.dk-row:hover { background: rgba(22, 19, 14, 0.72); }
+
+.dk-row .n { flex: none; width: 46px; padding-left: 13px; font-family: var(--lat);
+  font-style: italic; font-weight: 900; font-size: 15px; color: rgba(232, 196, 124, 0.66); }
+.dk-row .t { flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
+  letter-spacing: 0.04em; color: rgba(242, 234, 216, 0.9);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dk-row .c { flex: none; padding: 0 10px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10.5px; letter-spacing: 0.12em; color: rgba(242, 234, 216, 0.42); }
+.dk-row .s { flex: none; width: 74px; padding-right: 14px; text-align: right;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+  color: rgba(232, 196, 124, 0.66); white-space: nowrap; }
+
+/* THREE POPULATIONS, THREE TREATMENTS, and the row says which without a legend: what is behind you
+   is dimmed and still pressable, what is ahead is dimmed and is not. */
+.dk-row.done .t { color: rgba(242, 234, 216, 0.66); }
+.dk-row.ahead { background: rgba(12, 10, 8, 0.52); cursor: not-allowed; }
+.dk-row.ahead .n, .dk-row.ahead .t, .dk-row.ahead .c { color: rgba(242, 234, 216, 0.3); }
+.dk-row.ahead .s { color: rgba(242, 234, 216, 0.3); }
+.dk-row.ahead:hover { background: rgba(12, 10, 8, 0.52); }
+
+/* THE ONE YOU ARE ON INVERTS AND OVERHANGS, which is the whole selection: not an outline drawn
+   around a row but a filled slab that runs past the column the others stand in. */
+.dk-row.on { height: 50px; width: 480px;
+  background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
+    rgba(235, 230, 217, var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.dk-row.on:hover { background: linear-gradient(178deg, rgba(255, 253, 247, var(--paper)) 0%,
+    rgba(240, 235, 222, var(--paper)) 100%); }
+.dk-row.on .n { font-size: 21px; color: var(--hi-deep); }
+.dk-row.on .t { font-size: 18px; color: var(--ink); }
+.dk-row.on .c { color: rgba(20, 17, 13, 0.5); }
+.dk-row.on .s { width: 108px; color: rgba(20, 17, 13, 0.62); }
+
+/* what will not fit, counted rather than cut off mid-row */
+.dk-fold { display: flex; align-items: baseline; gap: 9px; margin-top: 9px; padding: 5px 13px 6px;
+  align-self: flex-start; background: rgba(10, 9, 6, 0.82);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg); }
+.dk-fold b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
+  color: var(--gold-hi); }
+.dk-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.62); }
+
+/* ---- the block itself, at poster size on the valley ------------------------------------------- */
+.dk-here { position: absolute; left: 656px; top: 196px; width: 456px; }
+
+.dk-cap { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.24em;
+  color: rgba(242, 234, 216, 0.82); white-space: nowrap; }
+.dk-cap i { font-style: normal; color: rgba(232, 196, 124, 0.7); }
+
+/* NO SIZE HERE ON PURPOSE. A name is set from its own length in `deckChainView`, because "Basic
+   Vowels" and "Compound Sounds & Digraphs" cannot share one. */
+.dk-name { display: block; margin-top: 13px; font-family: var(--lat); font-style: italic;
+  font-weight: 900; line-height: 0.96; color: var(--washi); text-shadow: var(--ftShadow); }
+/* A CJK NAME IS SET IN THE JAPANESE FACE, which has no italic — so asking for one shears it. */
 .dk-name[data-wide="1"] { font-family: var(--jp); font-style: normal; }
 
-.dk-sub { margin-top: 9px; display: flex; align-items: baseline; gap: 14px;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
-  color: rgba(20, 17, 13, 0.55); }
+.dk-chars { display: block; margin-top: 7px; font-family: var(--jp); font-weight: 400;
+  font-size: 25px; letter-spacing: 0.1em; color: rgba(242, 234, 216, 0.82);
+  text-shadow: var(--ftShadow); }
 
-.dk-gauge { margin-top: auto; display: flex; align-items: center; gap: 11px; padding-bottom: 4px; }
+/* ---- and everything measured, on one plate ---------------------------------------------------- */
+/* THE FIGURE IS NOT A SCORE, IT IS A KEY THAT TURNS, so it stands next to the gate it opens rather
+   than alone. Small measured type gets a ground; see `foundations/legibility.html`. */
+.dk-meter { display: block; margin-top: 16px; padding: 13px 18px 15px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.18); }
 
-.dk-segs { flex: 1; display: flex; gap: 3px; }
+.dk-sub { display: flex; align-items: baseline; gap: 12px; }
+.dk-sub b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 34px;
+  line-height: 1; color: var(--washi); }
+.dk-sub em { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 12px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.6); }
+.dk-sub s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 11px; letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap; }
 
-.dk-segs i { flex: 1; height: 14px; background: rgba(20, 17, 13, 0.13);
-  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
+.dk-track { display: block; margin-top: 11px; height: 13px; position: relative;
+  background: rgba(242, 234, 216, 0.12); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22); }
+.dk-track i { display: block; height: 100%; background: var(--gold); }
+/* where the gate stands on the track, which is what makes 62% legible as "eight short" */
+.dk-track u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--hi);
+  text-decoration: none; }
 
-.dk-segs i.got { background: var(--gold); box-shadow: none; }
+.dk-gate { display: block; margin-top: 11px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 11px; letter-spacing: 0.1em; line-height: 1.5; color: rgba(242, 234, 216, 0.74); }
+.dk-gate em { font-style: normal; color: #ff7a63; }
 
-.dk-gauge b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
-  color: var(--ink); }
-
-/* NOT FLEX ANY MORE. It carries one statement now, and as a flex container the space between
-   "WANTS" and its <em> was a whitespace-only text node between two flex items -- which is not
-   rendered, so the card read "WANTS80 CHARACTERS". */
-.dk-gate { display: block;
-  /* right padding clears the action slab, which overhangs this row's right end */
-  padding: 9px 180px 11px 22px; background: rgba(20, 17, 13, 0.06);
-  box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.16);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
-  color: rgba(20, 17, 13, 0.6); white-space: nowrap; }
-
-.dk-gate em { font-style: normal; color: #b23320; }
-
-/* the action slab, the same object the road's hero carries and the only vermilion here */
-.dk-slab { position: absolute; right: -14px; bottom: -30px; z-index: 3; padding: 9px 15px 10px;
-  background: var(--hi); box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); white-space: nowrap; }
-
+/* ---- the action ------------------------------------------------------------------------------- */
+.dk-slab { display: block; margin: 22px 0 0 auto; width: 318px; border: 0; cursor: pointer;
+  font: inherit; text-align: left; padding: 10px 18px 12px; background: var(--hi);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease; }
+.dk-slab:hover { filter: brightness(1.08); }
 .dk-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 10px; line-height: 12px; letter-spacing: 0.14em; color: #ffd9a1; }
-
-.dk-slab b { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
-  line-height: 17px; letter-spacing: 0.1em; color: var(--washi); margin-top: 2px; }
-
-/* THE COLOUR LAW OUTRANKS THE SHAPE: vermilion is the one thing to press, so a slab that would do
-   nothing if pressed does not get to wear it. A deck's block always starts; a curriculum step can
-   be a milestone the app has no screen for yet, and that one says NOT BUILT YET on ink. */
-.dk-slab[data-live="0"] { background: rgba(12, 10, 8, 0.78); }
+  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+.dk-slab b { display: block; margin-top: 3px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 17px; letter-spacing: 0.06em; color: var(--washi); }
+.dk-slab[data-live="0"] { background: rgba(12, 10, 8, 0.78); cursor: not-allowed; }
 .dk-slab[data-live="0"] em { color: rgba(242, 234, 216, 0.55); }
 .dk-slab[data-live="0"] b { color: rgba(242, 234, 216, 0.82); }
 
-/* ---- what is ahead, and cannot be pressed ---- */
-.dk-ahead { position: absolute; left: 866px; top: 202px; width: 239px; height: 236px;
-  display: flex; flex-direction: column;
-  background: rgba(10, 9, 6, calc(0.86 * var(--paper)));
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(242, 234, 216, 0.24);
-  transform: skewX(-8deg) rotate(-1.2deg); }
+/* ---- the whole deck once, in the foot band ---------------------------------------------------- */
+/* AND IT IS A SCRUBBER, which is the reach the pile sheet used to be: seventy-six blocks is more
+   than a ten-row window can walk, so the strip jumps. Six segments or seventy-six divide the same
+   width by construction rather than by a breakpoint. */
+.dk-strip { position: absolute; left: 168px; top: 584px; width: 944px;
+  background: rgba(10, 9, 6, 0.8); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.42),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.16); transform: skewX(-8deg) rotate(-1.2deg); }
 
-.dk-next { flex: 1; display: flex; flex-direction: column; justify-content: center;
-  gap: 7px; padding: 0 18px; }
-
-.dk-next span { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.5); }
-
-.dk-next b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 26px;
-  line-height: 1.02; color: rgba(242, 234, 216, 0.9); }
-
-.dk-next i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.42); }
-
-.dk-locked { padding: 10px 18px 12px; box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.16);
-  display: flex; align-items: baseline; justify-content: space-between;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
-  color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
-
-.dk-locked b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
-  color: rgba(242, 234, 216, 0.78); }
-
-/* THE RAIL'S CURSOR IS SET ONCE, further down, and this is where it used to be set twice. There
-   were two draggable surfaces and two gestures: `grab`/`grabbing` for the road, which was a reel
-   you pushed, and `ew-resize` for the rail, which is a scrubber you point at. The road is gone and
-   the rail kept both — the `grab` here and the `ew-resize` 2,400 lines below, same selector, so the
-   lower one silently won. See the note by `.dk-rail { cursor: ew-resize }`. */
-.dk-rail { position: absolute; left: 168px; top: 468px; width: 944px; height: 96px;
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
-  transform: skewX(-8deg) rotate(-1.2deg); }
-
-/* SEGMENTS DIVIDE THE WIDTH, they do not each claim a fixed number of pixels. That single
-   property is what lets one drawing hold six and seventy-six: `flex: 1` on 76 children is
-   12.8px each, on 6 it is 180, and neither overflows because neither can. */
-.dk-segrow { flex: 1; display: flex; align-items: stretch; gap: 3px; padding: 11px 16px 8px; }
-
-/* PRESSABLE, BUT ONLY WHERE PRESSING MEANS SOMETHING. A cleared segment jumps the hero
-   to that block, the open one returns it, and a locked one refuses -- the same three
-   answers the rest of this screen gives, now reachable in one click instead of a trip
-   through the grid. */
-.dk-segrow i { flex: 1; display: block; max-width: 120px; cursor: pointer;
-  background: rgba(20, 17, 13, 0.13); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
-
+.dk-segrow { display: flex; align-items: stretch; gap: 2px; padding: 8px 14px 6px; height: 16px;
+  box-sizing: content-box; }
+.dk-segrow i { flex: 1; display: block; cursor: pointer;
+  background: rgba(242, 234, 216, 0.14); box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.2); }
 .dk-segrow i.done { background: var(--gold); box-shadow: none; }
-
-.dk-segrow i:hover { filter: brightness(1.18); }
-
+.dk-segrow i.here { background: var(--hi); box-shadow: none; }
+.dk-segrow i.pick { box-shadow: 0 0 0 2px var(--washi); }
 .dk-segrow i.locked { cursor: not-allowed; }
+.dk-segrow i:hover { filter: brightness(1.2); }
 
-.dk-segrow i.here { background: #b23320; box-shadow: 0 0 0 2px rgba(20, 17, 13, 0.55); }
-
-.dk-segrow i.pick { background: var(--ink); box-shadow: 0 0 0 2px var(--hi); }
-
-.dk-railcap { display: flex; align-items: baseline; justify-content: space-between;
-  padding: 0 16px 9px; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
-
-/* ---- the cleared blocks, on demand ---- */
-.dk-open { position: absolute; inset: 0; z-index: 40; }
-
-.dk-scrim { position: absolute; inset: 0; background: rgba(8, 11, 18, 0.66); border: 0; }
-
-.dk-frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px;
-  zoom: var(--lk-u, 1); pointer-events: none; }
-
-.dk-frame > * { pointer-events: auto; }
-
-/* THE SHEET IS IN FRAME SPACE, NOT THE BLOCK'S -- `.dk-frame` is a 1280x720 box pinned to
-   the viewport, so these numbers are the contract's own. It is a modal over its own scrim,
-   but the stage does not grow for modals either. */
-.dk-sheet { position: absolute; left: 184px; top: 202px; width: 912px;
-  display: flex; flex-direction: column; transform: skewX(-8deg) rotate(-1.2deg);
-  background: var(--washi);
-  box-shadow: 12px 14px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18); }
-
-.dk-sheet > .dk-cap { background: #e0913a; color: var(--ink); font-size: 10px;
-  letter-spacing: 0.2em; padding: 7px 18px 8px; }
-
-.dk-sheet > .dk-cap i { color: rgba(20, 17, 13, 0.6); }
-
-.dk-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 12px 18px; }
-
-.dk-cell { position: relative; border: 0; cursor: pointer; text-align: left; padding: 8px 10px 9px;
-  background: rgba(20, 17, 13, 0.07); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
-  display: flex; flex-direction: column; gap: 4px; min-height: 58px; }
-
-.dk-cell b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 13px;
-  color: rgba(20, 17, 13, 0.45); }
-
-.dk-cell em { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.05em; line-height: 1.25; color: var(--ink); }
-
-.dk-cell i { margin-top: auto; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.45); }
-
-.dk-cell.on { background: var(--hi); box-shadow: none; }
-
-.dk-cell.on b { color: #ffd9a1; }
-
-.dk-cell.on em, .dk-cell.on i { color: var(--washi); }
-
-.dk-pager { display: flex; align-items: baseline; justify-content: space-between;
-  padding: 0 20px 14px; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5); }
-
-
-
-
-
-
-
-
+.dk-railcap { display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 0 16px 7px; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
+  letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
+.dk-railcap .cap { color: rgba(242, 234, 216, 0.8); }
 
 /* LISTENING IS NOT A ZERO, IT IS AN ABSENCE. `project_mock_score` returns
    `listening_projected: None` and `overall_passes: False` always, because the app has no
@@ -3128,257 +3046,175 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 
 
+/* ==================================================================================================
+   THE DRILLS — A CATALOGUE READS AS A LIST, NOT AS A FAN OF CARDS.
+
+   WHAT WAS HERE WAS A PHONE'S CAROUSEL. Seventeen modes on a horizontal road, the selected one
+   lifted out as a 240x300 card with the rest fanning off both edges at 45% opacity, two stacks of
+   paper counting what had scrolled away, and a 5200px rail translated under a 960px window. On a
+   desktop the fan ran off the stage into the hint column, the second and third cards carried a
+   number, a name and one 9px label over two hundred pixels of empty paper, and the only way to see
+   the twelfth mode was to press right eleven times.
+
+   A CATALOGUE IS A LIST. Every mode this deck offers is a row 27px tall, grouped under its own
+   chapter, with the one you are on inverted to paper and overhanging the column — and the mode
+   itself stands at poster size on the valley beside it, the same arrangement the course and a
+   deck's blocks use. Nothing is drawn at 45% opacity, nothing is cut off by the frame, and the
+   description is a sentence at 13px instead of 8.5.
+
+   THE FOLD IS STILL SAID OUT LOUD. A deck that offers twelve of seventeen has five closed over, and
+   a list that silently omits them looks like a shorter catalogue — so the foot band counts them.
+   ================================================================================================== */
 /* 31, NOT 28. The selected chip lifts 3px, so at 28 the one chip that matters was the one
    poking into the crown band. */
-.dr-decks { position: absolute; left: 160px; top: 195px; width: 960px;
+.dr-decks { position: absolute; left: 160px; top: 192px; width: 960px; height: 31px;
   display: flex; justify-content: center; gap: 9px; }
 
-.dr-deck { flex: none; height: 32px; display: flex; align-items: center; gap: 7px;
-  padding: 0 13px; border: 0; cursor: pointer; font: inherit; white-space: nowrap;
-  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
-  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  transition: background 0.25s ease, box-shadow 0.25s ease,
-    transform 0.25s cubic-bezier(0.2, 0.92, 0.24, 1); }
-
-.dr-deck b { font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px;
-  letter-spacing: 0.12em; color: var(--ink); }
-
-.dr-deck i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 12.5px;
-  line-height: 1; color: rgba(20, 17, 13, 0.45); }
-
-.dr-deck s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5); }
-
-.dr-deck.on { background: var(--ink); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45);
-  transform: translateY(-3px); }
-
+.dr-deck { flex: none; height: 31px; display: flex; align-items: center; gap: 8px;
+  padding: 0 15px; border: 0; cursor: pointer; font: inherit; white-space: nowrap;
+  background: linear-gradient(178deg, rgba(251, 248, 241, 0.9) 0%, rgba(235, 230, 217, 0.9) 100%);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: filter 0.16s ease; }
+.dr-deck:hover { filter: brightness(1.06); }
+.dr-deck b { font-family: var(--lat-ui); font-weight: 700; font-size: 12px; letter-spacing: 0.14em;
+  color: var(--ink); }
+.dr-deck s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5); }
+.dr-deck.on { background: var(--ink); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45); }
 .dr-deck.on b { color: var(--gold-hi); }
-
-.dr-deck.on i { color: rgba(232, 196, 124, 0.7); }
-
 .dr-deck.on s { color: rgba(242, 234, 216, 0.6); }
 
-/* the cursor is in the deck row rather than on the road */
-.dr-deck.on.zone { box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 2px var(--hi); }
+/* ---- every mode this deck offers, as lines ---------------------------------------------------- */
+.dr-run { position: absolute; left: 164px; top: 238px; width: 452px;
+  display: flex; flex-direction: column; gap: 2px; }
 
-/* ---- the road, inset to the stage ---- */
-.dr-strip { position: absolute; left: 160px; top: 234px; width: 960px; height: 342px;
-  overflow: hidden; --gutter: 70px; --solid: 190px;
-  -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter),
-    rgba(0,0,0,1) var(--solid), rgba(0,0,0,1) calc(100% - var(--solid)),
-    rgba(0,0,0,0) calc(100% - var(--gutter)), rgba(0,0,0,0) 100%);
-  mask-image: linear-gradient(90deg, rgba(0,0,0,0) 0, rgba(0,0,0,0) var(--gutter),
-    rgba(0,0,0,1) var(--solid), rgba(0,0,0,1) calc(100% - var(--solid)),
-    rgba(0,0,0,0) calc(100% - var(--gutter)), rgba(0,0,0,0) 100%); }
+/* THE FIVE CHAPTERS ARE NAMED IN ENGLISH FIRST. Their glyphs are the only thing the old road put
+   on a chapter, and a reader who does not read Japanese was told nothing by 認. */
+.dr-chap { display: flex; align-items: baseline; gap: 9px; height: 18px; padding-left: 3px;
+  margin-top: 4px; }
+.dr-chap:first-child { margin-top: 0; }
+.dr-chap b { font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.26em;
+  color: var(--gold-hi); text-shadow: var(--ftShadow); }
+.dr-chap i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 11px;
+  color: rgba(232, 196, 124, 0.6); text-shadow: var(--ftShadow); }
+.dr-chap u { flex: 1; height: 1px; text-decoration: none; background: rgba(232, 196, 124, 0.28); }
 
-.dr-rail { position: absolute; left: 0; top: 0; width: 5200px; height: 342px;
-  transition: transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); will-change: transform; }
+.dr-mode { display: flex; align-items: center; height: 27px; width: 452px;
+  border: 0; padding: 0; margin: 0; font: inherit; text-align: left; cursor: pointer;
+  background: rgba(12, 10, 8, 0.78); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.34);
+  transform: skewX(-8deg) rotate(-1.2deg); transition: background 0.18s ease; }
+.dr-mode:hover { background: rgba(22, 19, 14, 0.72); }
 
-/* ---- a group, riding above the modes it holds ---- */
-.dr-chap { position: absolute; top: 0; height: 28px; z-index: 6;
-  transition: left 0.54s cubic-bezier(0.2, 0.95, 0.22, 1),
-    width 0.54s cubic-bezier(0.2, 0.95, 0.22, 1), opacity 0.3s ease; }
+.dr-mode .n { flex: none; width: 42px; padding-left: 13px; font-family: var(--lat);
+  font-style: italic; font-weight: 900; font-size: 13px; color: rgba(232, 196, 124, 0.6); }
+.dr-mode .t { flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 700; font-size: 14px;
+  letter-spacing: 0.04em; color: rgba(242, 234, 216, 0.9);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dr-mode .s { flex: none; width: 92px; padding-right: 14px; text-align: right;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.12em;
+  color: rgba(242, 234, 216, 0.42); white-space: nowrap; }
 
-.dr-chapin { box-sizing: border-box; width: 100%; height: 28px; display: flex;
-  align-items: center; gap: 9px; padding: 0 11px; white-space: nowrap;
-  transform: skewX(-8deg); transform-origin: 0 50%;
-  background: linear-gradient(178deg, #fbf8f1 0%, #ebe6d9 100%);
-  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
-  transition: background 0.3s ease, box-shadow 0.3s ease; }
+/* THE SAME OVERHANGING SLAB the course's open step and a deck's open block make. Height does not
+   change: twelve rows have to fit the stage whichever one is chosen. */
+.dr-mode.on { width: 480px;
+  background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
+    rgba(235, 230, 217, var(--paper)) 100%);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(20, 17, 13, 0.16); }
+.dr-mode.on:hover { background: linear-gradient(178deg, rgba(255, 253, 247, var(--paper)) 0%,
+    rgba(240, 235, 222, var(--paper)) 100%); }
+.dr-mode.on .n { font-size: 15px; color: var(--hi-deep); }
+.dr-mode.on .t { font-size: 15px; color: var(--ink); }
+.dr-mode.on .s { color: rgba(20, 17, 13, 0.55); }
 
-.dr-chap.here .dr-chapin { background: var(--ink); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.45); }
+/* a mode this pool cannot run still reads; it just cannot be pressed */
+.dr-mode.shut { background: rgba(12, 10, 8, 0.6); }
+.dr-mode.shut .t { color: rgba(242, 234, 216, 0.44); }
+.dr-mode.shut .n { color: rgba(232, 196, 124, 0.35); }
+.dr-mode.on.shut .t { color: rgba(20, 17, 13, 0.55); }
 
-.dr-chapin u { flex: none; width: 19px; height: 19px; text-decoration: none;
-  background: var(--gold); color: var(--ink); font-family: var(--jp); font-weight: 700;
-  font-size: 11.5px; line-height: 19px; text-align: center; }
+/* ---- the mode itself, at poster size on the valley -------------------------------------------- */
+.dr-card { position: absolute; left: 656px; top: 236px; width: 456px; }
 
-.dr-chapin b { font-family: var(--lat-ui); font-weight: 700; font-size: 11.5px;
-  letter-spacing: 0.2em; color: var(--ink); }
+.dr-cap { display: inline-block; padding: 5px 12px 6px; background: rgba(10, 9, 6, 0.86);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.24em;
+  color: rgba(242, 234, 216, 0.82); white-space: nowrap; }
+.dr-cap i { font-style: normal; font-family: var(--jp); font-weight: 700; letter-spacing: 0.1em;
+  color: rgba(232, 196, 124, 0.7); }
 
-.dr-chap.here .dr-chapin b { color: var(--gold-hi); }
+/* no size here: a name is set from its own length, the same rule the deck's block name follows */
+.dr-hen { display: block; margin-top: 12px; font-family: var(--lat); font-style: italic;
+  font-weight: 900; line-height: 0.96; color: var(--washi); text-shadow: var(--ftShadow); }
 
-.dr-chapin i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 13px;
-  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.45); }
+.dr-hd { display: block; margin-top: 9px; font-family: var(--lat-ui); font-weight: 600;
+  font-size: 14px; letter-spacing: 0.02em; line-height: 1.45; color: rgba(242, 234, 216, 0.86);
+  text-shadow: var(--ftShadow); }
 
-.dr-chap.here .dr-chapin i { color: rgba(232, 196, 124, 0.7); }
+/* ---- what a catalogue cannot tell you, on one plate ------------------------------------------- */
+.dr-read { display: block; margin-top: 16px; padding: 13px 18px 14px;
+  background: rgba(10, 9, 6, 0.86); box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5),
+  inset 0 0 0 1px rgba(242, 234, 216, 0.18); }
 
-.dr-chapin s { margin-left: auto; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.5); }
+/* NOT PLAYED IS DRAWN AS NOT PLAYED rather than as nought per cent -- a mode you have never run is
+   not a mode you are bad at. */
+.dr-rec { display: flex; align-items: baseline; gap: 10px; }
+.dr-rec b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
+  line-height: 1; color: var(--washi); }
+.dr-rec i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.6); }
+.dr-rec b + i { margin-right: 8px; }
+.dr-rec .none { font-family: var(--lat-ui); font-weight: 700; font-size: 12px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.6); }
 
-.dr-chap.here .dr-chapin s { color: rgba(242, 234, 216, 0.6); }
+/* WHICH DECKS OFFER IT, which is the deck map read the other way and the one fact a learner
+   choosing a drill cannot get anywhere else. Named, not six anonymous squares. */
+.dr-cells { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 13px;
+  padding-top: 12px; box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.18); }
+.dr-cells i { display: block; padding: 3px 8px 4px; font-style: normal; font-family: var(--lat-ui);
+  font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  background: rgba(242, 234, 216, 0.08); color: rgba(242, 234, 216, 0.34); }
+.dr-cells i.has { background: rgba(242, 234, 216, 0.16); color: rgba(242, 234, 216, 0.8); }
+.dr-cells i.at { background: var(--gold); color: var(--ink); }
 
-/* ---- a mode you are not on ---- */
-.dr-tab { position: absolute; width: 94px; height: 236px; border: 0; padding: 11px 6px 9px;
-  font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center;
-  gap: 6px; background: linear-gradient(178deg, #e6ddc4 0%, #cbc1a4 100%);
-  box-shadow: 4px 6px 0 rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-  transform: skewX(-8deg) rotate(-1.2deg);
-  transition: opacity 0.3s ease, transform 0.52s cubic-bezier(0.2, 0.92, 0.24, 1),
-    left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); }
+/* ---- the action ------------------------------------------------------------------------------- */
+.dr-slab { display: block; margin: 20px 0 0 auto; width: 330px; border: 0; cursor: pointer;
+  font: inherit; text-align: left; padding: 10px 18px 12px; background: var(--hi);
+  box-shadow: 8px 10px 0 rgba(0, 0, 0, 0.52); transform: skewX(-8deg) rotate(-1.2deg);
+  transition: filter 0.16s ease; }
+.dr-slab:hover { filter: brightness(1.08); }
+.dr-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+.dr-slab b { display: block; margin-top: 3px; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 17px; letter-spacing: 0.05em; color: var(--washi); }
 
-.dr-tab b { flex: none; font-family: var(--lat); font-style: italic; font-weight: 900;
-  font-size: 21px; line-height: 1; color: var(--ink); }
+/* THE REASON IS A SENTENCE AND THE ACTION IS THREE WORDS, so a refused mode gets its own rule
+   rather than an override: "No verbs or adjectives to conjugate here" does not fit a slab. */
+.dr-slab.shut { width: 100%; margin-left: 0; background: rgba(20, 17, 13, 0.86); cursor: not-allowed; }
+.dr-slab.shut em { color: rgba(255, 122, 99, 0.9); }
+.dr-slab.shut b { font-size: 13px; letter-spacing: 0.02em; line-height: 1.4;
+  color: rgba(242, 234, 216, 0.82); }
 
-.dr-tab em { flex: none; display: block; width: 28px; height: 1px;
-  background: rgba(20, 17, 13, 0.4); }
+/* ---- the foot band: what is folded away, and how this run goes -------------------------------- */
+.dr-mini { position: absolute; left: 160px; top: 582px; width: 960px;
+  display: flex; justify-content: center; }
+.dr-line { padding: 4px 13px 5px; background: rgba(10, 9, 6, 0.8);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.42); transform: skewX(-8deg) rotate(-1.2deg);
+  white-space: nowrap; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.62); }
+.dr-line em { font-style: normal; color: var(--gold-hi); }
 
-.dr-tab i { flex: none; font-style: normal; font-family: var(--jp); font-size: 32px;
-  line-height: 1.1; color: var(--ink); }
-
-/* HORIZONTAL AND WRAPPING, not standing. Turned on its side "CONJUGATION DRILL" is 170px of
-   type in the 128 the stone has left after its number and glyph, and it was being clipped to
-   "CONJUGATION DRI". Wrapped across 82px it takes two lines and loses nothing. */
-.dr-tab span { flex: none; align-self: stretch; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; line-height: 11.5px; letter-spacing: 0.05em; text-align: center;
-  color: var(--ink); }
-
-.dr-tab s { flex: none; margin-top: auto; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9.5px; letter-spacing: 0.1em; white-space: nowrap;
-  color: rgba(20, 17, 13, 0.55); }
-
-.dr-tab:hover { filter: brightness(1.05); }
-
-/* ---- the mode you would run ---- */
-.dr-hero { position: absolute; width: 240px; height: 300px; border: 0; padding: 0;
-  font: inherit; cursor: pointer; text-align: left; z-index: 14;
-  display: flex; flex-direction: column;
-  background: linear-gradient(178deg, rgba(251,248,241,var(--paper)) 0%,
-    rgba(235,230,217,var(--paper)) 100%);
-  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.15);
-  transform: skewX(-8deg) rotate(-1.2deg);
-  transition: left 0.52s cubic-bezier(0.2, 0.92, 0.24, 1); }
-
-.dr-htab { flex: none; padding: 6px 10px 7px; text-align: center; white-space: nowrap;
-  background: var(--ink); color: var(--gold-hi); font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.18em; }
-
-.dr-hnum { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  padding: 11px 15px 0; }
-
-.dr-hnum b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
-  line-height: 1; color: var(--ink); }
-
-.dr-hnum s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.15em; white-space: nowrap; color: rgba(20, 17, 13, 0.5); }
-
-.dr-hglyph { margin-top: 1px; text-align: center; font-family: var(--jp); font-weight: 400;
-  font-size: 42px; line-height: 1.1; color: var(--ink); }
-
-.dr-hen { padding: 1px 12px 0; text-align: center; font-family: var(--lat);
-  font-style: italic; font-weight: 900; line-height: 1.1; letter-spacing: 0.01em;
-  color: #b23320; }
-
-.dr-hd { padding: 6px 16px 0; text-align: center; font-family: var(--lat-ui); font-weight: 600;
-  font-size: 10.5px; letter-spacing: 0.04em; line-height: 1.5; color: rgba(20, 17, 13, 0.66); }
-
-/* WHAT YOU HAVE DONE WITH THIS MODE ON THIS DECK, which the hub's cassettes carried and the road
-   did not. Set at the card's own quiet size: it is a record, not a claim, and a mode you have
-   never run says so rather than reading nought per cent. */
-.dr-rec { padding: 7px 14px 0; display: flex; align-items: baseline; justify-content: center;
-  gap: 5px; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
-  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45); white-space: nowrap; }
-
-.dr-rec b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px;
-  letter-spacing: 0; color: var(--ink); }
-
-.dr-rec i { font-style: normal; }
-
-/* a seam between the two figures, so "62% RIGHT 14 BEST RUN" reads as two facts and not four */
-.dr-rec i + b { margin-left: 8px; }
-
-/* WHICH SIX, NOT HOW MANY. The count is in the line beside it; these say WHICH decks offer this
-   mode, with the one you are standing on ringed -- that is the fact the fold is made of. */
-.dr-cells { margin-top: auto; padding: 0 15px 11px; display: flex; align-items: center;
-  justify-content: space-between; gap: 10px; }
-
-.dr-cells span { display: flex; gap: 4px; }
-
-.dr-cells i { display: block; width: 12px; height: 12px;
-  background: rgba(20, 17, 13, 0.14); transition: background 0.25s ease; }
-
-.dr-cells i.has { background: rgba(20, 17, 13, 0.78); }
-
-.dr-cells i.at { box-shadow: 0 0 0 2px var(--hi); }
-
-.dr-cells s { text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.12em; white-space: nowrap; color: rgba(20, 17, 13, 0.55); }
-
-.dr-slab { flex: none; height: 26px; display: grid; place-items: center; background: var(--hi);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
-  color: #ffd9a1; white-space: nowrap; }
-
-/* centred on the stones (frame 298-534), not hung off the bottom of the strip */
-.dr-side { position: absolute; top: 382px; width: 48px; height: 140px; z-index: 38;
-  transition: opacity 0.32s ease; }
-
-.dr-side.lo { left: 178px; }
-
-.dr-side.hi { right: 178px; }
-
-.dr-side i { position: absolute; top: 0; display: block; width: 26px; transform: skewX(-8deg); }
-
-.dr-side i:nth-child(1) { top: 14px; height: 112px; box-shadow: 2px 3px 0 rgba(0,0,0,0.4); }
-
-.dr-side i:nth-child(2) { top: 7px; height: 126px; box-shadow: 2px 3px 0 rgba(0,0,0,0.4); }
-
-.dr-side i:nth-child(3) { height: 140px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 7px; }
-
-.dr-side.lo i:nth-child(1) { left: 22px; background: #a9a087; }
-
-.dr-side.lo i:nth-child(2) { left: 11px; background: #c8bfa5; }
-
-.dr-side.lo i:nth-child(3) { left: 0; background: #e6ddc4;
-  box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.18); }
-
-.dr-side.hi i:nth-child(1) { right: 22px; background: #a9a087; }
-
-.dr-side.hi i:nth-child(2) { right: 11px; background: #c8bfa5; }
-
-.dr-side.hi i:nth-child(3) { right: 0; background: #e6ddc4;
-  box-shadow: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.18); }
-
-.dr-side b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px;
-  line-height: 1; color: var(--ink); }
-
-.dr-side u { writing-mode: vertical-rl; text-decoration: none; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 8.5px; letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.62); }
-
-/* ---- all seventeen, in the foot band ---- */
-.dr-mini { position: absolute; left: 160px; top: 578px; width: 960px;
-  display: flex; flex-direction: column; align-items: center; gap: 5px; }
-
-.dr-bars { display: flex; align-items: flex-end; gap: 3px; }
-
-.dr-bars i { display: block; background: var(--gold);
-  transition: width 0.34s cubic-bezier(0.2, 0.92, 0.24, 1),
-    height 0.34s cubic-bezier(0.2, 0.92, 0.24, 1), background 0.25s ease; }
-
-/* A FOLDED MODE KEEPS ITS MARK. This strip is the only place all seventeen are always visible,
-   which is what stops the fold reading as deletion. */
-.dr-bars i.off { background: rgba(242, 234, 216, 0.22); }
-
-.dr-line { white-space: nowrap; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
-  letter-spacing: 0.16em; color: var(--gold-hi);
-  paint-order: stroke fill; -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.78); }
-
-/* ---- HOW THIS RUN GOES ----------------------------------------------------------------------
-   The four switches the script hub carried and nothing else did: how many items a round holds,
-   whether it can be lost, whether it draws the leeches first, and whether it asks how sure you
-   were. Standing under the minimap in the foot band, which the frame contract leaves for a
-   whole-set statement about the screen — and these four are exactly that.
-
-   EVERY CHIP PRINTS THE KEY THAT WORKS IT, so the row spends neither of the two axes the road
-   already has: left and right walk the seventeen modes, up and down change deck.
-   -------------------------------------------------------------------------------------------- */
+/* FOUR SWITCHES THAT EXISTED ONLY INSIDE THE SCRIPT HUB, standing where the list ends rather than
+   on a settings page: they are the difference between eight cards and twenty, and between a round
+   that can be lost and one that cannot. Every chip prints the key that works it, so this row costs
+   neither of the two axes the screen already spends. */
 .dr-set {
-  position: absolute; left: 160px; top: 618px; width: 960px;
+  position: absolute; left: 160px; top: 616px; width: 960px;
   display: flex; justify-content: center; align-items: stretch; gap: 6px;
 }
 .dr-setlab {
-  display: flex; align-items: center; padding: 0 11px;
+  display: flex; align-items: center; padding: 0 12px;
   background: rgba(20, 17, 13, 0.72);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.22em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
   color: rgba(242, 234, 216, 0.62); white-space: nowrap;
   transform: skewX(-8deg) rotate(-1.2deg);
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
@@ -3389,7 +3225,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   transform: skewX(-8deg);
 }
 .dr-chip {
-  display: flex; align-items: baseline; gap: 6px; padding: 3px 10px 4px;
+  display: flex; align-items: baseline; gap: 7px; padding: 4px 12px 5px;
   border: 0; cursor: pointer; font: inherit; white-space: nowrap;
   background: linear-gradient(178deg, rgba(251, 248, 241, 0.9) 0%, rgba(235, 230, 217, 0.9) 100%);
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
@@ -3398,34 +3234,25 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 }
 /* the key, which is the whole reason this row needs no axis */
 .dr-chip s {
-  text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
-  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.42);
+  text-decoration: none; font-family: var(--lat); font-style: italic; font-weight: 900;
+  font-size: 11px; color: rgba(20, 17, 13, 0.45);
 }
 .dr-chip b {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
   color: var(--ink);
 }
 .dr-chip i {
-  font-style: normal; font-family: var(--lat); font-weight: 900; font-size: 10px;
-  color: rgba(20, 17, 13, 0.48);
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5);
 }
 .dr-chip:hover { filter: brightness(1.06); }
 .dr-chip.on {
-  background: var(--hi);
-  box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(20, 17, 13, 0.3);
+  background: var(--hi); box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.5);
 }
 .dr-chip.on s { color: rgba(255, 217, 161, 0.6); }
 .dr-chip.on b { color: #ffd9a1; }
 .dr-chip.on i { color: rgba(255, 217, 161, 0.75); }
 
-/* A MODE THE POOL CANNOT SUPPORT SAYS WHY, on the slab that would otherwise say RUN ON. Its own
-   rule rather than an override, because the reason is a SENTENCE and the action is three words:
-   `.dr-slab` is `nowrap` at 240px, and "No verbs or adjectives to conjugate here" is not. */
-.dr-slab.shut {
-  height: auto; min-height: 26px; padding: 5px 12px 6px; white-space: normal;
-  background: rgba(20, 17, 13, 0.82); color: rgba(242, 234, 216, 0.72);
-  font-size: 8.5px; line-height: 1.35; text-align: center;
-}
 
 
 
@@ -3461,8 +3288,6 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 
 
-/* the pile: a count, not a list. The list is the sheet, and that is what makes any one of
-   forty-three cleared blocks reachable without walking the chain. */
 
 
 
@@ -3840,21 +3665,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .back-tab button:hover .bt-jp { color: rgba(242, 234, 216, 0.75); }
 
-/* ---- ONE ADDITION TO THE DECK, WHICH THE MOCKUP HAD NO DATA FOR ------------------------------
-   The mockup's block cards carried a name and nothing else, because its blocks were authored
-   strings. The real ones come with a SAMPLE -- the first few characters actually in the block --
-   and that is the one thing on this card that says what you are about to study rather than what it
-   is called. "Voiced G + Z" tells you less than か・が・き・ぎ does.
 
-   Set in the mincho at the size the sub-line takes, so it reads as part of the name rather than as
-   another figure.
- */
-.dk-chars {
-  margin-top: 5px;
-  font-family: var(--jp); font-weight: 400; font-size: 15px; letter-spacing: 0.08em;
-  line-height: 1.4; color: rgba(20, 17, 13, 0.62);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
 
 /* ==================================================================================================
    WHAT THIS APP DRAWS AND THE MOCKUP DID NOT.
@@ -3995,7 +3806,6 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    because the rail is a MAP and the gesture is absolute — the segment under the pointer is the one
    you get, which is a scrubber, not a reel you push. See `useTraversal.ts`.
    ================================================================================================== */
-.dk-rail { cursor: ew-resize; }
 /* AND NOTHING GETS SELECTED WHILE A GESTURE IS RUNNING. Dragging across a row of type otherwise
    highlights it, so the reel leaves a blue smear behind wherever it has been pushed. */
 body.is-dragging { user-select: none; }

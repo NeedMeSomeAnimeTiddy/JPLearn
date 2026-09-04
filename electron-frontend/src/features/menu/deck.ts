@@ -1,5 +1,4 @@
 import type { BlockInfo } from '../../types'
-import type { ChainView } from './chain'
 
 /* ==================================================================================================
    THE DECK SCREEN — a milestone's level three, for the decks that are still cut into blocks.
@@ -86,28 +85,6 @@ export function deckChain(blocks: readonly BlockInfo[], gate: number = DEFAULT_G
   }
 }
 
-/* THE CLEARED BLOCKS ARE PAGED, AND THAT IS WHAT MAKES ANY ONE OF THEM REACHABLE. Twenty-four to a
-   page means even a forty-four-block deck is two pages and a grid move, rather than a walk down the
-   whole chain — and paging rather than scrolling because nothing in this menu scrolls. */
-export const DECK_PER_PAGE = 24
-
-export interface DeckSheet {
-  /** the block indices on this page */
-  cells: number[]
-  page: number
-  pages: number
-}
-
-export function deckSheet(cleared: number, page: number): DeckSheet {
-  const pages = Math.max(1, Math.ceil(cleared / DECK_PER_PAGE))
-  const at = Math.max(0, Math.min(page, pages - 1))
-  const from = at * DECK_PER_PAGE
-  const to = Math.min(cleared, from + DECK_PER_PAGE)
-  const cells: number[] = []
-  for (let i = from; i < to; i++) cells.push(i)
-  return { cells, page: at, pages }
-}
-
 /* WHAT THE OPEN BLOCK IS WORTH, in one line. The gate is stated as the thing it unlocks rather than
    as a target to hit, because "70%" on its own is the same unexplained figure the ascent's rungs
    had before they said what they were short of. */
@@ -128,63 +105,43 @@ export function railLine(chain: DeckChain): string {
 }
 
 /* ==================================================================================================
-   A DECK'S BLOCKS, AS A CHAIN — the words this screen puts in the shared shapes. See `chain.ts`,
-   and `components/screens.html`, which files this drawing and the course's under one name.
-   ================================================================================================== */
+   THE WINDOW ONTO THE BLOCKS.
 
-export function deckChainView(
-  chain: DeckChain, slug: string, mode: string, shown: number,
-): ChainView {
-  const here = chain.blocks[shown]
-  const next = chain.blocks[chain.here + 1]
-  const revisiting = shown !== chain.here
+   A deck is twelve blocks or seventy-six, and nine rows plus the line that counts what they do not
+   reach fit the stage — so the column shows a run around the cursor and counts the rest, exactly as
+   the course's ledger does. The cursor stands SECOND in its window rather than first, so one block
+   of history is always in view.
+   ================================================================================================== */
+export const BLOCK_WINDOW = 9
+
+export interface BlockWindow {
+  blocks: DeckBlock[]
+  behind: number
+  ahead: number
+  /** where the cursor sits inside `blocks` */
+  at: number
+}
+
+export function blockWindow(blocks: readonly DeckBlock[], cursor: number): BlockWindow {
+  if (blocks.length <= BLOCK_WINDOW) return { blocks: [...blocks], behind: 0, ahead: 0, at: cursor }
+  const start = Math.min(Math.max(0, cursor - 1), blocks.length - BLOCK_WINDOW)
   return {
-    items: chain.blocks.map((block) => ({
-      key: String(block.index),
-      no: block.no,
-      name: block.name,
-      note: `${block.cards} CARDS`,
-      state: block.state,
-    })),
-    here: chain.here,
-    /* a deck's blocks are a strict line: `compute_unlocked_count` stops at the first one under the
-       gate, so the open block IS the far end of what can be reached */
-    reach: chain.here,
-    cleared: chain.cleared,
-    beyond: chain.beyond,
-    behindLabel: chain.cleared === 1 ? 'BLOCK CLEARED' : 'BLOCKS CLEARED',
-    hero: {
-      cap: here
-        ? `${revisiting ? 'REVISITING' : 'OPEN NOW'} · BLOCK ${here.no} OF ${chain.blocks.length}`
-        : 'THIS DECK',
-      capRight: slug.replace(/_/g, ' ').toUpperCase(),
-      name: here?.name ?? '',
-      nameWide: false,
-      /* the first few characters of the block, which is what a name alone does not show */
-      under: here?.sample.length ? here.sample.join(' · ') : null,
-      subLeft: here ? `${here.cards} CARDS` : '',
-      subRight: revisiting ? 'CLEARED' : 'IN PROGRESS',
-      pct: here?.pct ?? 0,
-      gate: gateLine(chain, revisiting),
-      gateEm: null,
-      /* THE SLAB NAMES THE DRILL IT IS ABOUT TO RUN. It used to say THE ONLY WAY ON, which is the
-         gate line's argument said a second time over a button that used to open a picker. The
-         picker is gone; this press starts a round, so the small line says which round. */
-      slabEm: mode.toUpperCase(),
-      slabB: revisiting ? 'STUDY IT AGAIN' : 'START THIS BLOCK',
-      live: true,
-    },
-    ahead: {
-      kicker: 'NEXT, WHEN THIS ONE OPENS IT',
-      name: next ? next.name : 'THE DECK IS DONE',
-      meta: next ? `${next.cards} CARDS` : 'NOTHING LOCKED',
-      tailLabel: 'AND MORE AFTER IT',
-    },
-    rail: {
-      left: 'BLOCK 01',
-      mid: railLine(chain),
-      right: `BLOCK ${chain.blocks[chain.blocks.length - 1]?.no ?? '01'}`,
-    },
-    pile: { cap: 'CLEARED BLOCKS', act: 'OPEN THEM', empty: 'NOTHING BEHIND YOU YET' },
+    blocks: blocks.slice(start, start + BLOCK_WINDOW),
+    behind: start,
+    ahead: blocks.length - (start + BLOCK_WINDOW),
+    at: cursor - start,
   }
+}
+
+/* A NAME IS SET FROM ITS OWN LENGTH, because "Basic Vowels" and "Compound Sounds & Digraphs" cannot
+   share a size. The Latin italic black averages 0.62em per character; mincho is 1.06, which is why
+   a CJK name is measured against its own divisor rather than sheared into the Latin face. */
+export function blockNameSize(name: string, wide: boolean): number {
+  const n = Math.max(1, [...name].length)
+  return Math.max(22, Math.min(52, Math.floor(446 / (n * (wide ? 1.06 : 0.62)))))
+}
+
+/** true when the name is CJK, which is set in the mincho at one em per glyph */
+export function nameIsWide(name: string): boolean {
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(name)
 }

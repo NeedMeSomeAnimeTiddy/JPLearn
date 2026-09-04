@@ -2,10 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MinigameKey, MinigameStats, ScriptKey } from '../../../types'
 import { SESSION_LENGTH_PRESETS } from '../../../constants'
 import {
-  CHAPTER_NUM, TAB_W, TAB_W_SEL, drillChapters, drillDecks, drillModes, groupCopy,
-  nearestOffered, railDistance, railEnds, railLayout, railStep, tabScale,
+  drillChapters, drillDecks, drillModes, groupCopy, modeNameSize, modeStep, modeWindow,
+  nearestOffered, offeredList,
 } from '../drills'
-import { useHoverPick } from '../useHoverPick'
 import { screenHead } from '../chrome'
 import { refuse } from '../refuse'
 import { ScreenHead } from './ScreenHead'
@@ -31,8 +30,8 @@ export interface DrillSession {
 
 export interface DrillsProps {
   /* THE DECK IS THE APP'S NOW, NOT THE SCREEN'S. It was local state that committed only on start,
-     which was harmless while the hero's one claim was a name -- but the lock reasons below are
-     computed from the LIVE pool, so a road standing on a deck the app is not standing on would
+     which was harmless while the poster's one claim was a name -- but the lock reasons below are
+     computed from the LIVE pool, so a list standing on a deck the app is not standing on would
      draw another deck's refusals. */
   deck: ScriptKey
   /** the resolved deck, level included: KANJI N3 rather than KANJI */
@@ -52,17 +51,15 @@ export interface DrillsProps {
 }
 
 /* ==================================================================================================
-   DRILLS — seventeen modes on an axis of six decks, as the mockup draws it.
+   THE DRILLS — a catalogue, and a catalogue reads as a list. See the note over `.dr-run` for what
+   was here before: seventeen modes fanned out as cards off both edges of the stage, the second and
+   third carrying a number and a name over two hundred pixels of empty paper.
 
-   The first port put the rail and the tabs in but expanded the SELECTED TAB in place: the chosen
-   mode grew a description, a deck map and an action slab inside its own 94px stone. The mockup does
-   what the course's road does instead -- the stone you are on is not drawn at all, and a card stands
-   in its slot. That difference is why the port had no `.dr-hero`, `.dr-side` or `.dr-mini`, and why
-   a screen carrying three separate readouts looked like a row of tabs.
+   TWO AXES AND ONE OF EACH SHAPE. The deck is a row of tabs across the top because it is one
+   question with six answers; the modes are a column of lines because they are a catalogue; and the
+   one you are on stands at poster size on the valley, which is where this family of screens puts
+   the thing you are about to act on.
    ================================================================================================== */
-
-/** the middle of the strip, which is where the selection is held */
-const STRIP_MID = 474
 
 export function Drills({
   deck, slug, session, lockReasons, stats, onDeck, onStart, onUp,
@@ -76,7 +73,8 @@ export function Drills({
 
   const deckKey = deck
   const [sel, setSel] = useState(() => nearestOffered(modes, deck, 0))
-  const layout = railLayout(modes, deckKey, sel)
+  const offered = useMemo(() => offeredList(modes, deckKey), [modes, deckKey])
+  const win = modeWindow(offered, sel)
   const here = modes[sel]
   const shut = here ? lockReasons[here.key] ?? null : null
   const record = here ? stats[here.key] : undefined
@@ -94,10 +92,6 @@ export function Drills({
     map.set('c', session.toggleConfidence)
     return map
   }, [session])
-  /* walking the rail slides a stone under a stationary pointer, whose `mouseenter` would drag the
-     selection back off the one the keyboard just chose. See `useHoverPick`. */
-  const hover = useHoverPick(setSel)
-
 
   useEffect(() => { rootRef.current?.focus({ preventScroll: true }) }, [])
 
@@ -105,14 +99,13 @@ export function Drills({
     const node = rootRef.current
     if (!node) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowRight') {
-        event.preventDefault(); hover.keyed(); setSel((s) => railStep(layout, s, 1))
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault(); hover.keyed(); setSel((s) => railStep(layout, s, -1))
-      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault(); setSel((s) => modeStep(offered, s, 1))
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault(); setSel((s) => modeStep(offered, s, -1))
+      } else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
         event.preventDefault()
-        hover.keyed()
-        const step = event.key === 'ArrowDown' ? 1 : -1
+        const step = event.key === 'ArrowRight' ? 1 : -1
         const i = decks.findIndex((d) => d.key === deckKey)
         const next = decks[Math.max(0, Math.min(decks.length - 1, i + step))]
         onDeck(next.key)
@@ -133,29 +126,26 @@ export function Drills({
     }
     node.addEventListener('keydown', onKey)
     return () => node.removeEventListener('keydown', onKey)
-  }, [layout, decks, deckKey, modes, here, onDeck, onStart, hover, setKeys, shut])
+  }, [offered, decks, deckKey, modes, here, onDeck, onStart, setKeys, shut])
 
-  /* the rail is shifted so the selection sits at the strip's middle */
-  const shift = Math.round(STRIP_MID - (layout.centres[sel] ?? 0))
-  const ends = railEnds(layout)
-  const chapter = chapters.find((c) => sel >= c.from && sel <= c.to) ?? chapters[0]
-  const chapterIndex = chapters.indexOf(chapter)
-  const copy = groupCopy(chapter?.key ?? '')
-  /* THE RESOLVED DECK, because KANJI is five decks and the road runs on whichever of them the
+  /* THE RESOLVED DECK, because KANJI is five decks and the list runs on whichever of them the
      study screen last stood on. RUN ON KANJI over an N3 round is the same half-truth the deck
      screen's own caption exists to avoid. */
   const deckLabel = slug.replace(/_/g, ' ').toUpperCase()
-  /* the card's name is set from its own length, the same rule the deck screen's hero uses */
-  const nameSize = here
-    ? Math.max(14, Math.min(20, Math.floor(216 / (here.title.length * 0.62))))
-    : 16
+  const chapter = chapters.find((c) => sel >= c.from && sel <= c.to) ?? chapters[0]
+  const copy = groupCopy(chapter?.key ?? '')
+
+  /* a chapter heading is drawn where the chapter CHANGES inside the window, so a run that opens
+     halfway down RECOGNITION still says which chapter it is in */
+  let last: string | null = null
 
   return (
     <div className={screenClass(entered)} ref={rootRef} tabIndex={-1}>
       <div className="mn-frame" ref={frameRef}>
         <ScreenHead head={screenHead('DRILLS', 'drills')} />
-        {/* THE DECK AXIS. Its figure is counted out of SCRIPT_MINIGAMES rather than stated. */}
-        <div className="dr-decks">
+
+        {/* ─── the deck axis. Its figure is counted out of SCRIPT_MINIGAMES rather than stated. */}
+        <div className="dr-decks" role="group" aria-label="Which deck to drill">
           {decks.map((d) => (
             <button
               key={d.key}
@@ -170,180 +160,119 @@ export function Drills({
           ))}
         </div>
 
-        <div className="dr-strip">
-          <div className="dr-rail" style={{ transform: `translateX(${shift}px)` }}>
-            {/* THE CHAPTER BLOCKS RIDE OVER THEIR OWN SPAN, and a chapter the fold emptied has no
-                span to sit over -- so it is drawn as nothing rather than as a sliver. */}
-            {chapters.map((c, g) => {
-              let lo = -1
-              let hi = -1
-              let have = 0
-              for (let i = c.from; i <= c.to; i++) {
-                if (layout.offered[i]) { if (lo < 0) lo = i; hi = i; have++ }
-              }
-              if (lo < 0) {
-                return <div key={c.key} className="dr-chap" style={{ opacity: 0, width: 0 }} />
-              }
-              const a = layout.centres[lo] - (lo === sel ? TAB_W_SEL : TAB_W) / 2
-              const b = layout.centres[hi] + (hi === sel ? TAB_W_SEL : TAB_W) / 2
-              const total = c.to - c.from + 1
-              return (
-                <div
-                  key={c.key}
-                  className={g === chapterIndex ? 'dr-chap here' : 'dr-chap'}
-                  style={{ left: Math.round(a + 14), width: Math.round(b - a), opacity: 1 }}
-                >
-                  <div className="dr-chapin">
-                    <u>{CHAPTER_NUM[g] ?? ''}</u>
-                    <b>{c.title.toUpperCase()}</b>
-                    <i>{groupCopy(c.key).jp}</i>
-                    <s>{total} MODE{total === 1 ? '' : 'S'} · {have} HERE</s>
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* THE STONES. The selected one is not drawn -- the card stands in its slot -- and a
-                folded mode collapses into its own seam rather than fading where it stood. */}
-            {modes.map((m, i) => {
-              const d = railDistance(layout, i)
-              const on = d !== null
-              const isSel = i === sel
-              const fade = !on || isSel ? 0
-                : d === 1 ? 1 : d === 2 ? 0.92 : d === 3 ? 0.72 : d === 4 ? 0.45 : 0
-              return (
+        {/* ─── every mode this deck offers, as lines under its own chapter ─────────────────── */}
+        <div className="dr-run" role="group" aria-label="Drills this deck offers">
+          {win.list.map((i) => {
+            const m = modes[i]
+            /* NUMBERED BY ITS PLACE IN THE LIST YOU ARE LOOKING AT. The catalogue index skips --
+               hiragana offers twelve of seventeen -- so a column reading 01 02 03 06 08 10 looks
+               like rows failed to draw, and disagrees with the foot band's MODE 1 OF 12. */
+            const no = offered.indexOf(i) + 1
+            const chap = chapters.find((c) => i >= c.from && i <= c.to)
+            const head = chap && chap.key !== last ? chap : null
+            last = chap?.key ?? last
+            const locked = lockReasons[m.key]
+            return (
+              <Row key={m.key}>
+                {head ? (
+                  <span className="dr-chap">
+                    <b>{head.title.toUpperCase()}</b>
+                    <i>{groupCopy(head.key).jp}</i>
+                    <u />
+                  </span>
+                ) : null}
                 <button
-                  key={m.key}
                   type="button"
-                  className="dr-tab"
-                  style={{
-                    left: Math.round((on ? layout.centres[i] : layout.lefts[i]) - TAB_W / 2),
-                    top: 100,
-                    opacity: fade,
-                    pointerEvents: on && !isSel ? 'auto' : 'none',
-                    transform: `skewX(-8deg) rotate(-1.2deg) scale(${on ? tabScale(d ?? 0) : 0.2})`,
-                  }}
-                  onMouseEnter={() => hover.pick(i)}
-                  onFocus={() => hover.pick(i)}
+                  className={['dr-mode', i === sel ? 'on' : '', locked ? 'shut' : '']
+                    .filter(Boolean).join(' ')}
                   onClick={() => setSel(i)}
                   aria-label={`${m.title} — ${m.description}`}
-                  aria-hidden={!on || isSel}
-                  tabIndex={on && !isSel ? 0 : -1}
                 >
-                  <b>{String(i + 1).padStart(2, '0')}</b>
-                  <span>{m.title}</span>
-                  <s>
-                    {m.decks.length === decks.length
-                      ? `ALL ${decks.length}`
-                      : `${m.decks.length} DECK${m.decks.length === 1 ? '' : 'S'}`}
-                  </s>
-                </button>
-              )
-            })}
-
-            {here ? (
-              <button
-                type="button"
-                className="dr-hero"
-                style={{ left: Math.round(layout.centres[sel] - TAB_W_SEL / 2), top: 36 }}
-                onClick={() => { if (shut) { refuse(); return } onStart(deckKey, here.key) }}
-              >
-                <span className="dr-htab">
-                  {chapter ? `${chapter.title.toUpperCase()} · ${copy.jp}` : ''}
-                </span>
-                <span className="dr-hnum">
-                  <b>{String(sel + 1).padStart(2, '0')}</b>
-                  <s>
-                    {here.decks.length === decks.length
-                      ? `ON ALL ${decks.length} DECKS`
-                      : `ON ${here.decks.length} DECK${here.decks.length === 1 ? '' : 'S'}`}
-                  </s>
-                </span>
-                <span className="dr-hglyph">{copy.glyph}</span>
-                <span className="dr-hen" style={{ fontSize: `${nameSize}px` }}>{here.title}</span>
-                <span className="dr-hd">{here.description}</span>
-                {/* THE RECORD, WHICH IS THE ONE THING A CATALOGUE CANNOT TELL YOU. Not played is
-                    drawn as not played rather than as nought per cent -- a mode you have never
-                    run is not a mode you are bad at. */}
-                <span className="dr-rec">
-                  {played ? (
-                    <>
-                      <b>{Math.round((record.correct / record.attempted) * 100)}%</b>
-                      <i>RIGHT</i>
-                      <b>{record.bestStreak}</b>
-                      <i>BEST RUN</i>
-                    </>
-                  ) : <i>NOT PLAYED ON THIS DECK</i>}
-                </span>
-                {/* WHICH DECKS OFFER IT, which is the map read the other way and the one fact a
-                    learner picking a drill cannot get anywhere else. */}
-                <span className="dr-cells">
-                  <span>
-                    {decks.map((d) => (
-                      <i
-                        key={d.key}
-                        className={`${here.decks.includes(d.key) ? 'has' : ''}`
-                          + `${d.key === deckKey ? ' at' : ''}`}
-                        title={d.label}
-                      />
-                    ))}
+                  <span className="n">{String(no).padStart(2, '0')}</span>
+                  <span className="t">{m.title}</span>
+                  <span className="s">
+                    {/* THIS DECK OFFERS IT AND SOMETHING ELSE DOES NOT -- a missing voice model,
+                        too few cards. The poster carries which; the row only says it is shut. */}
+                    {locked ? 'SHUT'
+                      : m.decks.length === decks.length ? `ALL ${decks.length} DECKS`
+                        : `${m.decks.length} DECKS`}
                   </span>
-                  <s>OFFERED HERE</s>
-                </span>
-                <span className={shut ? 'dr-slab shut' : 'dr-slab'}>
-                  {shut ? shut.toUpperCase() : `RUN ON ${deckLabel} · ENTER ▸`}
-                </span>
-              </button>
-            ) : null}
+                </button>
+              </Row>
+            )
+          })}
+        </div>
+
+        {/* ─── and the mode itself, on the valley ──────────────────────────────────────────── */}
+        {here ? (
+          <div className="dr-card">
+            <span className="dr-cap">
+              {chapter ? chapter.title.toUpperCase() : ''} <i>{copy.jp}</i>
+              {' '}· MODE {String(offered.indexOf(sel) + 1).padStart(2, '0')} OF {offered.length}
+            </span>
+            <b className="dr-hen" style={{ fontSize: `${modeNameSize(here.title)}px` }}>
+              {here.title}
+            </b>
+            <span className="dr-hd">{here.description}</span>
+
+            <span className="dr-read">
+              {/* THE RECORD, WHICH IS THE ONE THING A CATALOGUE CANNOT TELL YOU. Not played is
+                  drawn as not played rather than as nought per cent -- a mode you have never
+                  run is not a mode you are bad at. */}
+              <span className="dr-rec">
+                {played ? (
+                  <>
+                    <b>{Math.round((record.correct / record.attempted) * 100)}%</b>
+                    <i>RIGHT</i>
+                    <b>{record.bestStreak}</b>
+                    <i>BEST RUN</i>
+                  </>
+                ) : <span className="none">NOT PLAYED ON THIS DECK</span>}
+              </span>
+              {/* WHICH DECKS OFFER IT, which is the map read the other way and the one fact a
+                  learner picking a drill cannot get anywhere else. */}
+              <span className="dr-cells">
+                {decks.map((d) => (
+                  <i
+                    key={d.key}
+                    className={`${here.decks.includes(d.key) ? 'has' : ''}`
+                      + `${d.key === deckKey ? ' at' : ''}`}
+                  >
+                    {d.label.toUpperCase()}
+                  </i>
+                ))}
+              </span>
+            </span>
+
+            <button
+              type="button"
+              className={shut ? 'dr-slab shut' : 'dr-slab'}
+              onClick={() => { if (shut) { refuse(); return } onStart(deckKey, here.key) }}
+              aria-disabled={!!shut}
+            >
+              <em>{shut ? 'CANNOT RUN HERE' : `${session.length} ITEMS`}</em>
+              <b>{shut ? shut.toUpperCase() : `RUN ON ${deckLabel} ▸`}</b>
+            </button>
           </div>
-        </div>
+        ) : null}
 
-        {/* what is off each end, counted rather than drawn */}
-        <div className="dr-side lo" style={{ opacity: ends.lo ? 1 : 0 }}>
-          <i /><i /><i><b>{ends.lo}</b><u>MORE</u></i>
-        </div>
-        <div className="dr-side hi" style={{ opacity: ends.hi ? 1 : 0 }}>
-          <i /><i /><i><b>{ends.hi}</b><u>MORE</u></i>
-        </div>
-
+        {/* THE FOLD, SAID OUT LOUD. A deck that offers twelve of seventeen has five closed over,
+            and a list that silently omits them looks like a shorter catalogue. */}
         <div className="dr-mini">
-          <span className="dr-bars">
-            {modes.map((m, i) => {
-              const d = railDistance(layout, i)
-              const off = d === null
-              const dd = d ?? 9
-              return (
-                <i
-                  key={m.key}
-                  className={off ? 'off' : undefined}
-                  style={{
-                    width: off ? 5 : dd === 0 ? 14 : dd === 1 ? 11 : dd === 2 ? 9 : dd <= 4 ? 8 : 6,
-                    height: off ? 6 : dd === 0 ? 19 : dd === 1 ? 14 : dd === 2 ? 11 : dd <= 4 ? 9 : 7,
-                    boxShadow: i === sel ? '0 0 0 2px var(--hi)' : 'none',
-                    marginLeft: i > 0 && modes[i - 1].group !== m.group ? 10 : undefined,
-                  }}
-                />
-              )
-            })}
-          </span>
-          {/* THE FOLD, SAID OUT LOUD. A deck that offers twelve of seventeen has five closed over,
-              and a road that silently omits them looks like a shorter catalogue. */}
           <span className="dr-line">
-            MODE {layout.at + 1} / {layout.list.length} OFFERED ON {deckLabel}
-            {layout.list.length < modes.length
-              ? ` · ${modes.length - layout.list.length} FOLDED AWAY`
+            MODE <em>{win.at + 1}</em> OF <em>{offered.length}</em> OFFERED ON {deckLabel}
+            {offered.length < modes.length
+              ? ` · ${modes.length - offered.length} FOLDED AWAY`
               : ''}
+            {win.behind ? ` · ${win.behind} ABOVE` : ''}
+            {win.ahead ? ` · ${win.ahead} BELOW` : ''}
           </span>
         </div>
 
         {/* ── HOW THIS RUN GOES ───────────────────────────────────────────────────────────────
-            Four switches that existed only inside the script hub, standing where the road ends
+            Four switches that existed only inside the script hub, standing where the list ends
             rather than on a settings page: they are the difference between eight cards and
-            twenty, and between a round that can be lost and one that cannot.
-
-            IN THE FOOT BAND, under the minimap, which the frame contract leaves for a whole-set
-            statement about the screen. Every chip prints the key that works it, so this row
-            costs neither of the two axes the road already spends. */}
+            twenty, and between a round that can be lost and one that cannot. */}
         <div className="dr-set" role="group" aria-label="How this run goes">
           <span className="dr-setlab">THIS RUN</span>
           {SESSION_LENGTH_PRESETS.map((preset, index) => (
@@ -394,8 +323,8 @@ export function Drills({
           </button>
         </div>
         <div className="hints">
-          <span><b>← →</b>Choose<em>選択</em></span>
-          <span><b>↑ ↓</b>Deck<em>教材</em></span>
+          <span><b>↑ ↓</b>Choose<em>選択</em></span>
+          <span><b>← →</b>Deck<em>教材</em></span>
           <span><b>1–3</b>Length<em>長さ</em></span>
           <span><b>L F C</b>Switches<em>設定</em></span>
           <span><b>ENTER</b>Run<em>決定</em></span>
@@ -403,4 +332,11 @@ export function Drills({
       </div>
     </div>
   )
+}
+
+/* A CHAPTER HEADING AND ITS FIRST ROW ARE TWO SIBLINGS, NOT A WRAPPER: `.dr-run` is the flex column
+   that spaces every child, so a div around the pair would collapse them into one slot and take the
+   gap with it. This fragment keys the pair and adds no box. */
+function Row({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
