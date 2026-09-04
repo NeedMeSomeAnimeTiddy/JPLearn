@@ -696,10 +696,16 @@ export function MinigameView({
       tone: 'duty' as const,
     }
 
-  const src = said && roundResponseMs != null
-    ? { label: 'ANSWERED IN', value: `${(roundResponseMs / 1000).toFixed(1)}S` }
-    : said && roundSrsResult
-      ? { label: 'NEXT REVIEW', value: `${roundSrsResult.interval}D` }
+/* THE INTERVAL IS THE ONE FACT A SPACED-REPETITION APP EXISTS TO TELL YOU, and it was an 8.5px
+     chip in a metadata row -- fifth of five -- while the stopwatch, which decides nothing, had the
+     prompt cell's whole dedicated line to itself. THEY SWAP: the interval takes the line and the
+     time keeps the footnote it deserves, so nothing is said twice and the loud slot carries the
+     fact worth being loud about. */
+  const nextReview = said && roundSrsResult ? roundSrsResult.interval : null
+  const src = nextReview != null
+    ? { label: 'NEXT REVIEW', value: `${nextReview}D` }
+    : said && roundResponseMs != null
+      ? { label: 'ANSWERED IN', value: `${(roundResponseMs / 1000).toFixed(1)}S` }
       : roundState.isMastered
         ? { label: 'THIS ONE IS', value: 'MASTERED' }
         : null
@@ -763,8 +769,8 @@ export function MinigameView({
                   : null}
                 /* the slips already say both, so only a typed or drawn round needs them spelled out */
                 showAnswers={fill !== 'choice'}
-                responseMs={roundResponseMs}
-                nextReviewDays={roundSrsResult?.interval ?? null}
+                /* the time only where the prompt cell's line is not already carrying it */
+                responseMs={nextReview != null ? roundResponseMs : null}
                 example={roundExampleSentence}
                 note={roundState.dictionaryNote
                   ? { title: roundState.dictionaryNote.title, copy: roundState.dictionaryNote.copy }

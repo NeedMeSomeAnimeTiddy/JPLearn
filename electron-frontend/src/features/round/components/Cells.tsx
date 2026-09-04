@@ -268,7 +268,6 @@ export interface VerdictProps {
   answer?: string | null
   showAnswers?: boolean
   responseMs?: number | null
-  nextReviewDays?: number | null
   example?: { jp: string; romaji: string; en: string } | null
   note?: { title: string; copy: string } | null
   saving?: boolean
@@ -281,7 +280,7 @@ export interface VerdictProps {
 export function RoundVerdict({
   message, tone, comboBonus = 0, milestoneStreak = null, livesEnabled = false,
   yours, yoursLabel = 'You said', answer, showAnswers = false,
-  responseMs, nextReviewDays, example, note, saving = false, saveFailed = false,
+  responseMs, example, note, saving = false, saveFailed = false,
   savingCopy = 'Saving that review…', saveFailedCopy = 'That review did not save.',
 }: VerdictProps) {
   return (
@@ -291,8 +290,10 @@ export function RoundVerdict({
         {comboBonus > 0 ? <span>+{comboBonus} combo</span> : null}
         {milestoneStreak ? <span>Streak ×{milestoneStreak}</span> : null}
         {tone === 'error' && livesEnabled ? <span className="cost">−1 life</span> : null}
+        {/* WHEN THIS CARD COMES BACK IS NOT IN HERE. It is the one fact worth reading off this
+            screen, so it stands on the prompt cell's own line at nineteen points rather than
+            fifth in a row of eight-and-a-half point chips. See `src` in `MinigameView`. */}
         {responseMs ? <span>Answered in {(responseMs / 1000).toFixed(1)}s</span> : null}
-        {nextReviewDays != null ? <span>Back in {nextReviewDays}d</span> : null}
       </div>
       {showAnswers && (yours || answer) ? (
         <div className="rd-verdict-answers">

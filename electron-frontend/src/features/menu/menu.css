@@ -788,6 +788,14 @@ body.mn-leaving .mn-open.on {
    the slab says which screen, the chips say how you are doing -- and reading as one row is closer to
    the truth than three things scattered over a picture.
    ================================================================================================== */
+/* THIS SLAB REACHES UNDER THE ROUND'S CHIPS AND A CAP HERE WILL NOT STOP IT. Measured on the
+   running round at 1600x1028: the slab LAYS OUT 493 wide at x250, ending at 743 -- well clear of
+   the chips, which lay out from 865 -- and PAINTS from 384 to 1169, over chips that paint from
+   1082. The width is not what is wrong. `.mn-frame` carries `zoom: var(--lk-u)` and this rule
+   carries it again, so every fixed piece of chrome rendered INSIDE the frame is scaled by the
+   SQUARE of it -- 1.5625 against the 1.25 that `.brand`, `.stats` and the round's own chip row get
+   from outside it. `.lvb`, `.hints` and `.back-tab` are in the same position. That is one fault in
+   the chrome layer rather than fourteen in the screens, and it is not fixed from here. */
 .pj-cap {
   position: fixed; left: 250px; top: 20px; zoom: var(--lk-u, 1);
   max-width: 640px; width: max-content; pointer-events: auto;
@@ -825,9 +833,10 @@ body.mn-leaving .mn-open.on {
 }
 /* the live line the screen wants to say about itself -- how many levels, how many seals */
 .pj-note {
-  align-self: center; padding: 0 18px 0 4px; margin-left: auto;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px; letter-spacing: 0.15em;
-  color: rgba(20, 17, 13, 0.45);
+  align-self: center; padding: 0 16px 0 6px; margin-left: auto;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.1em;
+  color: rgba(20, 17, 13, 0.5);
 }
 /* a heading has a line under it, which is the other half of "this is not an item" */
 .pj-cap::after {
