@@ -38,14 +38,33 @@ jobs:
         # install on every run, and the same interpreter the local checks use.
         run: |
           $problems = @()
+          $pythonExe = $null
 
-          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue |
+          $onPath = Get-Command python -CommandType Application -ErrorAction SilentlyContinue |
             Select-Object -First 1
-          if (-not $python) {
-            $problems += "python is not on PATH"
+          if ($onPath) {
+            $pythonExe = $onPath.Source
           } else {
-            $version = (& $python.Source --version) -replace '^Python ', ''
-            Write-Host "python  $version  ($($python.Source))"
+            # Fall back to the py launcher. It installs to a fixed location for all
+            # users and knows every interpreter on the machine, whereas PATH depends on
+            # an installer checkbox that defaults to off and on the runner service
+            # having been restarted since.
+            $launcher = Get-Command py -CommandType Application -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($launcher) {
+              $resolved = & $launcher.Source -3.11 -c "import sys; print(sys.executable)" 2>$null
+              if ($LASTEXITCODE -eq 0 -and $resolved) {
+                $pythonExe = "$resolved".Trim()
+                Write-Host "python is not on PATH; the py launcher resolved 3.11 instead"
+              }
+            }
+          }
+
+          if (-not $pythonExe) {
+            $problems += "no Python 3.11 found, on PATH or via the py launcher"
+          } else {
+            $version = (& $pythonExe --version) -replace '^Python ', ''
+            Write-Host "python  $version  ($pythonExe)"
             if ($version -notmatch '^3\.11\.') {
               $problems += "python is $version, expected 3.11.x"
             }
@@ -73,18 +92,9 @@ jobs:
 
             # A tool that is installed but invisible here looks identical to one that
             # was never installed, and the two have completely different fixes. Report
-            # enough to tell them apart: the account the runner runs as, and whether an
-            # interpreter exists somewhere this process cannot see.
+            # enough to tell them apart.
             Write-Host ""
             Write-Host "Runner account: $(whoami)"
-            $pathPython = ($env:PATH -split ';' | Where-Object { $_ -match 'python' })
-            if ($pathPython) {
-              Write-Host "PATH entries mentioning python:"
-              $pathPython | ForEach-Object { Write-Host "  $_" }
-            } else {
-              Write-Host "No PATH entry mentions python."
-            }
-
             $candidates = @(
               "$env:LOCALAPPDATA\Programs\Python",
               "$env:ProgramFiles\Python311",
@@ -92,19 +102,24 @@ jobs:
               "C:\Python311"
             ) | Where-Object { $_ -and (Test-Path $_) }
             if ($candidates) {
-              Write-Host "Found a Python install this process cannot reach on PATH:"
+              Write-Host "Python exists here but this process cannot reach it:"
               $candidates | ForEach-Object { Write-Host "  $_" }
-              Write-Host "If that is a per-user install, it belongs to the installing"
-              Write-Host "account, not to $(whoami) -- reinstall for all users."
+              Write-Host "A per-user install belongs to the installing account, not to"
+              Write-Host "$(whoami) -- reinstall for all users."
             }
-            $launcher = Get-Command py -CommandType Application -ErrorAction SilentlyContinue
-            if ($launcher) { Write-Host "The py launcher is available at $($launcher.Source)" }
 
             Write-Host ""
             Write-Host "Install Python 3.11 and Node 22+ for all users, then restart the"
             Write-Host "runner: a running service keeps the PATH it started with."
             exit 1
           }
+
+          # Publish the interpreter to every later step. The packaged app reads
+          # JPLEARN_PYTHON first (electron/main.cjs::resolvePythonCommand) and would
+          # otherwise fall back to a bare `python` that is not on this runner's PATH,
+          # so the packaged smoke test would start an app whose backend never answers.
+          Split-Path -Parent $pythonExe | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
+          "JPLEARN_PYTHON=$pythonExe" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
 
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
