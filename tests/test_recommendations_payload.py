@@ -8,6 +8,7 @@ screen a learner has just arrived at.
 from __future__ import annotations
 
 from datetime import date, timedelta
+from typing import Any, cast
 
 import pytest
 
@@ -15,6 +16,11 @@ from domain.decks import ALL_DECKS
 from domain.scheduler import ReviewState
 from data import database
 from scripts import desktop_bridge
+
+
+def _rows(payload: dict[str, object]) -> list[dict[str, Any]]:
+    """The recommendation rows, narrowed from the bridge's dict[str, object] payload."""
+    return cast(list[dict[str, Any]], payload["recommendations"])
 
 
 @pytest.fixture
@@ -56,8 +62,8 @@ class TestSectionResolution:
 
     def test_every_row_carries_a_launchable_section_and_drill(self, bridge_db) -> None:
         payload = desktop_bridge.build_recommendations_payload()
-        assert payload["recommendations"]
-        for row in payload["recommendations"]:
+        assert _rows(payload)
+        for row in _rows(payload):
             assert row["section"] in desktop_bridge._SECTION_LABELS
             assert row["minigame"]
             assert row["section_label"]
@@ -105,11 +111,11 @@ class TestColdStart:
     # action on the screen a new learner lands on.
     def test_a_fresh_account_still_gets_a_row(self, bridge_db) -> None:
         payload = desktop_bridge.build_recommendations_payload()
-        rows = payload["recommendations"]
+        rows = _rows(payload)
 
         assert len(rows) >= 1
         assert rows[0]["section"] == desktop_bridge._COLD_START_SECTION
-        assert payload["session_minutes"] > 0
+        assert cast(int, payload["session_minutes"]) > 0
         assert payload["session_note"]
 
     def test_a_fresh_account_reads_as_starter(self, bridge_db) -> None:
@@ -120,7 +126,7 @@ class TestColdStart:
     # The cold-start row is a recognition reason, so it must never launch a
     # production drill on cards the learner has never seen.
     def test_the_cold_start_row_launches_a_recognition_drill(self, bridge_db) -> None:
-        row = desktop_bridge.build_recommendations_payload()["recommendations"][0]
+        row = _rows(desktop_bridge.build_recommendations_payload())[0]
         assert row["minigame"] in ("meaning_match", "character_match")
         assert row["leech_focus_enabled"] is None
 
@@ -128,13 +134,13 @@ class TestColdStart:
 class TestSessionShape:
     def test_minutes_reflect_the_work_the_rows_contain(self, bridge_db) -> None:
         payload = desktop_bridge.build_recommendations_payload()
-        total = sum(row["review_count"] for row in payload["recommendations"])
+        total = sum(row["review_count"] for row in _rows(payload))
         assert payload["session_minutes"] == desktop_bridge.session_minutes(total)
 
     def test_the_note_names_the_top_row(self, bridge_db) -> None:
         payload = desktop_bridge.build_recommendations_payload()
-        rows = payload["recommendations"]
-        assert rows[0]["section_label"] in payload["session_note"]
+        rows = _rows(payload)
+        assert rows[0]["section_label"] in cast(str, payload["session_note"])
 
 
 class TestOverdueBacklog:
@@ -145,7 +151,7 @@ class TestOverdueBacklog:
         database.upsert_progression_node("hiragana", "unlocked", 0, 104, None, None)
 
         payload = desktop_bridge.build_recommendations_payload()
-        rows = payload["recommendations"]
+        rows = _rows(payload)
 
         hiragana = [row for row in rows if row["section"] == "hiragana"]
         assert hiragana, [row["section"] for row in rows]

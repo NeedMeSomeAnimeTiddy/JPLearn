@@ -58,7 +58,37 @@ COMMANDS = [
 ]
 
 
-def main() -> int:
+# Appended by --full. Together with the default steps these cover every job in
+# .github/workflows/electron-packaged-smoke.yml, so a green `dev.py --full` is
+# the local equivalent of that workflow passing.
+FRONTEND_FULL_SCRIPTS = ("test:ui", "package", "smoke:packaged")
+
+USAGE = """Usage: python scripts/dev.py [--full]
+
+  (no flags)  Codegen drift, mypy, architecture, DB schema, SRS integrity,
+              pytest, then frontend lint and build.
+  --full      Also runs the frontend unit tests, packages the Electron app,
+              and runs the packaged smoke test - the same set of checks as the
+              Electron Packaged Smoke workflow.
+"""
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+
+    if "--help" in args or "-h" in args:
+        print(USAGE)
+        return 0
+
+    full = "--full" in args
+    if full:
+        args.remove("--full")
+
+    if args:
+        print(f"Unknown argument(s): {' '.join(args)}\n")
+        print(USAGE)
+        return 2
+
     for command in COMMANDS:
         print(f"\n=== {command.name.upper()} ===")
 
@@ -72,7 +102,7 @@ def main() -> int:
             print(f"\nFAILED: {command.name}")
             return result.returncode
 
-    rc = _check_frontend()
+    rc = _check_frontend(full=full)
     if rc != 0:
         return rc
 
@@ -80,9 +110,10 @@ def main() -> int:
     return 0
 
 
-def _check_frontend() -> int:
+def _check_frontend(full: bool = False) -> int:
     frontend_dir = Path(__file__).parent.parent / "electron-frontend"
-    for script in ("lint", "build"):
+    scripts = ("lint", "build") + (FRONTEND_FULL_SCRIPTS if full else ())
+    for script in scripts:
         print(f"\n=== FRONTEND:{script.upper()} ===")
         result = subprocess.run(
             f"npm run {script}",

@@ -15,31 +15,154 @@ on:
 
 jobs:
   windows-packaged-smoke:
-    runs-on: windows-latest
-    timeout-minutes: 25
+    runs-on: [self-hosted, windows]
+    # A self-hosted runner executes workflow code on a personal machine, so pull requests
+    # from forks of this public repository are not run here; same-repository branches and
+    # pushes are.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Raised from 25: that fitted a hosted runner, where this job took about six minutes.
+    # One VM running jobs serially is a good deal slower, and a timeout kill reads exactly
+    # like a real failure.
+    timeout-minutes: 60
 
     defaults:
       run:
-        shell: pwsh
+        # Windows PowerShell 5.1, not pwsh: PowerShell 7 ships with GitHub-hosted
+        # runners but not with a plain Windows install, and the self-hosted runner
+        # has no pwsh on PATH. Everything here -- including scripts/bundle_python.ps1
+        # -- is written to run under 5.1.
+        shell: powershell
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Check toolchain
+        # actions/setup-python and actions/setup-node are deliberately not used here.
+        # setup-python's installer does a per-machine install and rewrites registry
+        # entries, which needs administrator rights the runner service does not have --
+        # it fails with "Error happened during Python installation". A dedicated build
+        # VM is better off with the toolchain installed once anyway: no download and
+        # install on every run, and the same interpreter the local checks use.
+        run: |
+          $problems = @()
+          $pythonExe = $null
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: electron-frontend/package-lock.json
+          $onPath = Get-Command python -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($onPath) {
+            $pythonExe = $onPath.Source
+          } else {
+            # Fall back to the py launcher. It installs to a fixed location for all
+            # users and knows every interpreter on the machine, whereas PATH depends on
+            # an installer checkbox that defaults to off and on the runner service
+            # having been restarted since.
+            $launcher = Get-Command py -CommandType Application -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($launcher) {
+              # GitHub's powershell wrapper sets $ErrorActionPreference = Stop, under
+              # which anything a native command writes to stderr becomes a terminating
+              # error. The launcher prints "No installed Python found!" there when it
+              # knows of no interpreter, which would kill this step before it could
+              # report why -- so failure is detected by exit code instead.
+              $previous = $ErrorActionPreference
+              $ErrorActionPreference = 'Continue'
+              $resolved = & $launcher.Source -3.11 -c "import sys; print(sys.executable)" 2>&1
+              $launcherExit = $LASTEXITCODE
+              $ErrorActionPreference = $previous
+
+              if ($launcherExit -eq 0 -and $resolved) {
+                $pythonExe = "$resolved".Trim()
+                Write-Host "python is not on PATH; the py launcher resolved 3.11 instead"
+              } else {
+                Write-Host "the py launcher knows of no 3.11: $resolved"
+              }
+            }
+          }
+
+          if (-not $pythonExe) {
+            $problems += "no Python 3.11 found, on PATH or via the py launcher"
+          } else {
+            $version = (& $pythonExe --version) -replace '^Python ', ''
+            Write-Host "python  $version  ($pythonExe)"
+            if ($version -notmatch '^3\.11\.') {
+              $problems += "python is $version, expected 3.11.x"
+            }
+          }
+
+          $node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $node) {
+            $problems += "node is not on PATH"
+          } else {
+            $version = (& $node.Source --version) -replace '^v', ''
+            Write-Host "node    $version  ($($node.Source))"
+            # 22 or newer, not pinned to 22: package.json has no engines field and
+            # local development runs 24, which is what every check was verified on.
+            $major = [int](($version -split '\.')[0])
+            if ($major -lt 22) {
+              $problems += "node is $version, expected 22 or newer"
+            }
+          }
+
+          if ($problems.Count -gt 0) {
+            Write-Host ""
+            Write-Host "This runner is missing part of the toolchain:" -ForegroundColor Red
+            $problems | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+
+            # A tool that is installed but invisible here looks identical to one that
+            # was never installed, and the two have completely different fixes. Report
+            # enough to tell them apart.
+            Write-Host ""
+            Write-Host "Runner account: $(whoami)"
+            $candidates = @(
+              "$env:LOCALAPPDATA\Programs\Python",
+              "$env:ProgramFiles\Python311",
+              "${env:ProgramFiles(x86)}\Python311",
+              "C:\Python311"
+            ) | Where-Object { $_ -and (Test-Path $_) }
+            if ($candidates) {
+              Write-Host "Python exists here but this process cannot reach it:"
+              $candidates | ForEach-Object { Write-Host "  $_" }
+              Write-Host "A per-user install belongs to the installing account, not to"
+              Write-Host "$(whoami) -- reinstall for all users."
+            }
+
+            Write-Host ""
+            Write-Host "If Python is installed but invisible here, it was almost certainly"
+            Write-Host "installed for one user: the launcher reads per-user registrations"
+            Write-Host "from HKCU, and this process's HKCU belongs to $(whoami), not to"
+            Write-Host "the account that ran the installer. Re-run the Python 3.11"
+            Write-Host "installer with 'Install Python for all users' ticked, then restart"
+            Write-Host "the runner."
+            exit 1
+          }
+
+          # Publish the interpreter so later steps can find it. JPLEARN_PYTHON is
+          # deliberately not set here: the next step builds a virtualenv from this
+          # interpreter and points the app at that instead.
+          Split-Path -Parent $pythonExe | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
 
       - name: Install backend test dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          # A virtualenv rather than this interpreter directly. The runner service
+          # cannot write to C:\Program Files\Python311, so pip falls back to the
+          # account's user site-packages -- which Python locates through %APPDATA%,
+          # and scripts/packaged-smoke.cjs overrides APPDATA to sandbox the app's
+          # data. The bridge then cannot import fugashi and every backend call dies.
+          # A venv keeps packages in its own site-packages, where APPDATA is irrelevant.
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $venvPython = Join-Path (Get-Location).Path '.venv\Scripts\python.exe'
+          & $venvPython -m pip install --disable-pip-version-check --quiet -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $venvPython -c "import fugashi, psutil; print('backend deps import OK')"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          # GITHUB_PATH prepends, so `python` in later steps is the venv's. The app
+          # reads JPLEARN_PYTHON first (electron/main.cjs::resolvePythonCommand).
+          Split-Path -Parent $venvPython | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
+          "JPLEARN_PYTHON=$venvPython" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
 
       - name: Install frontend dependencies
         working-directory: electron-frontend
@@ -64,14 +187,26 @@ jobs:
 
       - name: Run packaged smoke test
         working-directory: electron-frontend
+        # This runner reaches the app's first log line about six times slower than a
+        # developer machine does, so the 45s default is not a fair budget here.
+        env:
+          JPLEARN_SMOKE_TIMEOUT_MS: '180000'
         run: npm run smoke:packaged
 
       - name: Upload smoke artifacts
         if: always()
+        # Never fails the job. Artifact storage is subject to the same account-level
+        # restriction as hosted runner minutes, so this step cannot succeed while that
+        # holds -- and a green smoke test reported as a red job is worse than no
+        # upload. The files are on the runner regardless: a self-hosted workspace
+        # persists between runs, unlike a hosted one, so .smoke/ can be read directly
+        # on the machine.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: electron-packaged-smoke-artifacts
-          path: |
-            electron-frontend/.smoke/**
-            electron-frontend/out/**
+          # out/** is deliberately not uploaded: it is the whole packaged app, it is
+          # reproducible from the same commit, and it was most of the 453 files this
+          # step used to push. The smoke diagnostics are what a failure needs.
+          path: electron-frontend/.smoke/**
           if-no-files-found: warn

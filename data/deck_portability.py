@@ -551,7 +551,9 @@ def _import_daily_games(
                 "daily_games.word_pools.words must contain at most "
                 f"{DEFAULT_DAILY_POOL_LIMIT} words"
             )
-        normalized_words: list[tuple[object, ...]] = []
+        # Spelled out rather than tuple[object, ...] so the pool_position sort below
+        # can use the int the validator already returned instead of re-parsing it.
+        normalized_words: list[tuple[int, str, str, int, str, str, str, str]] = []
         positions: set[int] = set()
         for word in words:
             position = _required_nonnegative_int(
@@ -595,7 +597,7 @@ def _import_daily_games(
             raise ValueError(
                 "daily_games.word_pools.words.pool_position values must be contiguous from zero"
             )
-        normalized_words.sort(key=lambda word: int(word[0]))
+        normalized_words.sort(key=lambda word: word[0])
         imported_signature = (algorithm_version, tuple(normalized_words))
         existing_header = conn.execute(
             "SELECT algorithm_version FROM daily_word_pools WHERE pool_day = ?",

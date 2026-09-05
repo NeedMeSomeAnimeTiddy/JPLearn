@@ -400,6 +400,16 @@ def test_record_game_result_reports_newly_crossed_review_milestone(
     assert payload["milestones_reached"] == ["reviews_100"]
 
 
+def _milestones(status: dict[str, object]) -> list[dict[str, Any]]:
+    """The milestone list from `build_achievement_milestones_status`, typed for indexing."""
+    return cast("list[dict[str, Any]]", status["milestones"])
+
+
+def _node_mastery_badges(status: dict[str, object]) -> list[dict[str, Any]]:
+    """The badge list from `build_achievement_milestones_status`, typed for indexing."""
+    return cast("list[dict[str, Any]]", status["node_mastery_badges"])
+
+
 def test_build_achievement_milestones_status_reports_totals_and_earned_state(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -413,7 +423,7 @@ def test_build_achievement_milestones_status_reports_totals_and_earned_state(
     status = desktop_bridge.build_achievement_milestones_status()
 
     assert status["total_reviews"] == 100
-    milestones_by_descriptor = {m["descriptor"]: m for m in status["milestones"]}
+    milestones_by_descriptor = {m["descriptor"]: m for m in _milestones(status)}
     assert milestones_by_descriptor["reviews_100"]["earned"] is True
     assert milestones_by_descriptor["reviews_500"]["earned"] is False
 
@@ -549,7 +559,7 @@ def test_build_achievement_milestones_status_reports_node_mastery_badges(
 
     status = desktop_bridge.build_achievement_milestones_status()
 
-    badges_by_descriptor = {b["descriptor"]: b for b in status["node_mastery_badges"]}
+    badges_by_descriptor = {b["descriptor"]: b for b in _node_mastery_badges(status)}
     assert badges_by_descriptor["hiragana_mastered"]["earned"] is True
     assert badges_by_descriptor["tutorial_complete"]["earned"] is True
     assert badges_by_descriptor["katakana_mastered"]["earned"] is False
@@ -1711,16 +1721,36 @@ def test_worker_returns_handled_error_for_corrupt_daily_games_database(
     assert db_path.read_bytes() == corrupted_contents
 
 
+def _daily_pool(state: dict[str, object]) -> dict[str, Any]:
+    """The word pool from a daily-games state payload, typed for indexing."""
+    return cast("dict[str, Any]", state["pool"])
+
+
+def _daily_progress(state: dict[str, object]) -> dict[str, Any]:
+    """The per-day progress block from a daily-games payload, typed for indexing."""
+    return cast("dict[str, Any]", state["progress"])
+
+
+def _daily_streak(state: dict[str, object]) -> dict[str, Any]:
+    """The streak block from a daily-games payload, typed for indexing."""
+    return cast("dict[str, Any]", state["streak"])
+
+
+def _daily_attempts(state: dict[str, object]) -> list[dict[str, Any]]:
+    """The recorded attempts from a daily-games payload, typed for indexing."""
+    return cast("list[dict[str, Any]]", state["attempts"])
+
+
 def test_daily_games_state_creates_a_stable_same_day_pool(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
     first = desktop_bridge.build_daily_games_state("2026-07-15")
     second = desktop_bridge.build_daily_games_state("2026-07-15")
 
-    assert first["pool"] == second["pool"]
-    assert first["pool"]["day"] == "2026-07-15"
-    assert first["pool"]["words"]
-    assert set(first["pool"]["game_seeds"]) == {
+    assert _daily_pool(first) == _daily_pool(second)
+    assert _daily_pool(first)["day"] == "2026-07-15"
+    assert _daily_pool(first)["words"]
+    assert set(_daily_pool(first)["game_seeds"]) == {
         "crossword",
         "word_search",
         "match_pairs",
@@ -1747,7 +1777,7 @@ def test_daily_games_record_attempt_updates_daily_only_progress_and_streak(
 ) -> None:
     _use_temp_db(tmp_path, monkeypatch)
     state = desktop_bridge.build_daily_games_state("2026-07-15")
-    assert state["pool"]["words"]
+    assert _daily_pool(state)["words"]
 
     updated = desktop_bridge.record_daily_games_attempt(
         "2026-07-15",
@@ -1761,11 +1791,11 @@ def test_daily_games_record_attempt_updates_daily_only_progress_and_streak(
         ),
     )
 
-    assert updated["progress"]["attempt_count"] == 1
-    assert updated["progress"]["completed_daily_game_types"] == ["crossword"]
-    assert updated["progress"]["missed_words"][0]["miss_count"] == 1
-    assert updated["streak"]["current_streak_days"] == 1
-    assert updated["attempts"][0]["outcomes"] == [
+    assert _daily_progress(updated)["attempt_count"] == 1
+    assert _daily_progress(updated)["completed_daily_game_types"] == ["crossword"]
+    assert _daily_progress(updated)["missed_words"][0]["miss_count"] == 1
+    assert _daily_streak(updated)["current_streak_days"] == 1
+    assert _daily_attempts(updated)[0]["outcomes"] == [
         {"pool_position": 0, "outcome": "incorrect"}
     ]
 
@@ -1798,12 +1828,12 @@ def test_daily_games_repeated_daily_completion_is_idempotent_and_practice_is_iso
         (desktop_bridge.DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
     )
 
-    assert first["progress"]["attempt_count"] == 1
-    assert repeated["progress"]["attempt_count"] == 1
-    assert repeated["streak"]["current_streak_days"] == 1
-    assert practiced["progress"]["attempt_count"] == 2
-    assert practiced["progress"]["completed_daily_game_types"] == ["crossword"]
-    assert practiced["streak"]["current_streak_days"] == 1
+    assert _daily_progress(first)["attempt_count"] == 1
+    assert _daily_progress(repeated)["attempt_count"] == 1
+    assert _daily_streak(repeated)["current_streak_days"] == 1
+    assert _daily_progress(practiced)["attempt_count"] == 2
+    assert _daily_progress(practiced)["completed_daily_game_types"] == ["crossword"]
+    assert _daily_streak(practiced)["current_streak_days"] == 1
     with database._connect() as conn:  # type: ignore[attr-defined]
         assert conn.execute("SELECT * FROM review_states").fetchall() == before_states
         assert conn.execute("SELECT * FROM review_events").fetchall() == before_events
@@ -1832,7 +1862,7 @@ def test_daily_games_state_and_duplicate_retry_reconcile_stale_streak(
 
     loaded = desktop_bridge.build_daily_games_state("2026-07-15")
 
-    assert loaded["streak"]["current_streak_days"] == 1
+    assert _daily_streak(loaded)["current_streak_days"] == 1
     assert repository.load_streak_state().last_completed_day == date(2026, 7, 15)
 
     repository.save_streak_state(DailyGamesStreakState())
@@ -1846,8 +1876,8 @@ def test_daily_games_state_and_duplicate_retry_reconcile_stale_streak(
         (DailyGameWordOutcome(pool_position=1, outcome="incorrect"),),
     )
 
-    assert retried["progress"]["attempt_count"] == 1
-    assert retried["streak"]["current_streak_days"] == 1
+    assert _daily_progress(retried)["attempt_count"] == 1
+    assert _daily_streak(retried)["current_streak_days"] == 1
     assert repository.load_streak_state().last_completed_day == date(2026, 7, 15)
 
 
@@ -1890,9 +1920,9 @@ def test_daily_games_new_completion_reconstructs_streak_from_attempt_days(
         (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
     )
 
-    assert updated["streak"]["last_completed_day"] == "2026-07-16"
-    assert updated["streak"]["current_streak_days"] == 2
-    assert updated["streak"]["freezes_available"] == 3
+    assert _daily_streak(updated)["last_completed_day"] == "2026-07-16"
+    assert _daily_streak(updated)["current_streak_days"] == 2
+    assert _daily_streak(updated)["freezes_available"] == 3
 
     save_calls: list[DailyGamesStreakState] = []
     monkeypatch.setattr(repository, "save_streak_state", save_calls.append)
@@ -1937,8 +1967,8 @@ def test_daily_games_state_resolves_misses_by_completion_time_not_insertion_orde
 
     state = desktop_bridge.build_daily_games_state("2026-07-15")
 
-    assert state["progress"]["missed_words"] == [
-        {"word": state["pool"]["words"][0], "miss_count": 1}
+    assert _daily_progress(state)["missed_words"] == [
+        {"word": _daily_pool(state)["words"][0], "miss_count": 1}
     ]
 
 
@@ -1968,8 +1998,8 @@ def test_daily_games_state_clears_resolved_miss_summary(
         (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
     )
 
-    assert missed["progress"]["missed_words"][0]["miss_count"] == 1
-    assert corrected["progress"]["missed_words"] == []
+    assert _daily_progress(missed)["missed_words"][0]["miss_count"] == 1
+    assert _daily_progress(corrected)["missed_words"] == []
     assert DailyGamesRepository().load_active_game_miss_card_ids(
         "Vocabulary N5", date(2026, 7, 15)
     ) == set()

@@ -36,6 +36,16 @@ def _manifest() -> dict[str, object]:
     return json.loads((DATA_ROOT / "manifest.json").read_text(encoding="utf-8"))
 
 
+def _chunks(manifest: dict[str, object]) -> dict[str, dict[str, Any]]:
+    """Chunk name -> {path, sha256, characterCount}, narrowed from the parsed JSON."""
+    return cast(dict[str, dict[str, Any]], manifest["chunks"])
+
+
+def _characters(manifest: dict[str, object]) -> dict[str, dict[str, str]]:
+    """Character -> {chunk}, narrowed from the parsed JSON."""
+    return cast(dict[str, dict[str, str]], manifest["characters"])
+
+
 def test_offline_handwriting_data_covers_every_eligible_character_once() -> None:
     """Every single-character deck entry either has stroke data or is listed as lacking it.
 
@@ -49,7 +59,8 @@ def test_offline_handwriting_data_covers_every_eligible_character_once() -> None
     manifest = _manifest()
     expected = _eligible_characters()
     coverage = cast(dict[str, Any], manifest["coverage"])
-    characters = cast(dict[str, dict[str, str]], manifest["characters"])
+    characters = _characters(manifest)
+    chunks = _chunks(manifest)
     all_eligible = set().union(*map(set, expected.values()))
     missing_data = set(coverage["excludedMissingData"])
 
@@ -58,17 +69,18 @@ def test_offline_handwriting_data_covers_every_eligible_character_once() -> None
     assert missing_data <= all_eligible
     assert set(characters) == all_eligible - missing_data
     assert coverage["eligibleCharacters"] == len(characters)
-    assert all(set(entry) == {"chunk"} and entry["chunk"] in manifest["chunks"] for entry in characters.values())
+    assert all(set(entry) == {"chunk"} and entry["chunk"] in chunks for entry in characters.values())
 
 
 def test_chunk_payloads_are_valid_hashed_and_match_manifest_assignments() -> None:
     manifest = _manifest()
-    assignments_by_chunk: dict[str, set[str]] = {name: set() for name in manifest["chunks"]}
-    for character, entry in manifest["characters"].items():
+    chunks = _chunks(manifest)
+    assignments_by_chunk: dict[str, set[str]] = {name: set() for name in chunks}
+    for character, entry in _characters(manifest).items():
         assignments_by_chunk[entry["chunk"]].add(character)
 
-    assert 8 <= len(manifest["chunks"]) <= 12
-    for name, entry in manifest["chunks"].items():
+    assert 8 <= len(chunks) <= 12
+    for name, entry in chunks.items():
         raw = (DATA_ROOT / entry["path"]).read_bytes()
         payload = json.loads(raw.decode("utf-8"))
         assert hashlib.sha256(raw).hexdigest() == entry["sha256"]
