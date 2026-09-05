@@ -7,9 +7,14 @@ import random
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 try:
-    from pykakasi import kakasi as _kakasi_factory
+    from pykakasi import kakasi
+
+    # Bound through a separate name because `kakasi` is a class: assigning None
+    # directly to the imported name is a "Cannot assign to a type" error.
+    _kakasi_factory: Any | None = kakasi
 except ImportError:
     _kakasi_factory = None
 

@@ -148,13 +148,17 @@ def select_daily_word_pool(
         "new": [],
     }
     for candidate in candidates:
-        source = _source_for_candidate(candidate, reference_date, recent_window_days)
-        if source is not None:
-            buckets[source].append(candidate)
+        # Named apart from the bucket-ordering `source` below: that one is always
+        # one of the three literals, while this one is None for a candidate that
+        # belongs in no bucket at all.
+        candidate_source = _source_for_candidate(candidate, reference_date, recent_window_days)
+        if candidate_source is not None:
+            buckets[candidate_source].append(candidate)
 
     selected: list[DailyGameWord] = []
     seen_duplicates: set[str] = set()
-    for source in ("due", "recent", "new"):
+    bucket_order: tuple[DailyGameWordSource, ...] = ("due", "recent", "new")
+    for source in bucket_order:
         ranked = sorted(
             buckets[source],
             key=lambda candidate: _selection_rank(

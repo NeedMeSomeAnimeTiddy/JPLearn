@@ -24,6 +24,11 @@ def _first_card_id(slug: str) -> int:
     return ALL_DECKS[slug]().cards[0].id
 
 
+def _stored_scores() -> dict[str, dict[int, int]]:
+    """The persisted counters, narrowed from the bridge's dict[str, object] payload."""
+    return cast(dict[str, dict[int, int]], desktop_bridge.build_card_mastery_scores()["scores"])
+
+
 def test_record_result_returns_and_persists_the_counter(tmp_path: Path, monkeypatch) -> None:
     """The counter rides on the existing write call, so no extra round-trip."""
     _use_temp_db(tmp_path, monkeypatch)
@@ -34,7 +39,7 @@ def test_record_result_returns_and_persists_the_counter(tmp_path: Path, monkeypa
 
     assert first["mastery_score"] == 1
     assert second["mastery_score"] == 2
-    stored = desktop_bridge.build_card_mastery_scores()["scores"]
+    stored = _stored_scores()
     assert stored["hiragana"][card_id] == 2
 
 
@@ -82,9 +87,7 @@ def test_import_resolves_legacy_sections_to_owning_decks(tmp_path: Path, monkeyp
     assert result["cards_imported"] == 2
     assert result["cards_unresolved"] == 0
 
-    stored = cast(
-        dict[str, dict[int, int]], desktop_bridge.build_card_mastery_scores()["scores"]
-    )
+    stored = _stored_scores()
     assert stored["kanji_n5"][kanji_card] == 3
     assert stored["vocab_n5"][vocab_card] == CARD_MASTERY_MAX
     assert "vocab_greetings" not in stored
@@ -121,7 +124,7 @@ def test_import_clamps_out_of_range_legacy_values(tmp_path: Path, monkeypatch) -
 
     desktop_bridge.import_legacy_card_scores({"hiragana": {str(card_id): 999}})
 
-    stored = desktop_bridge.build_card_mastery_scores()["scores"]
+    stored = _stored_scores()
     assert stored["hiragana"][card_id] == CARD_MASTERY_MAX
 
 
@@ -139,7 +142,7 @@ def test_import_will_not_overwrite_progress_recorded_since(tmp_path: Path, monke
 
     assert result["imported"] is False
     assert result["cards_imported"] == 0
-    stored = desktop_bridge.build_card_mastery_scores()["scores"]
+    stored = _stored_scores()
     assert stored["hiragana"][card_id] == 1
 
 
