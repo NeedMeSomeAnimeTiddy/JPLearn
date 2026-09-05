@@ -1,1 +1,0 @@
-export { useHeatmap } from './useHeatmap'

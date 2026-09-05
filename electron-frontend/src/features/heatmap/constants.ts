@@ -1,2 +1,0 @@
-export const DEFAULT_LOOKBACK_DAYS = 365
-export const REVIEWS_PER_ROUND = 12
