@@ -130,15 +130,31 @@ jobs:
             exit 1
           }
 
-          # Publish the interpreter to every later step. The packaged app reads
-          # JPLEARN_PYTHON first (electron/main.cjs::resolvePythonCommand) and would
-          # otherwise fall back to a bare `python` that is not on this runner's PATH,
-          # so the packaged smoke test would start an app whose backend never answers.
+          # Publish the interpreter so later steps can find it. JPLEARN_PYTHON is
+          # deliberately not set here: the next step builds a virtualenv from this
+          # interpreter and points the app at that instead.
           Split-Path -Parent $pythonExe | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
-          "JPLEARN_PYTHON=$pythonExe" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
 
       - name: Install Python dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          # A virtualenv rather than this interpreter directly. The runner service
+          # cannot write to C:\Program Files\Python311, so pip falls back to the
+          # account's user site-packages -- which Python locates through %APPDATA%,
+          # and scripts/packaged-smoke.cjs overrides APPDATA to sandbox the app's
+          # data. The bridge then cannot import fugashi and every backend call dies.
+          # A venv keeps packages in its own site-packages, where APPDATA is irrelevant.
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $venvPython = Join-Path (Get-Location).Path '.venv\Scripts\python.exe'
+          & $venvPython -m pip install --disable-pip-version-check --quiet -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $venvPython -c "import fugashi, psutil; print('backend deps import OK')"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          # GITHUB_PATH prepends, so `python` in later steps is the venv's. The app
+          # reads JPLEARN_PYTHON first (electron/main.cjs::resolvePythonCommand).
+          Split-Path -Parent $venvPython | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
+          "JPLEARN_PYTHON=$venvPython" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
 
       - name: Install frontend dependencies
         working-directory: electron-frontend
