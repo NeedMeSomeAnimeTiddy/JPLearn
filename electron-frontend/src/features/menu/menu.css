@@ -2090,7 +2090,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-cap {
   display: flex; align-items: baseline; justify-content: space-between; white-space: nowrap;
   padding: 6px 15px 7px; background: var(--ink); color: var(--gold-hi);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
 }
 
 .lg-cap i { font-style: normal; color: rgba(232, 196, 124, 0.62); }
@@ -2129,7 +2129,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   font-size: 92px; line-height: 0.78; color: rgba(20, 17, 13, 0.15); }
 
 .lg-ghost i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.42); white-space: nowrap; }
+  font-size: 11px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.42); white-space: nowrap; }
 
 .lg-frz {
   margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 10px 24px 12px;
@@ -2159,8 +2159,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   transform: skewX(-8deg) rotate(-1.2deg); }
 
 .lg-resthead { flex: none; padding: 6px 18px 7px; background: rgba(20, 17, 13, 0.86);
-  color: var(--gold-hi); font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.2em; white-space: nowrap; }
+  color: var(--gold-hi); font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.16em; white-space: nowrap; }
 
 /* the rows are positioned by flex INSIDE the plate, so the ring has to be relative to the
    row rather than the frame -- hence its own positioning context here */
@@ -2212,8 +2212,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-strip i.none { background: rgba(20, 17, 13, 0.16); }
 .lg-stripcap {
   display: flex; justify-content: space-between; padding: 5px 20px 12px;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 8px; letter-spacing: 0.16em;
-  color: rgba(20, 17, 13, 0.42);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.12em;
+  color: rgba(20, 17, 13, 0.5);
 }
 .lg-line {
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
@@ -2232,8 +2232,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-line.off i { color: rgba(20, 17, 13, 0.32); font-weight: 700; }
 /* the caveat, which is the reason the sheet exists at all */
 .lg-note {
-  padding: 12px 20px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 9px;
-  line-height: 1.6; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.5);
+  padding: 12px 20px 0; font-family: var(--lat-ui); font-weight: 600; font-size: 11px;
+  line-height: 1.6; letter-spacing: 0.08em; color: rgba(20, 17, 13, 0.5);
 }
 
 /* a row is a door now, and has to look like one under the pointer */
@@ -2263,8 +2263,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    is the only one the arithmetic allows without moving the year band. */
 .lg-rowlab { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
 
-.lg-rowlab b { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.52); white-space: nowrap; }
+.lg-rowlab b { font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.6); white-space: nowrap; }
 
 .lg-rowlab i { font-style: normal; font-family: var(--jp-go); font-weight: 700;
   font-size: 12px; letter-spacing: 0.08em; color: rgba(20, 17, 13, 0.72);
@@ -2311,8 +2311,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   align-items: center; justify-content: center; gap: 1px; background: var(--gold);
   box-shadow: inset -4px 0 0 var(--ink); }
 
-.lg-lvn span { font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
-  letter-spacing: 0.24em; color: rgba(20, 17, 13, 0.62); white-space: nowrap; }
+.lg-lvn span { font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.62); white-space: nowrap; }
 
 .lg-lvn b { font-family: var(--lat); font-style: italic; font-weight: 900;
   font-size: 30px; line-height: 1; color: var(--ink); }
@@ -2322,8 +2322,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .lg-xprow { display: flex; align-items: baseline; justify-content: space-between; }
 
-.lg-xprow b { font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.6); white-space: nowrap; }
+.lg-xprow b { font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.15em; color: rgba(242, 234, 216, 0.6); white-space: nowrap; }
 
 .lg-xprow i { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
   font-size: 10px; letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap; }
@@ -2343,8 +2343,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .lg-pips i.got { background: var(--gold); box-shadow: none; }
 
-.lg-badges span { font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
+.lg-badges span { font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.14em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
 
 /* ==================================================================================================
    AN EARLIER COPY OF THIS SHEET USED TO SIT HERE, AND IT WAS THE ONE THAT RENDERED.
@@ -2378,7 +2378,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lg-ach .lg-pips i { width: 6px; height: 6px; }
 
 .lg-ach em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.16em; color: var(--gold-hi); white-space: nowrap; }
+  font-size: 10.5px; letter-spacing: 0.13em; color: var(--gold-hi); white-space: nowrap; }
 
 
 
@@ -2829,7 +2829,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   letter-spacing: 0; color: var(--ink); }
 
 .lb-mark em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 7.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.55); }
+  font-size: 10px; letter-spacing: 0.11em; color: rgba(20, 17, 13, 0.55); }
 
 .lb-body { flex: 1; min-width: 0; display: flex; flex-direction: column;
   justify-content: center; }
@@ -2861,7 +2861,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 .lb-detail i.new { color: #b23320; }
 
-.lb-detail i.src { font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.42); }
+.lb-detail i.src { font-size: 11px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.52); }
 
 .lb-detail s { flex: none; width: 3px; height: 3px; background: rgba(20, 17, 13, 0.28); }
 
@@ -2870,7 +2870,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   box-shadow: inset 1px 0 0 rgba(20, 17, 13, 0.14); }
 
 .lb-state em { font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); white-space: nowrap; }
+  font-size: 10.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45); white-space: nowrap; }
 
 .lb-state b { font-family: var(--lat); font-style: italic; font-weight: 900;
   letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
@@ -2887,11 +2887,11 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lb-slab b { font-family: var(--lat-ui); font-weight: 700; font-size: 12.5px;
   letter-spacing: 0.14em; color: #ffd9a1; }
 
-.lb-slab b.key { font-size: 9.5px; letter-spacing: 0.18em; color: rgba(255, 217, 161, 0.75); }
+.lb-slab b.key { font-size: 11px; letter-spacing: 0.15em; color: rgba(255, 217, 161, 0.75); }
 
 .lb-hint { flex: none; width: 186px; align-self: center; padding-right: 16px;
   text-align: right; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.18em; white-space: nowrap;
+  font-size: 11px; letter-spacing: 0.14em; white-space: nowrap;
   color: rgba(20, 17, 13, 0.32); }
 
 /* 28, NOT 26. This block's origin is frame y164, so the stage's 192 is 28 here -- the band
@@ -2923,7 +2923,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lb-head.here .lb-plate b.n { color: var(--ink); }
 
 .lb-plate i { flex: none; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.2em; white-space: nowrap; color: rgba(20, 17, 13, 0.42); }
+  font-size: 11px; letter-spacing: 0.15em; white-space: nowrap; color: rgba(20, 17, 13, 0.52); }
 
 /* ---- the whole library in one strip ---- */
 .lb-mini { position: absolute; left: 190px; top: 578px; width: 900px;
@@ -2935,7 +2935,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .lb-count { position: absolute; right: 190px; display: flex; align-items: baseline; gap: 7px;
   padding: 3px 10px 4px; background: rgba(10, 9, 6, 0.82);
   box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.24);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
   color: rgba(242, 234, 216, 0.6); white-space: nowrap; z-index: 34;
   transition: opacity 0.24s ease; }
 
@@ -3736,7 +3736,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 }
 
 .lg-none em {
-  font-family: var(--lat-ui); font-style: italic; font-weight: 700; font-size: 8.5px;
+  font-family: var(--lat-ui); font-style: italic; font-weight: 700; font-size: 10.5px;
   letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.45); white-space: nowrap;
 }
 
