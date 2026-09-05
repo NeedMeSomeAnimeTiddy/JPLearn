@@ -70,9 +70,39 @@ jobs:
             Write-Host ""
             Write-Host "This runner is missing part of the toolchain:" -ForegroundColor Red
             $problems | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+
+            # A tool that is installed but invisible here looks identical to one that
+            # was never installed, and the two have completely different fixes. Report
+            # enough to tell them apart: the account the runner runs as, and whether an
+            # interpreter exists somewhere this process cannot see.
             Write-Host ""
-            Write-Host "Install Python 3.11 and Node 22+ on the runner machine and restart"
-            Write-Host "the runner so it picks up the new PATH."
+            Write-Host "Runner account: $(whoami)"
+            $pathPython = ($env:PATH -split ';' | Where-Object { $_ -match 'python' })
+            if ($pathPython) {
+              Write-Host "PATH entries mentioning python:"
+              $pathPython | ForEach-Object { Write-Host "  $_" }
+            } else {
+              Write-Host "No PATH entry mentions python."
+            }
+
+            $candidates = @(
+              "$env:LOCALAPPDATA\Programs\Python",
+              "$env:ProgramFiles\Python311",
+              "${env:ProgramFiles(x86)}\Python311",
+              "C:\Python311"
+            ) | Where-Object { $_ -and (Test-Path $_) }
+            if ($candidates) {
+              Write-Host "Found a Python install this process cannot reach on PATH:"
+              $candidates | ForEach-Object { Write-Host "  $_" }
+              Write-Host "If that is a per-user install, it belongs to the installing"
+              Write-Host "account, not to $(whoami) -- reinstall for all users."
+            }
+            $launcher = Get-Command py -CommandType Application -ErrorAction SilentlyContinue
+            if ($launcher) { Write-Host "The py launcher is available at $($launcher.Source)" }
+
+            Write-Host ""
+            Write-Host "Install Python 3.11 and Node 22+ for all users, then restart the"
+            Write-Host "runner: a running service keeps the PATH it started with."
             exit 1
           }
 
