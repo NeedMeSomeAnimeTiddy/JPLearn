@@ -44,12 +44,12 @@
 }
 .lk-cap b { font-family: var(--jp); font-weight: 700; font-size: 13px; color: var(--gold-hi); }
 .lk-cap i {
-  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.2em; color: var(--gold-hi);
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.16em; color: var(--gold-hi);
 }
 .lk-cap s {
   margin-left: auto; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.45);
+  font-size: 10.5px; letter-spacing: 0.13em; color: rgba(242, 234, 216, 0.45);
 }
 
 /* THE FIELD IS THE WHOLE INTERFACE, so it is drawn as one: an underline the width of the sheet
@@ -82,7 +82,7 @@
 .lk-field input::placeholder { color: rgba(20, 17, 13, 0.26); }
 .lk-route {
   flex: none; margin-left: auto; padding: 4px 12px 5px; background: var(--ink);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.13em;
   color: var(--gold-hi); white-space: nowrap;
 }
 .lk-route.busy { color: rgba(232, 196, 124, 0.5); }
@@ -102,7 +102,7 @@
 .lk-line { display: flex; align-items: baseline; gap: 11px; }
 .lk-line em {
   flex: none; width: 96px; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45);
+  font-size: 10.5px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.45);
 }
 .lk-line > span {
   flex: 1; min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 12px;
@@ -121,12 +121,12 @@
   font-family: var(--jp); font-weight: 700; font-size: 16px; line-height: 1; color: var(--ink);
 }
 .lk-chips i.lat {
-  font-family: var(--lat-ui); font-size: 9.5px; letter-spacing: 0.14em; padding: 7px 10px;
+  font-family: var(--lat-ui); font-size: 10.5px; letter-spacing: 0.12em; padding: 7px 10px;
   color: rgba(20, 17, 13, 0.62);
 }
 .lk-note {
-  padding: 0 20px 14px; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.13em; line-height: 1.6; color: var(--hi);
+  padding: 0 20px 14px; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.11em; line-height: 1.6; color: var(--hi);
 }
 .lk-note.quiet { color: rgba(20, 17, 13, 0.4); }
 
@@ -139,8 +139,8 @@
 }
 .lk-r:last-child { box-shadow: none; }
 .lk-r b {
-  display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
-  letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.42);
+  display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.11em; color: rgba(20, 17, 13, 0.42);
 }
 .lk-r i {
   display: block; margin-top: 4px; font-style: normal; font-family: var(--jp); font-weight: 700;
@@ -156,14 +156,14 @@
 /* a route that answered gets a mark, so you can see where the answers are without visiting each */
 .lk-r u {
   float: right; text-decoration: none; font-family: var(--lat-ui); font-weight: 900;
-  font-size: 8.5px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.34);
+  font-size: 10.5px; letter-spacing: 0.09em; color: rgba(20, 17, 13, 0.34);
 }
 .lk-r.on u { color: rgba(232, 196, 124, 0.6); }
 .lk-r:focus-visible { outline: 2px solid var(--hi); outline-offset: -3px; }
 
 .lk-hint {
   position: absolute; left: 250px; top: 604px; width: 780px; text-align: center;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.13em;
   color: var(--gold-hi); paint-order: stroke fill;
   -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.8);
 }

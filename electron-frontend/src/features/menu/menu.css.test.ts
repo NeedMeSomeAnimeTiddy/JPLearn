@@ -292,6 +292,32 @@ describe('the frame contract', () => {
     expect(menuHas('.as-lockbox')).toBe(false)
   })
 
+  /* ==================================================================================================
+     TEN POINTS IS THE FLOOR, and it took four passes to get here.
+
+     The menu was drawn at phone scale and then rebuilt screen by screen at desktop scale, and every
+     time a screen's figures were resized the labels beside them were left where they were -- so the
+     ledger read `ACCURACY 正答率` at nine points against a per-cent at thirty, and the library set
+     `MIN` under a text's length at seven and a half. Sixty-nine rules across thirteen screens, found
+     one and two at a time because none of them was ever the worst thing on the screen it was on.
+
+     This is the line under that. A size below ten is not a design question at 1280x720 -- it is type
+     nobody at desk distance can read -- and the four rules at exactly ten are the floor rather than
+     an exception to it. `round.css` has its own smallest rule at 9.5, deliberately, on the card tags.
+     ================================================================================================== */
+  it('never sets menu type below ten points again', () => {
+    const offenders: string[] = []
+    for (const [name, css] of Object.entries(SHEETS)) {
+      for (const match of css.matchAll(/([^{}]*)\{([^{}]*)\}/g)) {
+        const selector = match[1].split('\n').pop()?.trim() ?? ''
+        for (const size of match[2].matchAll(/font-size:\s*([\d.]+)px/g)) {
+          if (Number(size[1]) < 10) offenders.push(`${name} ${selector} @${size[1]}px`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
   it('has no card grid and no card fan left to come back', () => {
     /* THE TWO SHAPES THIS FAMILY OF SCREENS DOES NOT MAKE. `.dk-sheet` was a six-across paged
        overlay of cleared blocks and `.dr-tab`/`.dr-hero`/`.dr-side` were seventeen modes fanned off

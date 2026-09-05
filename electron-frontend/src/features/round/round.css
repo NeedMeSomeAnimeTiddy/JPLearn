@@ -572,8 +572,8 @@
   padding: 2px 7px 3px;
   background: rgba(20, 17, 13, 0.07);
   box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
-  color: rgba(20, 17, 13, 0.55);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.12em;
+  color: rgba(20, 17, 13, 0.6);
 }
 
 /* LISTENING HIDES ITS PROMPT UNTIL THE ANSWER IS IN. Not `display: none` — the box keeps its place,

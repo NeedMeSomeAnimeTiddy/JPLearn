@@ -178,7 +178,7 @@
 }
 .brand-jp2 {
   margin-top: 3px;
-  font-family: var(--jp-go); font-weight: 400; font-size: 9.5px; letter-spacing: 0.24em;
+  font-family: var(--jp-go); font-weight: 400; font-size: 11px; letter-spacing: 0.2em;
   color: var(--washi-dim); text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.55);
 }
 /* the four claims the menu makes about you: the hour, the day, the streak and the level */
@@ -355,8 +355,8 @@
 
 .sh-cap { flex: none; display: flex; align-items: baseline; justify-content: space-between;
   gap: 10px; padding: 7px 15px 8px; background: var(--ink); white-space: nowrap; }
-.sh-cap b { font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.2em; color: var(--gold-hi); }
+.sh-cap b { font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.16em; color: var(--gold-hi); }
 .sh-cap i { font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 10.5px;
   letter-spacing: 0.1em; color: rgba(232, 196, 124, 0.6); }
 
@@ -369,17 +369,17 @@
    copied from `.sh-fig i` beside it, doing nothing but making the declaration read both ways */
 .sh-fig em { font-family: var(--lat); font-style: italic; font-weight: 900;
   font-size: 16px; line-height: 1.05; color: #b23320; }
-.sh-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.18em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
+.sh-fig i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.5); white-space: nowrap; }
 /* the one line that says WHY this and not something else -- without it the card is an
    instruction, and an instruction a learner cannot audit is one they stop trusting */
 .sh-why { margin-top: 9px; font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px;
   line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.66); }
 .sh-meta { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between;
   gap: 10px; padding: 10px 16px 9px; white-space: nowrap;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.14em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.12em;
   color: rgba(20, 17, 13, 0.5); }
-.sh-meta s { text-decoration: none; color: rgba(20, 17, 13, 0.34); }
+.sh-meta s { text-decoration: none; color: rgba(20, 17, 13, 0.45); }
 .sh-slab { flex: none; height: 32px; display: grid; place-items: center; background: var(--hi);
   font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
   color: #ffd9a1; white-space: nowrap; }
@@ -522,7 +522,7 @@
 .st-state b, .st-state i {
   flex: none; font-family: var(--lat-ui); font-weight: 700; font-style: normal; white-space: nowrap;
 }
-.st-state b { font-size: 8.5px; letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.45); }
+.st-state b { font-size: 10.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45); }
 .st-state i { font-size: 10px; letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.8); }
 .st-fig {
   display: none; align-items: center; gap: 10px;
@@ -622,8 +622,8 @@
      their bottoms already agreed; matching the bands makes the tops agree too and the pair
      reads as one line across rather than as two red rectangles at slightly different sizes. */
   flex: none; height: 28px; padding: 8px 9px; background: var(--hi);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; line-height: 12px;
-  letter-spacing: 0.14em; color: #ffd9a1; white-space: nowrap;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; line-height: 12px;
+  letter-spacing: 0.11em; color: #ffd9a1; white-space: nowrap;
 }
 .st-strip {
   flex: none; width: 20px; display: grid; place-items: center;
@@ -631,7 +631,7 @@
 }
 .st-strip span {
   writing-mode: vertical-rl;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.13em;
   line-height: 1; color: var(--ink);
 }
 
@@ -832,7 +832,7 @@ body.mn-leaving .mn-open.on {
 /* WHERE YOU CAME FROM, and only at level three -- at level two the heading IS the section, so a
    kicker would be the same word twice */
 .pj-kick {
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.22em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.18em;
   color: rgba(20, 17, 13, 0.5); margin-bottom: 4px;
 }
 .pj-title { display: flex; flex-direction: row; align-items: baseline; gap: 14px; }
@@ -848,7 +848,7 @@ body.mn-leaving .mn-open.on {
 .pj-note {
   align-self: center; padding: 0 16px 0 6px; margin-left: auto;
   min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.1em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.09em;
   color: rgba(20, 17, 13, 0.5);
 }
 /* a heading has a line under it, which is the other half of "this is not an item" */
@@ -877,7 +877,7 @@ body.mn-leaving .mn-open.on {
 .lvb-lab {
   display: flex; align-items: center; padding: 0 11px;
   background: rgba(20, 17, 13, 0.72);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
   color: rgba(242, 234, 216, 0.72); white-space: nowrap;
   transform: skewX(-8deg) rotate(-1.2deg);
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45);
@@ -892,16 +892,16 @@ body.mn-leaving .mn-open.on {
 }
 /* the printed digit, which is the whole reason this row needs no axis of its own */
 .lvb-chip s {
-  text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 8px;
-  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.42);
+  text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.42);
 }
 .lvb-chip b {
   font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
   color: var(--ink);
 }
 .lvb-chip i {
-  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
-  letter-spacing: 0.1em; color: rgba(20, 17, 13, 0.48);
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.09em; color: rgba(20, 17, 13, 0.48);
 }
 .lvb-chip:hover { filter: brightness(1.06); }
 .lvb-chip.on {
@@ -952,7 +952,7 @@ body.mn-leaving .mn-open.on {
 .as-tick { position: absolute; left: 168px; transform: translateY(-50%);
   padding: 2px 6px; background: rgba(10, 9, 6, 0.82);
   box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.22);
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
   color: rgba(242, 234, 216, 0.6); }
 
 /* 265/834, FOLLOWING THE COLUMNS. They ran 267-744 while the detail panel took the
@@ -970,7 +970,11 @@ body.mn-leaving .mn-open.on {
 
 .as-chip { z-index: 7; }
 
-.as-chip { position: absolute; left: 163px; width: 66px; transform: translateY(-50%) skewX(-8deg);
+/* 168, WHICH IS WHERE THE TICKS STAND. Skew bleeds sideways in proportion to HEIGHT, and this chip
+   wraps its label onto a second line -- so it was already painting from 159 at eight points and from
+   158.7 once the label became readable. Five pixels to the right of the moat is the fix, and it puts
+   the chip on the same left edge as `.as-tick`. */
+.as-chip { position: absolute; left: 168px; width: 82px; transform: translateY(-50%) skewX(-8deg);
   padding: 5px 0 6px; text-align: center; background: rgba(10, 9, 6, 0.9);
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); }
 
@@ -988,7 +992,7 @@ body.mn-leaving .mn-open.on {
 .as-chip.ready b { color: var(--washi); }
 
 .as-chip i { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 8px; letter-spacing: 0.2em; margin-top: 3px; color: rgba(242, 234, 216, 0.72); }
+  font-size: 10.5px; letter-spacing: 0.14em; margin-top: 3px; color: rgba(242, 234, 216, 0.72); }
 
 /* 0.72 AND 0.70, NOT 0.88 AND 0.86. An empty track is the part of the column that is not
    the drawing, and at 118 wide there is half as much again of it as there was at 84 --
@@ -1056,8 +1060,8 @@ body.mn-leaving .mn-open.on {
   font-weight: 900; font-size: 26px; line-height: 1; color: rgba(242, 234, 216, 0.55); }
 .as-col.here .as-id { margin-top: 16px; font-size: 30px; color: var(--gold-hi); }
 
-.as-state { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.38); }
+.as-state { display: block; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.5); }
 .as-col.here .as-state { font-size: 10px; color: var(--washi); }
 
 /* THE RULE THE FOUR BOXES USED TO REPEAT, ON A GROUND. Gold at 12px over a lit festival ground is
@@ -1270,7 +1274,7 @@ body.frosted .pr-plate, body.frosted .sc-plate {
 /* HOW MANY OF ITS KANJI ARE NEW TO YOU, which is the one thing that decides whether a word is
    readable today -- the payload says how many, never which. */
 .fd-row .s { flex: none; padding-right: 14px; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.16em; color: rgba(232, 196, 124, 0.62); white-space: nowrap; }
+  font-size: 10.5px; letter-spacing: 0.14em; color: rgba(232, 196, 124, 0.62); white-space: nowrap; }
 
 .fd-row.on { height: 50px; width: 480px;
   background: linear-gradient(178deg, rgba(251, 248, 241, var(--paper)) 0%,
@@ -1288,8 +1292,8 @@ body.frosted .pr-plate, body.frosted .sc-plate {
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg); }
 .fd-fold b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
   color: var(--gold-hi); }
-.fd-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.62); }
+.fd-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.62); }
 
 /* ---- the word itself, at poster size on the valley -------------------------------------------- */
 .fd-here { position: absolute; left: 656px; top: 196px; width: 456px; }
@@ -1340,7 +1344,7 @@ body.frosted .pr-plate, body.frosted .sc-plate {
   transition: filter 0.16s ease; }
 .fd-slab:hover { filter: brightness(1.08); }
 .fd-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+  font-size: 11px; letter-spacing: 0.18em; color: rgba(255, 232, 214, 0.85); }
 .fd-slab b { display: block; margin-top: 2px; font-family: var(--lat-ui); font-weight: 700;
   font-size: 16px; letter-spacing: 0.05em; color: var(--washi); }
 
@@ -1356,8 +1360,8 @@ body.frosted .pr-plate, body.frosted .sc-plate {
 .fd-denom span + span { box-shadow: inset 1px 0 0 rgba(242, 234, 216, 0.22); }
 .fd-denom b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
   color: var(--gold-hi); }
-.fd-denom i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.6); }
+.fd-denom i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.13em; color: rgba(242, 234, 216, 0.6); }
 
 .fd-set { position: absolute; left: 160px; top: 604px; width: 960px;
   display: flex; justify-content: center; align-items: stretch; gap: 6px; }
@@ -1460,8 +1464,8 @@ body.frosted .pr-plate, body.frosted .sc-plate {
   box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.45); transform: skewX(-8deg) rotate(-1.2deg); }
 .dk-fold b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px;
   color: var(--gold-hi); }
-.dk-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.62); }
+.dk-fold i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.62); }
 
 /* ---- the block itself, at poster size on the valley ------------------------------------------- */
 .dk-here { position: absolute; left: 656px; top: 196px; width: 456px; }
@@ -1516,7 +1520,7 @@ body.frosted .pr-plate, body.frosted .sc-plate {
   transition: filter 0.16s ease; }
 .dk-slab:hover { filter: brightness(1.08); }
 .dk-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+  font-size: 11px; letter-spacing: 0.18em; color: rgba(255, 232, 214, 0.85); }
 .dk-slab b { display: block; margin-top: 3px; font-family: var(--lat-ui); font-weight: 700;
   font-size: 17px; letter-spacing: 0.06em; color: var(--washi); }
 .dk-slab[data-live="0"] { background: rgba(12, 10, 8, 0.78); cursor: not-allowed; }
@@ -1542,8 +1546,10 @@ body.frosted .pr-plate, body.frosted .sc-plate {
 .dk-segrow i:hover { filter: brightness(1.2); }
 
 .dk-railcap { display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
-  padding: 0 16px 7px; font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px;
-  letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
+  /* 5, NOT 7. Two points of type on this caption is two pixels of plate, and the deck strip already
+     stood a pixel and a half off the foot band floor. */
+  padding: 0 16px 5px; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.15em; color: rgba(242, 234, 216, 0.55); white-space: nowrap; }
 .dk-railcap .cap { color: rgba(242, 234, 216, 0.8); }
 
 /* LISTENING IS NOT A ZERO, IT IS AN ABSENCE. `project_mock_score` returns
@@ -1741,7 +1747,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   position: absolute; left: 166px; top: 130px; padding: 5px 14px 6px;
   border: 0; background: rgba(8, 11, 18, 0.62); cursor: pointer;
   transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.13em;
   color: var(--gold-hi);
 }
 .pj-back:focus-visible { outline: 2px solid var(--hi); outline-offset: 3px; }
@@ -1843,8 +1849,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   justify-content: center; gap: 2px; padding-right: 18px; }
 .pr-tally b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
   line-height: 1; color: var(--gold-hi); }
-.pr-tally i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 9px;
-  letter-spacing: 0.2em; color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
+.pr-tally i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px;
+  letter-spacing: 0.16em; color: rgba(242, 234, 216, 0.5); white-space: nowrap; }
 
 /* the one you are on inverts and overhangs, the same move every other ledger on the stage makes */
 .pr-lane.on { height: 104px; width: 470px;
@@ -1930,7 +1936,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   font-style: normal; font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px;
   color: rgba(242, 234, 216, 0.62); }
 .wd-item u { flex: none; text-decoration: none; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.16em; color: rgba(232, 196, 124, 0.7); white-space: nowrap; }
+  font-size: 10.5px; letter-spacing: 0.14em; color: rgba(232, 196, 124, 0.7); white-space: nowrap; }
 /* one of the three has not been reached yet, and is drawn hollow rather than left out */
 .wd-item.hollow b, .wd-item.hollow em { color: rgba(242, 234, 216, 0.35); }
 .wd-item.hollow u { color: rgba(242, 234, 216, 0.3); }
@@ -1942,7 +1948,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   transition: filter 0.16s ease; }
 .pr-slab:hover { filter: brightness(1.08); }
 .pr-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+  font-size: 11px; letter-spacing: 0.18em; color: rgba(255, 232, 214, 0.85); }
 .pr-slab b { display: block; margin-top: 2px; font-family: var(--lat-ui); font-weight: 700;
   font-size: 16px; letter-spacing: 0.05em; color: var(--washi); }
 /* a lane that is not the obligation invites in ink rather than in vermilion */
@@ -2556,7 +2562,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   transition: filter 0.16s ease; }
 .sc-slab:hover { filter: brightness(1.08); }
 .sc-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+  font-size: 11px; letter-spacing: 0.18em; color: rgba(255, 232, 214, 0.85); }
 .sc-slab b { display: block; margin-top: 2px; font-family: var(--lat-ui); font-weight: 700;
   font-size: 16px; letter-spacing: 0.05em; color: var(--washi); }
 
@@ -3186,8 +3192,8 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .dr-cells { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 13px;
   padding-top: 12px; box-shadow: inset 0 1px 0 rgba(242, 234, 216, 0.18); }
 .dr-cells i { display: block; padding: 3px 8px 4px; font-style: normal; font-family: var(--lat-ui);
-  font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
-  background: rgba(242, 234, 216, 0.08); color: rgba(242, 234, 216, 0.34); }
+  font-weight: 700; font-size: 10.5px; letter-spacing: 0.11em;
+  background: rgba(242, 234, 216, 0.08); color: rgba(242, 234, 216, 0.45); }
 .dr-cells i.has { background: rgba(242, 234, 216, 0.16); color: rgba(242, 234, 216, 0.8); }
 .dr-cells i.at { background: var(--gold); color: var(--ink); }
 
@@ -3198,7 +3204,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
   transition: filter 0.16s ease; }
 .dr-slab:hover { filter: brightness(1.08); }
 .dr-slab em { display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9.5px; letter-spacing: 0.24em; color: rgba(255, 232, 214, 0.85); }
+  font-size: 11px; letter-spacing: 0.18em; color: rgba(255, 232, 214, 0.85); }
 .dr-slab b { display: block; margin-top: 3px; font-family: var(--lat-ui); font-weight: 700;
   font-size: 17px; letter-spacing: 0.05em; color: var(--washi); }
 
@@ -3706,7 +3712,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .pj-empty {
   position: absolute; left: 166px; top: 232px; width: 800px; padding: 14px 18px;
   background: var(--washi); transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
-  font-family: var(--lat-ui); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.12em;
   color: rgba(20, 17, 13, 0.5);
   box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.46), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
 }
@@ -3750,7 +3756,7 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 
 /* the mock's own line, under the bar it belongs to */
 .lv-mock { display: block; margin-top: 5px; font-family: var(--lat-ui); font-weight: 700;
-  font-size: 9px; letter-spacing: 0.12em; color: rgba(242, 234, 216, 0.5); }
+  font-size: 10.5px; letter-spacing: 0.1em; color: rgba(242, 234, 216, 0.5); }
 
 /* the moment darkens the valley on its own, because it is not somewhere you walked to */
 .un-open::after {
@@ -3853,12 +3859,12 @@ body.is-dragging { user-select: none; }
 }
 .sp-h b { font-family: var(--jp); font-weight: 700; font-size: 18px; letter-spacing: 0.1em; }
 .sp-h i {
-  font-family: var(--lat-ui); font-weight: 700; font-style: normal; font-size: 9px;
-  letter-spacing: 0.3em; color: rgba(20, 17, 13, 0.5);
+  font-family: var(--lat-ui); font-weight: 700; font-style: normal; font-size: 10.5px;
+  letter-spacing: 0.2em; color: rgba(20, 17, 13, 0.5);
 }
 .sp-r { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; margin-top: 7px; }
 .sp-r span {
-  font-family: var(--lat-ui); font-weight: 600; font-size: 9.5px; letter-spacing: 0.2em;
+  font-family: var(--lat-ui); font-weight: 600; font-size: 11px; letter-spacing: 0.16em;
   color: rgba(20, 17, 13, 0.58);
 }
 .sp-r b {
