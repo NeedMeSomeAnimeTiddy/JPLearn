@@ -892,7 +892,6 @@ describe('what each deck offers', () => {
     window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
 
     await openHandwritingRound()
-    expect(document.querySelector('.minigame-response-copy')).toBeNull()
 
     fireEvent.click(await screen.findByRole('button', { name: /complete unassisted handwriting/i }))
 

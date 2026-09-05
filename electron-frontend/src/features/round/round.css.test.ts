@@ -18,9 +18,16 @@ describe('the work cell is paper all the way down', () => {
     for (const gone of [
       'sentence-assembly', 'stroke-order-picker', 'stroke-order-candidate', 'speech-answer',
       'handwriting-answer-panel', 'handwriting-canvas',
+      /* and the screen the sheet replaced, whose last components went with the fills: the cassette
+         shell, the HUD, the four-choice grid, the feedback card and the post-run summary */
+      'minigame-cassette', 'minigame-hud', 'minigame-response', 'minigame-focus-mode',
+      'minigame-session-summary', 'round-feedback', 'option-button', 'option-grid',
+      'post-session', 'challenge-prompt', 'hint-assist', 'game-prompt-main',
     ]) {
-      expect(app.includes(gone), `${gone} is still styled in App.css`).toBe(false)
-      expect(round.includes(gone), `${gone} is still styled in round.css`).toBe(false)
+      /* ANCHORED TO THE START OF A CLASS NAME. `settings-option-button` CONTAINS `option-button`
+         and belongs to the settings modal, which is alive; the round grid is `.option-button`. */
+      expect(app.includes(`.${gone}`), `.${gone} is still styled in App.css`).toBe(false)
+      expect(round.includes(`.${gone}`), `.${gone} is still styled in round.css`).toBe(false)
     }
   })
 
