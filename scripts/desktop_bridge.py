@@ -110,7 +110,7 @@ from domain.progression_service import (  # noqa: E402
 )
 from domain.feature_catalog import JPLEARN_FEATURES  # noqa: E402
 from domain.feature_service import evaluate_features  # noqa: E402
-from domain.features import FeatureState  # noqa: E402
+from domain.features import Feature, FeatureState  # noqa: E402
 from domain.milestones import (  # noqa: E402
     REVIEW_COUNT_MILESTONES,
     STREAK_MILESTONES,
@@ -2052,7 +2052,7 @@ def build_progression_status() -> dict[str, object]:
 
 
 def _resolved_requirements(
-    feature_id: str, by_id: dict[str, object], seen: frozenset[str] = frozenset(),
+    feature_id: str, by_id: Mapping[str, Feature], seen: frozenset[str] = frozenset(),
 ) -> tuple[FeatureRequirementPayload, ...]:
     """Return the progression a feature waits on, through any feature chain.
 
