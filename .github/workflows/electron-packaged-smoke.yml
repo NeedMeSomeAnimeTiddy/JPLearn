@@ -195,10 +195,18 @@ jobs:
 
       - name: Upload smoke artifacts
         if: always()
+        # Never fails the job. Artifact storage is subject to the same account-level
+        # restriction as hosted runner minutes, so this step cannot succeed while that
+        # holds -- and a green smoke test reported as a red job is worse than no
+        # upload. The files are on the runner regardless: a self-hosted workspace
+        # persists between runs, unlike a hosted one, so .smoke/ can be read directly
+        # on the machine.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: electron-packaged-smoke-artifacts
-          path: |
-            electron-frontend/.smoke/**
-            electron-frontend/out/**
+          # out/** is deliberately not uploaded: it is the whole packaged app, it is
+          # reproducible from the same commit, and it was most of the 453 files this
+          # step used to push. The smoke diagnostics are what a failure needs.
+          path: electron-frontend/.smoke/**
           if-no-files-found: warn
