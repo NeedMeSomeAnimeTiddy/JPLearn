@@ -57,6 +57,10 @@ export interface RoundProps {
   onBack: () => void
   backLabel?: string
   backJp?: string
+  /* WHAT LEAVING IS CALLED TO A SCREEN READER, which is not always "leave this round" — the same
+     shell carries an exam paper, and abandoning one of those is not abandoning a round. The two
+     words on the tab are `backLabel`/`backJp`; this is the whole sentence they stand for. */
+  backAria?: string
   /** throw this run away and deal a new one; omitted where there is nothing to throw away */
   onRestart?: () => void
   hints: RoundHint[]
@@ -64,7 +68,7 @@ export interface RoundProps {
 
 export function Round({
   head, cap, run, ask, work, said = false, foot, onBack, backLabel = 'Leave', backJp = '中断',
-  onRestart, hints,
+  backAria = 'Leave this round', onRestart, hints,
 }: RoundProps) {
   const entered = useEntered()
   const frameRef = useFrameFit()
@@ -116,7 +120,7 @@ export function Round({
             one press and no confirmation, and a back arrow. They belong together in the corner the
             menu already puts its way out in, and the mark that says which is which is the word. */}
         <div className="back-tab">
-          <button type="button" onClick={onBack} aria-label="Leave this round">
+          <button type="button" onClick={onBack} aria-label={backAria}>
             <span className="bt-en">{backLabel}</span><span className="bt-jp">{backJp}</span>
           </button>
           {onRestart ? (

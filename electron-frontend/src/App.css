@@ -2106,19 +2106,6 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   gap: 16px;
 }
 
-/* CENTRING IS OPT-IN, because `.view-shell` is worn by four screens and three of them fill it.
-   JLPT Preparation is the one that does not: a panel a few hundred pixels tall in a scroll box the
-   height of the window, top-aligned, reading as the top of a page whose rest had failed to load.
-   Putting `align-content: center` on the shared class instead squeezed the Minigame's tape deck
-   from 1,600px to 467 and the Script Hub with it -- `justify-items` on a grid whose children have
-   no width of their own shrink-wraps them. `min-height` is what gives the grid a box to centre in;
-   without it there is nothing to centre against. */
-.view-shell.view-center {
-  min-height: 100%;
-  align-content: center;
-  justify-items: center;
-}
-
 .view-forward {
   animation: viewSlideForward var(--motion-view-duration, 280ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
 }
@@ -4700,8 +4687,7 @@ kbd {
   -webkit-box-orient: vertical;
 }
 
-.block-node-lock-reason,
-.jlpt-level-lock-reason {
+.block-node-lock-reason {
   display: block;
   font-size: 0.72rem;
   line-height: 1.35;
@@ -4735,15 +4721,7 @@ kbd {
   color: var(--text-muted);
 }
 
-.jlpt-level-node.is-active .jlpt-level-button {
-  border-color: color-mix(in oklab, var(--tone-ocean) 70%, var(--card-border));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone-ocean) 36%, transparent);
-}
 
-.jlpt-level-node.is-locked .jlpt-level-button {
-  opacity: 0.52;
-  cursor: not-allowed;
-}
 
 .block-minigame-head {
   margin-top: 8px;
@@ -9797,271 +9775,13 @@ html[data-reduced-motion='true'] *::after {
 }
 
 /* ============================================================
-   JLPT Preparation View
+   The exam's buttons in the settings modal
+
+   ALL THAT IS LEFT OF THE OLD JLPT PREP VIEW. The screen itself is the sheet now
+   (`features/round/round.css`, filled by `views/JLPTPrepView.tsx`) and the readiness dashboard it
+   used to open on is the menu's ASCENT and EXAM LEVEL screens. This one class outlived both because
+   the settings modal borrowed it.
    ============================================================ */
-
-.jlpt-prep-view {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 1.75rem;
-  /* WIDE ENOUGH FOR ALL FIVE LEVELS ON ONE ROW. At 900px the content box is 844, which `auto-fill`
-     divides into exactly three 240px tracks -- so five cards always drew as three and two, with a
-     hole in the corner where N1 was not. Five is prime: either every level is on one row or one row
-     is short, and the ladder reads as a ladder only when it is unbroken. 1,320 gives 1,264 of
-     content, which is five tracks and the gaps. */
-  max-width: 1320px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-/* `align-items` OR THE BUTTON IS THE WHOLE ROW. A column flex container stretches its children
-   across, which blockified the inline-flex "Home" button into 844 pixels of click target for 60
-   pixels of drawn control -- so clicking the empty space beside the title, anywhere along the row,
-   left the screen. Same shape in `.jlpt-results-header` below. */
-.jlpt-prep-header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.jlpt-prep-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-}
-
-.jlpt-prep-title {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.jlpt-prep-subtitle {
-  font-size: 0.85rem;
-  color: var(--text-soft);
-}
-
-.jlpt-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  color: var(--text-soft);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.2rem 0;
-  transition: color 0.15s;
-}
-.jlpt-back-btn:hover { color: var(--accent); }
-
-.jlpt-error-banner {
-  background: color-mix(in srgb, var(--status-error) 15%, transparent);
-  border: 1px solid var(--status-error);
-  color: var(--status-error);
-  border-radius: 6px;
-  padding: 0.6rem 0.9rem;
-  font-size: 0.82rem;
-}
-
-.jlpt-readiness-card.is-ready { border-color: var(--accent); }
-.jlpt-readiness-card.is-locked { opacity: 0.65; }
-/* Exam runner */
-.jlpt-exam-runner {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  padding: 1.5rem 1.75rem;
-  max-width: 640px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.jlpt-exam-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.jlpt-question-counter {
-  flex: 1;
-  text-align: center;
-  font-size: 0.82rem;
-  color: var(--text-soft);
-}
-
-.jlpt-timer {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-soft);
-}
-.jlpt-timer.is-urgent { color: var(--status-error); font-weight: 700; }
-
-.jlpt-mode-label {
-  font-size: 0.78rem;
-  color: var(--text-soft);
-}
-
-.jlpt-timer-bar {
-  height: 3px;
-  background: var(--track-bg);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.jlpt-timer-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 1s linear;
-}
-
-.jlpt-exam-card {
-  text-align: center;
-  padding: 1.5rem;
-  background: var(--card-bg-top);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-}
-
-.jlpt-card-level-tag {
-  font-size: 0.72rem;
-  color: var(--accent);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.jlpt-card-character {
-  font-size: 2.4rem;
-  font-weight: 700;
-  color: var(--text-main);
-  line-height: 1.2;
-}
-
-.jlpt-card-romaji {
-  font-size: 0.9rem;
-  color: var(--text-soft);
-  margin-top: 0.35rem;
-}
-
-.jlpt-choices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
-}
-
-.jlpt-choice {
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-control);
-  border: 1px solid var(--button-border);
-  background: var(--button-bg-top);
-  color: var(--text-main);
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, opacity 0.2s;
-  text-align: center;
-}
-.jlpt-choice:hover:not(:disabled) { border-color: var(--accent); }
-.jlpt-choice.is-correct  { border-color: var(--tone-teal);  background: color-mix(in srgb, var(--tone-teal)  18%, var(--card-bg-top)); }
-.jlpt-choice.is-wrong    { border-color: var(--status-error); background: color-mix(in srgb, var(--status-error) 15%, var(--card-bg-top)); }
-.jlpt-choice.is-dim      { opacity: 0.45; }
-
-.jlpt-example-sentence {
-  font-size: 0.8rem;
-  color: var(--text-soft);
-  text-align: center;
-  padding: 0.6rem;
-  border-radius: 7px;
-  background: var(--bg-subtle);
-}
-
-/* Results */
-.jlpt-results-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-  padding: 1.5rem 1.75rem;
-  max-width: 600px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.jlpt-results-header {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.jlpt-results-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.jlpt-results-stats {
-  display: flex;
-  gap: 1rem;
-}
-
-.jlpt-stat-chip {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.8rem;
-  background: var(--tile-bg);
-  border: 1px solid var(--tile-border);
-  border-radius: 9px;
-}
-.jlpt-stat-value { font-size: 1.4rem; font-weight: 700; color: var(--text-main); }
-.jlpt-stat-label { font-size: 0.75rem; color: var(--text-soft); }
-
-.jlpt-score-section {
-  padding: 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--card-border);
-  background: var(--card-bg-top);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.jlpt-score-section.is-pass { border-color: var(--tone-teal); }
-.jlpt-score-section.is-fail { border-color: var(--status-error); }
-
-.jlpt-score-label { font-size: 0.78rem; color: var(--text-soft); font-weight: 600; }
-.jlpt-score-value { font-size: 1.7rem; font-weight: 700; color: var(--text-main); }
-.jlpt-score-passmark {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.is-pass .jlpt-score-passmark { color: var(--tone-teal); }
-.is-fail .jlpt-score-passmark { color: var(--status-error); }
-.jlpt-score-listening { font-size: 0.77rem; color: var(--text-soft); }
-.jlpt-score-note      { font-size: 0.72rem; color: var(--text-soft); font-style: italic; }
-
-.jlpt-diagnostic-note {
-  font-size: 0.85rem;
-  color: var(--text-soft);
-  padding: 0.75rem 1rem;
-  background: var(--bg-subtle);
-  border-radius: 8px;
-}
-
-.jlpt-results-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
 .jlpt-action-btn {
   padding: 0.55rem 1.1rem;
   border-radius: 0;
@@ -10083,12 +9803,6 @@ html[data-reduced-motion='true'] *::after {
   box-shadow: none;
 }
 
-.jlpt-action-primary {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: var(--accent);
-}
-.jlpt-action-primary:hover { opacity: 0.9; }
 
 /* ── Shared primary button ──────────────────────────────────────── */
 .btn-primary {

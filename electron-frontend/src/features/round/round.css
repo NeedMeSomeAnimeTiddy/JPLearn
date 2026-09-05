@@ -41,9 +41,12 @@
   pointer-events: auto;
 }
 .rd-run .stat-chip { cursor: default; }
+/* TABULAR FIGURES, BECAUSE ONE OF THESE COUNTS DOWN. The exam's clock rewrites itself once a
+   second, and in a proportional face `01:11` is narrower than `01:00` — so the chip breathes, and
+   every chip to the left of it slides. It costs nothing on the counters that do not move. */
 .rd-run b {
   font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
-  letter-spacing: 0; color: var(--ink);
+  letter-spacing: 0; color: var(--ink); font-variant-numeric: tabular-nums;
 }
 .rd-run s { text-decoration: none; color: rgba(20, 17, 13, 0.34); }
 /* the one chip that is allowed to be loud, and only when it is about to matter */
@@ -73,9 +76,11 @@
   padding: 18px 22px 0;
   box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.16);
 }
-/* the exam's stem needs a line length rather than a specimen's width -- the one dimension any of
-   the six fills changes */
-.rd-sheet.wide .rd-ask { width: 392px; }
+/* 322 ON EVERY FILL, INCLUDING THE EXAM'S. The design card widens this cell to 392 for a grammar
+   cloze -- a sentence with a hole in it needs a line length rather than a specimen's width, and it
+   calls that "the only dimension any of these six change". This app's exam asks what one character
+   means out of four, which is a specimen, so the rule that did the widening was written and never
+   reached anything. It comes back with the question type that needs it, not before. */
 .rd-kick {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.2em;
@@ -98,7 +103,6 @@
   /* long prompts wrap; nothing here ever scrolls */
   overflow: hidden; word-break: break-word;
 }
-.rd-sheet.wide .rd-focus { place-items: center start; text-align: left; line-height: 1.9; }
 /* the gap a cloze leaves, drawn rather than typed as underscores */
 .rd-focus .rd-gap {
   display: inline-block; min-width: 62px;
@@ -540,6 +544,9 @@
   font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5);
 }
 .rd-tally-row b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; }
+/* A FIGURE THAT FELL SHORT OF THE ONE UNDER IT — the exam's section score against its own pass
+   mark. Vermilion is what you owe, which on a report is the number that did not get there. */
+.rd-tally-row.is-short b { color: var(--hi-deep); }
 .rd-acts { display: flex; gap: 0; margin: auto -1px -1px; }
 .rd-acts .rd-slab { margin: 0; flex: 1; width: auto; }
 .rd-acts .rd-slab + .rd-slab { box-shadow: inset 1px 0 0 rgba(242, 234, 216, 0.22); }

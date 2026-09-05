@@ -26,8 +26,6 @@ export interface AskProps {
   children: ReactNode
   /** solved from the prompt's own length; see `promptSize` */
   size: number
-  /** the exam's stem and anything else that wants a line length rather than a specimen's width */
-  wide?: boolean
   src?: { label: string; value: string } | null
   /** what opens under the prompt once the answer is on the screen */
   gloss?: ReactNode

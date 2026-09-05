@@ -1,216 +1,73 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, CheckCircle, Clock, XCircle } from 'lucide-react'
-import { JLPT_MODE_META } from '../constants'
-
-type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
-type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
-type SubView = 'building' | 'exam' | 'results'
-
-const LEVEL_LABELS: Record<JLPTLevel, string> = {
-  n5: 'JLPT N5', n4: 'JLPT N4', n3: 'JLPT N3', n2: 'JLPT N2', n1: 'JLPT N1',
-}
-
-// the menu's level-three screen shows the same four; see the note in constants.tsx
-const MODE_META = JLPT_MODE_META
-
-const MOCK_EXAM_SECONDS = 30 * 60   // 30 minutes for mock exam
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { EXAM_MODES, screenHead, unscored } from '../features/menu'
+import { Round, RoundAsk, RoundSlips, RoundWork, promptSize } from '../features/round'
+import type { RunChip } from '../features/round'
+import { JLPT_LEVEL_LABELS } from '../constants'
+import type { JlptExamMode, JlptLevel, RoundOption } from '../types'
 
 /* ==================================================================================================
-   THIS VIEW USED TO OPEN ON A DASHBOARD, AND THE MENU ALREADY IS ONE.
+   THE EXAM RUN — the second of the six screens past level three, and the second onto the SHEET.
 
-   It had three sub-views: a readiness dashboard, the exam runner, and the results panel. The
-   dashboard drew the five levels with their kanji and vocabulary bars and a lock line, and offered
-   four modes on each -- which is, card for card, what the menu's ASCENT and EXAM LEVEL screens draw.
-   Pressing "Diagnostic" on the menu's screen navigated here and showed you the same five cards
-   again, with the same four buttons, and you pressed the same one a second time.
+   IT WAS THE LAST DARK PANEL YOU COULD REACH FROM THE LADDER. You walked the valley, climbed the
+   ascent, picked a level and pressed one of four modes on a paper card — and then the app handed you
+   a rounded, sepia, phone-scale exam with a green progress bar in it. The seam was one press wide.
 
-   So the dashboard is gone and the entry point moved: this view is now only the two things the menu
-   has no answer for -- running an exam and reporting it -- and it is entered with the level and the
-   mode already decided. There is no way in that does not name both.
+   ONE OBJECT, SIX FILLS, AND THIS IS THE THIRD ONE BUILT. `design-system/components/past-three.html`
+   draws a drill, a crossword, an exam question, a passage, settings and the key sheet on the same
+   washi plate; the round built the shell (`features/round/Round.tsx`) and this reuses it whole. The
+   prompt cell asks, the work cell holds four slips, the slab is bled to the sheet's own floor and
+   the foot band carries the whole paper as a tick per question. Nothing here is a new layout — the
+   only thing this file decides is which words go in which slot.
+
+   WHAT THE MOCKUP HAS THAT THE APP DOES NOT. The design draws a grammar cloze — a sentence with a
+   hole in it, four particles, three sections and a mark-for-review key — and widens the prompt cell
+   to 392 for the stem, which the card calls "the only dimension any of these six change". This app's
+   exam asks one question type: what does this character mean, out of four. That is a SPECIMEN, not a
+   stem, so the cell stays at 322 and the widening waits for the question type that needs it. Drawing
+   sections and a mark key over data that does not exist would be a mockup, not a screen.
+
+   THE COUNTDOWN IS THE ONLY VERMILION IN THE CROWN, which is the design card's own rule and the
+   reason it is stated there: on every other screen in this app vermilion is what you owe, and a
+   clock running out is the only fact any of these six screens carries that is against you.
    ================================================================================================== */
-interface JLPTPrepViewProps {
-  /** which ladder rung the menu was standing on when it started this */
-  level: JLPTLevel
-  /** which of the four the menu pressed */
-  mode: JLPTExamMode
-  onBack: () => void
+
+type SubView = 'building' | 'exam' | 'results'
+
+const MOCK_EXAM_SECONDS = 30 * 60
+
+/** how long the slips hold the verdict before the next question is dealt */
+const REVEAL_MS = 800
+
+/* the ladder's own words for the four modes — the English name, the Japanese mark it wears on the
+   card you pressed, and what it is FOR. Reusing them is what makes the two screens one place. */
+const MODES = new Map(EXAM_MODES.map((mode) => [mode.key, mode]))
+
+function examHead(mode: JlptExamMode) {
+  const meta = MODES.get(mode)
+  return screenHead('JLPT', 'level', {
+    en: (meta?.label ?? 'EXAM').toUpperCase(),
+    jp: meta?.mark ?? '検定',
+  })
 }
 
-// ---------------------------------------------------------------------------
-// Exam runner sub-component
-// ---------------------------------------------------------------------------
+/** mm:ss, and the chip that prints it sets tabular figures so a second does not move the crown */
+function clock(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
 
 interface ExamQuestion {
   card_id: number
   deck: string
   question_type: string
-  level: JLPTLevel
-  card: { id: number; character: string; romaji: string; meaning: string; tags: string[]; example_sentence: string | null }
+  level: JlptLevel
+  card: {
+    id: number; character: string; romaji: string; meaning: string
+    tags: string[]; example_sentence: string | null
+  }
   distractor_meanings: string[]
   distractor_card_ids: number[]
-}
-
-interface ExamRunnerProps {
-  level: JLPTLevel
-  mode: JLPTExamMode
-  questions: ExamQuestion[]
-  onComplete: (correct: number, total: number) => void
-  onAbort: () => void
-}
-
-function buildChoices(question: ExamQuestion): string[] {
-  const choices = [question.card.meaning, ...question.distractor_meanings.slice(0, 3)]
-  // Deterministic sort so correct answer isn't always first: sort by meaning string
-  return [...choices].sort()
-}
-
-function ExamRunner({ mode, questions, onComplete, onAbort }: ExamRunnerProps) {
-  const isMock = mode === 'mock_exam'
-  const [index, setIndex] = useState(0)
-  const [correct, setCorrect] = useState(0)
-  const [selected, setSelected] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(isMock ? MOCK_EXAM_SECONDS : null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    if (!isMock || timeLeft === null) return
-    timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t === null || t <= 1) {
-          clearInterval(timerRef.current!)
-          onComplete(correct, questions.length)
-          return 0
-        }
-        return t - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMock])
-
-  const question = questions[index]
-  if (!question) return null
-
-  const choices = buildChoices(question)
-  const isLastQuestion = index === questions.length - 1
-
-  function handleChoice(choice: string) {
-    if (revealed) return
-    setSelected(choice)
-    setRevealed(true)
-    const isCorrect = choice === question.card.meaning
-    const newCorrect = isCorrect ? correct + 1 : correct
-
-    // Record result via SRS (fire-and-forget — exam scoring is independent of SRS)
-    void window.jplearnDesktop.recordGameResult?.({
-      slug: question.deck as Parameters<typeof window.jplearnDesktop.recordGameResult>[0]['slug'],
-      cardId: question.card_id,
-      isCorrect,
-      minigame: 'meaning_match',
-    }).catch(() => undefined)
-
-    setTimeout(() => {
-      if (isLastQuestion) {
-        if (timerRef.current) clearInterval(timerRef.current)
-        onComplete(newCorrect, questions.length)
-      } else {
-        setIndex((i) => i + 1)
-        setSelected(null)
-        setRevealed(false)
-        setCorrect(newCorrect)
-      }
-    }, 800)
-  }
-
-  const minutes = timeLeft !== null ? Math.floor(timeLeft / 60) : null
-  const seconds = timeLeft !== null ? timeLeft % 60 : null
-
-  return (
-    /* CENTRED, LIKE EVERY OTHER SHORT PANEL IN THIS VIEW. A twenty-question diagnostic is a card and
-       four buttons -- about 350px of a 985px box -- and top-aligned it read as the top of a page
-       that had not finished loading. `view-center` is the same opt-in the level ladder uses. */
-    <div className="view-shell view-center">
-      <div className="jlpt-exam-runner">
-      <div className="jlpt-exam-header">
-        <button type="button" className="jlpt-back-btn" onClick={onAbort} aria-label="Abort exam">
-          <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Abort
-        </button>
-        <span className="jlpt-question-counter">{index + 1} / {questions.length}</span>
-        {isMock && minutes !== null && seconds !== null ? (
-          <span className={`jlpt-timer ${timeLeft! < 60 ? 'is-urgent' : ''}`}>
-            <Clock size={14} strokeWidth={2.2} aria-hidden="true" />
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </span>
-        ) : (
-          <span className="jlpt-mode-label">{MODE_META[mode].label}</span>
-        )}
-      </div>
-
-      {isMock && timeLeft !== null ? (
-        <div
-          className="jlpt-timer-bar"
-          role="progressbar"
-          aria-valuenow={timeLeft}
-          aria-valuemin={0}
-          aria-valuemax={MOCK_EXAM_SECONDS}
-        >
-          <div className="jlpt-timer-fill" style={{ width: `${(timeLeft / MOCK_EXAM_SECONDS) * 100}%` }} />
-        </div>
-      ) : null}
-
-      <div className="jlpt-exam-card">
-        <div className="jlpt-card-level-tag">{LEVEL_LABELS[question.level]}</div>
-        <div className="jlpt-card-character">{question.card.character}</div>
-        <div className="jlpt-card-romaji">{question.card.romaji}</div>
-      </div>
-
-      <div className="jlpt-choices" role="group" aria-label="Answer choices">
-        {choices.map((choice) => {
-          const isThis = selected === choice
-          const isCorrectChoice = choice === question.card.meaning
-          let choiceClass = 'jlpt-choice'
-          if (revealed) {
-            if (isCorrectChoice) choiceClass += ' is-correct'
-            else if (isThis) choiceClass += ' is-wrong'
-            else choiceClass += ' is-dim'
-          }
-          return (
-            <button
-              key={choice}
-              type="button"
-              className={choiceClass}
-              onClick={() => handleChoice(choice)}
-              disabled={revealed}
-            >
-              {choice}
-            </button>
-          )
-        })}
-      </div>
-
-      {revealed && question.card.example_sentence ? (
-        <div className="jlpt-example-sentence">{question.card.example_sentence}</div>
-      ) : null}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Results sub-component
-// ---------------------------------------------------------------------------
-
-interface ResultsProps {
-  level: JLPTLevel
-  mode: JLPTExamMode
-  correct: number
-  total: number
-  projectedScore: number | null
-  readiness: JLPTLevelReadinessData | null
-  onRetry: () => void
-  onDrillWeakAreas: () => void
-  onBack: () => void
 }
 
 interface JLPTLevelReadinessData {
@@ -221,74 +78,284 @@ interface JLPTLevelReadinessData {
   pass_mark: number
 }
 
-function ResultsPanel({ level, mode, correct, total, projectedScore, readiness, onRetry, onDrillWeakAreas, onBack }: ResultsProps) {
-  const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0
-  const sectionMax = readiness?.vocab_grammar_section_max ?? null
-  const sectionPassMark = readiness?.vocab_grammar_pass_mark ?? null
-  const sectionPasses = projectedScore !== null && sectionPassMark !== null ? projectedScore >= sectionPassMark : null
+/* THE ORDER IS THE ALPHABET'S, not the deck's, which is how the answer stops being first every
+   time. Ids carry the index because two cards in a level may share a meaning and a duplicate key
+   would collapse two slips into one. */
+function buildChoices(question: ExamQuestion): RoundOption[] {
+  const labels = [question.card.meaning, ...question.distractor_meanings.slice(0, 3)]
+  return [...labels].sort().map((label, index) => ({ id: `${index}-${label}`, label }))
+}
+
+// ---------------------------------------------------------------------------
+// The paper itself
+// ---------------------------------------------------------------------------
+
+interface ExamRunnerProps {
+  level: JlptLevel
+  mode: JlptExamMode
+  questions: ExamQuestion[]
+  /** every answer in order, right or wrong — the results panel draws the same strip from it */
+  onComplete: (trail: boolean[]) => void
+  onAbort: () => void
+}
+
+function ExamRunner({ level, mode, questions, onComplete, onAbort }: ExamRunnerProps) {
+  const isMock = mode === 'mock_exam'
+  const [index, setIndex] = useState(0)
+  const [trail, setTrail] = useState<boolean[]>([])
+  const [chose, setChose] = useState<string | null>(null)
+  const [active, setActive] = useState(0)
+  const [timeLeft, setTimeLeft] = useState<number | null>(isMock ? MOCK_EXAM_SECONDS : null)
+
+  const total = questions.length
+  const question = questions[index]
+  const revealed = chose !== null
+  const choices = useMemo(() => (question ? buildChoices(question) : []), [question])
+
+  /* WHAT THE CLOCK REPORTS WHEN IT RUNS OUT. The old interval closed over `correct` at mount and
+     handed that to `onComplete`, so a mock exam that timed out was scored zero however many you
+     had got right. A ref reads the answers as they stand rather than as they were. */
+  const finish = useRef<(trail: boolean[]) => void>(onComplete)
+  finish.current = onComplete
+  const trailRef = useRef(trail)
+  trailRef.current = trail
+
+  useEffect(() => {
+    if (!isMock) return
+    const id = setInterval(() => setTimeLeft((t) => (t === null ? null : Math.max(0, t - 1))), 1000)
+    return () => clearInterval(id)
+  }, [isMock])
+
+  useEffect(() => {
+    if (timeLeft === 0) finish.current(trailRef.current)
+  }, [timeLeft])
+
+  /* the reveal's timer, held so that abandoning a paper mid-verdict does not set state on a
+     component that has left */
+  const dealt = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (dealt.current) clearTimeout(dealt.current) }, [])
+
+  const answer = useCallback((label: string) => {
+    if (chose !== null || !question) return
+    const right = label === question.card.meaning
+    const next = [...trail, right]
+    setChose(label)
+    setTrail(next)
+
+    /* exam scoring is its own thing, but an answer is still a review — fire and forget, the way
+       it always has been */
+    void window.jplearnDesktop.recordGameResult?.({
+      slug: question.deck as Parameters<typeof window.jplearnDesktop.recordGameResult>[0]['slug'],
+      cardId: question.card_id,
+      isCorrect: right,
+      minigame: 'meaning_match',
+    }).catch(() => undefined)
+
+    dealt.current = setTimeout(() => {
+      if (next.length >= total) { finish.current(next); return }
+      setIndex((i) => i + 1)
+      setChose(null)
+      setActive(0)
+    }, REVEAL_MS)
+  }, [chose, question, trail, total])
+
+  /* 1–4 ANSWERS AND ESCAPE ABANDONS, which is what the hint row has always said and what nothing
+     was listening for: the old runner drew the numbers on the buttons and bound no keys at all. */
+  const answerRef = useRef(answer)
+  answerRef.current = answer
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { onAbort(); return }
+      const picked = Number(event.key)
+      if (!Number.isInteger(picked) || picked < 1 || picked > choices.length) return
+      event.preventDefault()
+      answerRef.current(choices[picked - 1].label)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [choices, onAbort])
+
+  if (!question) return null
+
+  const meta = MODES.get(mode)
+  const chips: RunChip[] = [
+    {
+      key: 'q',
+      value: String(index + 1).padStart(2, '0'),
+      of: `/ ${total}`,
+      label: 'QUESTION',
+    },
+  ]
+  if (timeLeft !== null) {
+    chips.push({ key: 'clock', value: clock(timeLeft), label: 'LEFT', duty: true })
+  }
+
+  const last = trail.length >= total
 
   return (
-    <div className="view-shell view-center">
-      <div className="jlpt-results-panel">
-      <header className="jlpt-results-header">
-        <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to JLPT Prep">
-          <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> JLPT Prep
-        </button>
-        <h2 className="jlpt-results-title">{LEVEL_LABELS[level]} — {MODE_META[mode].label}</h2>
-      </header>
+    <Round
+      head={examHead(mode)}
+      cap={`${meta?.purpose ?? 'THE EXAM'} · ${total} QUESTIONS`}
+      run={chips}
+      said={revealed}
+      foot={{
+        at: trail.length,
+        target: total,
+        trail,
+        note: JLPT_LEVEL_LABELS[level].toUpperCase(),
+      }}
+      onBack={onAbort}
+      backLabel="Abandon"
+      backJp="中止"
+      backAria="Abort exam"
+      hints={[
+        { cap: '1–4', en: 'Answer', jp: '回答' },
+        { cap: 'ESC', en: 'Abandon', jp: '中止' },
+      ]}
+      ask={
+        <RoundAsk
+          kick={`QUESTION ${String(index + 1).padStart(2, '0')}`}
+          kickJp="問題"
+          size={promptSize(question.card.character)}
+          src={{ label: 'READING', value: question.card.romaji }}
+        >
+          <span lang="ja">{question.card.character}</span>
+        </RoundAsk>
+      }
+      work={
+        <RoundWork
+          kick="WHAT DOES IT MEAN"
+          kickJp="四択"
+          slab={
+            revealed
+              ? { text: last ? 'SCORING THE PAPER' : 'NEXT QUESTION', jp: last ? '採点' : '次へ', tone: 'calm' }
+              : { text: '1–4 TO ANSWER', jp: '回答' }
+          }
+        >
+          <RoundSlips
+            options={choices}
+            activeIndex={active}
+            disabled={revealed}
+            answer={revealed ? question.card.meaning : null}
+            chose={chose}
+            onActiveIndexChange={setActive}
+            onSelect={answer}
+          />
+        </RoundWork>
+      }
+    />
+  )
+}
 
-      <div className="jlpt-results-stats">
-        <div className="jlpt-stat-chip">
-          <span className="jlpt-stat-value">{correct}/{total}</span>
-          <span className="jlpt-stat-label">Correct</span>
-        </div>
-        <div className="jlpt-stat-chip">
-          <span className="jlpt-stat-value">{accuracy}%</span>
-          <span className="jlpt-stat-label">Accuracy</span>
-        </div>
-      </div>
+// ---------------------------------------------------------------------------
+// What the paper came to
+// ---------------------------------------------------------------------------
 
-      {mode === 'mock_exam' && projectedScore !== null && sectionMax !== null ? (
-        <div className={`jlpt-score-section ${sectionPasses ? 'is-pass' : 'is-fail'}`}>
-          <div className="jlpt-score-label">Language Knowledge (Vocab) Projected Score</div>
-          <div className="jlpt-score-value">{projectedScore} / {sectionMax}</div>
-          <div className="jlpt-score-passmark">
-            {sectionPasses
-              ? <><CheckCircle size={14} aria-hidden="true" /> Clears sectional pass mark ({sectionPassMark})</>
-              : <><XCircle size={14} aria-hidden="true" /> Below sectional pass mark ({sectionPassMark})</>
-            }
+interface ResultsProps {
+  level: JlptLevel
+  mode: JlptExamMode
+  trail: boolean[]
+  projectedScore: number | null
+  readiness: JLPTLevelReadinessData | null
+  onRetry: () => void
+  onDrillWeakAreas: () => void
+  onBack: () => void
+}
+
+function ResultsPanel({
+  level, mode, trail, projectedScore, readiness, onRetry, onDrillWeakAreas, onBack,
+}: ResultsProps) {
+  const total = trail.length
+  const correct = trail.filter(Boolean).length
+  const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0
+  const meta = MODES.get(mode)
+
+  /* THE SECTIONAL GATE, IN THE WORDS THE LADDER ALREADY USES. The JLPT does not add the papers up:
+     vocabulary-and-grammar is a separate pass mark, and this app can only ever project that one
+     section — `unscored()` is the same function the EXAM LEVEL screen prints its hatched line from.
+     The old panel said "Listening: N/A — not assessed in this app" and left the number it could not
+     speak for unexplained. */
+  const sectionMax = readiness?.vocab_grammar_section_max ?? null
+  const passMark = readiness?.vocab_grammar_pass_mark ?? null
+  const projected = mode === 'mock_exam' ? projectedScore : null
+  const short = projected !== null && passMark !== null && projected < passMark
+  const gap = sectionMax !== null ? unscored(sectionMax) : null
+
+  /* THE ONE SENTENCE THE FIGURES CANNOT SAY. A diagnostic's whole output is advice, and a mock's
+     projection is only worth reading next to what it does not cover. Everything else on this cell
+     is a number with a label, which is what a ledger row is for. */
+  const note = mode === 'diagnostic'
+    ? `KEEP WORKING AT ${JLPT_LEVEL_LABELS[level].toUpperCase()} BEFORE MOVING UP.`
+    : projected !== null ? 'THE PROJECTION IS VOCABULARY AND KANJI ONLY.' : null
+
+  return (
+    <Round
+      head={examHead(mode)}
+      cap={`${JLPT_LEVEL_LABELS[level].toUpperCase()} · ${meta?.label.toUpperCase() ?? 'EXAM'}`}
+      /* NO CHIPS, BECAUSE THE PAPER IS OVER. The crown's chips are a running paper's live state --
+         which question, how long is left -- and the two facts that would survive it are the per-cent
+         and the fraction, which are the two biggest things on the sheet a hand's width below. */
+      run={[]}
+      foot={{ at: total, target: total, trail, note: 'PAPER COMPLETE' }}
+      onBack={onBack}
+      backLabel="Back"
+      backJp="戻る"
+      backAria="Back to the exam ladder"
+      hints={[{ cap: 'ESC', en: 'Back', jp: '戻る' }]}
+      ask={
+        <div className="rd-ask">
+          <div className="rd-kick"><span>HOW IT WENT</span><em>結果</em></div>
+          <div className="rd-score">
+            <b>{accuracy}<sup>%</sup></b>
+            <i>{correct} OF {total} RIGHT</i>
           </div>
-          <div className="jlpt-score-listening">
-            Listening: <em>N/A — not assessed in this app</em>
-          </div>
-          <div className="jlpt-score-note">
-            Projection is vocab/kanji only and does not reflect actual JLPT performance.
+          <div className="rd-src">
+            {projected !== null && sectionMax !== null
+              ? <>PROJECTED <i>{projected} / {sectionMax}</i></>
+              : <>LEVEL <i>{JLPT_LEVEL_LABELS[level]}</i></>}
           </div>
         </div>
-      ) : null}
-
-      {mode === 'diagnostic' ? (
-        <div className="jlpt-diagnostic-note">
-          Based on your answers, continue studying{' '}
-          <strong>{LEVEL_LABELS[level]}</strong> before moving up.
+      }
+      work={
+        /* NOT `RoundWork`: the two actions ARE the slab here, side by side and bled to the same
+           floor, so there is no single slab for it to draw. The round's own report cell hand-writes
+           the cell for the same reason. */
+        <div className="rd-work">
+          <div className="rd-kick"><span>THE PAPER</span><em>記録</em></div>
+          {note ? <p className="rd-note">{note}</p> : null}
+          <div className="rd-body">
+            <div className="rd-tally">
+              <div className="rd-tally-row">Answered right<s>OF {total}</s><b>{correct}</b></div>
+              <div className="rd-tally-row">Missed<s /><b>{total - correct}</b></div>
+              {projected !== null && sectionMax !== null ? (
+                <div className={short ? 'rd-tally-row is-short' : 'rd-tally-row'}>
+                  Section score<s>OF {sectionMax}</s><b>{projected}</b>
+                </div>
+              ) : null}
+              {projected !== null && passMark !== null ? (
+                <div className="rd-tally-row">
+                  Sectional pass mark<s>{short ? 'SHORT BY ' + (passMark - projected) : 'CLEARED'}</s>
+                  <b>{passMark}</b>
+                </div>
+              ) : null}
+              {projected !== null && gap ? (
+                <div className="rd-tally-row">Not scored here<s>{gap.papers}</s><b>{gap.points}</b></div>
+              ) : null}
+            </div>
+            <div className="rd-acts">
+              <button type="button" className="rd-slab go" onClick={onRetry}>
+                SIT IT AGAIN<em>再開</em>
+              </button>
+              {mode !== 'weak_area_drill' ? (
+                <button type="button" className="rd-slab calm go" onClick={onDrillWeakAreas}>
+                  DRILL THE WEAK AREAS<em>弱点</em>
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
-      ) : null}
-
-      <div className="jlpt-results-actions">
-        <button type="button" className="jlpt-action-btn jlpt-action-primary" onClick={onRetry}>
-          Try Again
-        </button>
-        {mode !== 'weak_area_drill' ? (
-          <button type="button" className="jlpt-action-btn" onClick={onDrillWeakAreas}>
-            Drill Weak Areas
-          </button>
-        ) : null}
-        <button type="button" className="jlpt-action-btn" onClick={onBack}>
-          Back to JLPT Prep
-        </button>
-      </div>
-      </div>
-    </div>
+      }
+    />
   )
 }
 
@@ -296,19 +363,26 @@ function ResultsPanel({ level, mode, correct, total, projectedScore, readiness, 
 // Main view
 // ---------------------------------------------------------------------------
 
+interface JLPTPrepViewProps {
+  /** which ladder rung the menu was standing on when it started this */
+  level: JlptLevel
+  /** which of the four the menu pressed */
+  mode: JlptExamMode
+  onBack: () => void
+}
+
 export function JLPTPrepView({ level: startLevel, mode: startMode, onBack }: JLPTPrepViewProps) {
   const [subView, setSubView] = useState<SubView>('building')
   const [readiness, setReadiness] = useState<JLPTReadinessPayload | null>(null)
   const [readinessError, setReadinessError] = useState<string | null>(null)
 
-  const [activeLevel, setActiveLevel] = useState<JLPTLevel>(startLevel)
-  const [activeMode, setActiveMode] = useState<JLPTExamMode>(startMode)
+  const [activeLevel, setActiveLevel] = useState<JlptLevel>(startLevel)
+  const [activeMode, setActiveMode] = useState<JlptExamMode>(startMode)
   const [examQuestions, setExamQuestions] = useState<ExamQuestion[]>([])
   const [examLoading, setExamLoading] = useState(false)
   const [examError, setExamError] = useState<string | null>(null)
 
-  const [lastCorrect, setLastCorrect] = useState(0)
-  const [lastTotal, setLastTotal] = useState(0)
+  const [lastTrail, setLastTrail] = useState<boolean[]>([])
   const [lastProjectedScore, setLastProjectedScore] = useState<number | null>(null)
 
   type JLPTReadinessPayload = NonNullable<Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.getJLPTReadiness>>>>
@@ -327,11 +401,12 @@ export function JLPTPrepView({ level: startLevel, mode: startMode, onBack }: JLP
     void loadReadiness()
   }, [loadReadiness])
 
-  const startExam = useCallback(async (level: JLPTLevel, mode: JLPTExamMode) => {
+  const startExam = useCallback(async (level: JlptLevel, mode: JlptExamMode) => {
     setActiveLevel(level)
     setActiveMode(mode)
     setExamLoading(true)
     setExamError(null)
+    setSubView('building')
     try {
       const count = mode === 'diagnostic' ? 20 : 30
       const data = await window.jplearnDesktop.buildJLPTExamQueue?.(level, mode, count)
@@ -349,9 +424,10 @@ export function JLPTPrepView({ level: startLevel, mode: startMode, onBack }: JLP
     }
   }, [])
 
-  const handleExamComplete = useCallback(async (correct: number, total: number) => {
-    setLastCorrect(correct)
-    setLastTotal(total)
+  const handleExamComplete = useCallback(async (trail: boolean[]) => {
+    const total = trail.length
+    const correct = trail.filter(Boolean).length
+    setLastTrail(trail)
 
     let projected: number | null = null
     if (activeMode === 'mock_exam' && total > 0) {
@@ -414,8 +490,7 @@ export function JLPTPrepView({ level: startLevel, mode: startMode, onBack }: JLP
       <ResultsPanel
         level={activeLevel}
         mode={activeMode}
-        correct={lastCorrect}
-        total={lastTotal}
+        trail={lastTrail}
         projectedScore={lastProjectedScore}
         readiness={readiness?.levels[activeLevel] ?? null}
         onRetry={handleRetry}
@@ -425,30 +500,57 @@ export function JLPTPrepView({ level: startLevel, mode: startMode, onBack }: JLP
     )
   }
 
-  /* NOT A SCREEN, A WAIT. Building a queue takes one bridge round trip, and the only other thing
-     that can happen is that the level has too few cards to ask thirty questions about -- which is
-     a sentence, not a dashboard. Either way there is one way out and it goes back to the menu. */
-  return (
-    <div className="view-shell view-center">
-      <section className="jlpt-prep-view panel-glass">
-        <header className="jlpt-prep-header">
-          <button type="button" className="jlpt-back-btn" onClick={onBack} aria-label="Back to the exam ladder">
-            <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Back
-          </button>
-          <div className="jlpt-prep-title-row">
-            <h1 className="jlpt-prep-title">{LEVEL_LABELS[activeLevel]}</h1>
-            <span className="jlpt-prep-subtitle">{MODE_META[activeMode]?.label ?? activeMode}</span>
-          </div>
-        </header>
+  /* NOT A SCREEN, A WAIT — and it is the same sheet, because a screen that changes shape between
+     its own states is two screens sharing a route. Building a queue takes one bridge round trip,
+     and the only other thing that can happen is that the level has too few cards to ask thirty
+     questions about, which is a sentence. Either way there is one way out and it is the ladder. */
+  const meta = MODES.get(activeMode)
+  const expected = activeMode === 'diagnostic' ? 20 : 30
+  const failed = examError !== null
 
-        {examError ? <div className="jlpt-error-banner" role="alert">{examError}</div> : null}
-        {readinessError ? <div className="jlpt-error-banner" role="alert">{readinessError}</div> : null}
-        {!examError && !readinessError ? (
-          <p className="jlpt-building" aria-live="polite">
-            {examLoading ? 'Building your questions…' : 'Ready.'}
-          </p>
-        ) : null}
-      </section>
-    </div>
+  return (
+    <Round
+      head={examHead(activeMode)}
+      cap={`${JLPT_LEVEL_LABELS[activeLevel].toUpperCase()} · ${meta?.purpose ?? 'THE EXAM'}`}
+      run={[{ key: 'q', value: '00', of: `/ ${expected}`, label: 'QUESTION' }]}
+      foot={{ at: 0, target: expected, trail: [], note: 'NOT STARTED' }}
+      onBack={onBack}
+      backLabel="Back"
+      backJp="戻る"
+      backAria="Back to the exam ladder"
+      hints={[{ cap: 'ESC', en: 'Back', jp: '戻る' }]}
+      ask={
+        <RoundAsk
+          kick={failed ? 'NO PAPER' : 'ONE MOMENT'}
+          kickJp="準備"
+          size={132}
+          src={{ label: 'LEVEL', value: JLPT_LEVEL_LABELS[activeLevel] }}
+        >
+          <span lang="ja">{failed ? '無' : '試'}</span>
+        </RoundAsk>
+      }
+      work={
+        <RoundWork
+          kick="THE PAPER"
+          kickJp="演習"
+          slab={
+            failed
+              ? { text: 'BACK TO THE LADDER', jp: '戻る', tone: 'calm', onClick: onBack }
+              : { text: 'BUILDING', jp: '準備', tone: 'calm' }
+          }
+        >
+          <div className="rd-plain">
+            <h2>{meta?.label ?? 'Exam'}</h2>
+            {examError ? <p className="rd-err" role="alert">{examError}</p> : null}
+            {readinessError ? <p className="rd-err" role="alert">{readinessError}</p> : null}
+            {!examError ? (
+              <p aria-live="polite">
+                {examLoading ? 'Building your questions…' : 'Ready.'}
+              </p>
+            ) : null}
+          </div>
+        </RoundWork>
+      }
+    />
   )
 }

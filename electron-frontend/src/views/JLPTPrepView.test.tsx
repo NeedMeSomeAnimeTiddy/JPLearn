@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { JLPTPrepView } from './JLPTPrepView'
 
 afterEach(() => {
@@ -165,11 +165,13 @@ describe('JLPTPrepView', () => {
       )
     })
 
-    expect(await screen.findByText('1/1')).toBeTruthy()
-    expect(screen.getByText('100%')).toBeTruthy()
+    expect(await screen.findByText('1 OF 1 RIGHT')).toBeTruthy()
+    /* the per-cent is `100<sup>%</sup>`, and `getByText` reads only an element's own text nodes --
+       so it is asked for as the figure it is rather than as a string that spans two elements */
+    expect(document.querySelector('.rd-score b')?.textContent).toBe('100%')
 
     buildJLPTExamQueue.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }))
+    fireEvent.click(screen.getByRole('button', { name: /SIT IT AGAIN/ }))
     await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n5', 'diagnostic', 20))
   })
 
@@ -182,10 +184,10 @@ describe('JLPTPrepView', () => {
     show()
 
     fireEvent.click(await screen.findByRole('button', { name: 'one' }))
-    await screen.findByRole('button', { name: 'Drill Weak Areas' })
+    await screen.findByRole('button', { name: /DRILL THE WEAK AREAS/ })
 
     buildJLPTExamQueue.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: 'Drill Weak Areas' }))
+    fireEvent.click(screen.getByRole('button', { name: /DRILL THE WEAK AREAS/ }))
     await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n5', 'weak_area_drill', 30))
   })
 
@@ -199,11 +201,72 @@ describe('JLPTPrepView', () => {
 
     show()
     fireEvent.click(await screen.findByRole('button', { name: 'one' }))
-    await screen.findByRole('button', { name: 'Drill Weak Areas' })
-    fireEvent.click(screen.getByRole('button', { name: 'Drill Weak Areas' }))
+    await screen.findByRole('button', { name: /DRILL THE WEAK AREAS/ })
+    fireEvent.click(screen.getByRole('button', { name: /DRILL THE WEAK AREAS/ }))
 
     await waitFor(() => expect(buildJLPTExamQueue).toHaveBeenCalledWith('n5', 'weak_area_drill', 30))
     expect(buildJLPTExamQueue).toHaveBeenCalledTimes(2)
+  })
+
+  /* ================================================================================================
+     THE TWO THINGS THE OLD RUNNER GOT WRONG, both of which the sheet made visible by printing the
+     keys on the screen and the clock in the crown. */
+
+  it('answers on the number keys the hint row says answer', async () => {
+    /* the old runner drew 1-4 on nothing and bound no keys at all -- the numbers on the slips were
+       decoration. The sheet prints `1-4 TO ANSWER` on the slab and in the hint row, so they have to */
+    const saveJLPTExamResult = vi.fn(async () => ({ ok: true, id: 1 }))
+    installDesktopApi({
+      saveJLPTExamResult,
+      buildJLPTExamQueue: async () => ({
+        level: 'n5' as const,
+        mode: 'diagnostic' as const,
+        /* alphabetical, so the slips read four / one / three / two and the answer is the second */
+        questions: [question({ meaning: 'one', distractors: ['two', 'three', 'four'] })],
+      }),
+    })
+
+    show()
+    await screen.findByRole('button', { name: 'one' })
+
+    fireEvent.keyDown(window, { key: '2' })
+
+    await waitFor(() => {
+      expect(saveJLPTExamResult).toHaveBeenCalledWith(expect.objectContaining({ correct: 1 }))
+    })
+  })
+
+  it('reports the answers it has when the mock clock runs out, not zero', async () => {
+    /* THE BUG THIS REPLACES: the countdown's interval closed over `correct` at mount, so whatever
+       you had answered, a timed-out mock exam was saved as nought right. Nothing on the old screen
+       showed the clock's own reading either -- it was a bar. */
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const saveJLPTExamResult = vi.fn(async () => ({ ok: true, id: 1 }))
+      installDesktopApi({
+        saveJLPTExamResult,
+        buildJLPTExamQueue: async () => ({
+          level: 'n5' as const,
+          mode: 'mock_exam' as const,
+          questions: [
+            question({ card_id: 1, meaning: 'one' }),
+            question({ card_id: 2, meaning: 'five', distractors: ['six', 'seven', 'eight'] }),
+          ],
+        }),
+      })
+
+      show({ mode: 'mock_exam' })
+      fireEvent.click(await screen.findByRole('button', { name: 'one' }))
+
+      /* past the reveal, onto question two, and then let the whole half hour go by */
+      await act(async () => { await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 2000) })
+
+      expect(saveJLPTExamResult).toHaveBeenCalledWith(
+        expect.objectContaining({ correct: 1, questionsAnswered: 1, accuracy: 1 }),
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('goes back to the ladder it came from, since there is nothing below it any more', async () => {
