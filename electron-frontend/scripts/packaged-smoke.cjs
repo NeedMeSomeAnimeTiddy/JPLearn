@@ -8,7 +8,10 @@ const smokeDir = path.join(repoRoot, '.smoke')
 const appDataRoot = path.join(smokeDir, 'appdata')
 const smokeLogPath = path.join(smokeDir, 'packaged-smoke-log.txt')
 const journeyReportPath = path.join(appDataRoot, 'study-journey-smoke.json')
-const maxWaitMs = 45000
+// 45s suits a developer machine, where startup telemetry lands in about six
+// seconds. A slower build machine needs room without every developer waiting for
+// it, so JPLEARN_SMOKE_TIMEOUT_MS raises the ceiling where that is warranted.
+const maxWaitMs = Number.parseInt(process.env.JPLEARN_SMOKE_TIMEOUT_MS || '', 10) || 45000
 const pollIntervalMs = 500
 
 function ensureCleanDir(dirPath) {

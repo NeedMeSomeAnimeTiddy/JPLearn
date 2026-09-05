@@ -171,6 +171,10 @@ jobs:
 
       - name: Run packaged smoke test
         working-directory: electron-frontend
+        # This runner reaches the app's first log line about six times slower than a
+        # developer machine does, so the 45s default is not a fair budget here.
+        env:
+          JPLEARN_SMOKE_TIMEOUT_MS: '180000'
         run: npm run smoke:packaged
 
       - name: Upload smoke artifacts
