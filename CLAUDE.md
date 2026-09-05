@@ -43,7 +43,10 @@ npm run test:e2e          # build:quiet + vitest e2e config
 npm run make:release      # bundle Python + build the Windows installer into out/make/
 ```
 
-The two GitHub workflows have local equivalents, so neither needs CI to run:
+Both GitHub workflows target a self-hosted Windows runner (`runs-on: [self-hosted, windows]`)
+because hosted Actions minutes are unavailable on this account — if no runner is registered
+against the repo, they simply never start. Either way they have local equivalents, so neither
+needs CI to run:
 `python scripts/dev.py --full` covers every step of `electron-packaged-smoke.yml`, and
 `npm run make:release` produces the same installer `release.yml` uploads (it calls
 `scripts/bundle_python.ps1`, which the workflow also calls — keep the bundling logic

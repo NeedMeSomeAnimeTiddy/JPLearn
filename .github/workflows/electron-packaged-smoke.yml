@@ -15,8 +15,15 @@ on:
 
 jobs:
   windows-packaged-smoke:
-    runs-on: windows-latest
-    timeout-minutes: 25
+    runs-on: [self-hosted, windows]
+    # A self-hosted runner executes workflow code on a personal machine, so pull requests
+    # from forks of this public repository are not run here; same-repository branches and
+    # pushes are.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Raised from 25: that fitted a hosted runner, where this job took about six minutes.
+    # One VM running jobs serially is a good deal slower, and a timeout kill reads exactly
+    # like a real failure.
+    timeout-minutes: 60
 
     defaults:
       run:

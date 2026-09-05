@@ -10,8 +10,12 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: windows-latest
-    timeout-minutes: 55
+    # Tag pushes only, so there is no fork-PR exposure to guard against here.
+    runs-on: [self-hosted, windows]
+    # Raised from 55: this took under nine minutes on a hosted runner, but it downloads a
+    # Python distribution and builds a Squirrel installer, both of which are slower on one
+    # shared VM.
+    timeout-minutes: 90
 
     defaults:
       run:
