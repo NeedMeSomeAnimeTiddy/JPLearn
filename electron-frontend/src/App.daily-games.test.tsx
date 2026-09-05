@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { openDailyGames } from './test-entry'
 import App from './App'
 
@@ -100,17 +100,35 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+/* A TABLET ON THE DAILY ROAD. The first press selects and the second opens, which is the road's
+   own two-step and the same one the curriculum's rows use. */
+async function pressTablet(name: RegExp): Promise<void> {
+  const tablet = await screen.findByRole('button', { name })
+  fireEvent.click(tablet)
+  fireEvent.click(await screen.findByRole('button', { name }))
+}
+
 /** Back on the front door, whichever level of the menu it landed on. */
 async function backAtTheMenu(): Promise<void> {
   await waitFor(() => { expect(document.querySelector('.mn-frame')).toBeTruthy() })
 }
 
-async function openMissedWordReview(): Promise<void> {
-  if (!screen.queryByRole('heading', { name: 'Typing Blitz' })) {
-    await openDailyGames()
+/* ALL THE WAY OUT. The DAILY road is level THREE now -- PRACTICE, then the lane, then the road --
+   so one Escape lands on the lanes rather than on the front door. */
+async function backToTheFrontDoor(): Promise<void> {
+  for (let i = 0; i < 4; i++) {
+    if (screen.queryByRole('button', { name: /PRACTICE —/i })) return
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => { expect(document.querySelector('.mn-frame')).toBeTruthy() })
   }
-  const typingTile = (await screen.findByRole('heading', { name: 'Typing Blitz' })).closest('article')
-  fireEvent.click(within(typingTile!).getByRole('button', { name: 'Play' }))
+  await screen.findByRole('button', { name: /PRACTICE —/i })
+}
+
+async function openMissedWordReview(): Promise<void> {
+  if (!screen.queryByLabelText(/type the japanese word/i)) {
+    await openDailyGames()
+    await pressTablet(/^04 TYPING BLITZ/)
+  }
   const input = await screen.findByLabelText(/type the japanese word/i)
   fireEvent.change(input, { target: { value: 'wrong' } })
   fireEvent.submit(input.closest('form')!)
@@ -146,14 +164,12 @@ describe('Daily Games navigation', () => {
        own route -- PRACTICE, then the DAILY GAMES lane -- which is worth more than pressing the
        titlebar twice was. */
     await openDailyGames()
-    expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
-    const matchPairsTile = screen.getByRole('heading', { name: 'Match Pairs' }).closest('article')
-    fireEvent.click(within(matchPairsTile!).getByRole('button', { name: 'Play' }))
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
+    await pressTablet(/^03 MATCH PAIRS/)
     expect(await screen.findByRole('button', { name: /back to games/i })).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('button', { name: /back to games/i }), { key: 'Escape' })
-    expect(await screen.findByRole('button', { name: 'Back to main menu' })).toBeTruthy()
-    fireEvent.keyDown(window, { key: 'Escape' })
-    await backAtTheMenu()
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
+    await backToTheFrontDoor()
 
     /* the L1 row's two-step: the first press selects, the second opens. A synthetic `mouseEnter`
        does not stand in for the first, because a hover only counts after a real `pointermove` --
@@ -162,37 +178,37 @@ describe('Daily Games navigation', () => {
     fireEvent.click(practice)
     fireEvent.click(practice)
     fireEvent.click(await screen.findByRole('button', { name: /DAILY GAMES —/i }))
-    expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
     await backAtTheMenu()
 
     await openDailyGames()
-    expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
     await backAtTheMenu()
 
     fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
     const commandSearch = await screen.findByRole('textbox', { name: /search commands/i })
     fireEvent.change(commandSearch, { target: { value: 'daily' } })
     fireEvent.click(await screen.findByRole('option', { name: 'Daily Games' }))
-    expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
   })
 
-  it('returns from an active Daily Game to the hub before leaving Daily Games', async () => {
+  it('returns from an active puzzle to the DAILY road before leaving the menu', async () => {
     const review = buildReviewDesktopApi()
     window.jplearnDesktop = review.api as unknown as typeof window.jplearnDesktop
     render(<App />)
 
     await openDailyGames()
-    const typingTile = (await screen.findByRole('heading', { name: 'Typing Blitz' })).closest('article')
-    fireEvent.click(within(typingTile!).getByRole('button', { name: 'Play' }))
+    await pressTablet(/^04 TYPING BLITZ/)
     const input = await screen.findByLabelText(/type the japanese word/i)
 
     fireEvent.keyDown(input, { key: 'Escape' })
 
-    expect(await screen.findByRole('heading', { name: 'Crossword' })).toBeTruthy()
-    /* Escape stopped at the hub rather than carrying on out to the front door */
-    expect(document.querySelector('.mn-frame')).toBeNull()
+    /* ESCAPE STOPS AT THE ROAD, and the road is a menu screen now -- so the thing to assert is not
+       that the menu is absent but that it is standing on DAILY rather than back at the front door. */
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /PRACTICE —/i })).toBeNull()
   })
 
   it('hydrates a deduplicated cross-deck missed-word queue in supplied order without loading the study queue', async () => {
@@ -263,22 +279,22 @@ describe('Daily Games navigation', () => {
     expect(finalContinue.disabled).toBe(true)
     fireEvent.click(finalContinue)
     expect(screen.getByText('い')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Typing Blitz' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^04 TYPING BLITZ/ })).toBeNull()
     expect(recordGameResult).toHaveBeenCalledTimes(2)
 
     fireEvent.click(screen.getByRole('button', { name: /leave this round/i }))
-    expect(await screen.findByRole('heading', { name: 'Typing Blitz' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^04 TYPING BLITZ/ })).toBeTruthy()
     expect(recordGameResult).toHaveBeenCalledTimes(2)
   })
 
-  it('records only submitted explicit-review answers against each round deck and returns to Daily Games on leave or completion', async () => {
+  it('records only submitted explicit-review answers against each round deck and returns to the DAILY road on leave or completion', async () => {
     const review = buildReviewDesktopApi()
     window.jplearnDesktop = review.api as unknown as typeof window.jplearnDesktop
     render(<App />)
 
     await openMissedWordReview()
     fireEvent.click(screen.getByRole('button', { name: /leave this round/i }))
-    expect(await screen.findByRole('heading', { name: 'Typing Blitz' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^04 TYPING BLITZ/ })).toBeTruthy()
     expect(review.recordGameResult).not.toHaveBeenCalled()
 
     await openMissedWordReview()
@@ -297,7 +313,7 @@ describe('Daily Games navigation', () => {
     const finalContinue = screen.getByRole('button', { name: /continue immediately/i }) as HTMLButtonElement
     await waitFor(() => expect(finalContinue.disabled).toBe(false))
     fireEvent.click(finalContinue)
-    expect(await screen.findByRole('heading', { name: 'Typing Blitz' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^04 TYPING BLITZ/ })).toBeTruthy()
     expect(review.recordGameResult).toHaveBeenCalledTimes(2)
   })
 

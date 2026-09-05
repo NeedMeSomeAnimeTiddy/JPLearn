@@ -63,8 +63,17 @@ export async function appReady(): Promise<void> {
   await screen.findByRole('button', { name: /open shortcuts/i })
 }
 
-/** Daily Games, from the titlebar rather than from a screen. */
+/** The DAILY road, from the titlebar rather than from a screen. */
 export async function openDailyGames(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: /open shortcuts/i }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Daily Games' }))
+  await screen.findByRole('button', { name: /^01 CROSSWORD/ })
+}
+
+/* ONE PUZZLE, WHICH IS ALL `daily_games` IS NOW. The hub that offered four is gone -- the road
+   offers them and this view runs the one you pressed -- so every route that used to land on the
+   view lands on the road, and the view is one tablet further. */
+export async function openDailyPuzzle(name = /^01 CROSSWORD/): Promise<void> {
+  await openDailyGames()
+  fireEvent.click(await screen.findByRole('button', { name }))
 }

@@ -59,10 +59,10 @@ describe('what a screen says it is', () => {
   })
 
   it('knows every screen the menu can actually reach', () => {
-    /* `enterScreen` is called with seven ids across App.tsx; a screen missing from this table gets
+    /* `enterScreen` is called with eight ids across App.tsx; a screen missing from this table gets
        the section's name, which is a quiet downgrade rather than a visible break -- so it is pinned */
     expect(Object.keys(SCREEN_NAMES).sort()).toEqual(
-      ['deck', 'drills', 'feed', 'level', 'library', 'scenes', 'wall'],
+      ['daily', 'deck', 'drills', 'feed', 'level', 'library', 'scenes', 'wall'],
     )
   })
 })

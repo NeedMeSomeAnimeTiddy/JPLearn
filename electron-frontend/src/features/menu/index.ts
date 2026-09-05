@@ -8,6 +8,7 @@ export { Wall } from './components/Wall'
 export { Library } from './components/Library'
 export { ExamLevel } from './components/ExamLevel'
 export { Drills } from './components/Drills'
+export { Daily } from './components/Daily'
 export { Deck } from './components/Deck'
 export { Feed } from './components/Feed'
 export { Unlock } from './components/Unlock'
@@ -34,6 +35,8 @@ export { scenes, FREE_TALK } from './scenes'
 export { sealGroups, flatSeals, wallStep } from './wall'
 export { libraryRows, libraryWindow, libraryNote, READING_PACE, LIBRARY_WINDOW } from './library'
 export { levelDetail, sectionLine, unscored, EXAM_MODES } from './examLevel'
+export { dailyRows, dailyNote } from './daily'
+export type { DailyRow } from './daily'
 export {
   drillModes, drillDecks, drillChapters, nearestOffered, offeredList, modeWindow, modeStep,
   modeNameSize, groupCopy, MODE_WINDOW,

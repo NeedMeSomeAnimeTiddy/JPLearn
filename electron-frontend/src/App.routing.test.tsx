@@ -93,6 +93,16 @@ function makeApi() {
       generated_at: '2026-01-01T00:00:00+00:00',
     }),
     getDeckCards: async () => ({ cards }),
+    /* the DAILY road reads the day before it can offer a puzzle, and `daily_games` cannot be
+       entered without pressing one */
+    getDailyGamesState: async () => ({
+      pool: {
+        day: '2026-07-15', algorithm_version: 1, game_seeds: {},
+        words: [{ deck_slug: 'vocab_n5', deck_name: 'N5 Vocabulary', card_id: 1, character: '猫', romaji: 'neko', meaning: 'cat', source: 'deck' }],
+      },
+      streak: { last_completed_day: null, current_streak_days: 1, best_streak_days: 1, freezes_available: 0, freeze_month: null },
+      attempts: [], progress: { attempt_count: 0, completed_daily_game_types: [], missed_words: [] },
+    }),
     getBlockProgress: async () => ({ blocks: [] }),
     getStudyQueue: async () => ({ items: [] }),
     getOverviewCharacterMastery: async () => ({
@@ -196,6 +206,13 @@ async function openFromShortcutMenu(itemName: string): Promise<void> {
   fireEvent.click(await screen.findByRole('menuitem', { name: itemName }))
 }
 
+/* `daily_games` IS ONE PUZZLE NOW. "Daily Games" from the titlebar opens the DAILY road -- a menu
+   screen, so `view` stays 'home' -- and the view is one tablet further in. */
+async function openDailyPuzzle(): Promise<void> {
+  await openFromShortcutMenu('Daily Games')
+  fireEvent.click(await screen.findByRole('button', { name: /^01 CROSSWORD/ }))
+}
+
 describe('view -> parent (Escape back-navigation)', () => {
   it('walks up the menu rather than out of a view, because the deck screen IS home', async () => {
     /* THE SCRIPT HUB WAS A VIEW AND ITS REPLACEMENT IS NOT. A deck's screen is level three of the
@@ -214,15 +231,16 @@ describe('view -> parent (Escape back-navigation)', () => {
     expect(currentView()).toBe('home')
   })
 
-  it('returns daily_games to home', async () => {
+  it('returns daily_games to home — which is the DAILY road it was opened from', async () => {
     render(<App />)
     await expectView('home')
 
-    await openFromShortcutMenu('Daily Games')
+    await openDailyPuzzle()
     await expectView('daily_games')
 
     fireEvent.keyDown(window, { key: 'Escape' })
     await expectView('home')
+    expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
   })
 
   it('still parents the two views the shortcut menu no longer opens directly', () => {
@@ -271,7 +289,7 @@ describe('history stack (titlebar back/forward)', () => {
     await expectView('minigame')
     fireEvent.keyDown(window, { key: 'Escape' })
     await expectView('home')
-    await openFromShortcutMenu('Daily Games')
+    await openDailyPuzzle()
     await expectView('daily_games')
 
     const back = () => fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
@@ -309,15 +327,20 @@ describe('history stack (titlebar back/forward)', () => {
     // happens. See the note on waitForEnabled.
     await openGame('Hiragana', 'Meaning Match')
     await expectView('minigame')
-    await openFromShortcutMenu('Daily Games')
+    await openDailyPuzzle()
     await expectView('daily_games')
 
+    /* TWO BACKS, BECAUSE THE ROAD IS A STOP ON THE WAY. `daily_games` cannot be entered without
+       naming a puzzle, and the screen that names one is a menu screen — so walking there from the
+       round really does pass through home, and the trail is [home, minigame, home, daily_games]
+       rather than three entries. The extra hop is the road, which is a place you stood. */
     await waitForEnabled(/^Back$/)
+    fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
+    await expectView('home')
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
     await expectView('minigame')
 
-    /* Branching from here must discard the daily_games forward entry, so the trail becomes
-       [home, minigame, home]. THE BRANCH USED TO BE 'JLPT Prep' FROM THE SHORTCUT MENU, and that
+    /* Branching from here must discard the forward trail, so it becomes [home, minigame, home]. THE BRANCH USED TO BE 'JLPT Prep' FROM THE SHORTCUT MENU, and that
        item now opens the menu's own exam ladder rather than a view of its own; the branch after
        that was the script hub, which is gone too. Escaping out of the round is the destination
        that is left, and it is a real one -- it is what every round ends with. */
@@ -356,7 +379,7 @@ describe('home number-key shortcuts', () => {
     render(<App />)
     await expectView('home')
 
-    await openFromShortcutMenu('Daily Games')
+    await openDailyPuzzle()
     await expectView('daily_games')
 
     fireEvent.keyDown(window, { key: '1' })

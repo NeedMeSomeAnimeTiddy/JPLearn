@@ -628,7 +628,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     }
   }
 
-  const returnToDailyGamesHub = useCallback((): void => {
+  const returnToDailyGames = useCallback((): void => {
     resetSessionEnd()
     explicitReviewPersistenceRequestRef.current += 1
     feedbackAdvanceRef.current = null
@@ -640,7 +640,10 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     retryCardsRef.current = null
     retryTargetItemsRef.current = null
     setRetryTargetItems(null)
-    navigate('daily_games', 'back')
+    /* THE ROAD, NOT THE PUZZLE. `daily_games` used to be the hub, so coming back from a missed-word
+       review landed on the four tiles; it is one puzzle now and cannot be opened without naming
+       which, so this goes home and the menu path is still standing on DAILY. */
+    navigate('home', 'back')
   }, [resetSessionEnd, navigate])
 
   const startSession = useCallback(async (selectedGame: MinigameKey = activeGame, customCards?: GameCard[], customTargetItems?: number, restore?: PersistedSessionRestore) => {
@@ -863,12 +866,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       const nextItem = explicitItems[explicitReviewCursorRef.current]
       explicitReviewCursorRef.current += 1
       if (!nextItem) {
-        returnToDailyGamesHub()
+        returnToDailyGames()
         return
       }
       const candidate = buildRound([nextItem.card], 'romaji_sprint', 0, false, 0)
       if (!candidate) {
-        returnToDailyGamesHub()
+        returnToDailyGames()
         return
       }
 
@@ -941,7 +944,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     nextCardIndex,
     nextRoundMode,
     resetSessionCore,
-    returnToDailyGamesHub,
+    returnToDailyGames,
   ])
 
   const submitAnswer = useCallback(
@@ -1190,7 +1193,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
         if (completedRoundsAfterAnswer >= targetRounds) {
           if (explicitReviewItemsRef.current) {
-            returnToDailyGamesHub()
+            returnToDailyGames()
             return
           }
           resetSessionEnd()
@@ -1362,7 +1365,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       livesRemaining,
       nextRound,
       resetSessionEnd,
-      returnToDailyGamesHub,
+      returnToDailyGames,
       roundConfidenceScore,
       roundState,
       scriptStats,
@@ -1466,7 +1469,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
     startSession,
     startMissedWordReview,
-    returnToDailyGamesHub,
+    returnToDailyGames,
     handleRetry,
     handleResume,
     handleDismissResume,

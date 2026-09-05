@@ -42,6 +42,7 @@ export const SCREEN_NAMES: Record<string, { en: string; jp: string }> = {
   feed: { en: 'TODAY', jp: '今日' },
   /* under PRACTICE */
   drills: { en: 'DRILLS', jp: '演習' },
+  daily: { en: 'DAILY', jp: '日課' },
   /* under THE WORLD */
   library: { en: 'READING', jp: '読解' },
   scenes: { en: 'TALK', jp: '会話' },

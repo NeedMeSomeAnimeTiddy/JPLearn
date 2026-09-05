@@ -135,7 +135,7 @@ export interface StudySessionApi {
     restore?: import('../../types').PersistedSessionRestore,
   ) => Promise<void>
   startMissedWordReview: (missedWords: DailyGamesMissedWordPayload[]) => Promise<void>
-  returnToDailyGamesHub: () => void
+  returnToDailyGames: () => void
   handleRetry: (cardIds: number[]) => void
   handleResume: () => Promise<void>
   handleDismissResume: () => void

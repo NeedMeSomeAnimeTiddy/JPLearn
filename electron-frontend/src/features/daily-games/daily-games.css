@@ -19,21 +19,6 @@
   margin: 0 auto;
 }
 
-.daily-games-summary {
-  align-items: center;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  margin: 1.5rem 0;
-}
-
-/* the same omission one row up: the summary line styled its row and not the sentence in it, so a
-   16px paragraph sat beside 10.9px streak badges on the same baseline */
-.daily-games-summary p {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-soft);
-}
 
 /* ── Buttons: squared 3D push-button ──────────────────────── */
 
@@ -84,141 +69,10 @@
   box-shadow: 0 1px 0 var(--accent-ink);
 }
 
-/* ── Mode toggle: squared hub-chip-button style ────────────── */
-
-.daily-games-mode-control {
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--button-bg-top);
-  color: var(--text-main);
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  padding: 5px 11px;
-  box-shadow: 0 2px 0 var(--accent-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
-}
-
-.daily-games-mode-control:hover {
-  border-color: var(--accent);
-  background: color-mix(in oklab, var(--button-bg-top) 80%, var(--accent));
-}
-
-.daily-games-mode-control:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.daily-games-mode-control.is-active {
-  background: var(--accent-ink);
-  border-color: var(--accent);
-  color: var(--text-main);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
-  transform: translateY(2px);
-}
-
-.daily-games-mode-list,
-.daily-streak-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-/* ── Streak badge: squared hub-stat style ──────────────────── */
-
-.daily-streak-badge {
-  align-items: center;
-  border: 1px solid var(--accent-ink);
-  border-radius: 0;
-  display: inline-flex;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  gap: 5px;
-  padding: 4px 10px;
-  background: var(--button-bg-top);
-  color: var(--text-main);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.daily-streak-badge strong {
-  font-size: 0.85rem;
-}
-
-/* ── Tile: squared cassette-panel style ────────────────────── */
-
-.daily-game-tile {
-  position: relative;
-  align-items: center;
-  display: flex;
-  gap: 1rem;
-  min-height: 9rem;
-  padding: 1rem;
-  border-radius: 2px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 72%, transparent);
-  background: linear-gradient(145deg, var(--panel-bg), var(--panel-bg-alt));
-  box-shadow:
-    0 2px 0 var(--accent-ink),
-    0 8px 28px -16px rgba(0, 0, 0, 0.68);
-}
-
-.daily-game-tile::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.18) 100%);
-  z-index: 1;
-}
-
-.daily-game-tile p {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin: 0.5rem 0 0;
-}
-
-/* THE TILE'S NAME NEEDED A SIZE, AND AN `h2` WITHOUT ONE IS THE BROWSER'S 24px.
-   That made the four game names the largest type on the screen -- larger than the "Daily Games"
-   nameplate at 16.3px, beside 14px body copy and 10.9px chips -- which is exactly backwards for a
-   card in a grid of four. The rule set `margin` and stopped. */
-.daily-game-tile h2 {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.daily-game-tile-status {
-  align-items: center;
-  background: var(--panel-bg-alt);
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  display: inline-flex;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  gap: 0.25rem;
-  margin-left: auto;
-  padding: 0.375rem 0.625rem;
-}
-
-.daily-game-tile.is-complete .daily-game-tile-status {
-  color: var(--tone-teal);
-}
-
-.daily-game-tile.is-practice .daily-game-tile-status {
-  color: var(--tone-ocean);
-}
 
 /* ── Skeleton (squared) ────────────────────────────────────── */
 
-.daily-games-skeleton,
-/* `auto-fit` RATHER THAN A FIXED TWO, so the pair becomes one column when the column is narrow
-   instead of squeezing two 200px tiles side by side. */
-.daily-games-tile-grid {
+.daily-games-skeleton {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
@@ -746,7 +600,6 @@
 
 .daily-games-back:focus-visible,
 .daily-games-retry:focus-visible,
-.daily-games-mode-control:focus-visible,
 .daily-game-button:focus-visible,
 .match-pairs-card:focus-visible {
   outline: 0.25rem solid color-mix(in oklab, var(--accent) 60%, transparent);
@@ -780,17 +633,12 @@
 /* ── Responsive (squared) ──────────────────────────────────── */
 
 @media (max-width: 40rem) {
-  .daily-games-summary {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
+  
   .daily-games-heading {
     text-align: left;
   }
 
-  .daily-games-skeleton,
-  .daily-games-tile-grid {
+  .daily-games-skeleton {
     grid-template-columns: 1fr;
   }
 

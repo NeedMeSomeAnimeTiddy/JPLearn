@@ -42,7 +42,8 @@ import { MinigameView } from './views/MinigameView'
 import { MasteryOverlay } from './features/mastery'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { PassageHubView } from './views/PassageHubView'
-import { DAILY_GAMES_COPY } from './features/daily-games/constants'
+import { DAILY_GAMES_COPY, DAILY_GAME_TILES } from './features/daily-games/constants'
+import type { DailyGameType, DailyGamesMode } from './features/daily-games'
 import { dedupeDictionaryCards } from './features/card-notes'
 import { KanjiDetailPanel } from './features/kanji-detail'
 import { BADGE_METADATA } from './features/achievements'
@@ -54,7 +55,8 @@ import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
 import { flyHome, flyToSection } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
-  MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Deck, Feed, Unlock,
+  MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Daily, Deck, Feed,
+  Unlock,
   MenuChrome, leaveBoard, cancelLeaving,
   practiceLanes, worldLanes, ascentRungs, scenes as buildScenes, libraryRows, levelDetail, milestone,
   unlockMoment, heroFromStudyBlock, crownFrom, rowsFrom, type MenuSectionKey,
@@ -133,7 +135,7 @@ const STUDY_QUEUE_CACHE_TTL_MS = 45000
 const DECK_LOAD_TIMEOUT_MS = 15000
 const STARTUP_WARMUP_INITIAL_DELAY_MS = 900
 const STARTUP_WARMUP_YIELD_DEADLINE_MS = 45
-const DailyGamesHub = lazy(() => import('./features/daily-games/components/GamesHub'))
+const DailyGameView = lazy(() => import('./features/daily-games/components/DailyGameView'))
 
 function App() {
   // First-run setup wizard check — must be the first hooks so the conditional
@@ -284,16 +286,13 @@ function App() {
   const commandPalette = useCommandPalette()
   const lookup = useLookup()
 
-  function openDailyGames(): void {
-    closeKanjiDetail()
-    setDictionaryOpen(false)
-    setShowOverview(false)
-    setShowSettings(false)
-    tutor.closeTutorPanel()
-    navigate('daily_games', 'forward')
-    setShortcutMenuOpen(false)
-    setActiveShortcutFlyout(null)
-  }
+  /* AND THE PUZZLES DO TOO, for the reason the shelf and the ladder already moved: `daily_games`
+     is one puzzle now and cannot be opened without naming which. Every route that used to mean
+     "show me the four" opens the DAILY road, which is the screen that offers them -- through a ref,
+     because the menu path this needs is built four hundred lines below the palette that calls it. */
+  const [dailyPlay, setDailyPlay] = useState<{ type: DailyGameType; mode: DailyGamesMode } | null>(null)
+  const openDailyGamesRef = useRef<() => void>(() => {})
+  function openDailyGames(): void { openDailyGamesRef.current() }
 
   useEffect(() => {
     const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
@@ -635,7 +634,7 @@ function App() {
     explicitReviewItemsRef,
     startSession,
     startMissedWordReview,
-    returnToDailyGamesHub,
+    returnToDailyGames,
     resetSessionCore,
     resetSessionWithLives,
     resetSessionFull,
@@ -1271,6 +1270,24 @@ function App() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
   }, [navigate, menuPath, tutor])
 
+  const openDailyRoad = useCallback(() => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    /* ONLY WHEN THERE IS SOMEWHERE TO COME BACK FROM. The history stack is driven by `view`
+       changing, so navigating home from home is a no-op — but navigating home from a VIEW and then
+       into a puzzle pushes two entries where the walk was one, and Back then lands on a home the
+       learner never stopped at. */
+    if (view !== 'home') navigate('home', 'back')
+    menuPath.enterSection('DRILLS')
+    menuPath.enterScreen('daily')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
+  }, [view, navigate, menuPath, tutor])
+  openDailyGamesRef.current = openDailyRoad
+
   /* THE LADDER LIVES IN THE MENU NOW. Four separate routes used to navigate to `jlpt_prep` to show
      five readiness cards and four mode buttons -- the palette, the titlebar's shortcut menu, the
      curriculum's `jlpt` destination and the all-maps section list. That dashboard is gone, because
@@ -1591,7 +1608,7 @@ function App() {
         // An in-progress missed-word review returns to the Daily Games hub
         // before Escape is allowed to leave the minigame view at all.
         if (view === 'minigame' && explicitReviewItemsRef.current) {
-          returnToDailyGamesHub()
+          returnToDailyGames()
           return
         }
 
@@ -2490,7 +2507,7 @@ function App() {
           lanes={practiceLanes(summary)}
           onPick={(key) => {
             /* three genuinely different destinations, all of them places the app already has */
-            if (key === 'games') { openDailyGames(); return }
+            if (key === 'games') { menuPath.enterScreen('daily'); return }
             if (key === 'drills') { menuPath.enterScreen('drills'); return }
             /* REVIEW is the deck you are on, and it is the deck screen that opens it */
             openDeckScreen(activeScript)
@@ -2512,6 +2529,18 @@ function App() {
             /* TALK has a level three now -- picking the scene is a menu screen rather than the
                tutor's own picker, and it hands the CHOSEN scenario over rather than the list */
             menuPath.enterScreen('scenes')
+          }}
+          onUp={leaveMenuLevel}
+        />
+      ) : null}
+
+      {/* THE DAILY ROAD — the hub's picking job, on the object the design drew for it. Pressing a
+          tablet names the puzzle and the mode, and `daily_games` runs that one. */}
+      {view === 'home' && menuLevel === 3 && menuPath.screen === 'daily' ? (
+        <Daily
+          onPlay={(type, mode) => {
+            setDailyPlay({ type, mode })
+            navigate('daily_games', 'forward')
           }}
           onUp={leaveMenuLevel}
         />
@@ -2840,7 +2869,7 @@ function App() {
             : null}
           onBack={() => {
             if (explicitReviewItemsRef.current) {
-              returnToDailyGamesHub()
+              returnToDailyGames()
               return
             }
             navigate('home', 'back')
@@ -2902,7 +2931,10 @@ function App() {
             <span className="hub-nameplate">
               <span className="hub-nameplate-mark" aria-hidden="true">JPL-DLY-A</span>
               <strong className="hub-topbar-title">
-                <span className="hub-glitch-text">{DAILY_GAMES_COPY.title}</span>
+                {/* the road already chose, so this says WHICH rather than repeating the category */}
+                <span className="hub-glitch-text">
+                  {DAILY_GAME_TILES.find((t) => t.type === dailyPlay?.type)?.title ?? DAILY_GAMES_COPY.title}
+                </span>
               </strong>
             </span>
 
@@ -2912,9 +2944,14 @@ function App() {
           <div className="hub-studio">
             <ErrorBoundary>
               <Suspense fallback={<div className="daily-games-hub" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
-                <DailyGamesHub
-                  onReviewMissedWords={startMissedWordReview}
-                />
+                {dailyPlay ? (
+                  <DailyGameView
+                    gameType={dailyPlay.type}
+                    mode={dailyPlay.mode}
+                    onBack={() => { setDailyPlay(null); navigate('home', 'back') }}
+                    onReviewMissedWords={startMissedWordReview}
+                  />
+                ) : null}
               </Suspense>
             </ErrorBoundary>
           </div>

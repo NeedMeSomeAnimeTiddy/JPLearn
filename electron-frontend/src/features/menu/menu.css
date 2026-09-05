@@ -3709,6 +3709,17 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
    They are kept verbatim from the port rather than re-drawn, and they are down here rather than
    scattered so that the screens above stay a clean read of the mockup's own text.
    ================================================================================================== */
+/* THE ONLY CONTROL A FAILED FETCH NEEDS, on the plate that carries the failure. `.pj-empty` is
+   every screen's "there is nothing here" line; the daily road is the one that can be empty because
+   something BROKE rather than because nothing is there, and a reason with no way to try again is
+   a dead end. */
+.pa-retry {
+  margin-left: 14px; border: 0; cursor: pointer; padding: 4px 11px 5px;
+  background: var(--ink); color: var(--gold-hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+}
+.pa-retry:hover { background: var(--hi); color: #ffe9c9; }
+
 .pj-empty {
   position: absolute; left: 166px; top: 232px; width: 800px; padding: 14px 18px;
   background: var(--washi); transform: skewX(-8deg) rotate(-1.2deg); transform-origin: 0 50%;
