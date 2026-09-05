@@ -60,10 +60,22 @@ jobs:
             $launcher = Get-Command py -CommandType Application -ErrorAction SilentlyContinue |
               Select-Object -First 1
             if ($launcher) {
-              $resolved = & $launcher.Source -3.11 -c "import sys; print(sys.executable)" 2>$null
-              if ($LASTEXITCODE -eq 0 -and $resolved) {
+              # GitHub's powershell wrapper sets $ErrorActionPreference = Stop, under
+              # which anything a native command writes to stderr becomes a terminating
+              # error. The launcher prints "No installed Python found!" there when it
+              # knows of no interpreter, which would kill this step before it could
+              # report why -- so failure is detected by exit code instead.
+              $previous = $ErrorActionPreference
+              $ErrorActionPreference = 'Continue'
+              $resolved = & $launcher.Source -3.11 -c "import sys; print(sys.executable)" 2>&1
+              $launcherExit = $LASTEXITCODE
+              $ErrorActionPreference = $previous
+
+              if ($launcherExit -eq 0 -and $resolved) {
                 $pythonExe = "$resolved".Trim()
                 Write-Host "python is not on PATH; the py launcher resolved 3.11 instead"
+              } else {
+                Write-Host "the py launcher knows of no 3.11: $resolved"
               }
             }
           }
@@ -117,8 +129,12 @@ jobs:
             }
 
             Write-Host ""
-            Write-Host "Install Python 3.11 and Node 22+ for all users, then restart the"
-            Write-Host "runner: a running service keeps the PATH it started with."
+            Write-Host "If Python is installed but invisible here, it was almost certainly"
+            Write-Host "installed for one user: the launcher reads per-user registrations"
+            Write-Host "from HKCU, and this process's HKCU belongs to $(whoami), not to"
+            Write-Host "the account that ran the installer. Re-run the Python 3.11"
+            Write-Host "installer with 'Install Python for all users' ticked, then restart"
+            Write-Host "the runner."
             exit 1
           }
 
