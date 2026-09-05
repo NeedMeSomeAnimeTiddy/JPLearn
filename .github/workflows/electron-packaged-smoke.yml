@@ -33,17 +33,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Check toolchain
+        # actions/setup-python and actions/setup-node are deliberately not used here.
+        # setup-python's installer does a per-machine install and rewrites registry
+        # entries, which needs administrator rights the runner service does not have --
+        # it fails with "Error happened during Python installation". A dedicated build
+        # VM is better off with the toolchain installed once anyway: no download and
+        # install on every run, and the same interpreter the local checks use.
+        run: |
+          $problems = @()
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: electron-frontend/package-lock.json
+          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $python) {
+            $problems += "python is not on PATH"
+          } else {
+            $version = (& $python.Source --version) -replace '^Python ', ''
+            Write-Host "python  $version  ($($python.Source))"
+            if ($version -notmatch '^3\.11\.') {
+              $problems += "python is $version, expected 3.11.x"
+            }
+          }
+
+          $node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $node) {
+            $problems += "node is not on PATH"
+          } else {
+            $version = (& $node.Source --version) -replace '^v', ''
+            Write-Host "node    $version  ($($node.Source))"
+            if ($version -notmatch '^22\.') {
+              $problems += "node is $version, expected 22.x"
+            }
+          }
+
+          if ($problems.Count -gt 0) {
+            Write-Host ""
+            Write-Host "This runner is missing part of the toolchain:" -ForegroundColor Red
+            $problems | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+            Write-Host ""
+            Write-Host "Install Python 3.11 and Node 22 on the runner machine and restart"
+            Write-Host "the runner so it picks up the new PATH."
+            exit 1
+          }
 
       - name: Install backend test dependencies
         run: python -m pip install -r requirements.txt
