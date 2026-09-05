@@ -5487,7 +5487,6 @@ kbd {
   background: color-mix(in oklab, currentColor 14%, transparent);
 }
 
-
 .char-mastery-chip-copy {
   min-width: 0;
   display: grid;
@@ -6025,8 +6024,6 @@ kbd {
   border-radius: 999px;
   transition: width 600ms ease;
 }
-
-
 
 .titlebar-xp-details {
   position: absolute;
@@ -7926,24 +7923,6 @@ kbd {
   border-color: var(--accent);
 }
 
-.minigame-cassette-body .sentence-assembly-chip {
-  background: var(--bg-main);
-  border-color: var(--panel-border);
-  border-radius: 0;
-}
-
-.minigame-cassette-body .sentence-assembly-step-button {
-  background: var(--panel-bg);
-  border-color: var(--panel-border);
-  border-radius: 0;
-}
-
-.minigame-cassette-body .speech-answer-mic-button {
-  background: var(--panel-bg);
-  border-color: var(--panel-border);
-  border-radius: 0;
-}
-
 .minigame-cassette-body .confidence-chip {
   background: var(--panel-bg);
   border-color: var(--panel-border);
@@ -8233,8 +8212,6 @@ kbd {
   animation: minigamePointsGainFloat 700ms var(--motion-ease);
   pointer-events: none;
 }
-
-
 
 .minigame-support-row {
   display: grid;
@@ -8925,7 +8902,6 @@ kbd {
   }
 }
 
-
 .game-prompt-main.is-japanese {
   font-family: var(--sans);
   font-size: clamp(3rem, 11vw, 5.6rem);
@@ -9003,260 +8979,6 @@ kbd {
   cursor: pointer;
 }
 
-.speech-answer-panel {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.speech-answer-mic-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: calc(48px * var(--ui-scale));
-  height: calc(48px * var(--ui-scale));
-  border-radius: 999px;
-  border: 1px solid var(--button-border);
-  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
-  color: var(--text-main);
-  cursor: pointer;
-}
-
-.speech-answer-mic-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.speech-answer-mic-button.is-recording {
-  border-color: color-mix(in oklab, var(--tone-rose) 62%, var(--button-border));
-  background: color-mix(in oklab, var(--tone-rose) 22%, var(--button-bg-top));
-  animation: roundPulseSuccess 1.4s ease-in-out infinite;
-}
-
-.speech-answer-status {
-  font-size: 0.92rem;
-  color: var(--text-soft);
-  line-height: 1.5;
-}
-
-.speech-answer-transcript {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-main);
-  font-family: var(--mono);
-}
-
-.speech-answer-fallback-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--accent);
-  text-decoration: underline;
-  cursor: pointer;
-  font: inherit;
-}
-
-.sentence-assembly-panel {
-  display: grid;
-  gap: 12px;
-}
-
-.sentence-assembly-chip-list {
-  display: grid;
-  gap: 8px;
-  min-height: 48px;
-  padding: 10px;
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
-}
-
-.sentence-assembly-sortable-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
-.sentence-assembly-chip-list-active {
-  border-style: solid;
-  border-color: color-mix(in oklab, var(--accent) 42%, var(--button-border));
-}
-
-.sentence-assembly-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 9px;
-  border: 1px solid var(--button-border);
-  border-radius: 10px;
-  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
-  color: var(--text-main);
-  padding: 10px 12px;
-  cursor: pointer;
-  font-weight: 600;
-  text-align: left;
-}
-
-.sentence-assembly-reorder-controls {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-}
-
-.sentence-assembly-step-button {
-  border: 1px solid var(--button-border);
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--button-bg-top), var(--button-bg-bottom));
-  color: var(--text-main);
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.sentence-assembly-step-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.sentence-assembly-chip-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 0;
-  background: color-mix(in oklab, var(--accent) 22%, transparent);
-  border: 1px solid color-mix(in oklab, var(--accent) 44%, var(--panel-border));
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.sentence-assembly-chip-text {
-  flex: 1;
-}
-
-.sentence-assembly-chip:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.sentence-assembly-chip-active {
-  border-color: color-mix(in oklab, var(--accent) 42%, var(--button-border));
-}
-
-.sentence-assembly-chip.is-dragging {
-  box-shadow: 0 10px 20px -12px rgba(0, 0, 0, 0.7);
-  border-color: color-mix(in oklab, var(--accent) 58%, var(--button-border));
-}
-
-.sentence-assembly-empty {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.9rem;
-}
-
-.sentence-assembly-actions {
-  margin-top: 2px;
-}
-
-/* ── Sentence assembly: condense response card chrome ──────────── */
-.minigame-response-card:has(.sentence-assembly-panel) {
-  padding: 10px 12px;
-}
-
-.minigame-response-card:has(.sentence-assembly-panel) .minigame-response-head,
-.minigame-response-card:has(.sentence-assembly-panel) .minigame-response-copy,
-.minigame-response-card:has(.sentence-assembly-panel) .minigame-shortcut-row {
-  display: none;
-}
-
-.sentence-assembly-actions button {
-  min-width: auto;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
-}
-
-.sentence-assembly-actions button:last-child {
-  border-color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 18%, var(--bg-main));
-  color: var(--text-main);
-  font-weight: 700;
-}
-
-/* ── Sentence assembly: tighter internals ──────────────────────── */
-.sentence-assembly-chip-list {
-  padding: 6px;
-  gap: 6px;
-}
-
-.sentence-assembly-chip {
-  padding: 8px 10px;
-}
-
-.sentence-assembly-chip-index {
-  width: 20px;
-  height: 20px;
-  font-size: 0.7rem;
-}
-
-.stroke-order-picker {
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 0;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 28%, var(--card-border));
-  background: var(--bg-main);
-}
-
-.stroke-order-picker .game-input-row {
-  position: relative;
-}
-
-.stroke-order-picker .game-input-row::after {
-  content: 'romaji';
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--text-soft) 72%, white);
-  pointer-events: none;
-}
-
-.stroke-order-picker .game-input-row input {
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--chip-bg) 88%, white), var(--chip-bg));
-  border-color: color-mix(in oklab, var(--tone-ocean) 28%, var(--button-border));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding-right: 90px;
-}
-
-.stroke-order-picker .game-input-row input::placeholder {
-  color: color-mix(in oklab, var(--text-soft) 82%, white);
-}
-
-.stroke-order-candidate-wrap {
-  display: grid;
-  gap: 8px;
-}
-
-.stroke-order-candidate-wrap .status-line {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px dashed color-mix(in oklab, var(--tone-ocean) 28%, var(--card-border));
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-soft);
-  font-size: 0.88rem;
-}
-
 .option-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -9302,10 +9024,6 @@ kbd {
 
 .minigame-feedback-wrap .round-feedback-skip {
   margin-top: 0;
-}
-
-.stroke-order-picker .option-grid {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .option-button {
@@ -10105,7 +9823,6 @@ kbd {
     radial-gradient(circle at 80% -10%, color-mix(in oklab, var(--accent) 28%, transparent), transparent 44%),
     linear-gradient(170deg, color-mix(in oklab, var(--panel-bg-alt) 94%, black), color-mix(in oklab, var(--panel-bg) 96%, black));
 }
-
 
 .expertise-options {
   display: grid;
@@ -12624,7 +12341,6 @@ button.lpp-node:hover .lpp-node-ring {
 .error-boundary-retry {
   margin-top: 8px;
 }
-
 
 /* ── Onboarding Buttons ──────────────────────────────────────────── */
 

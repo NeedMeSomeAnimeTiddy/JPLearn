@@ -8,12 +8,25 @@ import {
   matchesCurvedKanaFallback,
   resolveHandwritingColors,
 } from './utils'
+import type { HandwritingColors } from './utils'
 
 interface UseHandwritingQuizOptions {
   character: string
   disabled: boolean
   externalHintUsed: boolean
   onComplete: (outcome: HandwritingOutcome) => void
+  /**
+   * The three colours the writer draws with, where the surface hosting it is not the app's own
+   * theme. Left out, they are resolved off the document root as before -- which is right for a
+   * dark panel and wrong on the round sheet's cream paper, where `--text-main` is near-white.
+   */
+  colors?: HandwritingColors
+  /**
+   * The square the writer draws in, in CSS pixels. HanziWriter sizes its SVG by attribute and sets
+   * no viewBox, so the drawing cannot be scaled down afterwards without clipping it -- a host that
+   * has less room than the default 280 has to say so here.
+   */
+  size?: number
 }
 
 function createOutcome(usedHint = false): HandwritingOutcome {
@@ -39,7 +52,9 @@ function getHandwritingColors() {
   )
 }
 
-export function useHandwritingQuiz({ character, disabled, externalHintUsed, onComplete }: UseHandwritingQuizOptions) {
+export function useHandwritingQuiz({
+  character, disabled, externalHintUsed, onComplete, colors, size = 280,
+}: UseHandwritingQuizOptions) {
   const targetRef = useRef<HTMLDivElement | null>(null)
   const writerRef = useRef<HanziWriter | null>(null)
   const characterDataRef = useRef<HandwritingCharacterData | null>(null)
@@ -50,6 +65,10 @@ export function useHandwritingQuiz({ character, disabled, externalHintUsed, onCo
   const startQuizRef = useRef<(startStrokeNum?: number) => void>(() => undefined)
   const onCompleteRef = useRef(onComplete)
   const externalHintUsedRef = useRef(externalHintUsed)
+  const colorsRef = useRef(colors)
+  colorsRef.current = colors
+  const sizeRef = useRef(size)
+  sizeRef.current = size
   const [status, setStatus] = useState<HandwritingStatus>('loading')
   const [mistakeCount, setMistakeCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -144,12 +163,12 @@ export function useHandwritingQuiz({ character, disabled, externalHintUsed, onCo
         if (disposed || !targetRef.current) return
         characterDataRef.current = data
         const writer = HanziWriter.create(targetRef.current, character, {
-          width: 280,
-          height: 280,
+          width: sizeRef.current,
+          height: sizeRef.current,
           padding: 12,
           showCharacter: false,
           showOutline: false,
-          ...getHandwritingColors(),
+          ...(colorsRef.current ?? getHandwritingColors()),
           charDataLoader: () => data,
           onLoadCharDataError: () => {
             if (!disposed) {

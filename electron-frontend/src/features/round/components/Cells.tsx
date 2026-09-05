@@ -189,10 +189,12 @@ export interface TypedProps {
   onChange: (value: string) => void
   onSubmit: (value: string) => void
   wanakanaMode?: 'hiragana' | 'katakana'
+  /** which script is being written -- see the note over `.rd-type input.lat` */
+  face?: 'jp' | 'lat'
 }
 
 export function RoundTyped({
-  inputRef, value, placeholder, disabled, onChange, onSubmit, wanakanaMode,
+  inputRef, value, placeholder, disabled, onChange, onSubmit, wanakanaMode, face = 'jp',
 }: TypedProps) {
   const composing = useRef(false)
   const [knocking, setKnocking] = useState(false)
@@ -220,6 +222,7 @@ export function RoundTyped({
       <div className="rd-type-row">
         <input
           ref={inputRef}
+          className={face === 'lat' ? 'lat' : undefined}
           value={value}
           placeholder={placeholder}
           autoComplete="off"
@@ -244,13 +247,49 @@ export function RoundTyped({
 }
 
 /* ==================================================================================================
+   AND WHAT THE LINE SAYS AFTERWARDS.
+
+   A field you can no longer type in is not an answer, it is a broken control -- and while it stood
+   there the verdict below it printed the same word again under the label `Your answer`. This is the
+   slips' own move made on a rule instead of on paper: what you wrote stays where you wrote it, and
+   is struck through in vermilion when it was wrong. What the answer WAS is the prompt cell's line,
+   which prints it in full the moment the round resolves, so it is not repeated here.
+   ================================================================================================== */
+export interface WroteProps {
+  text: string
+  right: boolean
+  face?: 'jp' | 'lat'
+  /** what the line is a record of -- `YOU WROTE`, `YOU SAID`, `YOU DREW` */
+  label?: string
+}
+
+export function RoundWrote({ text, right, face = 'jp', label = 'YOU WROTE' }: WroteProps) {
+  return (
+    <div className={right ? 'rd-said hit' : 'rd-said miss'}>
+      <span>
+        <b className={face === 'jp' ? 'jp' : undefined} lang={face === 'jp' ? 'ja' : undefined}>
+          {text}
+        </b>
+        <s>{label}</s>
+      </span>
+    </div>
+  )
+}
+
+/* ==================================================================================================
    WHAT A ROUND SAYS ONCE IT IS OVER, and it is everything the old feedback panel said.
 
-   THE SLIPS ALREADY CARRY THE VERDICT for a four-choice round — the right one is edged gold and the
-   one you pressed is struck through — so this is what a strip of paper cannot say: the message, what
-   it cost or earned, how long you took, when the card comes back, and the sentence or the dictionary
-   note that makes the miss worth having made. On a typed or drawn round it also carries the two
-   answers, because there are no slips to put them on.
+   EVERY FILL CARRIES ITS OWN VERDICT NOW, so this carries none of it: the slips edge the right one
+   gold and strike the one you pressed, the typed rule keeps what you wrote and strikes that, the
+   chunks lock in the order you left them and the drawn square holds the character you drew. What is
+   left for this panel is what none of those can say -- the message, what it cost or earned, how long
+   you took, and the sentence or the dictionary note that makes the miss worth having made.
+
+   IT USED TO PRINT BOTH ANSWERS HERE and that was a third printing rather than a first: the prompt
+   cell has said what the answer was since the sheet landed, several of the modes put it in the
+   message as well (`Not quite. The answer is ...`), and on sentence assembly what it printed under
+   `Your answer` was the internal chunk ids -- `chunk-0|chunk-1` -- because that is what the grader
+   is handed. A row that is wrong on one mode and redundant on the other fifteen is not a row.
 
    IT SITS BETWEEN THE WORK AND THE SLAB rather than replacing either. `MinigameResponsePanel` swapped
    the whole answer area for a feedback card, so the thing you had just pressed vanished at the moment
@@ -262,11 +301,6 @@ export interface VerdictProps {
   comboBonus?: number
   milestoneStreak?: number | null
   livesEnabled?: boolean
-  /** your answer and the right one — only drawn when the work cell is not already showing them */
-  yours?: string | null
-  yoursLabel?: string
-  answer?: string | null
-  showAnswers?: boolean
   responseMs?: number | null
   example?: { jp: string; romaji: string; en: string } | null
   note?: { title: string; copy: string } | null
@@ -279,7 +313,6 @@ export interface VerdictProps {
 
 export function RoundVerdict({
   message, tone, comboBonus = 0, milestoneStreak = null, livesEnabled = false,
-  yours, yoursLabel = 'You said', answer, showAnswers = false,
   responseMs, example, note, saving = false, saveFailed = false,
   savingCopy = 'Saving that review…', saveFailedCopy = 'That review did not save.',
 }: VerdictProps) {
@@ -295,12 +328,6 @@ export function RoundVerdict({
             fifth in a row of eight-and-a-half point chips. See `src` in `MinigameView`. */}
         {responseMs ? <span>Answered in {(responseMs / 1000).toFixed(1)}s</span> : null}
       </div>
-      {showAnswers && (yours || answer) ? (
-        <div className="rd-verdict-answers">
-          {yours ? <span><s>{yoursLabel}</s> <b>{yours}</b></span> : null}
-          {answer ? <span className="right"><s>The answer</s> <b>{answer}</b></span> : null}
-        </div>
-      ) : null}
       {example ? (
         <p className="rd-verdict-eg"><b lang="ja">{example.jp}</b> {example.en}</p>
       ) : null}

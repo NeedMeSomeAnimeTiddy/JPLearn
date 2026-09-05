@@ -36,8 +36,12 @@ vi.mock('./features/onboarding/components/WelcomeStep', () => ({
   },
 }))
 
-vi.mock('./features/handwriting/components/HandwritingAnswerPanel', () => ({
-  HandwritingAnswerPanel: ({ onComplete }: { onComplete: (outcome: { completed: boolean; mistakeCount: number; usedHint: boolean; usedAnimation: boolean; gaveUp: boolean }) => void }) => (
+/* Only the square you draw in is stood in for -- the other three boards in this module are the real
+   ones. HanziWriter wants a DOM it does not have here, and what these tests are about is what the
+   session does with an outcome rather than how a stroke is judged. */
+vi.mock('./features/round/components/Panels', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./features/round/components/Panels')>()),
+  RoundDraw: ({ onComplete }: { onComplete: (outcome: { completed: boolean; mistakeCount: number; usedHint: boolean; usedAnimation: boolean; gaveUp: boolean }) => void }) => (
     <div>
       <button type="button" onClick={() => onComplete({ completed: true, mistakeCount: 0, usedHint: false, usedAnimation: false, gaveUp: false })}>
         Complete unassisted handwriting
@@ -867,14 +871,14 @@ describe('what each deck offers', () => {
     await openGame('Kanji', 'Stroke Order')
 
     expect(await screen.findByText(/Type the romaji reading to see kanji options/i)).toBeTruthy()
-    expect(screen.getByPlaceholderText(/Type romaji reading/i)).toBeTruthy()
+    expect(screen.getByPlaceholderText(/Type the reading/i)).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: /toggle hint/i }))
     await waitFor(() => {
       const hintText = document.querySelector('.minigame-hint-popover-text')
       expect(hintText?.textContent).toContain('Type the reading, then select the matching kanji from the options')
     })
 
-    fireEvent.change(screen.getByPlaceholderText(/Type romaji reading/i), { target: { value: 'nichi' } })
+    fireEvent.change(screen.getByPlaceholderText(/Type the reading/i), { target: { value: 'nichi' } })
     const candidateList = await screen.findByLabelText(/kanji candidates/i)
     const candidateButtons = within(candidateList).getAllByRole('button')
     fireEvent.click(candidateButtons[0])
@@ -897,11 +901,11 @@ describe('what each deck offers', () => {
       isCorrect: true,
     })))
     expect(screen.getByText(/stroke order complete/i)).toBeTruthy()
-    expect(screen.getByText(/your answer/i)).toBeTruthy()
-    expect(screen.getByText(/the answer/i)).toBeTruthy()
-    const completedAnswerValues = Array.from(document.querySelectorAll('.rd-verdict-answers b')).map((value) => value.textContent)
-    expect(completedAnswerValues).toHaveLength(2)
-    expect(completedAnswerValues[0]).toBe(completedAnswerValues[1])
+    /* WHAT THE CHARACTER WAS IS THE PROMPT CELL'S LINE, and only that. The verdict used to print it
+       twice more under `Your answer` and `The answer`, which on a drawn round is the same glyph
+       three times over. */
+    expect(document.querySelector('.rd-verdict-answers')).toBeNull()
+    expect(document.querySelector('.rd-gloss b')?.textContent).toBeTruthy()
   })
 
   it('records a completed handwriting round with retries and assistance as correct', async () => {
@@ -917,9 +921,7 @@ describe('what each deck offers', () => {
     })))
     expect(screen.getByText(/stroke order complete/i)).toBeTruthy()
     expect(screen.queryByText(/stroke-order animation|rejected strokes|guide hint/i)).toBeNull()
-    const retryAnswerValues = Array.from(document.querySelectorAll('.rd-verdict-answers b')).map((value) => value.textContent)
-    expect(retryAnswerValues).toHaveLength(2)
-    expect(retryAnswerValues[0]).toBe(retryAnswerValues[1])
+    expect(document.querySelector('.rd-verdict-answers')).toBeNull()
   })
 
   it('records a given-up handwriting round as incomplete and incorrect', async () => {
@@ -933,8 +935,10 @@ describe('what each deck offers', () => {
       minigame: 'handwriting',
       isCorrect: false,
     })))
+    /* A ROUND YOU GAVE UP SAYS SO IN THE MESSAGE. It used to also print `Not completed` in an
+       answers row under the label `Your answer`, which is not an answer anybody gave. */
     expect(screen.getByText(/character not completed/i)).toBeTruthy()
-    expect(Array.from(document.querySelectorAll('.rd-verdict-answers b')).map((value) => value.textContent)[0]).toBe('Not completed')
+    expect(document.querySelector('.rd-verdict-answers')).toBeNull()
   })
 
   it('runs sentence assembly via bridge payload and records the sentence_assembly minigame', async () => {
@@ -1069,7 +1073,9 @@ describe('what each deck offers', () => {
     await openGame('Grammar', 'Sentence Assembly')
 
     fireEvent.click(await screen.findByRole('button', { name: /move 学生です。 later/i }))
-    fireEvent.click(screen.getByRole('button', { name: /submit order/i }))
+    /* THE SLAB IS THE SUBMIT NOW. It was a button inside the panel, which left the sheet's own
+       action bar promising ENTER TO ANSWER on a screen where Enter did nothing. */
+    fireEvent.click(screen.getByRole('button', { name: /submit this order/i }))
 
     await waitFor(() => expect(getGrammarMinigameData).toHaveBeenCalled())
     expect(getGrammarMinigameData).toHaveBeenCalledWith(expect.objectContaining({

@@ -210,7 +210,7 @@
 .rd-type { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px;
   padding-bottom: 16px; }
 .rd-type-row { display: flex; align-items: stretch; gap: 10px; }
-.rd-type input {
+.rd-type input, .rd-rule {
   flex: 1; min-width: 0;
   background: transparent; border: 0; outline: 0;
   padding: 6px 2px 8px;
@@ -218,12 +218,24 @@
   font-family: var(--jp); font-size: 34px; line-height: 1.2; color: var(--ink);
   letter-spacing: 0.02em;
 }
-.rd-type input::placeholder {
-  font-family: var(--lat-ui); font-weight: 600; font-size: 15px; letter-spacing: 0.14em;
-  color: rgba(20, 17, 13, 0.3);
+/* THE FACE FOLLOWS WHAT IS BEING WRITTEN. Two of the four typed modes want a reading or a meaning
+   in English and two want kana; Yu Mincho set an English word in a serif nothing else on the sheet
+   uses, which read as a different application's field left open on top of this one. */
+.rd-type input.lat, .rd-rule.lat {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px;
+  letter-spacing: 0.01em;
 }
-.rd-type input:focus { box-shadow: inset 0 -2px 0 var(--hi); }
-.rd-type input:disabled { color: rgba(20, 17, 13, 0.45); }
+.rd-type input::placeholder, .rd-rule::placeholder {
+  font-family: var(--lat-ui); font-weight: 600; font-style: normal; font-size: 15px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.3);
+}
+.rd-type input:focus, .rd-rule:focus { box-shadow: inset 0 -2px 0 var(--hi); }
+.rd-type input:disabled, .rd-rule:disabled { color: rgba(20, 17, 13, 0.45); }
+/* THE RULE IS THE FOCUS INDICATOR, AND IT ALREADY WAS. `App.css` puts a two-pixel accent outline
+   two pixels off every focused input, so the one field on this sheet -- which is focused the moment
+   the round deals, every round -- wore a gold rectangle around a line that had just turned
+   vermilion to say the same thing. The line stays; the rectangle goes. */
+.rd-type input:focus-visible, .rd-rule:focus-visible { outline: none; }
 .rd-type-go {
   flex: none; padding: 0 18px; border: 0; cursor: pointer;
   background: var(--gold); color: var(--ink);
@@ -238,10 +250,191 @@
 }
 .rd-type.knock { animation: rdKnock 0.22s ease; }
 
-/* ---- a mode that brings its own board sits in the cell rather than replacing the sheet ---------- */
+/* ==================================================================================================
+   WHAT YOU WROTE, ONCE IT IS WRITTEN.
+
+   The slips carry the verdict on a four-choice round -- the right one edged gold, the one you
+   pressed struck through -- and the typed fill had no equivalent, so it left a live-looking field
+   holding your answer and let the verdict underneath say `Your answer  one` a second time. Two
+   printings of the same four letters six lines apart, with a disabled text box between them.
+
+   THE LINE YOU WROTE ON IS THE SLIP. Your answer stays exactly where you put it and is struck in
+   vermilion when it was wrong; the answer itself is not repeated here at all, because the prompt
+   cell prints it in full the moment the round resolves. One fact, one place.
+   ================================================================================================== */
+.rd-said {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 10px;
+  padding-bottom: 16px;
+}
+.rd-said > span {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 6px 2px 8px;
+  box-shadow: inset 0 -2px 0 rgba(20, 17, 13, 0.28);
+}
+.rd-said b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 30px; color: var(--ink);
+}
+.rd-said b.jp { font-family: var(--jp); font-style: normal; font-weight: 400; font-size: 34px; }
+.rd-said s {
+  flex: none; margin-left: auto; text-decoration: none;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.45);
+}
+/* NOT AN ALPHA ON THE WHOLE THING -- see `legibility.html`. The rule goes vermilion and the words
+   are struck; they do not fade to the point of no longer being readable. */
+.rd-said.miss > span { box-shadow: inset 0 -2px 0 var(--hi); }
+.rd-said.miss b { color: rgba(20, 17, 13, 0.5); text-decoration: line-through 2px var(--hi); }
+/* VERMILION IS WHAT YOU OWE. A right answer takes the gold rule and the label stays quiet -- it was
+   set in vermilion here for one build, which is the colour this whole design uses for the miss. */
+.rd-said.hit > span { box-shadow: inset 0 -2px 0 var(--gold); }
+
+/* ==================================================================================================
+   THE FOUR BOARDS, DRAWN ON THE PAPER RATHER THAN HOSTED ON IT -- see `components/Panels.tsx` for
+   what stood here before and why none of the logic had to move. */
 .rd-panel {
   flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center;
   padding-bottom: 14px; overflow: hidden;
+}
+.rd-hollow {
+  flex: 1; display: grid; place-content: center;
+  margin: 0; padding: 18px 0;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.2em;
+  color: rgba(20, 17, 13, 0.4); text-align: center;
+}
+
+/* ---- build: a reading on the rule, and what that reading could be ------------------------------- */
+.rd-build { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding-bottom: 8px; }
+.rd-build .rd-type-row { flex: none; }
+.rd-cands {
+  flex: 1; min-height: 0;
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 8px;
+}
+.rd-cand {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-width: 78px; padding: 10px 12px 8px; border: 0; cursor: pointer;
+  background: rgba(20, 17, 13, 0.05); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  transition: background 0.14s ease;
+}
+.rd-cand:hover:not(:disabled) { background: var(--gold); }
+.rd-cand:disabled { cursor: default; }
+.rd-cand b { font-family: var(--jp); font-weight: 400; line-height: 1; color: var(--ink); }
+.rd-cand s {
+  text-decoration: none;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.55);
+}
+
+/* ---- order: the chunks as rows, which is what this design's left-hand column already is --------- */
+/* SAFE CENTRE, not centre. Two chunks in a cell that holds six should sit in the middle of it, and
+   six should fill it -- `safe` is the keyword that means "centre until that would push the first one
+   out of the top", which is exactly the difference between the two cases. */
+.rd-order {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; justify-content: safe center; gap: 6px;
+}
+.rd-chunk { display: flex; align-items: stretch; gap: 6px; min-height: 0; }
+.rd-grab {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 14px;
+  min-height: 42px; padding: 0 14px; border: 0; cursor: grab; text-align: left;
+  background: rgba(20, 17, 13, 0.05); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+}
+.rd-grab u {
+  flex: none; width: 22px; height: 22px; display: grid; place-items: center; text-decoration: none;
+  background: var(--ink); color: var(--washi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+}
+.rd-grab b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--jp); font-weight: 400; font-size: 21px; color: var(--ink);
+}
+.rd-grab:disabled { cursor: default; }
+/* LIFTED, NOT GLOWING. A row being dragged is a piece of paper picked up off the sheet, so it takes
+   the same shadow every other object in this menu takes when it stands proud of its column. */
+.rd-chunk.lifted .rd-grab {
+  background: var(--washi); box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.3), inset 0 0 0 1px var(--ink);
+}
+.rd-moves { flex: none; display: flex; flex-direction: column; gap: 2px; }
+.rd-moves button {
+  flex: 1; width: 28px; border: 0; cursor: pointer; padding: 0;
+  background: rgba(20, 17, 13, 0.08); color: var(--ink); font-size: 12px; line-height: 1;
+}
+.rd-moves button:hover:not(:disabled) { background: var(--gold); }
+.rd-moves button:disabled { color: rgba(20, 17, 13, 0.22); cursor: default; }
+.rd-undo {
+  align-self: flex-start; margin-top: 2px;
+  border: 0; cursor: pointer; padding: 6px 10px;
+  background: rgba(20, 17, 13, 0.08); color: rgba(20, 17, 13, 0.66);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+}
+.rd-undo:hover:not(:disabled) { background: var(--ink); color: var(--gold-hi); }
+.rd-undo:disabled { color: rgba(20, 17, 13, 0.3); cursor: default; }
+
+/* ---- draw: an ink square, and what the round is doing in it ------------------------------------ */
+.rd-draw {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+}
+/* THE CROSS IS THE PAPER'S, not the writer's -- practice paper is ruled in quarters and a bare
+   square gives a stroke nothing to be placed against. Two hairlines drawn as gradients, so the box
+   stays one object rather than three. */
+.rd-slate {
+  flex: none; width: 168px; height: 168px; display: grid; place-items: center;
+  background:
+    linear-gradient(rgba(20, 17, 13, 0.14), rgba(20, 17, 13, 0.14)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(rgba(20, 17, 13, 0.14), rgba(20, 17, 13, 0.14)) 0 50% / 100% 1px no-repeat,
+    rgba(20, 17, 13, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.28);
+  touch-action: none; cursor: crosshair;
+}
+.rd-draw-note, .rd-draw-state {
+  margin: 0;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.42); text-align: center;
+}
+.rd-draw-state { color: var(--ink); }
+.rd-marks { display: flex; gap: 1px; }
+.rd-marks button {
+  border: 0; cursor: pointer; padding: 7px 12px;
+  background: rgba(20, 17, 13, 0.08); color: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+}
+.rd-marks button:hover:not(:disabled) { background: var(--gold); }
+.rd-marks button.give:hover:not(:disabled) { background: var(--hi); color: #ffe9c9; }
+.rd-marks button:disabled { color: rgba(20, 17, 13, 0.3); cursor: default; }
+
+/* ---- speak: a stamp you press, and one line saying what it is doing ----------------------------- */
+.rd-speak {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+}
+.rd-mic {
+  flex: none; width: 108px; height: 108px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  border: 0; cursor: pointer; background: var(--hi); color: #ffe9c9;
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.3);
+}
+.rd-mic em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
+  letter-spacing: 0.2em;
+}
+.rd-mic.on { background: var(--ink); color: var(--gold-hi); }
+.rd-mic:disabled { background: rgba(20, 17, 13, 0.12); color: rgba(20, 17, 13, 0.4); cursor: default; }
+.rd-speak-line {
+  margin: 0; max-width: 420px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.55); text-align: center;
+}
+.rd-speak-line.is-bad { color: var(--hi-deep); letter-spacing: 0.04em; }
+.rd-heard {
+  margin: 0; font-family: var(--jp); font-size: 26px; color: var(--ink); text-align: center;
+}
+.rd-instead {
+  border: 0; cursor: pointer; padding: 7px 14px;
+  background: var(--ink); color: var(--gold-hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
 }
 
 /* ---- the slab, bled to the sheet's own floor ---------------------------------------------------- */
@@ -329,7 +522,14 @@
   font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 11px;
   letter-spacing: 0.22em; color: rgba(20, 17, 13, 0.5);
 }
-.rd-tally { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; padding-bottom: 12px; }
+/* THE ROWS SIT WHERE THE FIGURE OPPOSITE THEM DOES. Three or four ledger lines against the top of a
+   cell three hundred tall, with the per-cent centred in the cell beside it, read as a list that had
+   been cut off rather than as a short one. */
+.rd-tally {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; justify-content: safe center; gap: 0;
+  padding-bottom: 12px;
+}
 .rd-tally-row {
   display: flex; align-items: baseline; gap: 12px; padding: 7px 0 8px;
   box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
@@ -346,7 +546,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .rd-type.knock { animation: none; }
-  .rd-slip { transition: none; }
+  .rd-slip, .rd-cand { transition: none; }
 }
 
 /* ==================================================================================================

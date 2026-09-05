@@ -2,21 +2,19 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { Lightbulb, Volume2 } from 'lucide-react'
 import { HintPopover } from '../components/minigame/HintPopover'
 import { QueuePreview } from '../components/minigame/QueuePreview'
-import { SentenceAssemblyAnswerPanel } from '../components/minigame/SentenceAssemblyAnswerPanel'
-import { StrokeOrderAnswerPanel } from '../components/minigame/StrokeOrderAnswerPanel'
-import { SpeechAnswerPanel } from '../components/minigame/SpeechAnswerPanel'
-import { HandwritingAnswerPanel } from '../features/handwriting'
+import { HANDWRITING_ERROR_COPY } from '../features/handwriting'
 import type { HandwritingOutcome } from '../features/handwriting'
 import { screenHead } from '../features/menu'
 import type { MenuSectionKey } from '../features/menu'
 import {
-  EMPTY_TRAIL, Round, RoundAsk, RoundConfidence, RoundGloss, RoundSlips, RoundTyped, RoundVerdict,
-  RoundWork, promptSize, roundCopy, roundKind, stepTrail,
+  EMPTY_TRAIL, Round, RoundAsk, RoundBuild, RoundConfidence, RoundDraw, RoundGloss, RoundOrder,
+  RoundSlips, RoundSpeak, RoundTyped, RoundVerdict, RoundWork, RoundWrote,
+  promptSize, roundCopy, roundKind, stepTrail,
 } from '../features/round'
 import type { MinigameKey, NavDirection, ScriptKey } from '../types'
 import {
   CONFIDENCE_LEVEL_LABELS, CONFIDENCE_SCORES, FEEDBACK_COPY, MINIGAMES,
-  formatExpectedAnswer, formatFeedbackAnswerLabel,
+  formatExpectedAnswer,
 } from '../constants'
 import { formatTagLabel } from '../utils'
 import { lookupGrammarExplanation } from '../lib/grammarExplanations'
@@ -39,10 +37,11 @@ import { useSession } from '../context/SessionContext'
 
    THIS FILE KEPT ITS JOB AND LOST ITS LAYOUT. Every effect, every shortcut and all sixteen modes are
    the ones that were here; what moved out is where things go (`features/round`) and the two
-   eleven-branch ternaries that decided what each mode's panel was called (`ROUND_COPY`). Four modes
-   bring a board of their own — handwriting, stroke order, sentence assembly and speech — and those
-   panels are hosted in the work cell unchanged rather than redrawn, which is a staged port and is
-   said out loud rather than hidden.
+   eleven-branch ternaries that decided what each mode's panel was called (`ROUND_COPY`). The four
+   modes that bring a board of their own — handwriting, stroke order, sentence assembly and speech —
+   were hosted in the work cell unchanged for one commit, which is what a staged port looks like when
+   nobody has rendered it: the app's dark panels laid on cream paper, and a handwriting canvas
+   drawing in near-white ink on it. They are drawn on the sheet now — see `features/round/Panels`.
    ================================================================================================== */
 
 // Minimal card shape needed for stroke-order answer candidates.
@@ -163,6 +162,11 @@ export function MinigameView({
      states it. `roundFeedbackAnswer` is the session's own record of it and is the source; this is
      only here for the modes that do not set one. */
   const [chose, setChose] = useState<string | null>(null)
+  /* THE ORDER LIVES HERE, NOT IN THE CELL THAT DRAWS IT. Sentence assembly's own panel owned the
+     arrangement and carried its own Submit button, which put the round's one action somewhere other
+     than the slab every other mode answers from — and left the slab promising ENTER TO ANSWER on a
+     screen where Enter did nothing at all. */
+  const [order, setOrder] = useState<string[]>([])
 
   /* THE RUN'S OWN TRAIL, derived rather than stored — see `stepTrail`. The session counts how many
      rounds have gone and how many were right; the foot band needs the order, and the order is the
@@ -235,6 +239,13 @@ export function MinigameView({
     setSpeechFallbackToTyped(false)
   }, [roundState?.cardId, roundState?.mode])
 
+  /* A NEW SET OF CHUNKS IS A NEW ARRANGEMENT. Keyed off the ids themselves rather than off the card,
+     because a retry deals the same card and has to start unshuffled again. */
+  const chunkKey = roundState ? roundState.options.map((option) => option.id).join('|') : ''
+  useEffect(() => {
+    setOrder(chunkKey ? chunkKey.split('|') : [])
+  }, [chunkKey])
+
   const kind = roundState ? roundKind(roundState.mode) : 'choice'
   /* speech falls back to a typed answer when the microphone will not have it */
   const fill = kind === 'panel' && roundState?.mode === 'speech_recall' && speechFallbackToTyped
@@ -256,6 +267,16 @@ export function MinigameView({
       if (event.key === 'Enter' && isRoundResolving && roundFeedback !== null && !isInputFocused) {
         event.preventDefault()
         skipFeedback()
+        return
+      }
+
+      // Enter: sentence assembly has no field to submit from, so the key answers the round
+      if (
+        event.key === 'Enter' && !isRoundResolving && !isInputFocused
+        && activeRound.mode === 'sentence_assembly'
+      ) {
+        event.preventDefault()
+        putInOrderRef.current()
         return
       }
 
@@ -378,6 +399,17 @@ export function MinigameView({
     }
     return chips
   }, [sessionRounds, sessionActive, effectiveTargetItems, sessionStreak, sessionPoints, accuracy, livesEnabled, livesRemaining])
+
+  /* THE ONE ACTION THE SLAB TAKES ON AN ASSEMBLY ROUND, held in a ref so the keyboard effect below
+     does not have to re-bind every time a chunk moves. */
+  const putInOrder = useCallback(() => {
+    if (order.length === 0) return
+    const answer = order.join('|')
+    setChose(answer)
+    submitAnswer(answer)
+  }, [order, submitAnswer])
+  const putInOrderRef = useRef(putInOrder)
+  putInOrderRef.current = putInOrder
 
   const said = roundFeedback !== null
   const copy = roundState ? roundCopy(roundState.mode) : roundCopy('meaning_match')
@@ -574,7 +606,10 @@ export function MinigameView({
                   <b>{report.accuracy}<sup>%</sup></b>
                   <i>{report.correct} OF {report.rounds} CLEAN</i>
                 </div>
-                <div className="rd-src">FINISHED <i>{report.completedAt}</i></div>
+                {/* AT. `completedAt` is `toLocaleTimeString()` -- the clock -- and this slot is the
+                    one the round uses for NEXT REVIEW 1D, so `FINISHED 01:46:18` in nineteen-point
+                    display italic read as how long the run had taken. One word fixes it. */}
+                <div className="rd-src">FINISHED AT <i>{report.completedAt}</i></div>
               </div>
             }
             work={
@@ -583,8 +618,12 @@ export function MinigameView({
                 <div className="rd-body">
                   <div className="rd-tally">
                     <div className="rd-tally-row">Points earned<s /><b>{report.points}</b></div>
+                    {/* WHAT `goalCompletionPct` COUNTS IS ROUNDS, NOT ANSWERS. Printed as `Goal
+                        100% OF 8` it stood a hand's width from `1 OF 8 CLEAN` -- two percentages
+                        over the same denominator meaning opposite things. The raw pair cannot be
+                        misread and the percentage is the thing you would work out from it anyway. */}
                     <div className="rd-tally-row">
-                      Goal<s>{report.goalCompletionPct}% OF {report.targetItems}</s>
+                      Rounds finished<s>OF {report.targetItems}</s><b>{report.rounds}</b>
                     </div>
                     <div className="rd-tally-row">Missed<s /><b>{missed}</b></div>
                     {report.livesEnabled ? (
@@ -593,6 +632,13 @@ export function MinigameView({
                     {report.nearMissCardIds.length > 0 ? (
                       <div className="rd-tally-row">
                         Near misses<s /><b>{report.nearMissCardIds.length}</b>
+                      </div>
+                    ) : null}
+                    {/* the one field the report has carried since it existed and nothing has ever
+                        printed -- and it is only collected when you asked to be asked */}
+                    {report.averageConfidenceScore != null ? (
+                      <div className="rd-tally-row">
+                        How sure you were<s>OF 5</s><b>{report.averageConfidenceScore}</b>
                       </div>
                     ) : null}
                   </div>
@@ -690,17 +736,51 @@ export function MinigameView({
          both reach for; the slab is the same control wearing the sheet's clothes. */
       label: showKeyboardPrompts ? 'Continue immediately (Enter)' : 'Continue immediately',
     }
-    : {
-      text: fill === 'choice' ? '1–4 OR ENTER TO ANSWER' : 'ENTER TO ANSWER',
-      jp: '回答',
-      tone: 'duty' as const,
-    }
+    /* WHAT THE SLAB PROMISES HAS TO BE TRUE. It said ENTER TO ANSWER on every mode that was not a
+       four-choice round — including the three where Enter did nothing whatever, because the answer
+       was a canvas, a microphone or a pair of buttons inside the panel. A slab is one line and the
+       line has to be the way through. */
+    : fill === 'choice'
+      ? { text: '1–4 OR ENTER TO ANSWER', jp: '回答', tone: 'duty' as const }
+      : fill === 'typed'
+        ? { text: 'ENTER TO ANSWER', jp: '回答', tone: 'duty' as const }
+        : roundState.mode === 'sentence_assembly'
+          ? {
+            text: 'SUBMIT THIS ORDER',
+            jp: '並替',
+            tone: 'duty' as const,
+            onClick: putInOrder,
+            disabled: isRoundResolving || order.length === 0,
+          }
+          : roundState.mode === 'stroke_order'
+            ? { text: 'TYPE THE READING, THEN PICK', jp: '筆順', tone: 'duty' as const }
+            : roundState.mode === 'handwriting'
+              ? { text: 'DRAW IT, STROKE BY STROKE', jp: '手書', tone: 'duty' as const }
+              : { text: 'PRESS AND SPEAK', jp: '発話', tone: 'duty' as const }
 
 /* THE INTERVAL IS THE ONE FACT A SPACED-REPETITION APP EXISTS TO TELL YOU, and it was an 8.5px
      chip in a metadata row -- fifth of five -- while the stopwatch, which decides nothing, had the
      prompt cell's whole dedicated line to itself. THEY SWAP: the interval takes the line and the
      time keeps the footnote it deserves, so nothing is said twice and the loud slot carries the
      fact worth being loud about. */
+  /* WHICH SCRIPT IS BEING WRITTEN. Two of the four typed modes want English and two want kana, and
+     the field was set in Yu Mincho for all four — an English word in a serif no other cell uses. */
+  const typedFace = roundState.mode === 'romaji_sprint' || roundState.mode === 'typed_recall'
+    ? 'lat' as const
+    : 'jp' as const
+
+  /* AND WHICH FILLS HAND THE CELL OVER once the answer is in. `chose` is what was submitted, which
+     for stroke order is the character you picked and for speech is what the machine heard. */
+  const wroteIt = !chosen
+    ? null
+    : fill === 'typed'
+      ? { text: chosen, face: typedFace, label: 'YOU WROTE' }
+      : roundState.mode === 'stroke_order'
+        ? { text: chosen, face: 'jp' as const, label: 'YOU BUILT' }
+        : roundState.mode === 'speech_recall'
+          ? { text: chosen, face: 'jp' as const, label: 'YOU SAID' }
+          : null
+
   const nextReview = said && roundSrsResult ? roundSrsResult.interval : null
   const src = nextReview != null
     ? { label: 'NEXT REVIEW', value: `${nextReview}D` }
@@ -732,7 +812,11 @@ export function MinigameView({
             src={src}
             gloss={said ? (
               <RoundGloss
-                answer={correct}
+                /* THE APP'S OWN WORDING FOR A MULTI-GLOSS ANSWER. `day, sun, Japan` is a list the
+                   prompt cell was printing raw while the verdict panel underneath printed the same
+                   three words as `day, sun, or Japan`. One of them had to go and the readable one
+                   stays. */
+                answer={formatExpectedAnswer(correct)}
                 answerIsJp={roundState.mode === 'character_match' || roundState.mode === 'particle_cloze'}
                 under={glossUnder}
                 body={glossBody}
@@ -762,13 +846,6 @@ export function MinigameView({
                 comboBonus={roundComboBonus}
                 milestoneStreak={roundMilestoneStreak}
                 livesEnabled={livesEnabled}
-                yours={chosen}
-                yoursLabel={formatFeedbackAnswerLabel(roundState.mode)}
-                answer={roundFeedbackTone === 'error' || roundState.mode === 'handwriting'
-                  ? formatExpectedAnswer(correct)
-                  : null}
-                /* the slips already say both, so only a typed or drawn round needs them spelled out */
-                showAnswers={fill !== 'choice'}
                 /* the time only where the prompt cell's line is not already carrying it */
                 responseMs={nextReview != null ? roundResponseMs : null}
                 example={roundExampleSentence}
@@ -790,7 +867,19 @@ export function MinigameView({
               />
             ) : null}
           >
-            {fill === 'choice' ? (
+            {/* WHAT YOU DID, ONCE YOU HAVE DONE IT. Three of the six fills have nothing to hold
+                once the answer is in — a disabled field, a candidate grid nobody can press and a
+                microphone that is finished — so they hand the cell to the line that records what
+                you wrote, said or built. The two that ARE the record keep it: the square still
+                holds the character you drew and the rows still hold the order you left them in. */}
+            {said && wroteIt ? (
+              <RoundWrote
+                text={wroteIt.text}
+                right={roundFeedbackTone !== 'error'}
+                face={wroteIt.face}
+                label={wroteIt.label}
+              />
+            ) : fill === 'choice' ? (
               <RoundSlips
                 options={roundState.options}
                 activeIndex={activeChoiceIndex}
@@ -813,6 +902,7 @@ export function MinigameView({
                       : 'Type the meaning'
                 }
                 disabled={isRoundResolving}
+                face={typedFace}
                 onChange={(value) =>
                   setRoundInput(roundState.mode === 'romaji_sprint' ? sanitizeRomajiInput(value) : value)
                 }
@@ -830,38 +920,39 @@ export function MinigameView({
                 }
               />
             ) : (
-              /* THE FOUR THAT BRING A BOARD OF THEIR OWN. Hosted in the cell rather than redrawn —
-                 a canvas, a stroke grid, a drag-to-order strip and a microphone are four screens of
-                 their own and are the next thing to port, not a detail of this one. */
+              /* THE FOUR THAT BRING A BOARD OF THEIR OWN, drawn on the sheet — see
+                 `features/round/components/Panels.tsx`. */
               <div className="rd-panel">
                 {roundState.mode === 'handwriting' ? (
-                  <HandwritingAnswerPanel
+                  <RoundDraw
                     character={roundState.answer}
                     disabled={isRoundResolving}
-                    externalHintUsed={handwritingHintUsed}
+                    hintUsed={handwritingHintUsed}
+                    errorCopy={HANDWRITING_ERROR_COPY}
                     onComplete={onHandwritingOutcome}
                   />
                 ) : roundState.mode === 'stroke_order' ? (
-                  <StrokeOrderAnswerPanel
-                    activeBlockCards={activeBlockCards}
-                    answerInputRef={answerInputRef}
-                    roundInput={roundInput}
+                  <RoundBuild
+                    cards={activeBlockCards}
+                    inputRef={answerInputRef}
+                    value={roundInput}
                     disabled={isRoundResolving}
-                    onInputChange={setRoundInput}
+                    onChange={setRoundInput}
                     onSelect={(label) => { setChose(label); submitAnswer(label) }}
                   />
                 ) : roundState.mode === 'sentence_assembly' ? (
-                  <SentenceAssemblyAnswerPanel
+                  <RoundOrder
                     options={roundState.options}
                     disabled={isRoundResolving}
-                    onSubmit={(label) => { setChose(label); submitAnswer(label) }}
+                    order={order}
+                    onOrder={setOrder}
                   />
                 ) : (
-                  <SpeechAnswerPanel
-                    expectedAnswer={roundState.answer}
+                  <RoundSpeak
+                    expected={roundState.answer}
                     disabled={isRoundResolving}
                     onResult={({ transcript }) => { setChose(transcript); submitAnswer(transcript) }}
-                    onFallbackToTyped={() => setSpeechFallbackToTyped(true)}
+                    onFallback={() => setSpeechFallbackToTyped(true)}
                   />
                 )}
               </div>

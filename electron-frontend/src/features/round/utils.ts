@@ -115,3 +115,42 @@ export function stepTrail(state: TrailState, rounds: number, score: number): Tra
   for (let i = 0; i < played; i++) trail.push(i >= played - gained)
   return { trail, rounds, score }
 }
+
+/* ==================================================================================================
+   THE INK THE SHEET WRITES IN.
+
+   `useHandwritingQuiz` resolves its three colours off the document root — `--text-main` for the
+   character and the stroke you draw, `--tone-amber` for the one it is showing you. That is right for
+   the app's own dark panels and wrong here by the whole width of the palette: this cell is cream
+   paper inside the frame, and a near-white stroke on washi is a stroke you cannot see. Measured on
+   the running build, the character drew and nothing appeared.
+
+   These are `--ink`, `--ink` and `--gold` from `stage.css`, written out rather than read, because
+   the writer wants three concrete colours at mount and the sheet's palette does not change.
+   ================================================================================================== */
+export const SHEET_INK = {
+  strokeColor: '#14110d',
+  drawingColor: '#14110d',
+  highlightColor: '#cfa45c',
+} as const
+
+/* ==================================================================================================
+   AND THE CANDIDATE'S SIZE, SOLVED RATHER THAN SET — the same lesson as `promptSize` one cell over.
+
+   THE BINDING DIMENSION IS HEIGHT, NOT WIDTH. `getStrokeOrderCandidates` returns at most eight and
+   the strip they stand in is 546 wide by about two hundred tall once the rule above them has taken
+   its share — so four across is never tight and the second row always is. One row of them can be
+   read at arm's length; two rows have to fit a romaji label under each glyph as well, which is the
+   34 that comes off per row.
+   ================================================================================================== */
+/** the strip's height in board pixels, and what a glyph's label and padding cost under it */
+const CAND_H = 200
+const CAND_LABEL = 34
+
+export function candidateSize(count: number): number {
+  const rows = count <= 4 ? 1 : 2
+  return Math.max(30, Math.min(76, Math.floor((CAND_H - rows * CAND_LABEL) / rows)))
+}
+
+/** the square the handwriting cell gives the writer, which is also `.rd-slate`'s size in `round.css` */
+export const SLATE = 168

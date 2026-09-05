@@ -1,3 +1,5 @@
-export { HandwritingAnswerPanel } from './components/HandwritingAnswerPanel'
+export { HANDWRITING_ERROR_COPY, HANDWRITING_MISS_THRESHOLD } from './constants'
+export { useHandwritingQuiz } from './useHandwritingQuiz'
 export type { HandwritingOutcome } from './types'
 export { formatHandwritingAttemptValue, isHandwritingEligibleCharacter, isHandwritingOutcomeCorrect } from './utils'
+export type { HandwritingColors } from './utils'
