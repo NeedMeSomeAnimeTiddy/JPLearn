@@ -1,4 +1,4 @@
-import { sortByDifficulty, type Passage } from '../passages'
+import { READING_PACE, sortByDifficulty, type Passage } from '../passages'
 
 /* ==================================================================================================
    THE LIBRARY — THE WORLD's level three, through the READ lane.
@@ -14,11 +14,12 @@ import { sortByDifficulty, type Passage } from '../passages'
    which is a different statement from the app not keeping the answer. The caption says which it is,
    once.
 
-   FORTY WORDS A MINUTE, which is a beginner reading aloud and is what these are for. It is the one
-   number on this screen that is an assumption rather than a measurement, so it is named here rather
-   than buried in an expression.
+   FORTY WORDS A MINUTE, which is a beginner reading aloud and is what these are for. It moved to
+   `passages/constants` when the reader needed it too -- a shelf and a reader disagreeing about how
+   long the same text takes would be two answers to one question -- and is re-exported here because
+   this is where the menu reads it from.
    ================================================================================================== */
-export const READING_PACE = 40
+export { READING_PACE }
 
 export interface LibraryRow {
   id: string

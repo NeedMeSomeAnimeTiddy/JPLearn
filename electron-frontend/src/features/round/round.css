@@ -441,6 +441,75 @@
   font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
 }
 
+/* THE WORD THE CURSOR IS ON, which is the passage's prompt cell — the design card's `.word`.
+
+   IT IS THE ONE CELL IN THE APP THAT IS NEVER EMPTY BY CONSTRUCTION. The text annotates its own
+   readings, so the word and the reading are on the page already and cost nothing; only the English
+   needs a dictionary, and when there is none the `rd-src` line under this says so once instead of
+   the cell going blank. That is the whole argument for a cell rather than the popover this screen
+   used to open over the sentence you were reading. */
+.rd-term {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding-bottom: 10px; overflow: hidden;
+}
+.rd-term b {
+  font-family: var(--jp); font-weight: 400; line-height: 1.1; color: var(--ink);
+  word-break: break-word;
+}
+.rd-term i {
+  margin-top: 8px;
+  font-style: normal; font-family: var(--jp-go); font-size: 15px; letter-spacing: 0.1em;
+  color: rgba(20, 17, 13, 0.5);
+}
+.rd-term p {
+  margin-top: 12px;
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px; line-height: 1.25;
+  color: var(--hi-deep);
+  /* four lines and then it stops, the same law the round's own note obeys */
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ==================================================================================================
+   THE PROSE — the work cell when the sheet is carrying a TEXT rather than a question.
+
+   THE TWO CELLS SWAP JOBS AND KEEP THEIR SIZES. On a drill the left cell asks and the right answers;
+   on a passage the right cell IS the text and the left is the word the cursor stands on. Nothing
+   about the sheet changes, which is the whole argument for one object: a reader who has done a
+   drill already knows where to look.
+
+   THE SIZE IS SET FROM JS, not here. A page holds between one sentence and a hundred and twenty
+   characters and there is no one size right for both -- `proseSize` in `features/passages/reader`
+   solves it from the cell's own area, the way `promptSize` does one cell to the left.
+
+   FURIGANA IS TEN AND A HALF AND NOT NINE. The design card sets its readings at 9px, which is the
+   size this whole menu spent four passes climbing out of; a reading nobody can read is furniture
+   with a cost. `line-height: 2` is what leaves room for them, and it is why the page budget is
+   solved against a two-line leading rather than a normal one. */
+.rd-prose {
+  flex: 1; min-height: 0;
+  padding: 2px 0 8px;
+  font-family: var(--jp); font-weight: 400; line-height: 2;
+  letter-spacing: 0.04em; color: var(--ink);
+  overflow: hidden;
+}
+.rd-prose rt {
+  font-family: var(--jp-go); font-size: 10.5px; letter-spacing: 0;
+  color: rgba(20, 17, 13, 0.5);
+}
+
+/* A WORD IS A BUTTON, because the cursor is not only a keyboard thing -- the arrows walk it and a
+   mouse puts it where you point. It carries no button language of its own: on paper an annotated
+   word is already marked, and a border round every one of them would be a page of boxes. */
+.rd-word {
+  border: 0; padding: 0; margin: 0; background: none; cursor: pointer;
+  font: inherit; letter-spacing: inherit; color: inherit;
+}
+/* the mark the design gives a word you have stood on, and the one you are standing on now */
+.rd-word.on { background: var(--gold-hi); box-shadow: inset 0 0 0 2px var(--ink); }
+.rd-word:hover:not(.on) { box-shadow: inset 0 -3px 0 var(--hi); }
+.rd-word:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+
 /* ---- the slab, bled to the sheet's own floor ---------------------------------------------------- */
 .rd-slab {
   margin: auto -1px -1px;

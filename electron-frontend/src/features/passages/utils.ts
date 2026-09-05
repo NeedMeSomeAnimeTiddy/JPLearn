@@ -9,11 +9,3 @@ export function sortByDifficulty(passages: Passage[]): Passage[] {
     return a.difficulty - b.difficulty
   })
 }
-
-export function toggleFurigana(text: string): string {
-  return text.replace(/（[^）]*）/g, '')
-}
-
-export function hasFurigana(text: string): boolean {
-  return /（[^）]*）/.test(text)
-}

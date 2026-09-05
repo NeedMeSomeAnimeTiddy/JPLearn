@@ -13,7 +13,6 @@ export interface UsePassagesReturn {
   selectPassage: (passage: Passage) => void
   clearSelection: () => void
   setFuriganaVisible: (visible: boolean) => void
-  setFontSize: (size: ReaderSettings['fontSize']) => void
   markProgress: (passageId: string, status: PassageProgressEntry['status']) => void
   retry: () => void
 }
@@ -77,10 +76,6 @@ export function usePassages(): UsePassagesReturn {
     setReaderSettings((prev) => ({ ...prev, furiganaVisible: visible }))
   }, [])
 
-  const setFontSize = useCallback((size: ReaderSettings['fontSize']) => {
-    setReaderSettings((prev) => ({ ...prev, fontSize: size }))
-  }, [])
-
   const markProgress = useCallback((passageId: string, status: PassageProgressEntry['status']) => {
     setProgress((prev) => {
       const next = new Map(prev)
@@ -106,7 +101,6 @@ export function usePassages(): UsePassagesReturn {
     selectPassage,
     clearSelection,
     setFuriganaVisible,
-    setFontSize,
     markProgress,
     retry,
   }
