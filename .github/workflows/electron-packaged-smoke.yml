@@ -27,7 +27,11 @@ jobs:
 
     defaults:
       run:
-        shell: pwsh
+        # Windows PowerShell 5.1, not pwsh: PowerShell 7 ships with GitHub-hosted
+        # runners but not with a plain Windows install, and the self-hosted runner
+        # has no pwsh on PATH. Everything here -- including scripts/bundle_python.ps1
+        # -- is written to run under 5.1.
+        shell: powershell
 
     steps:
       - name: Checkout
