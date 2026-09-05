@@ -1,4 +1,4 @@
-import { punchCamera } from '../../valley/valley'
+import { punchCamera } from '../../valley/punch'
 
 /* ==================================================================================================
    WHAT A REFUSED PRESS LOOKS LIKE, AND UNTIL NOW IT LOOKED LIKE NOTHING AT ALL.

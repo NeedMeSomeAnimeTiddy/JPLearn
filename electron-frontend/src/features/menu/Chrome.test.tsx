@@ -10,7 +10,11 @@ import { screenClass } from './useScreen'
 import { UNLOCK_GOES_TO, UNLOCK_LEADS_TO } from './unlock'
 import type { MenuCrown } from './types'
 
-vi.mock('../../valley/valley', () => ({ punchCamera: vi.fn() }))
+/* THE MENU MOCKS THE HAND-OFF, NOT THE VALLEY. Mocking `valley.ts` here was the test agreeing with
+   a static edge that put three.js in the entry chunk -- see issue #83. `punch.ts` is what the menu
+   actually depends on now, and it is small enough that this mock is about behaviour rather than
+   about keeping a scene out of a test run. */
+vi.mock('../../valley/punch', () => ({ punchCamera: vi.fn(), setCameraPunch: vi.fn() }))
 
 afterEach(() => {
   cleanup()
@@ -156,7 +160,7 @@ describe('saying no', () => {
 
   it('knocks the frame as well as flashing, because either alone is ambiguous', async () => {
     /* a flash with no knock reads as a rendering glitch, and a knock with no flash is easy to miss */
-    const { punchCamera } = await import('../../valley/valley')
+    const { punchCamera } = await import('../../valley/punch')
     act(() => refuse())
     expect(punchCamera).toHaveBeenCalled()
   })

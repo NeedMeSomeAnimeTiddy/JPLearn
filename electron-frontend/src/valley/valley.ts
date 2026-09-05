@@ -31,6 +31,7 @@ import {
   aimAt, easeInOutSine, makeFlight, type CamState, type Flight,
 } from './flight'
 import { DESTINATIONS } from './destinations'
+import { setCameraPunch } from './punch'
 import { makePacer } from './pacing'
 import {
   FOG_COLOUR, FOG_DENSITY, SKY_U, aimKey, faceSun, gradeDisc, gradeSky, installRig,
@@ -1354,6 +1355,9 @@ export async function mountValley(url = './models/world.glb'): Promise<ValleyMar
       crane = null
       viewpoint?.dispose()
       viewpoint = null
+      /* and the menu is told there is no camera, so a refusal between this and the next build is a
+         no-op rather than a call into a disposed scene */
+      setCameraPunch(null)
       forest = null
       /* the world's own meshes go with `root`; these are the three that hold state OUTSIDE it --
          a material of their own, or a list of the world's meshes that must not outlive it */
@@ -1603,17 +1607,13 @@ export function valleyHandle() {
   return handle
 }
 
-/**
- * Knock the frame, because a press was heard and declined.
- *
- * The interface's half of a refusal is a flash; this is the other half, and it lives here because
- * there is one camera and three things asking to move it -- see `viewpoint.ts`. Safe when the valley
- * is off, which it must be: the app has to work with `?valley=off` and a menu whose feedback
- * depended on a canvas being there would not.
- */
-export function punchCamera(s = 1): void {
-  viewpoint?.punch(s)
-}
+/* THE KNOCK IS HANDED TO THE MENU RATHER THAN EXPORTED TO IT. There is one camera and three things
+   asking to move it -- see `viewpoint.ts` -- so the function itself is still the valley's. What
+   changed is the direction of the import: `refuse.ts` used to reach in here for it, which put this
+   file (and three.js behind it) on the entry's static graph and cost the dynamic import its whole
+   point. See `punch.ts` and issue #83. Registered at module scope because the closure reads
+   `viewpoint` when it is called, not when it is handed over. */
+setCameraPunch((s) => viewpoint?.punch(s))
 
 /* ==================================================================================================
    THE TWO CALLS REACT MAKES. Neither returns anything and both are safe when the valley is off --
