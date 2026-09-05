@@ -29,6 +29,7 @@ Deeper reference docs (read the relevant one before nontrivial work in that area
 python -m pytest -q                          # All tests
 python -m pytest tests/path/to/file.py -q    # Single file
 python scripts/dev.py                        # Full aggregate check (6 steps + frontend)
+python scripts/dev.py --full                 # ...plus frontend tests, package, packaged smoke
 python scripts/arch_check.py                 # Layer boundary check (domain/data/ui/src/scripts)
 
 # Frontend (run from electron-frontend/)
@@ -39,7 +40,14 @@ npm run lint              # oxlint — must pass with 0 warnings
 npm run test:ui           # vitest
 npm run test:a11y         # axe-core accessibility tests (vitest run src/App.accessibility.test.tsx)
 npm run test:e2e          # build:quiet + vitest e2e config
+npm run make:release      # bundle Python + build the Windows installer into out/make/
 ```
+
+The two GitHub workflows have local equivalents, so neither needs CI to run:
+`python scripts/dev.py --full` covers every step of `electron-packaged-smoke.yml`, and
+`npm run make:release` produces the same installer `release.yml` uploads (it calls
+`scripts/bundle_python.ps1`, which the workflow also calls — keep the bundling logic
+there rather than inline in the YAML).
 
 To just run the built app end-to-end without touching code: `npm run build && npm run start`
 from `electron-frontend/` (not `dev`, which is for active frontend development).

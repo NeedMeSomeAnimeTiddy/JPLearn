@@ -50,59 +50,16 @@ jobs:
           npm run build
 
       - name: Bundle Python (python-build-standalone)
-        # Downloads a self-contained Python 3.11 from astral-sh/python-build-standalone,
-        # installs runtime packages into it, and places it at python-bundle/ so
-        # Electron Forge can include it as an extraResource in the installer.
-        # No .pth file hacks needed — this distribution works out of the box.
-        run: |
-          $release = Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/astral-sh/python-build-standalone/releases/latest" `
-            -Headers @{ 'User-Agent' = 'JPLearn-CI' }
-
-          $asset = $release.assets | Where-Object {
-              $_.name -match 'cpython-3\.11\.' -and
-              $_.name -match 'x86_64-pc-windows-msvc' -and
-              $_.name -match 'install_only_stripped' -and
-              $_.name.EndsWith('.tar.gz')
-          } | Select-Object -First 1
-
-          if (-not $asset) {
-              Write-Error "Could not find Python 3.11 Windows x64 install_only asset in $($release.tag_name)"
-              exit 1
-          }
-
-          $sizeMb = [math]::Round($asset.size / 1MB, 1)
-          Write-Host "Downloading $($asset.name) ($sizeMb MB) from $($release.tag_name)..."
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile python-bundle.tar.gz
-
-          New-Item -ItemType Directory -Path python-bundle -Force | Out-Null
-          tar -xzf python-bundle.tar.gz -C python-bundle
-
-          $pythonExe = "python-bundle\python\python.exe"
-          if (-not (Test-Path $pythonExe)) {
-              Write-Error "python.exe not found at $pythonExe after extraction"
-              Get-ChildItem python-bundle -Recurse | Select-Object -First 20
-              exit 1
-          }
-
-          Write-Host "Installing runtime packages into bundle..."
-          & $pythonExe -m pip install psutil --quiet
-
-          Write-Host "Trimming Python test suite to reduce installer size..."
-          $toRemove = @(
-            "python-bundle\python\Lib\test",
-            "python-bundle\python\Lib\unittest\test",
-            "python-bundle\python\Lib\email\test",
-            "python-bundle\python\Lib\tkinter"
-          )
-          foreach ($dir in $toRemove) {
-            if (Test-Path $dir) {
-              Remove-Item -Recurse -Force $dir
-              Write-Host "  removed: $dir"
-            }
-          }
-
-          Write-Host "Python bundle ready: $(& $pythonExe --version)"
+        # Downloads a self-contained Python 3.11, installs runtime packages into it,
+        # and places it at python-bundle/ so Electron Forge can include it as an
+        # extraResource in the installer. The logic lives in the script rather than
+        # here so the installer can also be built locally or on a self-hosted runner.
+        #
+        # -Force because a self-hosted runner keeps its workspace between runs: a
+        # release must never ship a bundle left over from an earlier build.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/bundle_python.ps1 -Force
 
       - name: Build Windows installer
         working-directory: electron-frontend
