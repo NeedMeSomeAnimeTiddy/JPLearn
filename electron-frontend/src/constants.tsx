@@ -418,8 +418,6 @@ export const VOCAB_LEVEL_TO_DECK_SLUG: Record<JlptLevel, VocabDeckSlug> = {
   n1: 'vocab_n1',
 }
 
-export const KANJI_OVERVIEW_PAGE_SIZE = 45
-
 // ── Thematic category metadata ────────────────────────────────────────────────
 
 /** Mastery fraction of the previous category needed to unlock the next one. */

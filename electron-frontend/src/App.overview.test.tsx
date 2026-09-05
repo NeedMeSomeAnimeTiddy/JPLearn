@@ -117,29 +117,33 @@ const zeroSummary = {
 }
 
 /* ==================================================================================================
-   THE ACTIVITY PANEL'S TWO TESTS WENT WITH THE PANEL, AND THE BEHAVIOUR DID NOT.
+   WHAT THIS FILE COVERS NOW, AND WHAT LEFT WITH THE PANEL IT COVERED.
 
-   This modal used to draw a "Last 7 Days" and a "Last 30 Days" card. Both windows are still read
-   and still shown, in the two places that already had a claim on them:
+   THE ACTIVITY PANEL'S TWO TESTS WENT WITH THE PANEL and the behaviour did not: the WEEK is the menu
+   chrome's chip panel (`statPanels.test.ts`) and the THIRTY DAYS is a line on the ledger's MASTERED
+   sheet (`Ledger.test.tsx`).
 
-     - THE WEEK is the menu chrome's WEEK chip panel, and `statPanels.test.ts` pins it — reviewed,
-       correct with accuracy, active days and points, off the same `summary.activity.week`.
-     - THE THIRTY DAYS is a line on the ledger's MASTERED sheet, pinned in `Ledger.test.tsx`. It was
-       the one window with no home: the chip has the week and the year band has the year.
+   THE KANJI BROWSER'S FIVE WENT WITH THE BROWSER, and that behaviour did NOT move anywhere -- so it
+   is worth saying plainly rather than quietly. Searching 2,218 kanji by reading or meaning, filtering
+   them by theme and by mastery bucket, and paging forty-five at a time was an interface for finding
+   a card, and the app already has one of those on `/`. What the overlay draws instead is where you
+   are: every set's share, every block's bar, and every character's own score, which answers "how am
+   I doing" rather than "where is 山". The mastery-bucket filter is the one thing with no other home;
+   PRACTICE's weak-area drill acts on the same fact instead of listing it.
 
-   What remains in this file is the six tests for the kanji browser, which is the whole reason the
-   modal is still here — search, theme, mastery buckets and paging over 2,218 cards is an interface,
-   and the ledger's sheets are four lines and a caveat.
+   What is left here is the wiring: that the app opens the overlay, hands it real counts, and lets a
+   kanji through to the panel that draws one. The overlay's own three columns are covered in
+   `features/mastery/MasteryOverlay.test.tsx`, without an App around them.
    ================================================================================================== */
 
-describe('Overview kanji browser', () => {
+describe('Every character, from the app', () => {
   const kanjiCards = [
     { id: 1, note_key: `note:v1:builtin:${'a'.repeat(64)}`, character: '日', romaji: 'nichi', meaning: 'sun', tags: ['kanji', 'n5'], example_sentence: null, theme: 'Numbers & Time' },
     { id: 2, note_key: `note:v1:builtin:${'b'.repeat(64)}`, character: '月', romaji: 'getsu', meaning: 'moon', tags: ['kanji', 'n5'], example_sentence: null, theme: 'Numbers & Time' },
     { id: 3, note_key: `note:v1:builtin:${'c'.repeat(64)}`, character: '山', romaji: 'san', meaning: 'mountain', tags: ['kanji', 'n5'], example_sentence: null, theme: 'Nature & World' },
   ]
 
-  async function openKanjiLevel(): Promise<void> {
+  async function open(): Promise<void> {
     window.jplearnDesktop = {
       ...baseDesktopApi,
       getStudySummary: async () => zeroSummary,
@@ -149,86 +153,30 @@ describe('Overview kanji browser', () => {
         kanji_cards: kanjiCards,
       }),
     }
-
     render(<App />)
     fireEvent.click(await screen.findByRole('button', { name: /open study overview/i }))
-    fireEvent.click(document.querySelector('.char-mastery-toggle') as HTMLButtonElement)
-    fireEvent.click(await screen.findByRole('button', { name: /^JLPT N5:/ }))
   }
 
-  function chipLabels(): string[] {
-    return (Array.from(document.querySelectorAll('.char-mastery-chip-kanji')) as HTMLElement[])
-      .map((chip) => chip.querySelector('.char-mastery-chip-glyph')?.textContent ?? '')
-  }
-
-  it('narrows the chips by meaning, reading, or the character itself', async () => {
-    await openKanjiLevel()
-    const search = screen.getByRole('searchbox', { name: /search jlpt n5 kanji/i })
-
-    fireEvent.change(search, { target: { value: 'moon' } })
-    await waitFor(() => expect(chipLabels()).toEqual(['月']))
-
-    fireEvent.change(search, { target: { value: 'san' } })
-    await waitFor(() => expect(chipLabels()).toEqual(['山']))
-
-    // Pasting the kanji is the fastest route to one card, so it must match raw.
-    fireEvent.change(search, { target: { value: '日' } })
-    await waitFor(() => expect(chipLabels()).toEqual(['日']))
-  })
-
-  it('says so when nothing matches, rather than showing an empty grid', async () => {
-    await openKanjiLevel()
-    fireEvent.change(screen.getByRole('searchbox', { name: /search jlpt n5 kanji/i }), {
-      target: { value: 'zzz' },
+  it('opens on the sets the account has, counted off the bridge', async () => {
+    await open()
+    await waitFor(() => {
+      expect(document.querySelector('.mx-sheet')).toBeTruthy()
     })
-
-    expect(await screen.findByText(/no jlpt n5 kanji match that search/i)).toBeTruthy()
-    expect(chipLabels()).toEqual([])
-  })
-
-  it('filters by theme, which is the only grouping a kanji card carries', async () => {
-    await openKanjiLevel()
-    const select = screen.getByRole('combobox', { name: /filter jlpt n5 by theme/i })
-
-    fireEvent.change(select, { target: { value: 'Nature & World' } })
-    await waitFor(() => expect(chipLabels()).toEqual(['山']))
-
-    fireEvent.change(select, { target: { value: 'Numbers & Time' } })
-    await waitFor(() => expect(chipLabels()).toEqual(['日', '月']))
-
-    fireEvent.change(select, { target: { value: '' } })
-    await waitFor(() => expect(chipLabels()).toEqual(['日', '月', '山']))
-  })
-
-  it('combines the theme with search', async () => {
-    await openKanjiLevel()
-    fireEvent.change(screen.getByRole('combobox', { name: /filter jlpt n5 by theme/i }), {
-      target: { value: 'Numbers & Time' },
+    await waitFor(() => {
+      const rail = [...document.querySelectorAll('.mx-rail button')].map((b) => b.textContent ?? '')
+      expect(rail.some((r) => r.includes('KANJI N5'))).toBe(true)
     })
-    fireEvent.change(screen.getByRole('searchbox', { name: /search jlpt n5 kanji/i }), {
-      target: { value: 'moon' },
-    })
-
-    await waitFor(() => expect(chipLabels()).toEqual(['月']))
+    /* the two blocks these three cards are taught in, named the way the deck screen names them */
+    const blocks = [...document.querySelectorAll('.mx-list button')].map((b) => b.textContent ?? '')
+    expect(blocks.some((b) => b.includes('Numbers & Time'))).toBe(true)
+    expect(blocks.some((b) => b.includes('Nature & World'))).toBe(true)
   })
 
-  it('filters by mastery bucket, with a count on each chip', async () => {
-    window.localStorage.setItem('jplearn-card-scores-v2', JSON.stringify({
-      kanji_n5: { 1: 4, 2: 2 }, // 日 mastered, 月 learning, 山 untouched
-    }))
-    await openKanjiLevel()
-
-    expect(screen.getByRole('button', { name: /^Mastered/ }).textContent).toContain('1')
-    expect(screen.getByRole('button', { name: /^Learning/ }).textContent).toContain('1')
-    expect(screen.getByRole('button', { name: /^Not started/ }).textContent).toContain('1')
-
-    fireEvent.click(screen.getByRole('button', { name: /^Mastered/ }))
-    await waitFor(() => expect(chipLabels()).toEqual(['日']))
-
-    fireEvent.click(screen.getByRole('button', { name: /^Not started/ }))
-    await waitFor(() => expect(chipLabels()).toEqual(['山']))
-
-    fireEvent.click(screen.getByRole('button', { name: /^All/ }))
-    await waitFor(() => expect(chipLabels()).toEqual(['日', '月', '山']))
+  it('lets a kanji through to the panel that draws one properly', async () => {
+    await open()
+    await waitFor(() => expect(document.querySelectorAll('.mx-chip').length).toBe(2))
+    fireEvent.click(screen.getByRole('button', { name: /^日, nichi, sun/ }))
+    await screen.findByRole('dialog', { name: 'Kanji details: 日' })
+    expect(document.querySelector('.mx-sheet')).toBeNull()
   })
 })

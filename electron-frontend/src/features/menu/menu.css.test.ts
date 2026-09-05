@@ -34,6 +34,8 @@ const SHEET_PATHS = {
   /* the round is a menu screen that happens to be a session -- it reads the same tokens off the same
      stage roots, so it is guarded by the same checks */
   'round.css': '../round/round.css',
+  /* and EVERY CHARACTER stands on the lookup's own shell, which puts it on the same stage roots */
+  'mastery.css': '../mastery/mastery.css',
 }
 
 /** each sheet on its own, for the checks that are about one file's own source order */

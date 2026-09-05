@@ -243,12 +243,10 @@ describe('Accessibility — zero axe violations', () => {
     }
     const { container } = render(<App />)
     await act(async () => {})
+    /* the overlay opens on the first set it has, and its first block's characters are already
+       beside it -- there is no panel to expand and no tile to press first */
     fireEvent.click(await screen.findByRole('button', { name: /open study overview/i }))
-    const masteryToggle = document.querySelector('.char-mastery-toggle') as HTMLButtonElement | null
-    if (!masteryToggle) throw new Error('Expected mastery toggle button to be present')
-    fireEvent.click(masteryToggle)
-    fireEvent.click(await screen.findByRole('button', { name: 'JLPT N5: 0% mastered' }))
-    fireEvent.click(screen.getByRole('button', { name: '日, nichi, sun: 0/4' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^日, nichi, sun/ }))
     await screen.findByRole('dialog', { name: 'Kanji details: 日' })
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access

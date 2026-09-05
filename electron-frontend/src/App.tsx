@@ -39,7 +39,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { AppTitlebar } from './components/AppTitlebar'
 import { AppSettingsModal } from './components/AppSettingsModal'
 import { MinigameView } from './views/MinigameView'
-import { OverviewView } from './views/OverviewView'
+import { MasteryOverlay } from './features/mastery'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { PassageHubView } from './views/PassageHubView'
 import { DAILY_GAMES_COPY } from './features/daily-games/constants'
@@ -88,7 +88,6 @@ import {
   normalizeBlockList,
 } from './lib/deckUtils'
 import {
-  buildJlptLevelProgress,
   buildJlptLevelProgressFromLevelDecks,
   buildCategoryProgress,
 } from './lib/progressAggregation'
@@ -163,7 +162,6 @@ function App() {
   const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const [activeScript, setActiveScript] = useState<ScriptKey>(() => loadSessionPrefs()?.script ?? 'hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>(() => loadSessionPrefs()?.game ?? 'romaji_sprint')
@@ -199,13 +197,10 @@ function App() {
     n2_economy_trade: [], n2_government_society: [], n2_measure_analysis: [], n2_land_construction: [],
     n1_law_justice: [], n1_thought_reason: [], n1_conflict_crisis: [], n1_arts_expression: [],
   })
-  const [kanjiOverviewPage, setKanjiOverviewPage] = useState<Partial<Record<JlptLevel, number>>>({})
   const [overviewBlocksLoading, setOverviewBlocksLoading] = useState(false)
 
   const pageLoading = loading || gameLoading
   const pageLoadingLabel = gameLoading ? 'Loading deck cards…' : 'Loading…'
-  const [charMasteryExpanded, setCharMasteryExpanded] = useState(false)
-  const [expandedBlocks, setExpandedBlocks] = useState<string | null>(null)
   const [xpProgress, setXpProgress] = useState<XPProgress | null>(null)
   const [xpToasts, setXpToasts] = useState<Array<{ id: number; xp: number; levelBefore?: number; levelAfter?: number }>>([])
   const [milestoneToasts, setMilestoneToasts] = useState<Array<{ id: number; descriptor: string }>>([])
@@ -219,21 +214,12 @@ function App() {
   } | null>(null)
   const warnedSectionsRef = useRef<Set<string>>(new Set())
 
-  interface SelectedChar {
-    character: string
-    romaji: string
-    meaning: string
-    label: string
-    score: number
-  }
-  const [selectedChar, setSelectedChar] = useState<SelectedChar | null>(null)
   const [kanjiDetailCharacter, setKanjiDetailCharacter] = useState<string | null>(null)
   const kanjiDetailTriggerRef = useRef<HTMLElement | null>(null)
   const tutorTitlebarButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const openKanjiDetail = useCallback((character: string, trigger: HTMLElement) => {
     kanjiDetailTriggerRef.current = trigger
-    setSelectedChar(null)
     setKanjiDetailCharacter(character)
   }, [])
 
@@ -422,7 +408,6 @@ function App() {
     tutor.closeTutorPanel()
     setXpDetailsOpen(false)
     setStreakDetailsOpen(false)
-    setSelectedChar(null)
     setDictionarySeedQuery(seedQuery)
     setDictionaryOpen(true)
     setDictionaryOpenSignal((previous) => previous + 1)
@@ -954,7 +939,6 @@ function App() {
       if (startupFirstSummaryMsRef.current === null) {
         startupFirstSummaryMsRef.current = Math.round(performance.now() - startupBootMarkRef.current)
       }
-      setLastUpdated(new Date().toLocaleTimeString())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown desktop bridge error')
     } finally {
@@ -1245,11 +1229,6 @@ function App() {
       vocabDeckCardsByCategory, cardScores.vocab_n5,
     ),
     [vocabDeckCardsByCategory, cardScores.vocab_n5],
-  )
-
-  const overviewKanjiLevelProgress = useMemo(
-    () => buildJlptLevelProgress(overviewKanjiDeck, cardScores.kanji_n5),
-    [overviewKanjiDeck, cardScores.kanji_n5],
   )
 
   /* THE FIVE ROWS DISPATCH TO THE VIEWS THAT ALREADY EXIST. Phase 2 changes the front door, not
@@ -1589,10 +1568,6 @@ function App() {
           return
         }
 
-        if (selectedChar) {
-          setSelectedChar(null)
-          return
-        }
 
         if (showSettings) {
           setShowSettings(false)
@@ -1674,7 +1649,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, selectedChar, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
+  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
 
   const streak = useMemo(
     () => summary?.streak ?? { current_days: 0, best_days: 0, freezes_available: 0 },
@@ -3066,46 +3041,22 @@ function App() {
       }}>
       {renderView()}
 
-      {/* Study Overview popup — accessible on top of any view */}
-      {showOverview ? (
-        <div
-          className="modal-backdrop overview-backdrop"
-          role="presentation"
-          onClick={() => setShowOverview(false)}
-        >
-          <div
-            className="overview-popup-panel crt-scanlines"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Study Overview"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="crt-vhs-line" />
-            <OverviewView
-              loading={loading}
-              error={error}
-              lastUpdated={lastUpdated}
-              streak={streak}
-              overviewBlocks={overviewBlocks}
-              overviewCategoryBlocks={overviewCategoryBlocks}
-              overviewKanjiDeck={overviewKanjiDeck}
-              overviewKanjiLevelProgress={overviewKanjiLevelProgress}
-              overviewBlocksLoading={overviewBlocksLoading}
-              charMasteryExpanded={charMasteryExpanded}
-              expandedBlocks={expandedBlocks}
-              cardScores={cardScores}
-              kanjiOverviewPage={kanjiOverviewPage}
-              onClose={() => setShowOverview(false)}
-              onRefresh={() => void loadSummary()}
-              onToggleCharMastery={() => setCharMasteryExpanded((v) => !v)}
-              onSetExpandedBlocks={setExpandedBlocks}
-              onSetKanjiOverviewPage={setKanjiOverviewPage}
-              onOpenKanjiDetail={openKanjiDetail}
-              onSetSelectedChar={setSelectedChar}
-            />
-          </div>
-        </div>
-      ) : null}
+      {/* EVERY CHARACTER — the third thing in this app that is not a place, and so the third to
+          stand on the dictionary's shell rather than to be a screen. See `features/mastery`. */}
+      <MasteryOverlay
+        open={showOverview}
+        /* THE BLOCKS ARE A SECOND FETCH. `loading` is the summary's and `overviewBlocksLoading`
+           is the character data's; the cap says COUNTING while either is still out. */
+        loading={loading || overviewBlocksLoading}
+        error={error}
+        blocks={overviewBlocks}
+        categoryBlocks={overviewCategoryBlocks}
+        kanji={overviewKanjiDeck}
+        scores={cardScores}
+        onClose={() => setShowOverview(false)}
+        onRefresh={() => void loadSummary()}
+        onOpenKanjiDetail={openKanjiDetail}
+      />
 
       {/* the lookup is chrome, not session UI -- it stands above everything and is reachable
           from any screen, which is the one thing the app's own dictionary could never be */}
@@ -3188,47 +3139,6 @@ function App() {
       ) : null}
 
       {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
-
-      {selectedChar ? (
-        <div
-          className="char-detail-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Character detail: ${selectedChar.character}`}
-          onClick={(e) => { if (e.target === e.currentTarget) setSelectedChar(null) }}
-        >
-          <div className="char-detail-card">
-            <button
-              type="button"
-              className="char-detail-close"
-              onClick={() => setSelectedChar(null)}
-              aria-label="Close"
-            >✕</button>
-            <div className="char-detail-label">{selectedChar.label}</div>
-            <div className="char-detail-char" lang="ja">{selectedChar.character}</div>
-            <div className="char-detail-romaji">{selectedChar.romaji}</div>
-            {selectedChar.meaning !== selectedChar.romaji ? (
-              <div className="char-detail-meaning">{selectedChar.meaning}</div>
-            ) : null}
-            <div className="char-detail-score-bar-wrap">
-              {Array.from({ length: CARD_MASTERY_MAX }, (_, i) => (
-                <span
-                  key={i}
-                  className={`char-detail-pip ${i < selectedChar.score ? 'is-filled' : ''}`}
-                  aria-hidden="true"
-                />
-              ))}
-            </div>
-            <div className="char-detail-score-label">
-              {selectedChar.score === 0 && 'Not studied yet'}
-              {selectedChar.score === 1 && 'Just started'}
-              {selectedChar.score === 2 && 'Getting there'}
-              {selectedChar.score === 3 && 'Almost mastered'}
-              {selectedChar.score === CARD_MASTERY_MAX && 'Mastered ✓'}
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <aside className="assistant-toast-anchor" aria-live="polite" aria-label="Tutor updates">
         {settings.assistantToastLimit > 0 && tutor.activeAssistantToast ? (
