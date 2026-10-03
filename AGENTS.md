@@ -144,3 +144,8 @@ See `.github/agents/` for role-specific agent configs.
 
 💡 *Use `mem-find` to search full details. Use `mem-create` to save important decisions.*
 <!-- /open-mem-context -->
+
+
+## Shared project context
+
+Read `PROJECT-CONTEXT.md` before substantive project work, alongside the root and applicable scoped instructions. It is a dated guide to verified project facts and selected Claude knowledge; current source, accepted decisions and the user's task scope remain authoritative. Keep lasting knowledge there or in the existing decision documents, and use the task's explicit handoff for temporary progress.

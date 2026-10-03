@@ -18,6 +18,18 @@
     },
     "python-tests": {
       "command": "cmd.exe /d /c \".venv\\Scripts\\python.exe -m pytest -q\""
+    },
+    "start-app": {
+      "command": "cmd.exe /d /c \"cd /d electron-frontend && npm.cmd run start\""
+    },
+    "ui-a11y": {
+      "command": "cmd.exe /d /c \"cd /d electron-frontend && npm.cmd run test:a11y\""
+    },
+    "architecture": {
+      "command": "cmd.exe /d /c \".venv\\Scripts\\python.exe scripts/arch_check.py\""
+    },
+    "type-generation": {
+      "command": "cmd.exe /d /c \".venv\\Scripts\\python.exe scripts/generate_ts_types.py --check\""
     }
   },
   "metadataGeneration": {
