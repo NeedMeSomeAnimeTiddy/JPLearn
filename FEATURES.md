@@ -13,7 +13,7 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 - **Katakana** — Complete set (mirroring hiragana structure)
 - **JLPT Kanji** — N5 through N1 kanji (thematic categories for N5: numbers/time, nature/world, people/body, study/language, actions/travel; extended categories for N4–N1)
 - **JLPT Vocabulary** — N5 through N1 vocabulary with thematic groupings (greetings, numbers, time, family, body, food/drink, school, places, transport, adjectives, verbs, nouns)
-- **Grammar Patterns** — 64+ grammar patterns covering copula, particles, verb forms, adjectives, question words, connectives, and key expressions
+- **Grammar Patterns** — 88 grammar patterns covering copula, particles, verb forms, adjectives, question words, connectives, and key expressions
 - **Sentence Examples** — Structured example sentences for grammar-in-context learning
 
 ### Deeper Content Tracks
