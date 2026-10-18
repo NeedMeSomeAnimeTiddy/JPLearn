@@ -43,15 +43,6 @@ npm run test:e2e          # build:quiet + vitest e2e config
 npm run make:release      # bundle Python + build the Windows installer into out/make/
 ```
 
-Both GitHub workflows target a self-hosted Windows runner (`runs-on: [self-hosted, windows]`)
-because hosted Actions minutes are unavailable on this account — if no runner is registered
-against the repo, they simply never start. Either way they have local equivalents, so neither
-needs CI to run:
-`python scripts/dev.py --full` covers every step of `electron-packaged-smoke.yml`, and
-`npm run make:release` produces the same installer `release.yml` uploads (it calls
-`scripts/bundle_python.ps1`, which the workflow also calls — keep the bundling logic
-there rather than inline in the YAML).
-
 To just run the built app end-to-end without touching code: `npm run build && npm run start`
 from `electron-frontend/` (not `dev`, which is for active frontend development).
 
@@ -82,48 +73,12 @@ Enforced boundary: `scripts/arch_check.py` forbids `domain → data`, `domain �
 size warning for any hand-written file over 2,000 lines (currently `desktop_bridge.py` and
 `database.py`; auto-generated files like `domain/external_deck_data.py` are exempt).
 
-**Two SQLite DBs, not equivalent**: `data/jplearn.db` (via `database.py`) is the real,
-live-written database — review/progress/gamification/assistant state. `data/app.db` (via
-`SRSRepository` in `srs_repository.py`) is a dev/replay fixture used only by
-`scripts/srs_apply.py`/`srs_check.py`/`srs_replay.py`/`db_check.py` and one test — no runtime
-app path touches it, despite FEATURES.md describing it as live persistence.
-
-**Mastery has two sources of truth** that are reconciled by hand, not derived from each other:
-SQLite `review_states` (via the bridge `summary` command) and a `localStorage` `cardScores` map
-keyed by numeric card id. Any new progress-related feature should know which one it's reading.
-See `ARCHITECTURE.md` §4 before touching either.
-
-**Bridge is strictly serial**: the Python child process handles one request at a time, and a
-timed-out request tears down and rejects *every* other in-flight request. Never route a new
-long-running backend operation through the shared worker — give it a dedicated child process
-or a poll/progress channel instead. Four dedicated runtimes already exist to copy from:
-`llm_runtime.cjs` and `voice_runtime.cjs` (HTTP to a spawned server), `speech_runtime.cjs` and
-`ocr_runtime.cjs` (newline-JSON over stdin/stdout to `scripts/speech_recognition_server.py` /
-`scripts/ocr_server.py`). See ARCHITECTURE.md §2 "Dedicated runtimes" for the lifecycle rules
-these share (single-flight queue, kill-on-timeout, unload only between requests).
-
-**Card ids are hand-allocated by offset** (`domain/decks.py`, e.g. kanji N5→N1 at 0/1000/2000/…).
-Adding a deck means picking a verified-disjoint `id_offset` — there's no uniqueness assertion,
-so a collision silently corrupts SRS/mastery state rather than erroring.
-
 ## Key conventions
 
 - Python 3.11+; public APIs require type hints.
 - `domain/` is pure — no DB access, no UI code, no file I/O, no hidden state/randomness, time
   injected externally. SRS contract: `update(state, quality, confidence?) → ReviewState` in
   `domain/scheduler.py`.
-- `data/` normalizes Japanese text (NFC + dash/punctuation variants, `data/text_normalization.py`)
-  before every write — new write paths must go through it or lookups silently miss.
-- Mastered threshold: `repetitions >= 3` AND `interval >= 21` (days).
-- `data/database.load_states()` may fabricate a default `ReviewState` for unseen cards — only
-  persist after an actual review, not on load.
-- Any new bridge payload should be a `@dataclass`, either in `desktop_bridge.py` or in a `data/`
-  repository module the bridge imports from (e.g. `data/dictionary_repository.py`) — never
-  duplicated in both. `scripts/generate_ts_types.py` AST-walks the files listed in its
-  `SOURCE_FILES` tuple and generates `electron-frontend/src/generated/types.ts` from every
-  `@dataclass` it finds (`--check` mode detects drift). Adding a payload dataclass to a new
-  source file means adding that file to `SOURCE_FILES` too. Don't hand-write renderer types that
-  duplicate one of these dataclasses.
 - Read the matching `.github/instructions/<layer>.instructions.md` before editing inside
   `domain/`, `data/`, or `electron-frontend/` — each has more detail than the summary above
   (the electron one in particular covers accessibility, performance, and forbidden patterns).
@@ -139,13 +94,16 @@ multi-step work that includes edits, `Plan` when you need an implementation plan
 code. Everything else in `AGENTS.md` (architecture, conventions, commands, GitHub issue workflow)
 still applies.
 
-## GitHub
+## Project skills
 
-```bash
-gh issue list --repo NeedMeSomeAnimeTiddy/JPLearn --limit 5
-gh issue create --repo NeedMeSomeAnimeTiddy/JPLearn --title "..." --body "..." --label "bug|refactor|enhancement"
-```
-
+Load the matching skill before work in its area (not loaded by default):
+- `jplearn-backend-invariants` — two SQLite DBs, two mastery sources, serial bridge + dedicated
+  runtimes, card-id offsets, text normalization, mastered threshold, `load_states` trap, bridge
+  payload dataclasses/`generate_ts_types.py`. Load before touching persistence, progress/mastery,
+  the bridge or its payloads, a `*_runtime.cjs`, decks/card ids, or a `data/` write path.
+- `jplearn-release-github` — self-hosted-runner CI and its local equivalents (`dev.py --full`,
+  `make:release`, `bundle_python.ps1`), plus `gh issue` commands. Load for releases/installers,
+  workflow edits, CI questions, or GitHub issues.
 
 ## Shared project context
 
