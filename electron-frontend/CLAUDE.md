@@ -18,3 +18,5 @@ only when you're actually working here.
   shared copy.
 - Pure helpers belong in `src/lib/` where they can be unit-tested — not module-private in a
   component file.
+- **Square corners.** The UI is square-cornered: no `border-radius` on new components. Robbie's
+  ruling (July 2026): it is part of the app's cassette/VHS-hardware look, not an accident of old CSS.

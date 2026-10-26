@@ -3,59 +3,79 @@
 Read **Part 1** at Orient and **Part 2** at Reconcile. The search lines are patterns for the search
 tools, not commands to run.
 
-- **Constraints** (Part 1) define what a valid recommendation looks like. They cannot bias a reading
-  of the code, so they are read first. Breaking one produces advice that cannot be taken.
+- **Constraints** (Part 1) define what a valid recommendation looks like. They hold no conclusions
+  about whether any system works, so they are read first. Breaking one produces advice that cannot be
+  taken.
 - **Settled answers** (Part 2) record what somebody already concluded about specific systems.
   Reading them early costs the independent read, so they wait until every finding is traced.
+
+Facts below were checked against the source on 2026-10-26. Where one has drifted, the code wins and
+the drift is a STALE RECORD worth reporting.
 
 ---
 
 # Part 1 — Constraints (read up front)
 
-## Card identity is positional, and progress hangs off it
+## Each learner store has its own key
 
-`domain/decks.py` assigns card ids as `id_offset + index` over the imported rows, and every learner
-record — `review_states`, `review_events`, `card_mastery_scores`, card notes — is keyed by
-`(deck_name, card_id)`. So:
+| Store (table, file) | Keyed by | Consequence |
+|---|---|---|
+| `review_states` (`data/database.py`) | `(deck, card_id)`; deck is the deck's display **name**, normalised | Renaming a deck or moving a card id forks the schedule |
+| `review_events` | `deck`, `card_id` per row; append-only log | Migrations deliberately leave it as history (`data/category_identity_migration.py`) |
+| `leech_items` | `(deck, card_id)` by name | Readers not limited to the cards a deck shows see cards no deck serves |
+| `curriculum_stages` | `(deck, card_id, mode)` | as above |
+| `daily_game_miss_signals` | `(deck_name, card_id)` | as above |
+| `card_mastery_scores` (`data/mastery_repository.py`) | `(deck, card_id)` where deck is the **slug** | A slug change forks mastery; a name change does not |
+| `card_notes` (`data/card_notes_repository.py`) | an opaque `note_key` hashed from character and reading, independent of deck | Survives deck and id changes; a change to text normalisation moves it |
+| `daily_word_pools` / `_words` | `pool_day`, `pool_position`; rows carry `deck_slug`, `deck_name`, `card_id` | Results go by pool position |
+| Single-row and keyed-by-name tables (`streak_state`, `user_xp`, `user_settings`, `assistant_*`, `user_progression`, ...) | their own ids | Not tied to cards |
 
-- Dropping, inserting or reordering a corpus row moves every later card onto another word's history.
-  "Deduplicate the corpus" or "sort the deck" is never available as written. Hiding a card is done by
-  filtering after ids are assigned (`hidden_repeat_ids`, #80).
-- Renaming a deck forks its history in the same way. Category decks are *views* that keep their
-  parent's name for exactly this reason (#78).
-- Where an identity change is genuinely wanted, the shape is `data/category_identity_migration.py`:
-  back up the database, rewrite the keyed rows, report what moved.
-- Ids are hand-allocated per deck with no runtime uniqueness check; `tests/test_deck_id_uniqueness.py`
-  is the guard. Recommending a new deck means naming a verified-free `id_offset`.
+**Card ids are positional.** `domain/decks.py` assigns `id_offset + index` over the imported rows.
+Dropping, inserting or reordering a corpus row moves every later card onto another word's history,
+so "deduplicate the corpus" or "sort the deck" is never available as written; hiding a card is done
+by filtering after ids are assigned (`hidden_repeat_ids`, #80). Category decks are views that keep
+their parent's name and ids (#78). Ids are hand-allocated per deck; `tests/test_deck_id_uniqueness.py`
+is the guard, so a recommended new deck names a verified-free `id_offset`. Where an identity change
+is genuinely wanted, the shape is `data/category_identity_migration.py`: back up, rewrite the keyed
+stores, report what moved.
 
-## Two databases, one of them live
+## Where the live database is
 
-`data/jplearn.db` (via `data/database.py`) is the real store. `data/app.db` (via
-`SRSRepository`) is a dev and replay fixture for a few scripts and one test. A finding about
-`app.db` affects no learner; a recommendation to "use the repository layer" for live data points at
-the wrong database.
+The app's store is `jplearn.db`, at `<JPLEARN_DOCUMENTS_DIR>/data/` when that is set, else
+`Documents\JPLearn Progress\data\` for the Electron app, else the repo's `data/` for Python run
+directly (`electron/main.cjs::resolveProgressDocumentsDir`, `data/database.py::_resolve_db_path`).
+`data/app.db` (`SRSRepository`) is a dev and replay fixture no runtime path uses.
+
+## Mastery: one store, three notions
+
+`card_mastery_scores` in SQLite is the counter; the renderer's `localStorage` copy is a warm-start
+snapshot only. `domain/mastery.py` defines three distinct notions of "mastered"; a recommendation
+that merges them changes what the learner is shown.
 
 ## The bridge is serial
 
-One Python child serves every study query, one request at a time, and a timed-out request tears it
-down and rejects everything else in flight. A recommendation that adds a slow call to it is an
-error. Long work gets a dedicated runtime (`ocr_runtime.cjs`, `speech_runtime.cjs`,
-`voice_runtime.cjs`, `llm_runtime.cjs` are the patterns) or a one-shot process.
+One Python child serves every study query, one request at a time (`electron/bridge_worker.cjs`). A
+request that times out is rejected on its own; the worker is restarted only after
+`BRIDGE_MAX_CONSECUTIVE_TIMEOUTS` (3, `electron/main.cjs`) timeouts in a row, and a restart settles
+only that child's requests. Slow work still blocks every query queued behind it, so a
+recommendation that adds a slow call to the bridge is an error. Long work gets a dedicated runtime
+(`ocr_runtime.cjs`, `speech_runtime.cjs`, `voice_runtime.cjs`, `llm_runtime.cjs`) or a one-shot
+process.
 
 ## Layers
 
 `domain/` is pure: no database, no file I/O, no UI, time and randomness injected. `data/` holds no
 business logic or UI behaviour. `scripts/arch_check.py` forbids `domain → data`, `domain → ui`,
-`data → ui`, `scripts → ui`. "Move this lookup into the domain function" is unavailable if the lookup
-reads the database; pass the value in instead.
+`data → ui`, `scripts → ui`. "Move this lookup into the domain function" is unavailable when the
+lookup reads the database; pass the value in instead.
 
-## Local-first and offline
+## What may leave the machine
 
-The learner's text, recordings, photos and tutor conversations stay on the machine; the tutor is a
-local llama.cpp model, speech is local Whisper, OCR is local PaddleOCR, voice is local VOICEVOX.
-"Use a hosted API" is never available. The network is for downloads the learner starts. Since the
-2026 setup-probe fix: **nothing that reports what is installed may sit behind a network call**
-(ARCHITECTURE §8 B4).
+The tutor (llama.cpp), speech recognition (Whisper), OCR (PaddleOCR) and voice (VOICEVOX) all run
+locally; "use a hosted API" is never available. Outbound traffic is downloads the learner starts
+(`electron/setup_runtime.cjs`, `scripts/get_*.py`) and the packaged app's update check
+(`electron/updater.cjs`, GitHub Releases, when a repository is configured). Nothing that reports what
+is installed may wait on the network.
 
 ## The renderer is untrusted
 
@@ -66,32 +86,34 @@ main process then trusts.
 
 ## The renderer's own rules
 
-From `.github/instructions/electron.instructions.md` and `electron-frontend/CLAUDE.md`:
-React 19.2 without `forwardRef` or `import React`; new stateful systems go in
-`src/features/<name>/`, never inline in `App.tsx`; colours from `@radix-ui/colors` tokens, never raw
-hex; **square corners** (no `border-radius` on new components); WCAG 2.1 AA, keyboard reachable,
-visible focus; no synchronous IPC. A recommendation that breaks one of these is an error. Existing
-code that breaks one is a finding only with a consequence (a learner who cannot reach a control, a
-colour that fails contrast), not for the rule alone.
+From `.github/instructions/electron.instructions.md` and `electron-frontend/CLAUDE.md`: React 19.2
+without `forwardRef` or `import React`; new stateful systems go in `src/features/<name>/`, never
+inline in `App.tsx`; colours from `@radix-ui/colors` tokens, never raw hex; WCAG 2.1 AA, keyboard
+reachable, visible focus; no synchronous IPC. Robbie's ruling, recorded in
+`electron-frontend/CLAUDE.md`: the UI is square-cornered. A recommendation that breaks one of these
+is an error. Existing code that breaks one is a finding only with a consequence (a control a learner
+cannot reach, a colour that fails contrast), not for the rule alone.
 
 ## Generated files
 
-`electron-frontend/src/generated/types.ts`, `domain/external_deck_data.py` and the handwriting
-manifest are outputs. A finding about their content is a finding about their generator or source
-data; a hand edit is never the fix.
+`electron-frontend/src/generated/types.ts` (`scripts/generate_ts_types.py`, whose `SOURCE_FILES`
+lists the payload modules), `domain/external_deck_data.py`
+(`python -m scripts.import_external_lists --conflict-policy keep-first`) and the handwriting manifest
+(`scripts/build_handwriting_assets.py`) are outputs. A finding about their content is a finding
+about their generator or source data; a hand edit is never the fix.
 
 ## The authored world
 
 The menu's 3D valley (`world.glb`, built from `environment.blend`) is Robbie's authored work. A
-performance finding about it may recommend camera, culling, loading or material changes; it may
-never recommend hiding, decimating or replacing his meshes without asking him.
+performance finding may recommend camera, culling, loading or material changes; hiding, decimating
+or replacing his meshes needs his approval and is recommended only as a question to him.
 
 ## Age is not a defect
 
-Much of this code was written by much older models, and Robbie wants it made robust. That makes
-consequences the measure: a finding names what goes wrong for the learner or the data, when, and
-how often. Unfamiliar style, length or a pattern a newer model would not choose is not a finding on
-its own. Equally, no "simplify now, build it properly later" advice.
+Much of this code was written by much older models, and Robbie wants it made robust. Consequences
+are the measure: a finding names what goes wrong for the learner or the data, when, and how often.
+Unfamiliar style, length or a pattern a newer model would not choose is not a finding on its own.
+And no "simplify now, build it properly later" advice.
 
 ---
 
@@ -101,45 +123,58 @@ its own. Equally, no "simplify now, build it properly later" advice.
 
 For each traced finding, in this order:
 
-1. **Search `ARCHITECTURE.md` section 8** for the file, symbol or concept; a struck id is closed and
-   says how. Also search sections 2-7: several "looks wrong" choices are explained there with
-   measurements (section 4 on why mastery is not derived from FSRS, for example).
-2. **Search `DEBT.md`** for the symbol, and read every open entry's trigger. A trigger that has
-   fired is the most valuable thing a pass reports: say which, and give the count or the caller
+1. **Search `ARCHITECTURE.md`** — section 8 for the file, symbol or concept (a struck id is closed and
+   says how), then sections 2-7, where several choices that look wrong are explained with
+   measurements (section 4 on why mastery is not derived from FSRS state, for example).
+2. **Search `DEBT.md`**, and read every open entry's trigger (`census.py --records` lists them). A
+   fired trigger is the most valuable thing a pass reports: say which, with the count or the caller
    that fired it.
 3. **Search closed GitHub issues** for the subject (`gh issue list --state closed --search "<term>"`
    under Checks to run), and the code comment beside the thing: rulings often live there.
-4. **Check `FEATURES.md`** for what the system is supposed to do; built but unverified is not
-   broken.
-5. **Assign a bucket:** NEW · RECORDED · TRIGGER FIRED · STALE RECORD · or, if the code disagrees
-   with a record, a Question for Robbie (never resolved silently).
+4. **Check `FEATURES.md`** for what the system is meant to do; built but unverified is not broken.
+5. **Assign a bucket.** A record that describes the code wrongly is a STALE RECORD: report the
+   record. A conflict with a decision, or an intent the records leave unclear, is a question for
+   Robbie. Anything else the records do not cover is NEW.
 
-## Things that reliably look like findings and are not
+## Intentional designs — not findings while they hold
 
-| What the code looks like | Why it is not a finding |
+| What the code looks like | Why it is by design |
 |---|---|
-| `kanji_n1` ids run past its nominal 1,000-slot spacing | `ARCH §8 A1`: guarded by `tests/test_deck_id_uniqueness.py`; nothing else claims ids above 4000 |
-| Category builders in `domain/decks.py` still allocate their own `id_offset` | #78: they are source data for matching (`CATEGORY_SOURCE_DECKS`); `ALL_DECKS` serves views that keep the parent's ids and name |
-| A word on two JLPT lists appears in only one level deck; old `review_states` rows for the hidden card remain | #80, decided by Robbie: lowest level keeps it, ids do not move, nothing is migrated |
-| `localStorage` holds card scores as well as SQLite | `ARCH §8 A2` closed: SQLite `card_mastery_scores` is the truth; `localStorage` is a warm-start snapshot |
-| Mastery counter is not derived from FSRS state | `ARCHITECTURE.md` §4: measured and ruled out |
-| `data/app.db` / `SRSRepository` unused by the app | `ARCH §8 D4`, recorded |
-| Bridge worker is serial | `ARCH §8 B1`: a constraint by design; slow work already moved off it |
-| `desktop_bridge.py` and `data/database.py` over 2,000 lines | `arch_check.py` warns on purpose; `ARCH §8 D2` records the split already done |
-| `App.tsx` is large and holds routing state | `ARCH §8 D1`, recorded with its remaining step (#69) |
-| `main.py` / `gui.py` raise `RuntimeError` | The legacy GUI is retired on purpose; Electron is the only surface |
-| `domain/external_deck_data.py` is enormous | Generated from `data/external_sources/*.csv`; exempt from size checks |
-| The valley models are not in git | Release `valley-models-1` holds them, pinned by SHA-256 in `electron-frontend/scripts/fetch-models.cjs` |
-| `mockups/` holds a large, separately built three.js app | A prototype workspace for menu design, not shipped code |
-| Release CI runs on a self-hosted runner, or not at all | GitHub-hosted runners are unavailable on the account; `scripts/dev.py --full` and `npm run make:release` are the verified local equivalents |
-| The packaged app uses `python-bundle/` before system Python | Deliberate; the bundle must carry `fugashi` and `unidic-lite` or the bridge dies |
-| A CSS class with no literal mention in source | May be built: `is-${tone}` (`Cells.tsx`), `assistant-toast-${priority}` (`TutorToast.tsx`). Check producers before calling it dead |
+| Category builders in `domain/decks.py` still allocate their own `id_offset` | #78: they are source data for matching (`CATEGORY_SOURCE_DECKS`); `ALL_DECKS` serves views with the parent's ids and name |
+| A word on two JLPT lists appears in only one level deck; old rows for the hidden card remain in the database | #80, Robbie's decision: the lowest level keeps it, ids do not move, nothing is migrated |
+| `kanji_n1` ids run past its nominal 1,000-slot spacing | `ARCH §8 A1`: guarded by `tests/test_deck_id_uniqueness.py` |
+| `localStorage` holds card scores as well as SQLite | `ARCH §8 A2`: SQLite is the truth, `localStorage` a warm-start snapshot |
+| Mastery is not derived from FSRS state | `ARCHITECTURE.md` §4, measured |
+| `review_events` keeps old deck names after a migration | `data/category_identity_migration.py`: an append-only log of what happened at the time |
+| `main.py` / `gui.py` raise `RuntimeError` | The legacy GUI is retired; Electron is the only surface |
+| `domain/external_deck_data.py` is enormous | Generated from `data/external_sources/*.csv` |
+| The valley models are not in git | Release `valley-models-1`, pinned by SHA-256 in `electron-frontend/scripts/fetch-models.cjs` |
+| `mockups/` holds a separately built three.js app | A prototype workspace for menu design, not shipped |
+| The packaged app uses `python-bundle/` before system Python | Deliberate; the bundle must carry `fugashi` and `unidic-lite` |
+| Release checks run locally rather than on GitHub-hosted runners | Hosted runners are unavailable on the account; `scripts/dev.py --full` and `npm run make:release` are the local equivalents |
+| A CSS class with no literal mention in source | May be built at runtime (`is-${tone}` in `Cells.tsx`, `assistant-toast-${priority}` in `TutorToast.tsx`); check producers first |
 
-This table is a snapshot and drifts. **The searches are the authority; the table is the shortcut.**
-If it disagrees with a record, the record wins — and say so, because a stale row here is worth
-fixing.
+## Recorded problems that are still open — re-check, never exempt
 
-## When the record and the code genuinely disagree
+These are known and not yet fixed. Confirm the record still describes the code, check whether its
+scope has grown, and report a change either way. Reporting the unchanged problem again is one line,
+RECORDED.
 
-That is a real finding and a serious one. Say which record, quote it, show what the code does
-instead, and put it under Questions for Robbie. Whether the code or the record is wrong is his call.
+| Record | What it says is open |
+|---|---|
+| `ARCH §8 B1` | Slow work on the serial bridge blocks everything behind it |
+| `ARCH §8 B2` | Timeout handling; partly addressed (one timeout no longer stops the worker) — check what remains |
+| `ARCH §8 B3` | The fallback after a worker failure spawns a one-shot Python process per request |
+| `ARCH §8 D1` | `App.tsx` size and routing; its figures are older than the code |
+| `ARCH §8 D4` | `data/app.db` and `SRSRepository` are unused by the app but documented as live |
+| `ARCH §8 D5`, `D6`, `E1`-`E3`, `F1`-`F5` | Leftover packages, incomplete modules, test gaps, stale docs |
+| `desktop_bridge.py` and `data/database.py` over 2,000 lines | `arch_check.py` warns on purpose |
+
+## Historical fixes — a regression is a finding
+
+`ARCH §8 A1`-`A4`, `B4`, `C1`, `C2`, `D2`, `D3` are struck: each was fixed, and the row says how. Code
+that has drifted back is a NEW finding citing the old row.
+
+These tables are snapshots and drift. **The searches are the authority; the tables are the
+shortcut.** If a table disagrees with a record, the record wins, and the stale row here is worth
+reporting.

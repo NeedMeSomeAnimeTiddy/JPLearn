@@ -61,6 +61,11 @@ The units a scoped audit can name. Each is a reasonable single pass.
 | Import, export and backups | `data/deck_portability.py`, `scripts/deck_portability.py` |
 | The menu and the valley | `features/menu/`, `src/valley/` |
 | Renderer state and settings | `App.tsx`, `src/types.ts`, `src/constants.tsx`, `components/AppSettingsModal.tsx`, `electron/config_store.cjs` |
+| Answer checking and grading | `domain/answer_check.py`, `domain/conjugation.py`, `features/round/` |
+| Progression and onboarding | `domain/progression*.py`, `domain/curriculum.py`, `features/progression/`, `features/onboarding/` |
+| Reading passages | `scripts/build_passages_db.py`, `views/PassageHubView.tsx`, `features/passages/` |
+| Handwriting | `features/handwriting/`, `public/handwriting-data/`, `scripts/build_handwriting_assets.py` |
+| Packaging, updates and upgrades | `electron-frontend/forge.config.*`, `scripts/bundle_python.ps1`, `electron/updater.cjs`, schema versions in `data/database.py` |
 
 ## Searches that work here
 
@@ -74,9 +79,10 @@ id_offset|_VOCAB_ID_CAPACITY|hidden_repeat_ids           domain/decks.py
 deck_name|\.name\b.*deck                                  scripts/desktop_bridge.py (where a deck name becomes a key)
 ```
 
-Every learner table is keyed `(deck, card_id)`. When a reader is not scoped to a deck's own card ids
-(compare `load_deck_summary_counts`, which is, with a bare `SELECT ... FROM leech_items`), it can see
-rows for cards no deck shows (#80's hidden repeats).
+Learner stores have different keys (known-answers Part 1 has the table): most are deck name plus
+card id, mastery scores use the deck slug, notes a deck-independent hash. When a reader is not
+limited to a deck's own card ids (compare `load_deck_summary_counts`, which is, with a bare
+`SELECT ... FROM leech_items`), it can see rows for cards no deck shows (#80's hidden repeats).
 
 ### The bridge and the runtimes
 
@@ -94,12 +100,17 @@ For each command: what it reads, how long it can take, and whether it is on the 
 
 ```
 https\.get\(|https\.request\(|net\.request|fetch\(       electron-frontend/electron/
+autoUpdater|updateElectronApp                             electron-frontend/electron/
 urllib|requests\.\w                                       scripts/ data/ domain/
-navigator\.onLine|online|offline                          electron-frontend/src/
+fetch\(|XMLHttpRequest|new WebSocket|EventSource          electron-frontend/src/
+https?://                                                 electron-frontend/src/ electron-frontend/index.html (CSS url(), links)
+navigator\.onLine                                         electron-frontend/src/
 ```
 
-For each: what triggers it, the timeout, what the learner sees when it fails, and whether anything
-reporting installed state waits on it.
+For each: loopback, a bundled resource (the renderer's `fetch` of `public/` files, e.g. handwriting
+data) or external; what triggers it; the timeout; what the learner sees when it fails; whether
+anything reporting installed state waits on it. Dependencies can fetch without a call site here; the
+updater is one.
 
 ### IPC
 

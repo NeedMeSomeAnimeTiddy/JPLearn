@@ -1,6 +1,6 @@
 ---
 name: jplearn-backend-invariants
-description: JPLearn backend invariants and traps moved from root CLAUDE.md - the two SQLite DBs, the two mastery sources of truth, the strictly serial Python bridge and dedicated runtimes, hand-allocated card id offsets, Japanese text normalization on writes, the mastered threshold, load_states default fabrication, and the bridge-payload dataclass / generate_ts_types rule. Use when touching persistence or SQLite, progress/mastery/review state, scripts/desktop_bridge.py or any bridge command or payload, electron/*_runtime.cjs or a new long-running backend operation, decks or card ids (domain/decks.py), or data/ write paths.
+description: JPLearn backend invariants and traps moved from root CLAUDE.md - the two SQLite DBs, where mastery lives (SQLite, with a localStorage snapshot), the strictly serial Python bridge and dedicated runtimes, hand-allocated card id offsets, Japanese text normalization on writes, the mastered threshold, load_states default fabrication, and the bridge-payload dataclass / generate_ts_types rule. Use when touching persistence or SQLite, progress/mastery/review state, scripts/desktop_bridge.py or any bridge command or payload, electron/*_runtime.cjs or a new long-running backend operation, decks or card ids (domain/decks.py), or data/ write paths.
 ---
 
 # JPLearn backend invariants
@@ -16,13 +16,14 @@ live-written database — review/progress/gamification/assistant state. `data/ap
 `scripts/srs_apply.py`/`srs_check.py`/`srs_replay.py`/`db_check.py` and one test — no runtime
 app path touches it, despite FEATURES.md describing it as live persistence.
 
-**Mastery has two sources of truth** that are reconciled by hand, not derived from each other:
-SQLite `review_states` (via the bridge `summary` command) and a `localStorage` `cardScores` map
-keyed by numeric card id. Any new progress-related feature should know which one it's reading.
-See `ARCHITECTURE.md` §4 before touching either.
+**Mastery lives in SQLite.** The counter is `card_mastery_scores`, keyed `(deck_slug, card_id)` and
+written on the same bridge call as the review; `review_states` (keyed by deck *name*) holds the FSRS
+schedule. The renderer's `localStorage` `cardScores` is a warm-start snapshot only (#66). Any new
+progress-related feature should know which one it is reading. See `ARCHITECTURE.md` §4.
 
-**Bridge is strictly serial**: the Python child process handles one request at a time, and a
-timed-out request tears down and rejects *every* other in-flight request. Never route a new
+**Bridge is strictly serial**: the Python child process handles one request at a time, so a slow
+request blocks everything queued behind it; three timeouts in a row restart it and reject what was
+queued on it (`electron/bridge_worker.cjs`). Never route a new
 long-running backend operation through the shared worker — give it a dedicated child process
 or a poll/progress channel instead. Four dedicated runtimes already exist to copy from:
 `llm_runtime.cjs` and `voice_runtime.cjs` (HTTP to a spawned server), `speech_runtime.cjs` and
