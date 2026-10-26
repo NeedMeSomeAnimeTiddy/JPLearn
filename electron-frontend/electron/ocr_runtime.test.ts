@@ -16,12 +16,12 @@ class FakeOcrProcess extends EventEmitter {
   killed = false
   readonly stdout = new EventEmitter()
   readonly stderr = new EventEmitter()
-  readonly stdin = {
+  readonly stdin = Object.assign(new EventEmitter(), {
     write: (chunk: string) => {
       this.requests.push(JSON.parse(chunk))
       return true
     },
-  }
+  })
 
   kill() {
     this.killed = true
@@ -269,6 +269,15 @@ describe('ocr runtime', () => {
 
     await expect(runtime.extractText('a.png')).rejects.toThrow(/OCR server script not found/)
     expect(spawnFn).not.toHaveBeenCalled()
+  })
+
+  it('a failed write to a dying process is heard, not thrown', async () => {
+    const { runtime, spawned } = createHarness()
+    void runtime.extractText('a.png').catch(() => undefined)
+    await vi.waitFor(() => expect(spawned[0].requests).toHaveLength(1))
+    // an EventEmitter with no 'error' listener throws here; the runtime must have one
+    expect(() => spawned[0].stdin.emit('error', new Error('write EPIPE'))).not.toThrow()
+    spawned[0].exit()
   })
 
   it('stops the process on unload', async () => {

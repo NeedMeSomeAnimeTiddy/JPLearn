@@ -137,6 +137,13 @@ function createBridgeWorker(options) {
       }
     })
 
+    /* A WRITE TO A WORKER THAT HAS EXITED BEFORE NODE HAS NOTICED fails later, on stdin (EPIPE), and
+       an 'error' with no listener is an uncaught exception in the main process. Recorded and no more:
+       the exit's own 'close' follows and settles the requests that were written to it. */
+    child.stdin.on('error', (error) => {
+      telemetry.lastWorkerError = `Bridge worker stdin failed: ${error.message}`
+    })
+
     child.stderr.setEncoding?.('utf8')
     child.stderr.on('data', (chunk) => {
       stderr += String(chunk)

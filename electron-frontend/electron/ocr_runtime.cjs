@@ -175,6 +175,11 @@ function createOcrRuntime(options = {}) {
     })
 
     proc.stdout.on('data', handleStdoutData)
+    // a write to a process that has just died fails later on stdin (EPIPE); unheard, it would crash
+    // the main process. Its 'close' settles the requests.
+    proc.stdin.on('error', (error) => {
+      lastError = error.message
+    })
     proc.stderr.on('data', (chunk) => {
       const text = chunk.toString().trim()
       if (!text) return

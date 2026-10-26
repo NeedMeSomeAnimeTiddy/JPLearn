@@ -12,12 +12,12 @@ class FakeWorker extends EventEmitter {
   killed = false
   readonly stdout = new EventEmitter()
   readonly stderr = new EventEmitter()
-  readonly stdin = {
+  readonly stdin = Object.assign(new EventEmitter(), {
     write: (chunk: string) => {
       this.requests.push(JSON.parse(chunk))
       return true
     },
-  }
+  })
 
   kill() {
     this.killed = true
@@ -142,6 +142,18 @@ describe('bridge worker', () => {
     expect(bridge.state.child).toBeNull()
     void bridge.request(['summary']).catch(() => undefined)
     expect(spawned).toHaveLength(2)
+  })
+
+  it('a write that fails on a dead worker is recorded, not thrown, and its close settles the request', async () => {
+    const { bridge, spawned, telemetry } = createHarness()
+    const pending = bridge.request(['summary'])
+    const worker = spawned[0]
+    // an EventEmitter with no 'error' listener throws here; the worker must have one
+    expect(() => worker.stdin.emit('error', new Error('write EPIPE'))).not.toThrow()
+    expect(telemetry.lastWorkerError).toMatch(/stdin failed: write EPIPE/)
+    worker.close(1)
+    await expect(pending).rejects.toThrow(/exited with code 1/)
+    expect(telemetry.lastWorkerError).toMatch(/exited with code 1/) // the fuller exit detail wins
   })
 
   it('tears down the worker after repeated timeouts, but not for timeouts on a replaced one', async () => {
