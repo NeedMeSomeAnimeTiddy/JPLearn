@@ -1,0 +1,1489 @@
+<!-- @dsCard group="Components" name="The tools" subtitle="Kanji detail, conversation practice, and the choice for chat and image translation" width="1360" height="11368" -->
+<!doctype html>
+<meta charset="utf-8">
+<title>The tools</title>
+<style>
+  :root {
+    --washi: #f2ead8; --ink: #14110d; --hi: #e34a33; --hi-deep: #b23320;
+    --gold: #cfa45c; --gold-hi: #e8c47c; --washi-dim: #cfc6ae; --world: #4f9d6b;
+    --jp: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+    --jp-go: "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", "Meiryo", sans-serif;
+    --lat: "Segoe UI Black", "Arial Black", "Segoe UI", sans-serif;
+    --lat-ui: "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", Arial, sans-serif;
+    --skew: skewX(-8deg) rotate(-1.2deg);
+    --skew2: skewX(-8deg) rotate(1deg);
+    --drop: 6px 8px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.16);
+    --drop-s: 3px 4px 0 rgba(0,0,0,0.45), inset 0 0 0 1px rgba(20,17,13,0.2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { background: #10131e; color: var(--washi); font-family: var(--lat-ui);
+    font-weight: 600; letter-spacing: 0.03em; padding: 34px 40px 60px; }
+  h1 { font-family: var(--lat); font-style: italic; font-size: 26px; margin-bottom: 10px; }
+  h2 { font-size: 10.5px; letter-spacing: 0.2em; color: var(--gold-hi); font-weight: 700;
+    margin: 40px 0 12px; }
+  .lede { max-width: 1010px; font-size: 13px; line-height: 1.75; color: rgba(242,234,216,0.82); }
+  .lede + .lede { margin-top: 8px; }
+  .lede b { color: var(--gold-hi); }
+  code { font-family: ui-monospace, Consolas, monospace; color: var(--gold-hi);
+    letter-spacing: 0; font-size: 11px; }
+  .note { margin: 10px 0 26px; padding: 15px 18px; background: rgba(227,74,51,0.1);
+    box-shadow: inset 0 0 0 1px rgba(227,74,51,0.4); max-width: 1010px;
+    font-size: 12px; line-height: 1.7; }
+  .note b { color: #ff9d86; }
+  .note.calm { background: rgba(207,164,92,0.09); box-shadow: inset 0 0 0 1px rgba(207,164,92,0.34); }
+  .note.calm b { color: var(--gold-hi); }
+  .note p { margin: 6px 0 0; }
+  figure { margin: 0 0 12px; background: rgba(255,255,255,0.03);
+    box-shadow: inset 0 0 0 1px rgba(242,234,216,0.13); width: max-content; }
+  figcaption { padding: 13px 18px 17px; max-width: 1280px; }
+  .name { display: flex; align-items: baseline; gap: 13px; flex-wrap: wrap; margin-bottom: 7px; }
+  .name b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px; }
+  .name i { font-style: normal; font-size: 9px; letter-spacing: 0.2em; color: rgba(242,234,216,0.45); }
+  .name u { text-decoration: none; font-size: 9px; letter-spacing: 0.16em; padding: 2px 8px;
+    background: rgba(227,74,51,0.2); color: #ff9d86; }
+  figcaption p { font-size: 12px; line-height: 1.7; color: rgba(242,234,216,0.76); }
+  figcaption p + p { margin-top: 6px; }
+  figcaption p b { color: var(--washi); }
+  /* the numbers a plate is built from, and where in the code each one comes from */
+  .nums { margin-top: 9px; display: grid; grid-template-columns: max-content 1fr; gap: 3px 16px;
+    font-size: 11px; line-height: 1.5; color: rgba(242,234,216,0.7); }
+  .nums dt { font-weight: 700; letter-spacing: 0.12em; color: var(--gold-hi); white-space: nowrap; }
+  .nums dd { margin: 0; }
+
+  /* ================================================================================================
+     THE PLATE — 1280x720 of real valley at 1:1, exactly as `past-three.html` draws it. */
+  .plate { position: relative; width: 1280px; height: 720px; overflow: hidden; }
+  .plate > img { display: block; width: 1280px; height: 720px; }
+  .board { position: absolute; inset: 0; font-family: var(--lat-ui); }
+  .dim { position: absolute; inset: 0; background: rgba(8,11,18,0.66); }
+
+  /* ---- the crown, the foot band, back and hints: past-three's own ---- */
+  .brand { position: absolute; left: 48px; top: 24px; display: flex; gap: 9px; align-items: center; }
+  .brand i { width: 28px; height: 28px; background: var(--hi); display: block;
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.45); }
+  .brand b { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+    font-size: 13px; letter-spacing: 0.16em; color: var(--washi); text-shadow: 2px 2px 0 rgba(0,0,0,0.6); }
+  .brand s { display: block; text-decoration: none; font-family: var(--jp-go); font-size: 8.5px;
+    letter-spacing: 0.24em; color: rgba(242,234,216,0.72); text-shadow: 1px 1px 0 rgba(0,0,0,0.6); }
+  .hd { position: absolute; left: 48px; top: 56px; display: flex; align-items: stretch;
+    width: max-content; transform: var(--skew); background: var(--washi); box-shadow: var(--drop); }
+  .hd-mark { flex: none; width: 54px; display: grid; place-items: center; background: var(--world);
+    color: var(--washi); font-family: var(--jp); font-size: 30px; line-height: 1;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.2); }
+  .hd-txt { display: flex; flex-direction: column; align-items: flex-start; padding: 10px 20px 11px; }
+  .hd-kick { font-weight: 700; font-size: 9.5px; letter-spacing: 0.22em; color: rgba(20,17,13,0.5);
+    margin-bottom: 5px; }
+  .hd-title { display: flex; align-items: baseline; gap: 16px; }
+  .hd-title b { font-family: var(--jp); font-weight: 700; font-size: 32px; letter-spacing: 0.13em;
+    line-height: 1; color: var(--ink); }
+  .hd-title i { font-style: normal; font-weight: 700; font-size: 13px; letter-spacing: 0.3em;
+    color: rgba(20,17,13,0.55); }
+  .cap { position: absolute; left: 52px; top: 152px; width: max-content; display: flex;
+    align-items: center; gap: 9px; padding: 5px 13px 6px; background: var(--washi);
+    box-shadow: var(--drop-s); transform: var(--skew2); transform-origin: 0 50%;
+    font-weight: 700; font-size: 10px; letter-spacing: 0.2em; color: var(--ink); }
+  .cap s { text-decoration: none; color: rgba(20,17,13,0.3); }
+  .cap em { font-style: normal; font-family: var(--jp-go); font-size: 10px; letter-spacing: 0.06em;
+    color: rgba(20,17,13,0.55); }
+  .run { position: absolute; right: 48px; top: 30px; display: flex; align-items: stretch; gap: 6px; }
+  .run > span { display: flex; align-items: center; gap: 7px; padding: 6px 12px 7px;
+    background: var(--washi); box-shadow: var(--drop-s); transform: var(--skew);
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20,17,13,0.6); }
+  .run b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px;
+    letter-spacing: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .run s { text-decoration: none; color: rgba(20,17,13,0.34); }
+  .foot { position: absolute; left: 184px; top: 598px; width: 912px; display: flex;
+    align-items: center; gap: 15px; padding: 6px 14px 7px; transform: var(--skew);
+    background: rgba(10,9,6,0.82); box-shadow: inset 0 0 0 1px rgba(242,234,216,0.2),
+      2px 3px 0 rgba(0,0,0,0.45); }
+  .foot > b, .foot > s { flex: none; font-weight: 700; font-size: 9px; letter-spacing: 0.2em;
+    color: var(--washi); }
+  .foot > s { text-decoration: none; color: rgba(242,234,216,0.56); margin-left: auto; }
+  .ticks { flex: 1; display: flex; gap: 3px; height: 15px; }
+  .ticks i { flex: 1; background: rgba(242,234,216,0.14); box-shadow: inset 0 0 0 1px rgba(242,234,216,0.3); }
+  .ticks i.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.3); }
+  .ticks i.here { background: var(--washi); box-shadow: inset 0 0 0 2px var(--ink); }
+  /* an optional objective is the same tick with a broken edge -- counted, never owed */
+  .ticks i.opt { box-shadow: inset 0 0 0 1px rgba(242,234,216,0.3); background:
+    repeating-linear-gradient(90deg, rgba(242,234,216,0.14) 0 5px, transparent 5px 8px); }
+  .ticks i.opt.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.3); }
+  /* GIVEN, NOT EARNED: the model answer was handed over. Gold is earned, so this is gold's outline */
+  .ticks i.given { background: rgba(207,164,92,0.22); box-shadow: inset 0 0 0 2px var(--gold); }
+  .ticks label { flex: 1; display: block; font-size: 8px; letter-spacing: 0.12em; }
+  .back { position: absolute; left: 48px; top: 648px; display: flex; gap: 8px; }
+  .back span { padding: 6px 16px 7px; background: var(--washi); box-shadow: var(--drop-s);
+    transform: var(--skew); font-weight: 700; font-size: 10px; letter-spacing: 0.18em; color: var(--ink); }
+  .back span + span { background: rgba(242,234,216,0.7); color: rgba(20,17,13,0.66); }
+  .back em { font-style: normal; font-family: var(--jp-go); font-size: 9px; margin-left: 7px;
+    color: rgba(20,17,13,0.5); }
+  .hints { position: absolute; right: 46px; top: 618px; display: flex; flex-direction: column;
+    gap: 6px; align-items: flex-end; }
+  .hints span { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 9.5px;
+    letter-spacing: 0.14em; color: var(--washi); text-shadow: 2px 2px 0 rgba(0,0,0,0.72); }
+  .hints b { padding: 3px 8px 4px; background: var(--washi); color: var(--ink);
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.45); transform: var(--skew); font-size: 9px;
+    text-shadow: none; letter-spacing: 0.1em; }
+  .hints em { font-style: normal; font-family: var(--jp-go); font-size: 9px; color: rgba(242,234,216,0.68); }
+
+  /* ================================================================================================
+     THE SHEET — past-three's, and `round.css`'s `.rd-sheet`, at 184 / 192 / 912 x 384. */
+  .sheet { position: absolute; left: 184px; top: 192px; width: 912px; height: 384px;
+    display: flex; background: var(--washi); transform: var(--skew);
+    box-shadow: 8px 11px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.16); }
+  .ask { flex: none; width: 322px; display: flex; flex-direction: column; min-height: 0;
+    padding: 18px 22px 0; box-shadow: inset -1px 0 0 rgba(20,17,13,0.16); }
+  .kick { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font-weight: 700; font-size: 10.5px; letter-spacing: 0.2em; color: var(--hi-deep); }
+  .kick em { font-style: normal; font-family: var(--jp-go); font-size: 10px; letter-spacing: 0.06em;
+    color: rgba(20,17,13,0.45); }
+  .kick.q { color: rgba(20,17,13,0.45); }
+  .work { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 18px 22px 0; }
+  .work > .kick { color: rgba(20,17,13,0.45); margin-bottom: 12px; }
+  .src { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 0 0 14px; font-weight: 700; font-size: 10px; letter-spacing: 0.18em; color: rgba(20,17,13,0.5); }
+  .src i { font-style: normal; color: var(--ink); letter-spacing: 0.1em; }
+  .slab { margin: auto -1px -1px; height: 40px; display: flex; align-items: center;
+    justify-content: center; gap: 14px; background: var(--hi); font-weight: 700; font-size: 11.5px;
+    letter-spacing: 0.18em; color: #ffd9a1; flex: none; }
+  .slab.calm { background: var(--ink); color: var(--gold-hi); }
+  .slab em { font-style: normal; font-family: var(--jp-go); font-size: 10px; letter-spacing: 0.06em;
+    color: rgba(255,217,161,0.66); }
+  .acts { display: flex; margin: auto -1px -1px; flex: none; }
+  .acts .slab { margin: 0; flex: 1; }
+  .acts .slab + .slab { box-shadow: inset 1px 0 0 rgba(242,234,216,0.22); }
+  /* the slab's question state: one line, two answers, no banner */
+  .slab.ask-q { justify-content: flex-start; padding: 0 0 0 16px; gap: 0; font-size: 10.5px;
+    letter-spacing: 0.12em; }
+  .slab.ask-q > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slab.ask-q > b, .slab.ask-q > i { flex: none; height: 100%; display: grid; place-items: center;
+    padding: 0 14px; font-style: normal; font-weight: 700; letter-spacing: 0.16em; }
+  .slab.ask-q > b { background: var(--hi-deep); color: #fff; }
+  .slab.ask-q > i { background: var(--ink); color: var(--gold-hi); }
+
+  /* the prompt's own tools -- `round.css` `.rd-tools` */
+  .tools { display: flex; gap: 6px; }
+  .tools u { width: 22px; height: 22px; display: grid; place-items: center; text-decoration: none;
+    background: rgba(20,17,13,0.08); color: rgba(20,17,13,0.6); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.18);
+    font-size: 11px; letter-spacing: 0; }
+  .tools u.on { background: var(--hi); color: #ffe9c9; box-shadow: none; }
+
+  /* ---- the character's line, which is the conversation's specimen ---- */
+  .line { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center;
+    padding-bottom: 8px; }
+  .line b { font-family: var(--jp); font-weight: 400; font-size: 34px; line-height: 1.22; color: var(--ink); }
+  .line i { display: block; margin-top: 8px; font-style: normal; font-family: var(--jp-go);
+    font-size: 12px; letter-spacing: 0.06em; color: rgba(20,17,13,0.5); }
+  .line p { margin-top: 9px; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
+    line-height: 1.18; color: var(--hi-deep); }
+  .earlier { display: inline-block; padding: 4px 10px 5px; background: rgba(20,17,13,0.08);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.18); color: rgba(20,17,13,0.66); }
+
+  /* ---- the reply: a rule on the paper, `round.css`'s `.rd-type` ---- */
+  .rule-row { display: flex; align-items: stretch; gap: 10px; }
+  .rule { flex: 1; min-width: 0; padding: 6px 2px 8px; box-shadow: inset 0 -2px 0 var(--hi);
+    font-family: var(--jp); font-size: 28px; line-height: 1.2; color: var(--ink); white-space: nowrap; overflow: hidden; }
+  .rule.empty { box-shadow: inset 0 -2px 0 rgba(20,17,13,0.28); font-family: var(--lat-ui);
+    font-size: 14px; letter-spacing: 0.14em; color: rgba(20,17,13,0.3); padding-top: 18px; }
+  .rule.off { box-shadow: inset 0 -2px 0 rgba(20,17,13,0.18); color: rgba(20,17,13,0.45); }
+  .mic { flex: none; width: 62px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; background: var(--ink); color: var(--gold-hi);
+    box-shadow: 3px 4px 0 rgba(20,17,13,0.25); font-weight: 700; font-size: 9px; letter-spacing: 0.14em; }
+  .mic b { font-size: 16px; line-height: 1; }
+  .mic.rec { background: var(--hi); color: #ffe9c9; }
+  .mic.busy { background: rgba(20,17,13,0.12); color: rgba(20,17,13,0.45); box-shadow: none; }
+  .mic.gone { background: rgba(20,17,13,0.06); color: rgba(20,17,13,0.3); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.14); }
+  .heard { margin-top: 8px; font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.45;
+    color: rgba(20,17,13,0.6); }
+  .heard b { color: var(--ink); letter-spacing: 0.14em; }
+  .heard .jp { font-family: var(--jp); font-size: 13px; color: var(--ink); letter-spacing: 0.02em; }
+  .status { margin-top: 8px; font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em; color: rgba(20,17,13,0.55); }
+  .status.bad { color: var(--hi-deep); letter-spacing: 0.04em; font-size: 11px; line-height: 1.45; }
+
+  /* ---- slips, the round's, on a single column here ---- */
+  .slip { display: flex; align-items: center; gap: 12px; padding: 8px 14px 9px; background: var(--washi-dim);
+    box-shadow: 3px 4px 0 rgba(20,17,13,0.22), inset 0 0 0 1px rgba(20,17,13,0.16); }
+  .slip u { text-decoration: none; flex: none; min-width: 26px; height: 22px; padding: 0 6px; display: grid;
+    place-items: center; background: var(--gold); color: var(--ink); font-weight: 700; font-size: 9px;
+    letter-spacing: 0.12em; }
+  .slip .t { flex: 1; min-width: 0; }
+  .slip .t > b { display: block; font-size: 11.5px; letter-spacing: 0.03em; color: var(--ink); font-weight: 600;
+    line-height: 1.4; }
+  .slip .t > s { display: block; text-decoration: none; font-weight: 700; font-size: 9px; letter-spacing: 0.18em;
+    color: rgba(20,17,13,0.5); margin-bottom: 2px; }
+  .slip .jp { font-family: var(--jp); font-size: 19px; color: var(--ink); line-height: 1.25; }
+  .slip .kana { font-family: var(--jp-go); font-size: 11px; letter-spacing: 0.05em; color: rgba(20,17,13,0.55); margin-left: 8px; }
+  .slip .ro { font-size: 10.5px; letter-spacing: 0.06em; color: rgba(20,17,13,0.55); margin-left: 8px; }
+  .slip.gold { background: var(--washi); box-shadow: 4px 5px 0 rgba(20,17,13,0.26), inset 4px 0 0 var(--gold),
+    inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .slip.fix { background: var(--washi); box-shadow: 4px 5px 0 rgba(20,17,13,0.26), inset 4px 0 0 var(--hi),
+    inset 0 0 0 1px rgba(20,17,13,0.2); }
+  .slip.fix u { background: var(--hi); color: #ffe9c9; }
+  .slip.quiet { background: rgba(20,17,13,0.05); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.14); }
+  .slip.quiet u { background: rgba(20,17,13,0.14); color: rgba(20,17,13,0.5); }
+  .btn { flex: none; padding: 5px 10px 6px; background: rgba(20,17,13,0.08); color: rgba(20,17,13,0.66);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.16); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em; }
+  .btn.go { background: var(--hi); color: #ffe9c9; box-shadow: none; }
+  .btn.ink { background: var(--ink); color: var(--gold-hi); box-shadow: none; }
+
+  /* ---- the said line, answered: `round.css` `.rd-said` ---- */
+  .said { display: flex; align-items: baseline; gap: 12px; padding: 6px 2px 8px; box-shadow: inset 0 -2px 0 var(--hi); }
+  .said b { font-family: var(--jp); font-weight: 400; font-size: 32px; color: var(--ink); }
+  .said s { margin-left: auto; text-decoration: none; font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+    color: var(--hi-deep); }
+  .said s em { font-style: normal; font-family: var(--jp-go); font-size: 10px; letter-spacing: 0.04em; color: rgba(20,17,13,0.45); margin-left: 6px; }
+
+  /* ---- rows of a list on the sheet (objectives, a summary) ---- */
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; align-items: baseline; gap: 10px; padding: 5px 0 6px; box-shadow: inset 0 -1px 0 rgba(20,17,13,0.1);
+    font-size: 11.5px; letter-spacing: 0.03em; color: var(--ink); font-weight: 600; }
+  .row i { flex: none; width: 10px; height: 10px; align-self: center; background: rgba(20,17,13,0.12);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.3); }
+  .row i.on { background: var(--gold); }
+  .row i.given { background: rgba(207,164,92,0.25); box-shadow: inset 0 0 0 2px var(--gold); }
+  .row i.opt { background: transparent; box-shadow: inset 0 0 0 1px rgba(20,17,13,0.3); }
+  .row s { margin-left: auto; text-decoration: none; font-weight: 700; font-size: 9px; letter-spacing: 0.16em;
+    color: rgba(20,17,13,0.42); }
+  .row s.g { color: #8a6a2e; }
+  .fold { padding: 7px 0 0; font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em; color: rgba(20,17,13,0.42); }
+  .small { font-size: 10.5px; line-height: 1.5; letter-spacing: 0.03em; color: rgba(20,17,13,0.6); font-weight: 600; }
+
+  /* the score the finished session opens on -- `round.css` `.rd-score` */
+  .score { display: flex; flex-direction: column; align-items: flex-start; padding: 6px 0 10px; }
+  .score b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 64px; line-height: 1; color: var(--ink); }
+  .score b sup { font-size: 24px; vertical-align: super; color: var(--hi-deep); }
+  .score i { font-style: normal; font-weight: 700; font-size: 10px; letter-spacing: 0.2em; color: rgba(20,17,13,0.5); margin-top: 2px; }
+
+  /* the level choice: two slips, one hot */
+  .lvl { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 10px 14px 11px; background: var(--washi-dim);
+    box-shadow: 3px 4px 0 rgba(20,17,13,0.22), inset 0 0 0 1px rgba(20,17,13,0.16); }
+  .lvl b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 17px; color: var(--ink); }
+  .lvl p { font-size: 10.5px; line-height: 1.45; color: rgba(20,17,13,0.66); letter-spacing: 0.02em; }
+  .lvl.hot { background: var(--washi); box-shadow: 5px 6px 0 rgba(20,17,13,0.3), inset 4px 0 0 var(--hi),
+    inset 0 0 0 1px rgba(20,17,13,0.2); }
+
+  /* ================================================================================================
+     THE LOOKUP'S SHELL — `lookup.css` and `mastery.css`, copied rather than re-imagined. */
+  .lk-sheet { position: absolute; left: 250px; top: 152px; width: 780px; display: flex; flex-direction: column;
+    transform: var(--skew); background: var(--washi);
+    box-shadow: 12px 15px 0 rgba(0,0,0,0.55), inset 0 0 0 1px rgba(20,17,13,0.18); }
+  .mx-sheet { position: absolute; left: 190px; top: 150px; width: 900px; display: flex; flex-direction: column;
+    transform: var(--skew); background: var(--washi);
+    box-shadow: 12px 15px 0 rgba(0,0,0,0.55), inset 0 0 0 1px rgba(20,17,13,0.18); }
+  .lk-cap { display: flex; align-items: baseline; gap: 11px; padding: 7px 20px 8px; background: var(--ink); white-space: nowrap; }
+  .lk-cap b { font-family: var(--jp); font-weight: 700; font-size: 13px; color: var(--gold-hi); }
+  .lk-cap i { font-style: normal; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; color: var(--gold-hi); }
+  .lk-cap s { margin-left: auto; text-decoration: none; font-weight: 700; font-size: 10.5px; letter-spacing: 0.13em;
+    color: rgba(242,234,216,0.45); }
+  .lk-cap u { text-decoration: none; padding: 1px 8px 2px; font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+    background: rgba(242,234,216,0.14); color: var(--gold-hi); }
+  .lk-cap u.lv { background: var(--gold); color: var(--ink); }
+  .lk-field { display: flex; align-items: center; gap: 12px; padding: 16px 20px 13px; box-shadow: inset 0 -2px 0 var(--ink); }
+  .lk-field .q { flex: none; font-weight: 700; font-size: 20px; line-height: 1; color: rgba(20,17,13,0.3); }
+  .lk-field .v { flex: 1; min-width: 0; font-family: var(--jp); font-weight: 700; font-size: 22px; line-height: 1.2;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lk-field .v.lat { font-family: var(--lat-ui); font-size: 19px; letter-spacing: 0.02em; }
+  .lk-field .v.ph { color: rgba(20,17,13,0.26); font-family: var(--lat-ui); font-size: 17px; font-weight: 600; letter-spacing: 0.06em; }
+  .lk-route { flex: none; margin-left: auto; padding: 4px 12px 5px; background: var(--ink); font-weight: 700;
+    font-size: 10.5px; letter-spacing: 0.13em; color: var(--gold-hi); white-space: nowrap; }
+  .lk-ans { padding: 15px 20px 4px; display: flex; gap: 20px; min-height: 168px; }
+  .lk-note { padding: 0 20px 14px; font-weight: 700; font-size: 11px; letter-spacing: 0.11em; line-height: 1.6; color: var(--hi); }
+  .lk-note.quiet { color: rgba(20,17,13,0.4); }
+  .lk-routes { display: flex; box-shadow: inset 0 1px 0 rgba(20,17,13,0.2); }
+  .lk-r { flex: 1; min-width: 0; padding: 9px 12px 11px; box-shadow: inset -1px 0 0 rgba(20,17,13,0.14); }
+  .lk-r:last-child { box-shadow: none; }
+  .lk-r b { display: block; font-weight: 700; font-size: 10.5px; letter-spacing: 0.11em; color: rgba(20,17,13,0.42); }
+  .lk-r i { display: block; margin-top: 4px; font-style: normal; font-family: var(--jp); font-weight: 700; font-size: 13px;
+    line-height: 1.2; color: rgba(20,17,13,0.62); }
+  .lk-r.on { background: var(--ink); box-shadow: none; }
+  .lk-r.on b { color: rgba(232,196,124,0.65); }
+  .lk-r.on i { color: var(--gold-hi); }
+  .lk-r.off b, .lk-r.off i { color: rgba(20,17,13,0.28); }
+  .lk-r u { float: right; text-decoration: none; font-weight: 900; font-size: 10.5px; letter-spacing: 0.09em; color: rgba(20,17,13,0.34); }
+  .lk-r.on u { color: rgba(232,196,124,0.6); }
+  .lk-hint { position: absolute; left: 250px; top: 604px; width: 780px; text-align: center; font-weight: 700;
+    font-size: 11px; letter-spacing: 0.13em; color: var(--gold-hi); paint-order: stroke fill;
+    -webkit-text-stroke: 0.2em rgba(8,11,18,0.8); }
+  .lk-line { display: flex; align-items: baseline; gap: 11px; }
+  .lk-line em { flex: none; width: 96px; font-style: normal; font-weight: 700; font-size: 10.5px; letter-spacing: 0.13em;
+    color: rgba(20,17,13,0.45); }
+  .lk-line > span { flex: 1; min-width: 0; font-weight: 600; font-size: 12px; line-height: 1.45; color: rgba(20,17,13,0.75); }
+  .lk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .lk-chips i { font-style: normal; padding: 4px 10px 5px; background: rgba(20,17,13,0.1);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.2); font-family: var(--jp); font-weight: 700; font-size: 16px;
+    line-height: 1; color: var(--ink); }
+  .mx-hint { padding: 7px 20px 8px; background: var(--ink); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
+    color: rgba(242,234,216,0.62); }
+  .mx-hint b { color: var(--gold-hi); font-weight: 700; }
+  .mx-kick { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; font-weight: 700; font-size: 10.5px;
+    letter-spacing: 0.18em; color: var(--hi-deep); }
+  .mx-kick s { margin-left: auto; text-decoration: none; letter-spacing: 0.13em; color: rgba(20,17,13,0.45); }
+
+  /* ================================================================================================
+     THE CHARACTER — three columns on Every character's 900 x 316 body. */
+  .kx-body { display: flex; height: 316px; }
+  .kx-c1 { flex: none; width: 236px; display: flex; flex-direction: column; padding: 14px 18px 12px;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.16); }
+  .kx-c2 { flex: none; width: 340px; display: flex; flex-direction: column; padding: 12px 18px 10px;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.16); }
+  .kx-c3 { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 12px 18px 10px; }
+  .kx-glyph { width: 140px; height: 140px; display: grid; place-items: center; background: var(--ink);
+    font-family: var(--jp); font-weight: 700; font-size: 96px; line-height: 1; color: var(--gold-hi); }
+  .kx-mean { margin-top: 12px; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 20px;
+    line-height: 1.15; color: var(--hi-deep); }
+  .kx-facts { margin-top: auto; display: flex; flex-direction: column; gap: 5px; }
+  .kx-facts div { display: flex; align-items: baseline; gap: 10px; }
+  .kx-facts em { flex: none; width: 56px; font-style: normal; font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em;
+    color: rgba(20,17,13,0.45); }
+  .kx-facts span { font-weight: 600; font-size: 11.5px; color: var(--ink); letter-spacing: 0.02em; }
+  .kx-facts span.x { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px; }
+  .kx-rd { display: flex; align-items: baseline; gap: 10px; padding: 4px 0 5px; box-shadow: inset 0 -1px 0 rgba(20,17,13,0.1); }
+  .kx-rd u { flex: none; width: 34px; text-decoration: none; text-align: center; padding: 2px 0 3px; background: var(--ink);
+    color: var(--gold-hi); font-weight: 700; font-size: 9px; letter-spacing: 0.14em; }
+  .kx-rd > b { flex: none; font-family: var(--jp); font-weight: 700; font-size: 20px; color: var(--ink); min-width: 46px; }
+  .kx-rd > span { min-width: 0; font-size: 11px; line-height: 1.4; color: rgba(20,17,13,0.66); }
+  .kx-rd > span .jp { font-family: var(--jp); font-size: 15px; color: var(--ink); }
+  .kx-rd > span .kana { font-family: var(--jp-go); font-size: 10px; color: rgba(20,17,13,0.5); margin: 0 5px; }
+  .kx-rd.none > span { font-style: italic; color: rgba(20,17,13,0.36); }
+  .kx-cp { display: flex; align-items: baseline; gap: 9px; padding: 2px 0 3px; box-shadow: inset 0 -1px 0 rgba(20,17,13,0.08); }
+  .kx-cp b { flex: none; font-family: var(--jp); font-weight: 700; font-size: 17px; color: var(--ink); }
+  .kx-cp i { flex: none; font-style: normal; font-family: var(--jp-go); font-size: 10px; color: rgba(20,17,13,0.5); width: 52px; }
+  .kx-cp span { min-width: 0; font-size: 11px; color: rgba(20,17,13,0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kx-more { margin-top: 6px; align-self: flex-start; padding: 3px 9px 4px; background: rgba(20,17,13,0.08);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.18); font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: rgba(20,17,13,0.6); }
+  .kx-stroke { display: flex; gap: 14px; align-items: flex-end; margin-top: 12px; }
+  .kx-slate { position: relative; flex: none; width: 176px; height: 176px; display: grid; place-items: center;
+    background:
+      linear-gradient(rgba(20,17,13,0.14), rgba(20,17,13,0.14)) 50% 0 / 1px 100% no-repeat,
+      linear-gradient(rgba(20,17,13,0.14), rgba(20,17,13,0.14)) 0 50% / 100% 1px no-repeat,
+      rgba(20,17,13,0.04);
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.28); }
+  .kx-slate > b, .kx-slate > i { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal;
+    font-family: var(--jp); font-weight: 400; font-size: 142px; line-height: 1; }
+  .kx-slate > b { color: rgba(20,17,13,0.13); }
+  /* mid-replay: the first strokes drawn, the rest still outline -- what hanzi-writer paints */
+  .kx-slate > i { color: var(--ink); clip-path: inset(0 66% 0 0); }
+  .kx-side { display: flex; flex-direction: column; gap: 8px; padding-bottom: 2px; }
+  .kx-band { padding: 9px 20px 10px; background: rgba(20,17,13,0.06); box-shadow: inset 0 -1px 0 rgba(20,17,13,0.14);
+    display: flex; align-items: baseline; gap: 14px; }
+  .kx-band b { font-weight: 700; font-size: 9.5px; letter-spacing: 0.2em; color: rgba(20,17,13,0.45); flex: none; }
+  .kx-band span { font-weight: 600; font-size: 12px; font-style: italic; color: rgba(20,17,13,0.62); }
+  .kx-band u { margin-left: auto; text-decoration: none; flex: none; padding: 3px 9px 4px; background: var(--ink);
+    color: var(--gold-hi); font-weight: 700; font-size: 9.5px; letter-spacing: 0.14em; }
+
+  /* ================================================================================================
+     CROPS — the states strip. A piece of the work cell at 1:1 on a piece of the same valley. */
+  .strip { display: grid; gap: 0; width: 1280px; }
+  .strip.three { grid-template-columns: repeat(3, 1fr); }
+  .strip.two { grid-template-columns: repeat(2, 1fr); }
+  .crop { position: relative; height: 214px; overflow: hidden; background: url(../assets/valley-reading.png) no-repeat;
+    box-shadow: inset -1px 0 0 rgba(16,19,30,0.9), inset 0 -1px 0 rgba(16,19,30,0.9); }
+  .crop::before { content: ""; position: absolute; inset: 0; background: rgba(8,11,18,0.18); }
+  .crop .mini { position: absolute; left: 30px; top: 22px; right: 34px; height: 150px; display: flex; flex-direction: column;
+    padding: 14px 18px 0; background: var(--washi); transform: var(--skew);
+    box-shadow: 6px 8px 0 rgba(0,0,0,0.5), inset 0 0 0 1px rgba(20,17,13,0.16); }
+  .crop .mini .kick { color: rgba(20,17,13,0.45); margin-bottom: 8px; }
+  .crop .mini .rule { font-size: 22px; }
+  .crop .mini .rule.empty { font-size: 12px; padding-top: 13px; }
+  .crop .mini .mic { width: 52px; }
+  .crop .mini .slab { height: 34px; font-size: 10.5px; }
+  .crop .lab { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 14px 7px; background: rgba(10,9,6,0.86);
+    font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: var(--washi); display: flex; gap: 10px; }
+  .crop .lab code { margin-left: auto; font-size: 10px; }
+
+  /* ================================================================================================
+     A AGAINST B -- the full plate at half size, so the two can stand side by side. Saved at 2x. */
+  .pair { display: grid; grid-template-columns: 640px 640px; width: 1280px; }
+  .half { position: relative; width: 640px; height: 360px; overflow: hidden;
+    box-shadow: inset -1px 0 0 rgba(16,19,30,0.9); }
+  .half > .plate { transform: scale(0.5); transform-origin: 0 0; }
+  .half-lab { display: flex; align-items: baseline; gap: 10px; padding: 8px 14px 9px; font-weight: 700; font-size: 10px;
+    letter-spacing: 0.18em; color: var(--washi); background: rgba(10,9,6,0.6); }
+  .half-lab b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px; letter-spacing: 0.02em; color: var(--gold-hi); }
+  .half-lab s { text-decoration: none; margin-left: auto; color: rgba(242,234,216,0.5); }
+
+  /* the reply on the lookup's answer area, with a pager because nothing scrolls */
+  .reply { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .reply-who { display: flex; align-items: baseline; gap: 10px; font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
+    color: var(--hi-deep); margin-bottom: 7px; }
+  .reply-who s { margin-left: auto; text-decoration: none; color: rgba(20,17,13,0.45); letter-spacing: 0.13em; }
+  .reply p { font-weight: 600; font-size: 13px; line-height: 1.55; color: rgba(20,17,13,0.82); letter-spacing: 0.02em; }
+  .reply p .jp { font-family: var(--jp); font-weight: 700; font-size: 15px; color: var(--ink); }
+  .pager { margin-top: auto; align-self: flex-end; display: flex; gap: 8px; align-items: center; padding-top: 6px;
+    font-weight: 700; font-size: 10px; letter-spacing: 0.16em; color: rgba(20,17,13,0.5); }
+  .pager b { padding: 3px 9px 4px; background: var(--ink); color: var(--gold-hi); letter-spacing: 0.14em; }
+  .ask-was { flex: none; width: 190px; display: flex; flex-direction: column; gap: 6px; padding-right: 16px;
+    box-shadow: inset -1px 0 0 rgba(20,17,13,0.14); }
+  .ask-was em { font-style: normal; font-weight: 700; font-size: 9.5px; letter-spacing: 0.16em; color: rgba(20,17,13,0.45); }
+  .ask-was p { font-weight: 600; font-size: 11.5px; line-height: 1.45; color: rgba(20,17,13,0.66); }
+  .ask-was p.you { color: var(--ink); }
+
+  /* the screenshot, drawn: what an imported image looks like on the paper */
+  .shot { flex: none; width: 210px; height: 158px; position: relative; background: #2b3346;
+    box-shadow: inset 0 0 0 1px rgba(20,17,13,0.4), 3px 4px 0 rgba(20,17,13,0.25); overflow: hidden; }
+  .shot .sign { position: absolute; left: 22px; top: 18px; width: 166px; height: 118px; background: #e9e1cc;
+    box-shadow: 0 0 0 3px #6b4a2a; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    transform: rotate(-3deg); }
+  .shot .sign b { font-family: var(--jp); font-weight: 700; font-size: 24px; color: #1d1a16; letter-spacing: 0.1em; }
+  .shot .sign i { font-style: normal; font-family: var(--jp-go); font-size: 10.5px; color: #3a352d; }
+  .shot .sign i.blur { filter: blur(0.6px); color: #6c665b; }
+  .shot u { position: absolute; left: 0; right: 0; bottom: 0; text-decoration: none; padding: 3px 8px 4px; background: rgba(10,9,6,0.8);
+    font-weight: 700; font-size: 9px; letter-spacing: 0.12em; color: rgba(242,234,216,0.8); }
+  .ocr { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ocr-l { display: flex; align-items: baseline; gap: 10px; padding: 4px 0 5px; box-shadow: inset 0 -1px 0 rgba(20,17,13,0.1); }
+  .ocr-l b { font-family: var(--jp); font-weight: 700; font-size: 15px; color: var(--ink); min-width: 0; }
+  .ocr-l s { margin-left: auto; flex: none; text-decoration: none; font-weight: 700; font-size: 9.5px; letter-spacing: 0.12em;
+    color: rgba(20,17,13,0.45); font-variant-numeric: tabular-nums; }
+  .ocr-l.low b { color: rgba(20,17,13,0.55); text-decoration: underline wavy var(--hi) 1px; text-underline-offset: 4px; }
+  .ocr-l.low s { color: var(--hi-deep); }
+  .ocr-en { margin-top: 8px; padding: 7px 10px 8px; background: rgba(20,17,13,0.05); box-shadow: inset 3px 0 0 var(--gold);
+    font-weight: 600; font-size: 12px; line-height: 1.5; color: var(--ink); }
+  .ocr-en em { display: block; font-style: normal; font-weight: 700; font-size: 9px; letter-spacing: 0.18em; color: rgba(20,17,13,0.45); margin-bottom: 2px; }
+  .ways { display: flex; gap: 6px; margin-top: 8px; }
+  .ways span { padding: 3px 8px 4px; background: rgba(20,17,13,0.08); box-shadow: inset 0 0 0 1px rgba(20,17,13,0.16);
+    font-weight: 700; font-size: 9px; letter-spacing: 0.12em; color: rgba(20,17,13,0.6); }
+  .ways span b { color: var(--ink); }
+  .nomodel { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 0 6px; }
+  .nomodel h3 { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px; color: var(--ink); }
+  .nomodel p { font-weight: 600; font-size: 12px; line-height: 1.55; color: rgba(20,17,13,0.66); max-width: 520px; }
+  .nomodel p.bad { color: var(--hi-deep); font-weight: 700; letter-spacing: 0.06em; }
+
+  /* the map of ways in */
+  table.map { border-collapse: collapse; width: 1180px; margin-top: 4px; font-size: 11.5px; line-height: 1.5; }
+  table.map th { text-align: left; font-size: 9.5px; letter-spacing: 0.18em; color: var(--gold-hi); font-weight: 700;
+    padding: 6px 12px 7px; box-shadow: inset 0 -1px 0 rgba(242,234,216,0.24); }
+  table.map td { vertical-align: top; padding: 7px 12px 8px; color: rgba(242,234,216,0.8);
+    box-shadow: inset 0 -1px 0 rgba(242,234,216,0.1); }
+  table.map td:first-child { color: var(--washi); font-weight: 700; white-space: nowrap; }
+  table.map td b { color: var(--gold-hi); }
+</style>
+
+<h1>The tools</h1>
+<p class="lede">
+  <code>past-three.html</code> moved the screens a session happens in onto one sheet of paper. This
+  card is <b>everything that was still left in the old sepia language</b> after that: the kanji
+  detail panel, conversation practice (the scenario tutor), and the two other things the tutor pop-up
+  holds — chat with the tutor and image translation. None of it is built. Robbie approves this card
+  before any of it is.
+</p>
+<p class="lede">
+  <b>Two objects, already in the app, carry all of it.</b> Things you <i>consult</i> stand on the lookup's
+  scrim — Look it up, Every character and settings already do — so the kanji panel joins them, on
+  Every character's own 900-wide shell. Things you <i>do</i> stand on the stage's sheet, the way the
+  round, the exam and the passage do, so conversation practice gets the sheet and a place in The
+  World. Chat and image translation are the one open question, and section EIGHT draws both answers
+  side by side.
+</p>
+
+<div class="note calm">
+  <b>The numbers on these plates.</b>
+  <p>Every count, chip and limit below is one the code can produce today, and the note under each
+  plate says where it comes from. The kanji plates use the payload the bridge actually builds for
+  漢 and 語 (<code>data/dictionary_repository.py</code>, <code>build_kanji_detail_payload</code>, run
+  for this card); the conversation plates use the cafe scene's real script
+  (<code>lib/scenarios/cafeOrder.ts</code>). The only invented words are the ones a model writes — the
+  tutor's reply and the translation in section EIGHT — and those are labelled where they appear.</p>
+  <p><b>Backdrops.</b> The scrim plates stand on <code>valley-sunset.png</code>, as settings does in
+  <code>past-three.html</code>. The World has no plate of its own, so the conversation stands on
+  <code>valley-reading.png</code>, the hot-spring town — the same ground
+  <code>assets/screen-scenes.png</code> shows its two scenes on.</p>
+</div>
+
+<!-- ============================================================================================ -->
+<h2>ONE — A KANJI, WITH THE DICTIONARY</h2>
+<p class="lede" style="margin-bottom:14px">
+  Today a dark cassette modal titled <i>Kanji details</i>, a summary card, a readings grid, a
+  compounds list and a stroke box, stacked in a scroller. <b>Here it is Every character's sheet with
+  the columns filled differently</b>: the character, what it sounds like, what it is made of.
+</p>
+
+<figure id="p1">
+  <div class="plate">
+    <img src="../assets/valley-sunset.png" alt="the valley, dimmed, with the kanji sheet over it">
+    <div class="board">
+      <div class="dim"></div>
+      <div class="mx-sheet">
+        <div class="lk-cap">
+          <b>字</b><i>CHARACTER</i>
+          <s>漢 · FROM LOOK IT UP</s>
+          <u class="lv">N3</u><u>ESC</u>
+        </div>
+        <div class="kx-body">
+          <div class="kx-c1">
+            <div class="kx-glyph">漢</div>
+            <div class="kx-mean">Sino- · China</div>
+            <div class="kx-facts">
+              <div><em>STROKES</em><span class="x">13</span></div>
+              <div><em>LEVEL</em><span class="x">N3</span></div>
+              <div><em>THEME</em><span>Kanji N4 · Study &amp; Language</span></div>
+            </div>
+          </div>
+          <div class="kx-c2">
+            <div class="mx-kick"><span>READINGS</span><s>1 ON · 0 KUN</s></div>
+            <div class="kx-rd"><u>ON</u><b>カン</b><span><span class="jp">漢</span><span class="kana">かん</span>China</span></div>
+            <div class="kx-rd none"><u>KUN</u><b>—</b><span>Not available in the offline data.</span></div>
+            <div class="mx-kick" style="padding-top:10px;padding-bottom:4px"><span>COMPOUNDS</span><s>COMMON FIRST</s></div>
+            <div class="kx-cp"><b>漢語</b><i>かんご</i><span>Sino-Japanese word</span></div>
+            <div class="kx-cp"><b>漢詩</b><i>かんし</i><span>Chinese poem; Chinese poetry</span></div>
+            <div class="kx-cp"><b>漢字</b><i>かんじ</i><span>kanji; Chinese character</span></div>
+            <div class="kx-cp"><b>漢文</b><i>かんぶん</i><span>Chinese classical writing</span></div>
+            <div class="kx-more">+ MORE · ENTER TO SEARCH THEM IN LOOK IT UP</div>
+          </div>
+          <div class="kx-c3">
+            <div class="mx-kick"><span>BUILT FROM</span><s>6 PARTS</s></div>
+            <div class="lk-chips"><i>汁</i><i>艾</i><i>口</i><i>一</i><i>大</i><i>二</i></div>
+            <div class="kx-stroke">
+              <div class="kx-slate"><b>漢</b><i>漢</i></div>
+              <div class="kx-side">
+                <div class="mx-kick" style="padding:0"><span>STROKE ORDER</span></div>
+                <span class="btn ink">↻ REPLAY</span>
+                <span class="small">13 strokes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mx-hint"><b>←→</b> COLUMN · <b>↑↓</b> MOVE · <b>ENTER</b> REPLAY / SEARCH · <b>ESC</b> BACK TO LOOK IT UP</div>
+      </div>
+      <div class="lk-hint">ESC GOES BACK TO LOOK IT UP · OPENED FROM EVERY CHARACTER, IT GOES BACK THERE</div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>A kanji, with the dictionary</b><i>REPLACES KanjiDetailPanel</i><u>NOT BUILT</u></div>
+    <p><b>Every character's shell, not a new one.</b> 900 × 316 at left 190, top 150, the band and the
+      foot from <code>mastery.css</code>. Sheets on the scrim are exempt from the stage's y range, and
+      this one is the same object Every character already hands a kanji to — so opening it from there
+      is a change of columns, not a change of screen.</p>
+    <p><b>Escape goes up one level, to wherever it was opened from.</b> From Look it up it returns to
+      Look it up, still holding 漢; from Every character it returns there. The old panel closed
+      outright, which from inside Look it up threw away the query as well.</p>
+    <p><b>What is honest about 漢, and why it looks thin.</b> The dictionary has one ON reading and no
+      KUN, and a reading's example word is <i>the character standing alone</i> with that reading
+      (<code>_reading_examples_by_normalized_reading</code> matches <code>japanese = 漢</code>), so
+      the example is 漢 かん, not 漢字. That is what the code gives; the KUN row says so in the
+      panel's own words rather than going blank.</p>
+    <dl class="nums">
+      <dt>N3 in the band</dt><dd><code>jlpt_level</code>: KANJIDIC's <code>jlptLevel</code> 3, mapped to "N3" by
+        <code>build_offline_dictionary_sqlite.py:297</code>. <b style="color:#ff9d86">This is a data bug</b>: KANJIDIC's
+        levels are the pre-2010 four-level test, so 3 is not N3 — the app's own deck files 漢 under Kanji N4
+        (the theme line beside it). Flagged for the lead; the plate shows what the code would show. Null
+        level = no chip.</dd>
+      <dt>13 STROKES</dt><dd><code>stroke_count</code> (KANJIDIC). The panel prints "13 strokes" under the stroke box today.</dd>
+      <dt>1 ON · 0 KUN</dt><dd><code>on_readings.length</code>, <code>kun_readings.length</code>. Each reading carries at
+        most 2 examples (<code>_KANJI_READING_EXAMPLE_LIMIT</code>); one is drawn. A kanji with more readings
+        than the column holds folds them to "N MORE READINGS".</dd>
+      <dt>4 compounds, + MORE</dt><dd>The first four of the 12 the payload carries (<code>_KANJI_COMPOUND_LIMIT</code>,
+        ordered common-first, then shortest, then entry id), and <code>has_more_compounds</code> is true
+        (179 entries contain 漢). The brief asks for a bare "+ MORE"; the payload does know it holds 8 more
+        than are drawn, so "8 MORE, AND MORE" is also producible — the lead's call.</dd>
+      <dt>6 PARTS</dt><dd><code>components</code> from <code>domain/kanji_components.py</code> (KRADFILE) — ships with the app.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>TWO — A KANJI, DECK ONLY</h2>
+<p class="lede" style="margin-bottom:14px">
+  <b>The state Robbie actually sees.</b> The offline dictionary is not installed, so the bridge
+  returns <code>source: "deck_only"</code>: no meanings, no readings, no compounds, no stroke count.
+  What ships with the app is still there — the parts, the level and theme from the deck, and the
+  stroke-order box, whose data is bundled separately.
+</p>
+
+<figure id="p2">
+  <div class="plate">
+    <img src="../assets/valley-sunset.png" alt="the valley, dimmed, with the deck-only kanji sheet over it">
+    <div class="board">
+      <div class="dim"></div>
+      <div class="mx-sheet">
+        <div class="lk-cap">
+          <b>字</b><i>CHARACTER</i>
+          <s>語 · FROM THE DECK, NOT THE DICTIONARY</s>
+          <u class="lv">N5</u><u>ESC</u>
+        </div>
+        <div class="kx-band">
+          <b>DECK ONLY</b>
+          <span>Readings, compounds and stroke counts need the offline dictionary.</span>
+          <u>SETTINGS › OFFLINE DICTIONARY</u>
+        </div>
+        <div class="kx-body" style="height:280px">
+          <div class="kx-c1" style="width:300px">
+            <div class="kx-glyph">語</div>
+            <div class="kx-facts">
+              <div><em>LEVEL</em><span class="x">N5</span></div>
+              <div><em>THEME</em><span>Kanji N5 · Study &amp; Language</span></div>
+              <div><em>TAGS</em><span>Kanji · N5</span></div>
+            </div>
+          </div>
+          <div class="kx-c2" style="width:250px;padding-left:22px">
+            <div class="mx-kick"><span>BUILT FROM</span><s>3 PARTS</s></div>
+            <div class="lk-chips" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:4px">
+              <i style="font-size:34px;padding:8px 14px 10px">言</i>
+              <i style="font-size:34px;padding:8px 14px 10px">口</i>
+              <i style="font-size:34px;padding:8px 14px 10px">五</i>
+            </div>
+            <span class="small" style="margin-top:auto">From the deck's KRADFILE data.</span>
+          </div>
+          <div class="kx-c3" style="padding-left:24px">
+            <div class="mx-kick"><span>STROKE ORDER</span><s>SHIPPED WITH THE APP</s></div>
+            <div class="kx-stroke" style="margin-top:6px">
+              <div class="kx-slate" style="width:210px;height:210px"><b style="font-size:170px">語</b><i style="font-size:170px;clip-path:inset(0 52% 0 0)">語</i></div>
+              <div class="kx-side">
+                <span class="btn ink">↻ REPLAY</span>
+                <span class="small">Works without<br>the dictionary.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mx-hint"><b>ENTER</b> REPLAY · <b>ESC</b> BACK TO LOOK IT UP</div>
+      </div>
+      <div class="lk-hint">READINGS AND COMPOUNDS FOLD INTO ONE LINE — PARTS AND STROKE ORDER TAKE THEIR ROOM</div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>A kanji, deck only</b><i>THE SAME SHEET, ONE LINE INSTEAD OF A COLUMN</i><u>NOT BUILT</u></div>
+    <p><b>The readings column leaves; it does not stand there empty.</b> Today's panel draws all five
+      sections and fills three of them with "Not available in the offline data." — three identical
+      grey sentences that read as a fault. Here readings, compounds and meanings fold into one band
+      under the header, in the panel's existing <code>deckOnly</code> words, with the one place that
+      fixes it, and the parts and the stroke box take the room at a larger size. Three full columns
+      and a stated reason is a design; three columns with holes is a bug report.</p>
+    <p><b>The band is the lookup's own vocabulary</b> — <code>assets/screen-lookup.png</code> already
+      says "THE OFFLINE DICTIONARY IS NOT INSTALLED" in the same place, for the same reason.</p>
+    <dl class="nums">
+      <dt>N5, theme, tags</dt><dd>The real deck-only payload for 語: <code>jlpt_level "N5"</code>
+        (<code>jlpt_level_source "deck"</code>), <code>categories ["Kanji N5 · Study &amp; Language"]</code>,
+        <code>tags ["kanji","n5"]</code>.</dd>
+      <dt>3 PARTS</dt><dd><code>components ["言","口","五"]</code> — the same three Look it up shows in <code>screen-lookup.png</code>.</dd>
+      <dt>no stroke count</dt><dd><code>stroke_count: null</code> in deck-only, so the box prints no count (today's
+        <code>KanjiStrokeAnimation</code> already hides it when null). The box itself loads bundled hanzi-writer data
+        (<code>handwriting-data-manifest.json</code> has 語).</dd>
+      <dt>why 漢 is N4 here</dt><dd>Deck-only 漢 reads <code>N4</code> from the deck; with the dictionary it reads
+        "N3" (plate ONE). The same character changes level when you install a download — the data bug noted above.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>THREE — CONVERSATION, CHOOSING HOW MUCH HELP</h2>
+<p class="lede" style="margin-bottom:14px">
+  Conversation practice leaves the tutor pop-up for its own screen. <b>You arrive from The World's
+  Scenes</b> (level three, <code>Scenes.tsx</code>, built) having already picked the scene, so this
+  screen asks the one question left: how much help.
+</p>
+
+<figure id="p3">
+  <div class="plate">
+    <img src="../assets/valley-reading.png" alt="the hot-spring town, with the scene's sheet standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">会</div>
+        <div class="hd-txt">
+          <div class="hd-kick">THE WORLD · TALK</div>
+          <div class="hd-title"><b>会話</b><i>TALK</i></div>
+        </div>
+      </div>
+      <div class="cap">ORDER AT A CAFE <s>·</s> <em>カフェで注文する</em> <s>·</s> NOT PLAYED</div>
+      <div class="run">
+        <span><b>01</b><s>/</s> 02 SCENE</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask">
+          <div class="kick"><span>WHO YOU'LL TALK TO</span><em>相手</em></div>
+          <div class="line" style="justify-content:flex-start;padding-top:16px">
+            <span style="font-family:var(--lat);font-style:italic;font-weight:900;font-size:30px;color:var(--ink)">Barista</span>
+            <span style="font-weight:700;font-size:10px;letter-spacing:0.2em;color:rgba(20,17,13,0.5);margin-top:3px">CAFE STAFF</span>
+            <b style="font-size:26px;margin-top:22px">カフェで注文する</b>
+            <p style="font-size:19px;margin-top:4px">Order at a Cafe</p>
+            <span class="small" style="margin-top:10px">Practice ordering a drink, choosing a size, and deciding eat-in or takeaway at a Japanese cafe.</span>
+          </div>
+          <div class="src">LINES <i>BEGINNER AND INTERMEDIATE</i></div>
+        </div>
+        <div class="work">
+          <div class="kick"><span>WHAT YOU NEED TO DO</span><span>4 NEEDED · 2 OPTIONAL</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 22px">
+            <div class="rows">
+              <div class="row"><i class="opt"></i>Greet the barista<s>OPTIONAL</s></div>
+              <div class="row"><i></i>Order a drink</div>
+              <div class="row"><i></i>Choose a size</div>
+            </div>
+            <div class="rows">
+              <div class="row"><i></i>Say eat-in or takeaway</div>
+              <div class="row"><i></i>Confirm the order</div>
+              <div class="row"><i class="opt"></i>Thank the barista<s>OPTIONAL</s></div>
+            </div>
+          </div>
+          <div class="kick q" style="margin:16px 0 9px"><span>HOW MUCH HELP</span><em>難易度</em></div>
+          <div style="display:flex;gap:12px">
+            <div class="lvl hot"><b>Beginner</b><p>Simpler phrasing, more generous hints, slower audio, and kana/romaji reading aids.</p></div>
+            <div class="lvl"><b>Intermediate</b><p>Natural phrasing at a normal pace with lighter hints.</p></div>
+          </div>
+          <p class="small" style="margin-top:14px;font-size:10px;line-height:1.5"><b style="color:var(--ink);letter-spacing:0.16em;font-size:9px">GRADING&nbsp;&nbsp;</b>Responses are graded entirely by deterministic rules on this device. Anything the rules can’t place falls back to the scenario’s own recovery line.</p>
+          <p class="small" style="margin-top:6px;font-size:10px;line-height:1.5"><b style="color:var(--ink);letter-spacing:0.16em;font-size:9px">PRIVACY&nbsp;&nbsp;</b>Speech recognition runs locally on this device. Responses are graded with deterministic rules first; a local AI model may help judge unclear answers only if one is installed and enabled in Settings. Raw audio recordings are never saved. Transcripts are stored on this device only after you complete a scenario.</p>
+          <div class="slab">ENTER TO START THE CONVERSATION <em>開始</em></div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>OBJECTIVES</b>
+        <span class="ticks"><i class="opt"></i><i></i><i></i><i></i><i></i><i class="opt"></i></span>
+        <s>0 OF 4 NEEDED · 2 OPTIONAL</s>
+      </div>
+      <div class="back"><span>BACK <em>戻る</em></span><span>PAST SESSIONS <em>履歴</em></span></div>
+      <div class="hints">
+        <span><b>←→</b> Level <em>選択</em></span>
+        <span><b>ENTER</b> Start <em>開始</em></span>
+        <span><b>ESC</b> Back <em>戻る</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>Conversation — choosing how much help</b><i>REPLACES ScenarioIntro</i><u>NOT BUILT</u></div>
+    <p><b>The scene in the prompt cell, the choice in the work cell.</b> Who you will talk to and what
+      the scene is stand where a round's character stands; the objectives and the two levels are the
+      work. The level is two slips and ←→, not 1/2 — digits are contested by <code>App</code>.</p>
+    <p><b>The grading and privacy notes are both here, whole and verbatim</b>
+      (<code>evaluationDeterministicMode</code>, <code>privacyDisclosure</code>), set small under the
+      choice they qualify. With a model installed the grading line swaps to
+      <code>evaluationAiMode</code>, which is one line longer — still inside the cell.</p>
+    <dl class="nums">
+      <dt>01 / 02 SCENE</dt><dd>Two scenes exist: <code>cafeOrder.ts</code> and <code>shinjukuDirections.ts</code> (the two in <code>screen-scenes.png</code>).</dd>
+      <dt>4 NEEDED · 2 OPTIONAL</dt><dd><code>CAFE_ORDER_SCENARIO.objectives</code>: six, <code>required: false</code> on
+        greet and thanks. The player counts <code>metRequired / requiredObjectives.length</code> (<code>ScenarioPlayer.tsx:67-68</code>).</dd>
+      <dt>NOT PLAYED</dt><dd>The status line <code>Scenes.tsx</code> already draws per scene (<code>screen-scenes.png</code>).</dd>
+      <dt>Level copy</dt><dd><code>SCENARIO_LEVEL_LABELS</code> / <code>SCENARIO_LEVEL_DESCRIPTIONS</code>, verbatim.</dd>
+      <dt>PAST SESSIONS</dt><dd>The second back tab — see SIX for where past sessions go.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>FOUR — CONVERSATION, ASKING</h2>
+<p class="lede" style="margin-bottom:14px">
+  The screen the scene is spent on. Today it is a chat log in a pop-up, every line a bubble, the
+  reply box at the bottom and the hint in a floating popover. <b>Here only the line you are answering
+  is on the paper</b>; the conversation behind it is one button away.
+</p>
+
+<figure id="p4">
+  <div class="plate">
+    <img src="../assets/valley-reading.png" alt="the hot-spring town, with the conversation standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">会</div>
+        <div class="hd-txt">
+          <div class="hd-kick">THE WORLD · TALK</div>
+          <div class="hd-title"><b>会話</b><i>TALK</i></div>
+        </div>
+      </div>
+      <div class="cap">ORDER AT A CAFE <s>·</s> <em>カフェで注文する</em> <s>·</s> BEGINNER</div>
+      <div class="run">
+        <span><b>1</b><s>/</s> 4 OBJECTIVES</span>
+        <span>HINT <b>1</b> OF 3</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask">
+          <div class="kick"><span>BARISTA · CAFE STAFF</span><span class="tools"><u title="Replay this line">▶</u></span></div>
+          <div class="line">
+            <b style="font-size:26px">サイズは<br>いかがなさいますか？</b>
+            <i>さいずはいかがなさいますか？</i>
+            <p>What size would you like?</p>
+          </div>
+          <div class="src"><span class="earlier">↑ 4 EARLIER TURNS</span><span>AUDIO <i>0.85×</i></span></div>
+        </div>
+        <div class="work">
+          <div class="kick"><span>YOUR REPLY</span><span>ROMAJI TURNS INTO KANA AS YOU TYPE</span></div>
+          <div class="rule-row">
+            <div class="rule">レギュラーでお願いします</div>
+            <div class="mic"><b>●</b>CTRL+M</div>
+          </div>
+          <p class="heard"><b>HEARD</b> “<span class="jp">レギュラーでお願いします</span>” Edit it if you need to, then submit.</p>
+          <div class="kick q" style="margin:16px 0 8px"><span>HINTS</span><span style="letter-spacing:0.14em">ASKING NEVER COUNTS AS AN ATTEMPT</span></div>
+          <div class="slip gold"><u>1</u><div class="t"><b>Pick a size: small, regular (M), or large.</b></div></div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+            <span class="btn">SHOW ANOTHER HINT</span>
+            <span class="small" style="font-size:10px">2 MORE ON THIS LINE</span>
+          </div>
+          <div class="slab">SAY IT <em>送る</em></div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>OBJECTIVES</b>
+        <span class="ticks"><i class="opt on"></i><i class="on"></i><i class="here"></i><i></i><i></i><i class="opt"></i></span>
+        <s>1 OF 4 NEEDED · 1 OPTIONAL MET</s>
+      </div>
+      <div class="back"><span>LEAVE <em>退出</em></span><span>START OVER <em>最初から</em></span></div>
+      <div class="hints">
+        <span><b>ENTER</b> Say it <em>送る</em></span>
+        <span><b>CTRL+M</b> Speak <em>録音</em></span>
+        <span><b>ESC</b> Leave <em>中断</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>Conversation — asking</b><i>REPLACES ScenarioPlayer + LearnerInputPanel + ScenarioHintPanel</i><u>NOT BUILT</u></div>
+    <p><b>The character's line is the specimen.</b> Japanese large, the reading under it, and the
+      English always shown, at every level — the critique asked about hiding it and the brief keeps
+      current behaviour. The replay button sits in the kicker's line, where the round keeps its own
+      speaker.</p>
+    <p><b>Earlier turns are a button, not a key.</b> The reply field takes romaji, so any bare letter
+      is typing. The mic gets <code>CTRL+M</code> for the same reason — a modifier, never a letter.
+      <b>That shortcut is new</b>; today the mic is a mouse-only button.</p>
+    <p><b>What the mic heard lands in the field</b>, to edit before it is sent — exactly today's
+      behaviour, with today's words. The hint popover becomes slips on the paper: the ladder unfolds
+      one step at a time under the field and nothing floats over anything.</p>
+    <dl class="nums">
+      <dt>1 / 4 OBJECTIVES</dt><dd><code>metRequired / requiredObjectives.length</code>. <b style="color:#ff9d86">The brief's
+        "1 / 5" cannot happen</b>: the cafe has 4 required objectives (and 6 in all); Shinjuku has 4 required of 5. Drawn as
+        the code counts. The greet tick is gold but not counted — it is optional.</dd>
+      <dt>HINT 1 OF 3</dt><dd>The beginner ladder on <code>n-size-turn</code> has 3 steps; one revealed
+        (<code>revealedLevel + 1</code>). Intermediate has 1. A ladder per line, not a budget — it resets on the next line.</dd>
+      <dt>4 EARLIER TURNS</dt><dd>The transcript at this node on a clean run: いらっしゃいませ, こんにちは, ご注文は…, コーヒーをください.
+        (The brief's "2 EARLIER TURNS" is the count one line earlier, at the order — plate FIVE.)</dd>
+      <dt>AUDIO 0.85×</dt><dd><code>SCENARIO_TTS_SPEED_SCALE.beginner</code>; intermediate is 1×.</dd>
+      <dt>Foot ticks</dt><dd>All six objectives in authored order; optional ones have a broken edge and never count toward the figure.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>FIVE — CONVERSATION, ANSWERED</h2>
+<p class="lede" style="margin-bottom:14px">
+  Today the correction is a line of small text inside your own chat bubble, and the next line from
+  the barista has already arrived underneath it. <b>Here the sheet holds the answer until you take
+  the next line</b>, which is the round's answered state, applied.
+</p>
+
+<figure id="p5">
+  <div class="plate">
+    <img src="../assets/valley-reading.png" alt="the hot-spring town, with the answered conversation standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">会</div>
+        <div class="hd-txt">
+          <div class="hd-kick">THE WORLD · TALK</div>
+          <div class="hd-title"><b>会話</b><i>TALK</i></div>
+        </div>
+      </div>
+      <div class="cap">ORDER AT A CAFE <s>·</s> <em>カフェで注文する</em> <s>·</s> BEGINNER</div>
+      <div class="run">
+        <span><b>0</b><s>/</s> 4 OBJECTIVES</span>
+        <span>HINT <b>0</b> OF 3</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask">
+          <div class="kick q"><span>BARISTA · YOU WERE ANSWERING</span><span class="tools"><u>▶</u></span></div>
+          <div class="line">
+            <b style="font-size:26px">ご注文は<br>いかがなさいますか？</b>
+            <i>ごちゅうもんはいかがなさいますか？</i>
+            <p>What would you like to order?</p>
+          </div>
+          <div class="src"><span class="earlier">↑ 2 EARLIER TURNS</span><span>ATTEMPT <i>1 OF 3</i></span></div>
+        </div>
+        <div class="work">
+          <div class="kick"><span>YOU SAID</span><em>回答</em></div>
+          <div class="said"><b>コーヒー</b><s>PARTIAL <em>部分</em></s></div>
+          <p class="heard" style="margin-top:7px">Understood, not quite: the barista knows what you want, and asks you again.</p>
+          <div class="slip fix" style="margin-top:16px">
+            <u>FIX</u>
+            <div class="t">
+              <s>TRY SAYING IT LIKE THIS</s>
+              <span class="jp">コーヒーをください</span><span class="kana">こーひーをください</span><span class="ro">(ko-hi- wo kudasai)</span>
+            </div>
+          </div>
+          <div class="slip quiet" style="margin-top:12px">
+            <u>NEXT</u>
+            <div class="t">
+              <s>THE BARISTA, NEXT</s>
+              <span class="jp" style="font-size:16px">お飲み物は何になさいますか？</span><span class="ro">Which drink would you like?</span>
+            </div>
+          </div>
+          <div class="slab calm">ENTER FOR THE NEXT LINE <em>次へ</em></div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>OBJECTIVES</b>
+        <span class="ticks"><i class="opt on"></i><i class="here"></i><i></i><i></i><i></i><i class="opt"></i></span>
+        <s>0 OF 4 NEEDED · 1 OPTIONAL MET</s>
+      </div>
+      <div class="back"><span>LEAVE <em>退出</em></span><span>START OVER <em>最初から</em></span></div>
+      <div class="hints">
+        <span><b>ENTER</b> Next <em>次へ</em></span>
+        <span><b>ESC</b> Leave <em>中断</em></span>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>Conversation — answered</b><i>THE SAME SHEET</i><u>NOT BUILT</u></div>
+    <p><b>Your line on the rule, the outcome beside it, the correction as a vermilion slip, and the
+      slab turns ink.</b> The round's grammar exactly: vermilion is what you owe, ink is what comes next.
+      A partial answer is not struck through — the barista understood it — so the rule turns
+      vermilion and the words stay readable.</p>
+    <p><b>The hold is the view's, not the engine's.</b> <code>submitLearnerResponse</code> has already
+      advanced and pushed the barista's follow-up by the time this draws
+      (<code>engine.ts:271</code>); the screen simply shows it as the next slip and waits for Enter
+      before making it the specimen. No change to the engine, the transcript or what is saved.</p>
+    <p><b>"YOU COULD ALSO SAY" is not on this plate because it cannot be.</b> The model answer is
+      written onto the <i>barista's</i> turn when a line's attempts run out (<code>engine.ts:298-305</code>),
+      never alongside a correction. It is drawn in the strip under SIX.</p>
+    <dl class="nums">
+      <dt>PARTIAL</dt><dd>コーヒー on <code>n-order</code> hits <code>mistake-missing-please</code>, <code>classifyAs: 'partial'</code>; the
+        correction, reading and romaji are that mistake's own. Outcomes are <code>correct | partial | incorrect | unclear</code>;
+        only <code>partial</code> carries a correction.</dd>
+      <dt>0 / 4</dt><dd>A partial answer sets no objective (<code>engine.ts:262</code> requires <code>correct</code>).</dd>
+      <dt>ATTEMPT 1 OF 3</dt><dd><code>recovery.maxAttempts</code> on <code>n-order</code> is 3. A partial does not spend an attempt
+        (only incorrect/unclear do), so this reads 1 OF 3 until a miss.</dd>
+      <dt>2 EARLIER TURNS</dt><dd>いらっしゃいませ and こんにちは, before the barista's ご注文は.</dd>
+      <dt>The explanatory sentence</dt><dd><b style="color:#ff9d86">New copy, for Robbie's call.</b> The mistake's authored
+        <code>explanation</code> ("Name the drink, then add ください…") exists but today reaches the screen only in the summary, and only
+        if repeated twice. The line under the rule could carry it instead of the generic sentence drawn here.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>SIX — CONVERSATION, THE END</h2>
+<p class="lede" style="margin-bottom:14px">
+  Today two screens — a summary that scrolls, then a separate panel of cards with four text boxes
+  each. <b>Here one sheet</b>: what you met on the left, what to keep on the right.
+</p>
+
+<figure id="p6">
+  <div class="plate">
+    <img src="../assets/valley-reading.png" alt="the hot-spring town, with the finished session standing on it">
+    <div class="board">
+      <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+      <div class="hd">
+        <div class="hd-mark">会</div>
+        <div class="hd-txt">
+          <div class="hd-kick">THE WORLD · TALK · FINISHED</div>
+          <div class="hd-title"><b>会話</b><i>TALK</i></div>
+        </div>
+      </div>
+      <div class="cap">ORDER AT A CAFE <s>·</s> <em>カフェで注文する</em> <s>·</s> BEGINNER</div>
+      <div class="run">
+        <span><b>4</b><s>/</s> 4 OBJECTIVES</span>
+        <span><b>1</b>CORRECTION</span>
+        <span><b>4</b>CARDS TO REVIEW</span>
+      </div>
+
+      <div class="sheet">
+        <div class="ask">
+          <div class="kick"><span>SESSION COMPLETE</span><em>完了</em></div>
+          <div class="score"><b>4<sup>/4</sup></b><i>NEEDED OBJECTIVES MET</i></div>
+          <div class="rows">
+            <div class="row"><i class="on"></i>Greet the barista<s class="g">MET</s></div>
+            <div class="row"><i class="on"></i>Order a drink<s class="g">MET</s></div>
+            <div class="row"><i class="on"></i>Choose a size<s class="g">MET</s></div>
+            <div class="row"><i class="on"></i>Say eat-in or takeaway<s class="g">MET</s></div>
+            <div class="row"><i class="on"></i>Confirm the order<s class="g">MET</s></div>
+            <div class="row"><i class="given"></i>Thank the barista<s>ASSISTED</s></div>
+          </div>
+          <div class="fold" style="padding-bottom:12px">4 WORDS · 2 PATTERNS · 2 NEXT STEPS</div>
+        </div>
+        <div class="work">
+          <div class="kick"><span>CARDS TO KEEP</span><span>NOTHING IS SAVED UNTIL YOU ACCEPT</span></div>
+          <div class="slip fix" style="padding:6px 12px 7px">
+            <u>FIX</u>
+            <div class="t"><s>1 CORRECTION</s><span class="jp" style="font-size:16px">コーヒーをください</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px;margin-top:11px">
+            <div class="slip gold" style="padding:5px 10px 6px 14px">
+              <div class="t"><span class="jp" style="font-size:16px">コーヒー</span><span class="kana">こーひー</span><span class="ro">coffee</span></div>
+              <span class="btn go">ACCEPT</span><span class="btn">DISMISS</span><span class="btn">EDIT</span>
+            </div>
+            <div class="slip" style="padding:5px 10px 6px 14px">
+              <div class="t"><span class="jp" style="font-size:16px">お願いします</span><span class="kana">おねがいします</span><span class="ro">please (when requesting something)</span></div>
+              <span class="btn">ACCEPT</span><span class="btn">DISMISS</span>
+            </div>
+            <div class="slip" style="padding:5px 10px 6px 14px">
+              <div class="t"><span class="jp" style="font-size:16px">〜をください</span><span class="ro">Please give me ~ (polite request for an item)</span></div>
+              <span class="btn">ACCEPT</span><span class="btn">DISMISS</span>
+            </div>
+            <div class="slip" style="padding:5px 10px 6px 14px">
+              <div class="t"><span class="jp" style="font-size:16px">コーヒーをください</span><span class="ro">Remember to add ください or お願いします…</span></div>
+              <span class="btn">ACCEPT</span><span class="btn">DISMISS</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="btn">SKIP ALL</span></div>
+          <div class="acts">
+            <div class="slab calm">REPLAY <em>再挑戦</em></div>
+            <div class="slab calm">BACK TO THE SCENES <em>戻る</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <b>OBJECTIVES</b>
+        <span class="ticks"><i class="opt on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="opt given"></i></span>
+        <s>4 OF 4 NEEDED · 1 GIVEN</s>
+      </div>
+      <div class="back"><span>BACK TO THE SCENES <em>戻る</em></span></div>
+      <div class="hints">
+        <span><b>↑↓</b> Card <em>選択</em></span>
+        <span><b>ENTER</b> Accept <em>保存</em></span>
+        <span><b>ESC</b> Back <em>戻る</em></span>
+      </div>
+    </div>
+  </div>
+  <div class="strip two" id="p6s">
+    <div class="crop" style="background-position:0 -330px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule off">れぎゅらーで</div></div>
+        <p class="status bad">Your progress in this session will be discarded.</p>
+        <div class="slab ask-q"><span>LEAVE THIS SCENARIO?</span><b>YES, DISCARD</b><i>KEEP GOING</i></div>
+      </div>
+      <div class="lab">ESC · LEAVE<code>leaveConfirm</code></div>
+    </div>
+    <div class="crop" style="background-position:-640px -330px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule off">れぎゅらーで</div></div>
+        <p class="status bad">Your current progress will be discarded.</p>
+        <div class="slab ask-q"><span>RESTART THIS SCENARIO?</span><b>YES, DISCARD</b><i>KEEP GOING</i></div>
+      </div>
+      <div class="lab">START OVER<code>restartConfirm</code></div>
+    </div>
+    <div class="crop" style="background-position:-300px -120px">
+      <div class="mini">
+        <div class="kick"><span>OUT OF TRIES · ASSISTED</span></div>
+        <div class="slip fix" style="padding:5px 10px 6px"><u>ALSO</u><div class="t"><s>YOU COULD ALSO SAY</s><span class="jp" style="font-size:15px">コーヒーをください</span><span class="ro">(ko-hi- wo kudasai)</span></div></div>
+        <div class="slab calm">ENTER FOR THE NEXT LINE <em>次へ</em></div>
+      </div>
+      <div class="lab">3RD MISS<code>assistLabel</code></div>
+    </div>
+    <div class="crop" style="background-position:-640px -420px">
+      <div class="mini">
+        <div class="kick"><span>CARDS TO KEEP</span></div>
+        <p class="status bad">This session could not be saved (…), so no SRS drafts are available for it.</p>
+        <div class="slab">TRY SAVING AGAIN <em>再試行</em></div>
+      </div>
+      <div class="lab">NOT SAVED<code>persistenceNote</code></div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>Conversation — the end</b><i>REPLACES ScenarioSummaryPanel + SrsDraftReviewPanel</i><u>NOT BUILT</u></div>
+    <p><b>The summary and the card review become one sheet.</b> The objectives are the score; the
+      suggested cards are slips with the panel's real actions — Accept, Dismiss, and Edit on the
+      card under the cursor (front, back, reading, notes open in place of the slip), plus Skip all.
+      Nothing is saved until Accept, which is today's rule and is said on the sheet.</p>
+    <p><b>Everything else folds to a count.</b> Vocabulary, grammar and next steps are a line, not
+      three lists; the full transcript, today behind "Show full transcript", is the earlier-turns
+      button from FOUR.</p>
+    <p><b>The confirmations are the slab, not a banner</b> (the strip above). Leave and start over
+      turn the slab into the question and its two answers, with the consequence on the status line
+      above it — the panel's own sentence, split at its full stop. Escape on the question is "Keep going". The "Try saving again" slab in the last crop is <b>new</b> — today the note
+      only reports the failure — and is the lead's call.</p>
+    <p><b>Past sessions</b> (<code>ScenarioHistoryPanel</code>) are reached from The World's Scenes
+      and the intro's second back tab, as a sheet on the lookup's scrim — they are something you
+      consult, like Every character. The list, the per-session delete and Clear all keep their own
+      two-step confirmations ("Yes, delete" / "Keep it").</p>
+    <dl class="nums">
+      <dt>4 / 4 · ASSISTED</dt><dd><code>deriveScenarioSummary</code> statuses <code>met | assisted | missed</code>; thanks has
+        <code>maxAttempts: 1</code>, so one miss hands over the model answer and marks it assisted.</dd>
+      <dt>1 CORRECTION</dt><dd>Turns with <code>correction</code> set — the partial コーヒー from FIVE.</dd>
+      <dt>4 CARDS</dt><dd><code>generateSrsDrafts</code> on this run: srs-coffee and srs-please (n-order visited), srs-o-kudasai
+        (grammar on n-order), srs-missing-please (that mistake was hit). Front, reading and back are the authored strings.</dd>
+      <dt>4 WORDS · 2 PATTERNS · 2 NEXT STEPS</dt><dd>コーヒー, お願いします, サイズ, 持ち帰り (n-order, n-size, n-eatin traversed);
+        〜をください, 〜でお願いします; <code>suggestedNextSteps</code> has two.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>SEVEN — THE STATES IN BETWEEN</h2>
+<p class="lede" style="margin-bottom:14px">
+  Every one of these is a line in today's composer or a status paragraph above it. <b>On the sheet
+  each is the work cell's own status line and the slab's sentence</b>; typing stays available in
+  every one of them, which is today's rule.
+</p>
+
+<figure id="p7">
+  <div class="strip three">
+    <div class="crop" style="background-position:-150px -300px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule off" style="font-size:19px">レギュラーでお願いします</div><div class="mic busy"><b>●</b>CTRL+M</div></div>
+        <div class="slab calm">CHECKING YOUR ANSWER… <em>確認中</em></div>
+      </div>
+      <div class="lab">CHECKING WITH THE MODEL<code>evaluatingResponse</code></div>
+    </div>
+    <div class="crop" style="background-position:-560px -300px">
+      <div class="mini">
+        <div class="kick" style="color:var(--hi-deep)"><span>BARISTA · CAFE STAFF</span><span class="tools"><u class="on">■</u></span></div>
+        <div style="font-family:var(--jp);font-size:22px;color:var(--ink);margin-top:4px">サイズはいかがなさいますか？</div>
+        <p class="status">PLAYING AUDIO…</p>
+      </div>
+      <div class="lab">THE CHARACTER SPEAKING<code>npcSpeaking</code></div>
+    </div>
+    <div class="crop" style="background-position:-900px -300px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE OR SPEAK</div><div class="mic rec"><b>■</b>STOP</div></div>
+        <p class="status">Listening… (max 8s)</p>
+      </div>
+      <div class="lab">LISTENING<code>SCENARIO_MIC_MAX_DURATION_MS</code></div>
+    </div>
+    <div class="crop" style="background-position:-150px -120px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE OR SPEAK</div><div class="mic busy"><b>●</b>WAIT</div></div>
+        <p class="status">Requesting microphone access…</p>
+      </div>
+      <div class="lab">MIC · REQUESTING<code>micRequesting</code></div>
+    </div>
+    <div class="crop" style="background-position:-560px -120px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE OR SPEAK</div><div class="mic busy"><b>●</b>WAIT</div></div>
+        <p class="status">Transcribing…</p>
+      </div>
+      <div class="lab">MIC · TRANSCRIBING<code>micTranscribing</code></div>
+    </div>
+    <div class="crop" style="background-position:-900px -120px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE YOUR RESPONSE</div><div class="mic gone"><b>●</b>CTRL+M</div></div>
+        <p class="status bad">Microphone permission was denied. Enable it in your system settings, or type your response instead.</p>
+      </div>
+      <div class="lab">MIC · DENIED<code>micPermissionDenied</code></div>
+    </div>
+    <div class="crop" style="background-position:-150px -420px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE YOUR RESPONSE</div><div class="mic gone"><b>●</b>CTRL+M</div></div>
+        <p class="status bad">No microphone was found on this device. Type your response instead.</p>
+      </div>
+      <div class="lab">MIC · NO DEVICE<code>micNoDevice</code></div>
+    </div>
+    <div class="crop" style="background-position:-560px -420px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE YOUR RESPONSE</div></div>
+        <p class="status bad">Speech recognition is unavailable in this build. Type your response instead.</p>
+      </div>
+      <div class="lab">NO SPEECH RECOGNITION<code>sttUnavailable</code></div>
+    </div>
+    <div class="crop" style="background-position:-900px -420px">
+      <div class="mini">
+        <div class="kick"><span>YOUR REPLY</span></div>
+        <div class="rule-row"><div class="rule empty">TYPE OR SPEAK</div><div class="mic"><b>●</b>CTRL+M</div></div>
+        <p class="status bad">Recording failed. Please try again, or type your response instead.</p>
+      </div>
+      <div class="lab">AN ERROR<code>micFailed</code></div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>The states in between</b><i>ONE LINE AND ONE SLAB EACH</i><u>NOT BUILT</u></div>
+    <p><b>Nothing here is a new box.</b> Each state is the status line under the reply rule, or the
+      slab's own sentence when the state is about the whole turn (checking with the model is the slab,
+      because the turn is already committed and only a second submission is blocked). Every word is
+      <code>SCENARIO_COPY</code> or the player's own string, verbatim.</p>
+    <p><b>Where the mic cannot work, the mic button stays and goes quiet</b> and the field's
+      placeholder says "type your response"; where speech recognition is missing from the build the
+      button is gone entirely, which is today's <code>canRecord</code> rule.</p>
+    <p><b>Drawn as three rows of three, not one row</b> — nine states at 1280 wide would be 142 px
+      each, too narrow to read the sentences. "Listening…" is added to the brief's eight because it
+      is the state the mic spends most of its time in.</p>
+    <dl class="nums">
+      <dt>max 8s</dt><dd><code>SCENARIO_MIC_MAX_DURATION_MS = 8000</code>, counted down by <code>LearnerInputPanel</code>.</dd>
+      <dt>Checking</dt><dd>Only when a local model is installed and the rules were unsure (<code>SCENARIO_AI_TIMEOUT_MS</code> 15 s cap).</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>EIGHT — CHAT AND IMAGE TRANSLATION: A OR B</h2>
+<p class="lede" style="margin-bottom:8px">
+  <b>This one is Robbie's to decide.</b> Look it up already names both tools along its foot —
+  <code>A QUESTION 質問</code> (<code>assistant-chat</code>) and <code>A SCREENSHOT 画像</code>
+  (<code>assistant-chat-ocr</code>) — and deliberately does not answer them:
+  <i>"this overlay is a lookup, not a conversation"</i> (<code>features/lookup/constants.ts:7-10</code>).
+  The tutor pop-up that does answer them is the last cassette panel in the app.
+</p>
+<p class="lede" style="margin-bottom:14px">
+  <b>A — fold them into Look it up</b>, reversing that written decision: with a model running, the
+  two dimmed routes become answerable and the tutor pop-up retires. <b>B — one tutor sheet</b> on the
+  same scrim, the same shape wherever it is opened from. Each row below is the same moment in both.
+  The tutor's reply and the translation are illustrative — a model writes them.
+</p>
+
+<figure id="p8">
+  <div class="pair">
+    <div class="half-lab"><b>A</b> FOLD INTO LOOK IT UP <s>A QUESTION</s></div>
+    <div class="half-lab"><b>B</b> ONE TUTOR SHEET <s>CHAT</s></div>
+  </div>
+  <div class="pair" id="p8-chat">
+    <div class="half">
+      <div class="plate">
+        <img src="../assets/valley-sunset.png" alt="">
+        <div class="board">
+          <div class="dim"></div>
+          <div class="lk-sheet">
+            <div class="lk-cap"><b>引く</b><i>LOOK IT UP</i><s>ONE FIELD · FIVE ANSWERS · ANY LEVEL</s></div>
+            <div class="lk-field"><span class="q">/</span><span class="v lat">Why do I keep mixing up しゃ and しょ?</span><span class="lk-route">assistant-chat</span></div>
+            <div class="lk-ans" style="min-height:196px">
+              <div class="reply">
+                <div class="reply-who"><span>THE TUTOR</span><s>▶ HEAR IT</s></div>
+                <p>Both are し plus a small kana, and the small kana is the whole difference: <span class="jp">しゃ</span> takes や (a), <span class="jp">しょ</span> takes よ (o). Say the vowel before you look at the main character — your misses are all on the second glyph, which means you are reading し and guessing the rest. Try ten of each in Meaning Match with</p>
+                <div class="pager"><span>LONG REPLIES PAGE, THEY DO NOT SCROLL</span><b>1 OF 3 ↓</b></div>
+              </div>
+            </div>
+            <div class="lk-note quiet">ENTER ASKS A FOLLOW-UP · THE LAST 20 TURNS ARE KEPT</div>
+            <div class="lk-routes">
+              <div class="lk-r"><b>ONE KANJI</b><i>漢字</i></div>
+              <div class="lk-r"><b>A WORD</b><i>辞書</i></div>
+              <div class="lk-r"><b>A PHRASE</b><i>例文</i></div>
+              <div class="lk-r on"><b>A QUESTION<u>3</u></b><i>質問</i></div>
+              <div class="lk-r"><b>A SCREENSHOT</b><i>画像</i></div>
+            </div>
+          </div>
+          <div class="lk-hint">← → ANOTHER ROUTE · ↓ NEXT PAGE · ESC CLOSES</div>
+        </div>
+      </div>
+    </div>
+    <div class="half">
+      <div class="plate">
+        <img src="../assets/valley-sunset.png" alt="">
+        <div class="board">
+          <div class="dim"></div>
+          <div class="lk-sheet">
+            <div class="lk-cap"><b>先生</b><i>THE TUTOR</i><s>LOCAL MODEL · ON THIS DEVICE</s><u>CLEAR</u></div>
+            <div class="lk-ans" style="min-height:236px;padding-top:16px">
+              <div class="ask-was">
+                <em>YOU ASKED</em>
+                <p class="you">Why do I keep mixing up しゃ and しょ?</p>
+                <em style="margin-top:auto">EARLIER</em>
+                <p>4 TURNS · ↑ TO READ</p>
+              </div>
+              <div class="reply">
+                <div class="reply-who"><span>THE TUTOR</span><s>▶ HEAR IT</s></div>
+                <p>Both are し plus a small kana, and the small kana is the whole difference: <span class="jp">しゃ</span> takes や (a), <span class="jp">しょ</span> takes よ (o). Say the vowel before you look at the main character — your misses are all on the second glyph, which means you are reading し and guessing the rest.</p>
+                <div class="pager"><b>1 OF 3 ↓</b></div>
+              </div>
+            </div>
+            <div class="lk-field" style="box-shadow:inset 0 2px 0 rgba(20,17,13,0.2), inset 0 -2px 0 var(--hi)"><span class="q">›</span><span class="v ph">Ask your coach for help with your current weak area...</span><span class="lk-route">0 / 600</span></div>
+            <div class="lk-routes">
+              <div class="lk-r on"><b>CHAT<u>3</u></b><i>会話</i></div>
+              <div class="lk-r"><b>IMAGE TRANSLATION</b><i>画像</i></div>
+            </div>
+          </div>
+          <div class="lk-hint">← → CHAT / IMAGE · ↑ EARLIER · ESC CLOSES</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pair">
+    <div class="half-lab"><b>A</b> FOLD INTO LOOK IT UP <s>A SCREENSHOT</s></div>
+    <div class="half-lab"><b>B</b> ONE TUTOR SHEET <s>IMAGE TRANSLATION</s></div>
+  </div>
+  <div class="pair" id="p8-image">
+    <div class="half">
+      <div class="plate">
+        <img src="../assets/valley-sunset.png" alt="">
+        <div class="board">
+          <div class="dim"></div>
+          <div class="lk-sheet">
+            <div class="lk-cap"><b>引く</b><i>LOOK IT UP</i><s>ONE FIELD · FIVE ANSWERS · ANY LEVEL</s></div>
+            <div class="lk-field"><span class="q">/</span><span class="v lat">shop-sign.png</span><span class="lk-route">assistant-chat-ocr</span></div>
+            <div class="lk-ans" style="min-height:204px">
+              <div style="display:flex;flex-direction:column">
+                <div class="shot"><div class="sign"><b>本日休業</b><i>明日は10時から営業します</i><i class="blur">ご迷惑をおかけします</i></div><u>shop-sign.png</u></div>
+                <div class="ways"><span><b>PICK</b> A FILE</span><span><b>CTRL+V</b> PASTE</span><span><b>DROP</b> IT</span></div>
+              </div>
+              <div class="ocr">
+                <div class="reply-who"><span>3 LINES</span><s>KEEPING LINES ABOVE 30%</s></div>
+                <div class="ocr-l"><b>本日休業</b><s>98%</s></div>
+                <div class="ocr-l"><b>明日は10時から営業します</b><s>91%</s></div>
+                <div class="ocr-l low"><b>ご迷惑をおかけします</b><s>22% · KEPT, IT IS JAPANESE</s></div>
+                <div class="ocr-en"><em>ENGLISH · THE WHOLE IMAGE</em>Closed today. We open from 10 o'clock tomorrow. We apologize for the inconvenience.</div>
+              </div>
+            </div>
+            <div class="lk-note quiet">PNG, JPEG OR WEBP · UP TO 30 MB · NOTHING LEAVES THIS DEVICE</div>
+            <div class="lk-routes">
+              <div class="lk-r"><b>ONE KANJI</b><i>漢字</i></div>
+              <div class="lk-r"><b>A WORD</b><i>辞書</i></div>
+              <div class="lk-r"><b>A PHRASE</b><i>例文</i></div>
+              <div class="lk-r"><b>A QUESTION</b><i>質問</i></div>
+              <div class="lk-r on"><b>A SCREENSHOT<u>3</u></b><i>画像</i></div>
+            </div>
+          </div>
+          <div class="lk-hint">← → ANOTHER ROUTE · CTRL+V ANOTHER IMAGE · ESC CLOSES</div>
+        </div>
+      </div>
+    </div>
+    <div class="half">
+      <div class="plate">
+        <img src="../assets/valley-sunset.png" alt="">
+        <div class="board">
+          <div class="dim"></div>
+          <div class="lk-sheet">
+            <div class="lk-cap"><b>先生</b><i>THE TUTOR</i><s>LOCAL MODEL · ON THIS DEVICE</s><u>CLEAR</u></div>
+            <div class="lk-ans" style="min-height:262px;padding-top:16px">
+              <div style="display:flex;flex-direction:column">
+                <div class="shot"><div class="sign"><b>本日休業</b><i>明日は10時から営業します</i><i class="blur">ご迷惑をおかけします</i></div><u>shop-sign.png</u></div>
+                <div class="ways"><span><b>PICK</b> A FILE</span><span><b>CTRL+V</b> PASTE</span><span><b>DROP</b> IT</span></div>
+              </div>
+              <div class="ocr">
+                <div class="reply-who"><span>3 LINES</span><s>KEEPING LINES ABOVE 30%</s></div>
+                <div class="ocr-l"><b>本日休業</b><s>98%</s></div>
+                <div class="ocr-l"><b>明日は10時から営業します</b><s>91%</s></div>
+                <div class="ocr-l low"><b>ご迷惑をおかけします</b><s>22% · KEPT, IT IS JAPANESE</s></div>
+                <div class="ocr-en"><em>ENGLISH · THE WHOLE IMAGE</em>Closed today. We open from 10 o'clock tomorrow. We apologize for the inconvenience.</div>
+              </div>
+            </div>
+            <div class="lk-note quiet" style="padding-top:2px">PNG, JPEG OR WEBP · UP TO 30 MB · NOTHING LEAVES THIS DEVICE</div>
+            <div class="lk-routes">
+              <div class="lk-r"><b>CHAT</b><i>会話</i></div>
+              <div class="lk-r on"><b>IMAGE TRANSLATION<u>3</u></b><i>画像</i></div>
+            </div>
+          </div>
+          <div class="lk-hint">← → CHAT / IMAGE · CTRL+V ANOTHER IMAGE · ESC CLOSES</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pair">
+    <div class="half-lab"><b>A</b> FOLD INTO LOOK IT UP <s>NO MODEL</s></div>
+    <div class="half-lab"><b>B</b> ONE TUTOR SHEET <s>NO MODEL</s></div>
+  </div>
+  <div class="pair" id="p8-off">
+    <div class="half">
+      <div class="plate">
+        <img src="../assets/valley-sunset.png" alt="">
+        <div class="board">
+          <div class="dim"></div>
+          <div class="lk-sheet">
+            <div class="lk-cap"><b>引く</b><i>LOOK IT UP</i><s>ONE FIELD · FIVE ANSWERS · ANY LEVEL</s></div>
+            <div class="lk-field"><span class="q">/</span><span class="v lat">Why do I keep mixing up しゃ and しょ?</span><span class="lk-route">assistant-chat</span></div>
+            <div class="lk-ans">
+              <div class="nomodel">
+                <h3>This route needs the tutor model.</h3>
+                <p class="bad">Chatbot is disabled in settings.</p>
+                <p>Turn on Chat with Tutor in Settings › Assistant, or download a model in Tutor models. The first three routes answer without one.</p>
+              </div>
+            </div>
+            <div class="lk-note">A QUESTION AND A SCREENSHOT ARE DIMMED UNTIL A MODEL IS RUNNING</div>
+            <div class="lk-routes">
+              <div class="lk-r"><b>ONE KANJI</b><i>漢字</i></div>
+              <div class="lk-r"><b>A WORD</b><i>辞書</i></div>
+              <div class="lk-r"><b>A PHRASE</b><i>例文</i></div>
+              <div class="lk-r off" style="box-shadow:inset 0 -3px 0 var(--hi), inset -1px 0 0 rgba(20,17,13,0.14)"><b>A QUESTION</b><i>質問</i></div>
+              <div class="lk-r off"><b>A SCREENSHOT</b><i>画像</i></div>
+            </div>
+          </div>
+          <div class="lk-hint">CTRL+, OPENS SETTINGS · ← → ANOTHER ROUTE · ESC CLOSES</div>
+        </div>
+      </div>
+    </div>
+    <div class="half">
+      <div class="plate">
+        <img src="../assets/valley-sunset.png" alt="">
+        <div class="board">
+          <div class="dim"></div>
+          <div class="lk-sheet">
+            <div class="lk-cap"><b>先生</b><i>THE TUTOR</i><s>NO MODEL RUNNING</s></div>
+            <div class="lk-ans" style="min-height:236px">
+              <div class="nomodel">
+                <h3>The tutor needs its model.</h3>
+                <p class="bad">Chatbot is disabled in settings.</p>
+                <p class="bad">Image Translation is not installed. Install it in Settings &gt; Tutor &gt; Image Translation.</p>
+                <p>Both live in Settings › Assistant. Look it up still answers a kanji, a word or a phrase without either.</p>
+              </div>
+            </div>
+            <div class="lk-routes">
+              <div class="lk-r on"><b>CHAT</b><i>会話</i></div>
+              <div class="lk-r off"><b>IMAGE TRANSLATION</b><i>画像</i></div>
+            </div>
+          </div>
+          <div class="lk-hint">CTRL+, OPENS SETTINGS · ESC CLOSES</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <div class="name"><b>Chat and image translation — A or B</b><i>REPLACES TutorPanel, TutorMenu, TutorChatPanel, OcrWorkbench</i><u>ROBBIE DECIDES</u></div>
+    <p><b>A — one field for everything.</b> Look it up already infers the route from what you type; a
+      question in English goes to A QUESTION, an image pasted or dropped goes to A SCREENSHOT. Long
+      replies page (<code>1 OF 3 ↓</code>) because nothing scrolls. <b>The cost</b>: it reverses the
+      decision written into <code>lookup/constants.ts</code>, the conversation history (the last 20
+      turns) has to live on a sheet built for one answer, and "/" — today a lookup — starts a model call
+      whenever the inference guesses "question".</p>
+    <p><b>B — the tutor keeps a door of its own</b>, the same sheet from the titlebar, the palette,
+      free talk and the progression map, never a stage version and a scrim version. Two tabs instead of
+      a menu, the earlier turns folded to a count on the left. <b>The cost</b>: a sixth thing on the
+      scrim, and Look it up's two named-but-dimmed routes stay a pointer to somewhere else.</p>
+    <p><b>Both show the no-model state</b> in the app's own error strings. Chat is gated on
+      <code>assistantChatEnabled</code>, image translation on the OCR package being installed; the
+      tutor menu today hides chat entirely when it is off, which is why neither option hides it here
+      — a door that disappears reads as a feature the app does not have.</p>
+    <dl class="nums">
+      <dt>1 OF 3 ↓</dt><dd>Pages of one reply, cut to the answer area's height. The reply is a single string
+        (<code>AssistantChatTurn.content</code>); the page count is the view's.</dd>
+      <dt>0 / 600</dt><dd><code>ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT</code> — today's counter.</dd>
+      <dt>20 TURNS</dt><dd><code>getAssistantChatHistory(20)</code> (<code>useTutor.ts:207</code>).</dd>
+      <dt>3 LINES · 98% / 91% / 22%</dt><dd>Per-line <code>confidence</code> is in the OCR payload's <code>lines</code>
+        (<code>ocr_extraction.py:132-197</code>) but the renderer drops it today and keeps only <code>text</code> and
+        <code>lineCount</code>. A line below the filter is kept anyway when it is Japanese script (<code>:181-183</code>),
+        which is exactly the line worth marking.</dd>
+      <dt>ABOVE 30%</dt><dd>Default <code>min_confidence 0.30</code>; the slider in today's workbench sets it in 5% steps.</dd>
+      <dt>ONE ENGLISH BLOCK</dt><dd><b style="color:#ff9d86">Not a translation per line</b>, as the brief asks: the app
+        translates the whole extracted text in one call (<code>translateAssistantChatOcrText</code>). Per-line English
+        would be one model call per line — a backend change, so the plate shows what exists.</dd>
+      <dt>30 MB · PNG/JPEG/WEBP</dt><dd><code>ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB</code>; the file input's <code>accept</code>.
+        <b>Paste and drop are new</b> — today it is a file picker only.</dd>
+    </dl>
+  </figcaption>
+</figure>
+
+<!-- ============================================================================================ -->
+<h2>NINE — THE WAYS IN, AFTER THIS</h2>
+<p class="lede" style="margin-bottom:12px">
+  Every entry point that opens the tutor pop-up today, and where it lands once this card is built.
+  <b>Scenario entries all go to The World's Scenes at level three</b>; the chat and image entries
+  depend on whether Robbie picks A or B.
+</p>
+<table class="map">
+  <tr><th>ENTRY POINT</th><th>TODAY</th><th>AFTER</th></tr>
+  <tr><td>Scenes, a scene picked<br><code>App.tsx:2618-2627</code></td><td>Selects the scenario and opens the pop-up on it</td>
+    <td>The conversation screen (THREE), on that scene. Escape returns to Scenes.</td></tr>
+  <tr><td>Scenes, Free Talk<br><code>App.tsx:2629-2630</code></td><td>Opens the pop-up on chat</td>
+    <td><b>A</b>: Look it up on A QUESTION · <b>B</b>: the tutor sheet on CHAT</td></tr>
+  <tr><td>Palette · Open Tutor<br><code>App.tsx:309</code></td><td>Opens the pop-up's menu</td>
+    <td><b>A</b>: Look it up, empty · <b>B</b>: the tutor sheet on CHAT. The menu itself retires in both.</td></tr>
+  <tr><td>Palette · Chat with Tutor<br><code>App.tsx:310</code></td><td>Pop-up on chat</td><td><b>A</b>: A QUESTION · <b>B</b>: CHAT</td></tr>
+  <tr><td>Palette · Scenario Practice<br><code>App.tsx:311</code></td><td>Pop-up on the scenario list</td><td>The World's Scenes, level three</td></tr>
+  <tr><td>Palette · Image Translation<br><code>App.tsx:312</code></td><td>Pop-up on image translation</td><td><b>A</b>: A SCREENSHOT · <b>B</b>: IMAGE TRANSLATION</td></tr>
+  <tr><td>Progression map · scenarios<br><code>openProgressionNode</code>, <code>App.tsx:702-704</code></td><td>Pop-up on scenarios</td><td>The World's Scenes, level three</td></tr>
+  <tr><td>Progression map · tutor<br><code>App.tsx:705-707</code></td><td>Pop-up on chat</td><td><b>A</b>: A QUESTION · <b>B</b>: CHAT</td></tr>
+  <tr><td>Titlebar tutor button<br><code>App.tsx:2306-2316</code> (<code>:2315</code>), <code>AppTitlebar.tsx:434</code></td><td>Toggles the pop-up's menu</td>
+    <td><b>A</b>: toggles Look it up · <b>B</b>: toggles the tutor sheet. <code>:2315</code> and the titlebar button are one entry, not two.</td></tr>
+  <tr><td>Toast action<br><code>useTutor.ts:192</code></td><td>Starts a practice round (<code>onToastNavigate</code>, <code>App.tsx:658-669</code>) — never opened the pop-up</td>
+    <td>Unchanged. <code>TutorToast</code> stays as it is.</td></tr>
+  <tr><td>Tutor settings</td><td>Already in app settings (<code>TutorSettingsTab</code>)</td><td>Unchanged — the no-model states point there.</td></tr>
+</table>
+
+<h2>WHAT THE LEAD SHOULD KNOW BEFORE THIS IS APPROVED</h2>
+<div class="note">
+  <b>Four things on this card are new behaviour, not restyling.</b>
+  <p>The mic's <code>CTRL+M</code> (FOUR); the view holding the answered state until Enter while the
+  engine has already moved on (FIVE); "Try saving again" on a failed save (SIX); paste and drop for
+  images (EIGHT). Each is small and each is drawn because the brief's layout needs it, but none exists
+  today.</p>
+  <p><b>Three numbers in the brief do not match the code</b>, and the plates follow the code: the
+  cafe's objectives are <b>1 / 4</b>, not 1 / 5 (four required of six); the earlier-turns count is 4
+  on the size question (2 is the count at the order, used on FIVE); and image translation returns
+  <b>one</b> English block for the whole image, not a translation per line.</p>
+  <p><b>One data bug surfaced while drawing</b>: the dictionary build maps KANJIDIC's pre-2010 JLPT
+  level straight onto N-levels (<code>build_offline_dictionary_sqlite.py:297</code>), so 漢 reads N3
+  with the dictionary and N4 without it. Not this card's to fix.</p>
+</div>
