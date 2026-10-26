@@ -59,7 +59,7 @@
     },
     "sqlite": {
       "type": "local",
-      "command": ["npx", "-y", "@bytebase/dbhub@latest", "--transport", "stdio", "--dsn", "sqlite:///C:/Users/Robbie/Documents/Projects/JPLearn/data/jplearn.db"],
+      "command": ["npx", "-y", "@bytebase/dbhub@latest", "--transport", "stdio", "--dsn", "sqlite:///F:/Projects/JPLearn/data/jplearn.db"],
       "enabled": true
     },
     "sequential-thinking": {
@@ -81,7 +81,7 @@
     },
     "external_directory": {
       "*": "ask",
-      "C:\\Users\\Robbie\\Documents\\Projects\\JPLearn\\**": "allow",
+      "F:\\Projects\\JPLearn\\**": "allow",
       "~/.config/opencode/**": "allow"
     }
   }
