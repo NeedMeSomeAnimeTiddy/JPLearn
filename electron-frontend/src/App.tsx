@@ -2718,11 +2718,9 @@ function App() {
           onPick={(scenarioId) => {
             if (scenarioId) {
               /* THE SCENE, AND THEN ITS SCREEN. A conversation already under way in this scene is
-                 resumed where it stood; any other pick starts at choosing how much help. */
-              const running = scenarioTutor.session?.status === 'active'
-                && scenarioTutor.selectedScenario?.id === scenarioId
-                && scenarioTutor.screen === 'session'
-              if (!running) scenarioTutor.selectScenario(scenarioId)
+                 resumed where it stood; another scene, while one is under way, is asked about on
+                 that conversation's slab first; any other pick starts at choosing how much help. */
+              scenarioTutor.selectScenario(scenarioId)
               setConversationOpen(true)
               return
             }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Round } from '../../round'
 import { screenHead } from '../../menu'
 import type { UseScenarioTutorReturn } from '../useScenarioTutor'
@@ -25,16 +25,14 @@ export interface ConversationProps {
 /* ==================================================================================================
    CONVERSATION PRACTICE, AS ITS OWN SCREEN — the round's session sheet with a character on it,
    started from The World's scenes. `useScenarioTutor` keeps the session and does every piece of the
-   work; this only decides which of the four boards is drawn, and holds the one thing the hook does
-   not: the answer you have just given, until you press ENTER past it.
+   work -- including holding the answer you have just given until you press ENTER past it, so it is
+   still held when you leave the screen and come back -- and this only decides which of the four
+   boards is drawn.
    ================================================================================================== */
 export function Conversation({
   scenarioTutor: tutor, played = null, romajiEnabled, onToggleRomaji, audioEnabled, onToggleAudio, onLeave,
 }: ConversationProps) {
-  /* how long the transcript was when the reply went, while the sheet is holding its answer */
-  const [held, setHeld] = useState<number | null>(null)
-  const sessionId = tutor.session?.sessionId ?? null
-  useEffect(() => { setHeld(null) }, [sessionId])
+  const held = tutor.heldFrom
 
   /* THE PICKER IS THE SCENES SCREEN NOW. When the tutor goes back to its own list -- a leave that
      was confirmed, or a finished session put away -- the screen goes back to the scenes. */
@@ -49,7 +47,6 @@ export function Conversation({
   const send = () => {
     if (!session || session.status !== 'active' || tutor.evaluatingResponse) return
     if (tutor.learnerInputValue.trim().length === 0) return
-    setHeld(session.transcript.length)
     tutor.submitResponse()
   }
 
@@ -73,7 +70,7 @@ export function Conversation({
         session={session}
         answer={answer}
         onSend={send}
-        onNext={() => setHeld(null)}
+        onNext={tutor.releaseAnswer}
         romajiEnabled={romajiEnabled}
         onToggleRomaji={onToggleRomaji}
         audioEnabled={audioEnabled}
