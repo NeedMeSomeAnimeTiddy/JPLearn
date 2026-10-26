@@ -1,0 +1,61 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-26T21:00:00Z" },
+  "title": "Kanji and conversation screens",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 720, "title": "1 · Kanji sheet, deck only (the state Robbie sees)" },
+    "KanjiDictionary.dc.html": { "x": 1760, "y": 0, "w": 1280, "h": 720, "title": "2 · Kanji sheet, with the offline dictionary" },
+    "ConvLevel.dc.html": { "x": 0, "y": 840, "w": 1280, "h": 720, "title": "3 · Conversation, choosing a level" },
+    "ConvAsking.dc.html": { "x": 1760, "y": 840, "w": 1280, "h": 720, "title": "4 · Conversation, asking" },
+    "ConvAnswered.dc.html": { "x": 0, "y": 1680, "w": 1280, "h": 720, "title": "5 · Conversation, answered" },
+    "ConvFinished.dc.html": { "x": 1760, "y": 1680, "w": 1280, "h": 720, "title": "6 · Conversation, finished" },
+    "ConvStates.dc.html": { "x": 0, "y": 2520, "w": 1280, "h": 330, "title": "6b · Leaving, and a save that fails (crops at 1:1)" }
+  },
+  "order": [
+    "Main.dc.html",
+    "KanjiDictionary.dc.html",
+    "ConvLevel.dc.html",
+    "ConvAsking.dc.html",
+    "ConvAnswered.dc.html",
+    "ConvFinished.dc.html",
+    "ConvStates.dc.html"
+  ],
+  "notes": {
+    "title": { "x": 0, "y": -330, "kind": "title1", "maxW": 3040, "text": "Kanji and conversation screens" },
+    "n1": {
+      "x": 1320, "y": 0, "w": 400, "size": "s", "fill": "gray",
+      "text": "1 · KANJI, DECK ONLY\nBorrows: Every character's 900×316 shell with Look it up's header and foot bar; the ink glyph tile and the vermilion 'not installed' line are screen-lookup.png's own; the hatched dash rows are The Exam's rule for an absence (screen-level.png); the ',' key and 'NOT INSTALLED · 6 MIN' chip are settings'.\nChanged vs tools.html plate TWO: that plate re-cut the sheet (extra band, 280 body, new column widths). Here the shell and all three columns are identical to the dictionary state; the middle column stays and names what is missing, so the two states are one object and Escape, replay and column edges never move.\nData (tools.html's run for 語): N5 from the deck, Kanji N5 · Study & Language, tags kanji · n5, parts 言 口 五, no stroke count."
+    },
+    "n2": {
+      "x": 3080, "y": 0, "w": 400, "size": "s", "fill": "gray",
+      "text": "2 · KANJI, WITH THE DICTIONARY\nBorrows: the same shell; compounds in the lookup's own row form.\nChanged vs tools.html plate ONE: dropped the keys it invented (←→ column, ENTER searches a compound); '+ MORE' became a count the payload can give, '4 OF 12+' (12 compounds carried, has_more true); the part chips are Every character's chip, not a new one; only ENTER replays and ESC goes back.\nData is tools.html's run for 漢. Its N3 chip is the KANJIDIC level bug tools.html flagged (the deck files 漢 under N4); drawn as the code would show it.\nColumns are 200 / 330 / 370 in both states."
+    },
+    "n3": {
+      "x": 1320, "y": 840, "w": 400, "size": "s", "fill": "gray",
+      "text": "3 · CONVERSATION, CHOOSING A LEVEL\nBorrows: past-three's session sheet (322 | work cell), Scenes.tsx's scene copy (screen-scenes.png), and the round's slip and slab.\nChanged vs tools.html plate THREE: the objectives moved into the prompt cell, so the scene reads whole on the left and the work cell holds only the choice; each level now carries the one real number that differs (AUDIO 0.85× vs 1×); the heading is English-led (TALK 会話, not 会話 TALK); the grading and privacy notes stay verbatim, small, under the choice. Level is ←→ and ENTER, not digits."
+    },
+    "n4": {
+      "x": 3080, "y": 840, "w": 400, "size": "s", "fill": "gray",
+      "text": "4 · CONVERSATION, ASKING\nBorrows: past-three's round (the line is the specimen, the rule is the reply, the slab is the one hot thing).\nChanged vs tools.html plate FOUR: the mic is paper while idle and turns vermilion only when recording, so SAY IT is the single hot object (tools.html had an ink mic beside a vermilion slab); two lines of invented copy are gone ('asking never counts as an attempt', '2 more on this line') since the crown already says HINT 1 OF 3; the hint slip is the hint's own ladder step. English stays shown; Ctrl+M speaks."
+    },
+    "n5": {
+      "x": 1320, "y": 1680, "w": 400, "size": "s", "fill": "gray",
+      "text": "5 · CONVERSATION, ANSWERED\nBorrows: past-three plate TWO (nothing moves; the correction is vermilion, the next thing is ink).\nChanged vs tools.html plate FIVE: the heading mark turns vermilion on a partial, as the round's does on a miss; the invented explanatory sentence under the rule is removed (the mistake's authored explanation exists but only the Summary shows it today, so using it is Robbie's call); the correction and the barista's next line stay until ENTER. The model answer (YOU COULD ALSO SAY) still never appears here: it only arrives when attempts run out."
+    },
+    "n6": {
+      "x": 3080, "y": 1680, "w": 400, "size": "s", "fill": "gray",
+      "text": "6 · CONVERSATION, FINISHED\nBorrows: past-three's score block and objective rows; the draft panel's own fields (Front, Back, Reading, Notes) and actions.\nChanged vs tools.html plate SIX: the FIX slip is gone (it was the fourth card's content twice); only the card under the cursor opens its four fields, the others are one line, so four ACCEPT/DISMISS pairs become one ACCEPT slab, the screen's one vermilion; '4 CARDS TO REVIEW' is the crown's owed chip; the score's /4 is gold, not vermilion; 'Show full transcript' and 'Replay scenario' are the panel's real actions. (A run left early would head this ENDED EARLY, the summary's other heading; not drawn.)"
+    },
+    "n6b": {
+      "x": 1320, "y": 2520, "w": 400, "size": "s", "fill": "gray",
+      "text": "6b · THE QUESTION AND THE FAILURE\nThe leave confirmation is the slab turned into its two answers (SCENARIO_COPY, split at the full stop). The failed save keeps the panel's own sentence; 'Try saving again' is the new slab Robbie asked for, and (…) is the reason the error carries."
+    },
+    "diff": {
+      "x": 1760, "y": 2520, "w": 900, "size": "s", "fill": "orange",
+      "text": "WHAT THIS CHANGES FROM tools.html (plates 1–6)\nAcross all six: English leads the heading (TALK 会話); the scrim plates show the dimmed front-door chips and key hints, as screen-lookup.png does; every plate is on its section's real backdrop at 1280×720.\nKanji: same shell for both states (tools.html re-cut it for deck only); deck-only now leads; dropped invented keys; compound count not '+ MORE'.\nConversation: objectives moved to the prompt cell on the level screen; mic idle is paper; vermilion is only ever the one hot thing; invented sentences removed; the finished sheet has one ACCEPT slab and one open card instead of four button pairs; the score is gold.\nDecided by Robbie, drawn here, not built: Ctrl+M, the correction held until Enter, 'Try saving again'. New and still his call: the ',' key on the deck-only sheet, one open card with a single ACCEPT slab, and where SKIP ALL sits."
+    }
+  },
+  "designSystems": []
+}

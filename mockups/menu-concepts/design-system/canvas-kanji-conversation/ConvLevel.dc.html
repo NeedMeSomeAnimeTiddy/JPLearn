@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conversation, choosing a level</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="jp-sheet.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="plate" style="width: 1280px; height: 720px">
+  <img class="bg" src="/_blob/f957aa0b71601c86d1ee1133ed6d1578" alt="The hot-spring town, with the scene's sheet standing on it">
+  <div class="board">
+    <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+    <div class="hd">
+      <div class="hd-mark">会</div>
+      <div class="hd-txt">
+        <div class="hd-kick">THE WORLD · SCENES</div>
+        <div class="hd-title"><b>TALK</b><i>会話</i></div>
+      </div>
+    </div>
+    <div class="cap">ORDER AT A CAFE <s>·</s> <em>カフェで注文する</em> <s>·</s> NOT PLAYED</div>
+    <div class="run"><span><b>01</b><s>/</s> 02 SCENE</span></div>
+
+    <div class="sheet">
+      <div class="ask">
+        <div class="kick"><span>BARISTA · CAFE STAFF</span><em>相手</em></div>
+        <div style="margin-top: 14px; font-family: var(--jp); font-size: 26px; line-height: 1.22; color: var(--ink)">カフェで注文する</div>
+        <div style="margin-top: 4px; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 20px; line-height: 1.18; color: var(--hi-deep)">Order at a Cafe</div>
+        <div class="small" style="margin-top: 8px; font-size: 10.5px">Practice ordering a drink, choosing a size, and deciding eat-in or takeaway at a Japanese cafe.</div>
+        <div class="kick q" style="margin-top: 16px; padding-bottom: 4px"><span>WHAT YOU NEED TO DO</span><span>4 NEEDED · 2 OPTIONAL</span></div>
+        <div class="rows">
+          <div class="row"><i class="opt"></i>Greet the barista<s>OPTIONAL</s></div>
+          <div class="row"><i></i>Order a drink</div>
+          <div class="row"><i></i>Choose a size</div>
+          <div class="row"><i></i>Say eat-in or takeaway</div>
+          <div class="row"><i></i>Confirm the order</div>
+          <div class="row"><i class="opt"></i>Thank the barista<s>OPTIONAL</s></div>
+        </div>
+      </div>
+      <div class="work">
+        <div class="kick"><span>HOW MUCH HELP</span><span>←→ CHOOSE · <em>難易度</em></span></div>
+        <div class="lvls">
+          <div class="lvl hot">
+            <b>Beginner</b>
+            <p>Simpler phrasing, more generous hints, slower audio, and kana/romaji reading aids.</p>
+            <div class="spec"><span>AUDIO 0.85×</span></div>
+          </div>
+          <div class="lvl">
+            <b>Intermediate</b>
+            <p>Natural phrasing at a normal pace with lighter hints.</p>
+            <div class="spec"><span>AUDIO 1×</span></div>
+          </div>
+        </div>
+        <div class="note-sm" style="margin-top: 16px"><b>GRADING</b>Responses are graded entirely by deterministic rules on this device. Anything the rules can’t place falls back to the scenario’s own recovery line.</div>
+        <div class="note-sm" style="margin-top: 8px"><b>PRIVACY</b>Speech recognition runs locally on this device. Responses are graded with deterministic rules first; a local AI model may help judge unclear answers only if one is installed and enabled in Settings. Raw audio recordings are never saved. Transcripts are stored on this device only after you complete a scenario.</div>
+        <div class="slab">ENTER TO START THE CONVERSATION <em>開始</em></div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <b>OBJECTIVES</b>
+      <span class="ticks"><i class="opt"></i><i></i><i></i><i></i><i></i><i class="opt"></i></span>
+      <s>0 OF 4 NEEDED · 2 OPTIONAL</s>
+    </div>
+    <div class="back"><span>BACK <em>戻る</em></span><span>PAST SESSIONS <em>履歴</em></span></div>
+    <div class="hints">
+      <span><b>←→</b> Level <em>選択</em></span>
+      <span><b>ENTER</b> Start <em>開始</em></span>
+      <span><b>ESC</b> Back <em>戻る</em></span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

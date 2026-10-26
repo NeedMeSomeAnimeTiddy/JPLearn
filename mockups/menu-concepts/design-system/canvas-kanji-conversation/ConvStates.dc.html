@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conversation, leaving and a failed save</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="jp-sheet.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="crops" style="width: 1280px; height: 330px">
+  <div class="crop">
+    <img class="bg" src="/_blob/f957aa0b71601c86d1ee1133ed6d1578" alt="The hot-spring town" style="left: 0px; top: -250px">
+    <div class="tint"></div>
+    <div class="mini">
+      <div class="kick"><span>YOUR REPLY</span><em>回答</em></div>
+      <div class="rule-row"><div class="rule off">れぎゅらーで</div></div>
+      <p class="status bad">Your progress in this session will be discarded.</p>
+      <div class="slab ask-q"><span>LEAVE THIS SCENARIO?</span><b>YES, DISCARD</b><i>KEEP GOING</i></div>
+    </div>
+    <div class="lab">ESC · LEAVE THIS SCENARIO<code>leaveConfirm · ESC again = KEEP GOING</code></div>
+  </div>
+  <div class="crop">
+    <img class="bg" src="/_blob/f957aa0b71601c86d1ee1133ed6d1578" alt="The hot-spring town" style="left: -640px; top: -250px">
+    <div class="tint"></div>
+    <div class="mini">
+      <div class="kick"><span>CARDS TO KEEP</span><em>保存</em></div>
+      <p class="status bad" style="margin-top: 14px">This session could not be saved (…), so no SRS drafts are available for it.</p>
+      <div class="slab">TRY SAVING AGAIN <em>再試行</em></div>
+    </div>
+    <div class="lab">THE SAVE FAILED<code>persistenceNote · (…) is the error's own reason</code></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":330}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

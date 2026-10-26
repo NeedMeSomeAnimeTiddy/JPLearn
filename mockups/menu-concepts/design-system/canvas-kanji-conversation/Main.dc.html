@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kanji sheet, deck only</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="jp-sheet.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="plate" style="width: 1280px; height: 720px">
+  <img class="bg" src="/_blob/100d39845d0102270646854f1f4b092f" alt="The valley at sunset, dimmed behind the kanji sheet">
+  <div class="board">
+    <div class="brand"><i></i><span><b>JPLEARN</b><s>日本語学習</s></span></div>
+    <div class="stats">
+      <span>21:40</span>
+      <span>10/26 MON</span>
+      <span class="st"><b>12</b> DAY STREAK <em>連続</em></span>
+      <span class="lv">Lv <b>7</b><i><u></u></i></span>
+    </div>
+    <div class="hints">
+      <span><b>↑↓</b> Select <em>選択</em></span>
+      <span><b>ENTER</b> Confirm <em>決定</em></span>
+      <span><b>ESC</b> Back <em>戻る</em></span>
+    </div>
+    <div class="dim"></div>
+
+    <div class="mx-sheet">
+      <div class="lk-cap">
+        <b>字</b><i>CHARACTER</i>
+        <s>語 · FROM THE DECK, NOT THE DICTIONARY</s>
+        <u class="lv">N5</u><u>ESC</u>
+      </div>
+      <div class="kx-body">
+        <div class="kx-c1">
+          <div class="kx-glyph">語</div>
+          <div class="kx-facts">
+            <div><em>LEVEL</em><span class="x">N5<i>TAGGED FROM THE DECK</i></span></div>
+            <div><em>THEME</em><span>Kanji N5 · Study &amp; Language</span></div>
+            <div><em>TAGS</em><span>Kanji · N5</span></div>
+          </div>
+        </div>
+        <div class="kx-c2">
+          <div class="mx-kick"><span>DECK ONLY</span><s>4 NEED THE DICTIONARY</s></div>
+          <div class="gh"><em>READINGS</em><span>—</span></div>
+          <div class="gh"><em>MEANINGS</em><span>—</span></div>
+          <div class="gh"><em>COMPOUNDS</em><span>—</span></div>
+          <div class="gh"><em>STROKE COUNT</em><span>—</span></div>
+          <div class="kx-why">Readings, compounds and stroke counts need the offline dictionary.</div>
+          <div class="kx-fix" style="flex-direction: column; align-items: stretch; gap: 6px">
+            <div style="display: flex; align-items: center; gap: 10px"><span>OFFLINE DICTIONARY</span><s>NOT INSTALLED · 6 MIN</s></div>
+            <div>PRESS <b>,</b> FOR SETTINGS</div>
+          </div>
+        </div>
+        <div class="kx-c3">
+          <div class="mx-kick"><span>BUILT FROM</span><s>3 PARTS</s></div>
+          <div class="mx-chips"><i class="mx-chip big">言</i><i class="mx-chip big">口</i><i class="mx-chip big">五</i></div>
+          <div class="mx-kick q" style="margin-top: 14px; padding-bottom: 0"><span>STROKE ORDER</span><s>WORKS WITHOUT THE DICTIONARY</s></div>
+          <div class="kx-stroke">
+            <div class="kx-slate"><b>語</b><i>語</i></div>
+            <div class="kx-side">
+              <span class="btn ink">↻ REPLAY</span>
+              <span class="small">ENTER REPLAYS<br>THE STROKES</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mx-hint"><b>ENTER</b> REPLAY · <b>,</b> SETTINGS · <b>ESC</b> BACK TO LOOK IT UP</div>
+    </div>
+    <div class="lk-hint">ESC GOES UP ONE LEVEL — BACK TO LOOK IT UP, OR TO EVERY CHARACTER, WHICHEVER OPENED IT</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
