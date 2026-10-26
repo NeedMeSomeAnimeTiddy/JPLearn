@@ -1,0 +1,290 @@
+/* ==================================================================================================
+   THE CONVERSATION — the round's sheet (`round.css`) with a character standing on it. These are the
+   objects the approved boards draw that a drill never needed (canvas-kanji-conversation/jp-sheet.css:
+   the line, the reply rule and its mic, the slips, the level choice, the drafted cards, the
+   leave question) and nothing else: the sheet, its two cells, the kickers, the slab, the foot band
+   and the tabs are the round's own.
+
+   Square corners, one skew (the sheet's), hard shadows. Ten points is the floor for type, as on
+   every menu screen; the board's nine-point labels are set at ten here.
+   ================================================================================================== */
+
+/* the screen's own box is the round's; this only gives its key handling a subtree to own, and
+   carries the board's deep gold, which the stage's tokens do not */
+.cv-root { display: contents; --cv-gold-deep: #8a6a2e; }
+
+/* a kicker that has stopped asking -- the answered line, the list's own headings */
+.rd-kick.cv-q { color: rgba(20, 17, 13, 0.45); }
+
+/* ---- the foot band: objectives, some optional (hatched) and some given (a gold edge) ------------- */
+.rd-ticks i.cv-opt {
+  background: repeating-linear-gradient(90deg, rgba(242, 234, 216, 0.14) 0 5px, transparent 5px 8px);
+  box-shadow: inset 0 0 0 1px rgba(242, 234, 216, 0.3);
+}
+.rd-ticks i.cv-opt.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.3); }
+.rd-ticks i.cv-given { background: rgba(207, 164, 92, 0.22); box-shadow: inset 0 0 0 2px var(--gold); }
+.rd-ticks i.cv-opt.here { background: var(--washi); box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* ---- the kicker's right-hand side: chips and small buttons ------------------------------------- */
+.cv-kick-side { display: flex; align-items: center; gap: 6px; }
+.cv-btn {
+  flex: none; border: 0; cursor: pointer; padding: 4px 10px 5px;
+  background: rgba(20, 17, 13, 0.08); color: rgba(20, 17, 13, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+}
+.cv-btn:hover:not(:disabled) { background: var(--gold); color: var(--ink); }
+.cv-btn.on, .cv-btn.ink { background: var(--ink); color: var(--gold-hi); box-shadow: none; }
+.cv-btn:disabled { opacity: 0.45; cursor: default; }
+.cv-btn:focus-visible, .cv-lvl:focus-visible, .cv-card:focus-visible, .cv-hrow:focus-visible,
+.cv-mic:focus-visible, .cv-ask-q button:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+
+/* ---- the character's line — the conversation's specimen ---------------------------------------- */
+.cv-line {
+  flex: 1; min-height: 0; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center; padding-bottom: 8px;
+}
+.cv-line b { font-family: var(--jp); font-weight: 400; line-height: 1.24; color: var(--ink); }
+.cv-line i {
+  display: block; margin-top: 8px; font-style: normal; font-family: var(--jp-go); font-size: 12px;
+  letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.5);
+}
+.cv-line p {
+  margin: 9px 0 0; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 21px;
+  line-height: 1.18; color: var(--hi-deep);
+}
+.cv-line.quiet b { color: rgba(20, 17, 13, 0.62); }
+.cv-line.quiet p { color: rgba(20, 17, 13, 0.5); }
+.cv-earlier {
+  display: inline-block; padding: 4px 10px 5px; background: rgba(20, 17, 13, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.18); color: rgba(20, 17, 13, 0.66);
+}
+.cv-src i { font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.1em; color: var(--ink); }
+
+/* ---- the reply: a rule on the paper, and the mic beside it --------------------------------------- */
+.cv-rule-row { display: flex; align-items: stretch; gap: 10px; }
+.rd-rule.cv-rule { font-size: 28px; box-shadow: inset 0 -2px 0 var(--hi); }
+.rd-rule.cv-rule:disabled { box-shadow: inset 0 -2px 0 rgba(20, 17, 13, 0.18); }
+.cv-mic {
+  flex: none; width: 96px; border: 0; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  background: var(--washi-dim);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em; color: var(--ink);
+}
+.cv-mic i { display: inline-block; width: 8px; height: 8px; background: var(--hi); margin-right: 6px; }
+.cv-mic u {
+  text-decoration: none; padding: 2px 7px 3px; background: var(--washi); color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.24); font-size: 10px; letter-spacing: 0.1em;
+}
+/* the one hot thing, while it is listening */
+.cv-mic.on { background: var(--hi); color: #ffe9c9; box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.3); }
+.cv-mic.on i { background: #ffe9c9; }
+.cv-mic:disabled { opacity: 0.5; cursor: default; }
+.cv-heard { margin: 8px 0 0; font-family: var(--lat-ui); font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.45; color: rgba(20, 17, 13, 0.6); }
+.cv-heard b { color: var(--ink); letter-spacing: 0.14em; }
+.cv-heard span { font-family: var(--jp); font-size: 13px; color: var(--ink); letter-spacing: 0.02em; }
+.cv-status {
+  margin: 8px 0 0; font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.55);
+}
+.cv-status.bad { color: var(--hi-deep); letter-spacing: 0.04em; font-size: 11px; line-height: 1.45; }
+
+/* ---- slips: a hint, a correction, the next line ---------------------------------------------- */
+.cv-sub { margin: 16px 0 8px; }
+.cv-slips { display: flex; flex-direction: column; gap: 8px; }
+.cv-slip {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px 9px; background: var(--washi-dim);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+}
+.cv-slip u {
+  text-decoration: none; flex: none; min-width: 26px; height: 22px; padding: 0 6px;
+  display: grid; place-items: center; background: var(--gold); color: var(--ink);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.12em;
+}
+.cv-slip .t { flex: 1; min-width: 0; font-family: var(--lat-ui); }
+.cv-slip .t > b { display: block; font-size: 11.5px; letter-spacing: 0.03em; color: var(--ink); font-weight: 600; line-height: 1.4; }
+.cv-slip .t > s {
+  display: block; text-decoration: none; font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.5); margin-bottom: 2px;
+}
+.cv-slip .jp { font-family: var(--jp); font-size: 19px; color: var(--ink); line-height: 1.25; }
+.cv-slip .kana { font-family: var(--jp-go); font-size: 11px; letter-spacing: 0.05em; color: rgba(20, 17, 13, 0.55); margin-left: 8px; }
+.cv-slip .ro { font-size: 10.5px; letter-spacing: 0.06em; color: rgba(20, 17, 13, 0.55); margin-left: 8px; }
+.cv-slip .en { display: block; font-size: 10.5px; letter-spacing: 0.04em; color: rgba(20, 17, 13, 0.6); }
+.cv-slip.fix {
+  background: var(--washi);
+  box-shadow: 4px 5px 0 rgba(20, 17, 13, 0.26), inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.cv-slip.fix u { background: var(--hi); color: #ffe9c9; }
+.cv-slip.quiet { background: rgba(20, 17, 13, 0.05); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.14); }
+.cv-slip.quiet u { background: rgba(20, 17, 13, 0.14); color: rgba(20, 17, 13, 0.5); }
+.cv-more { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
+.cv-small {
+  font-family: var(--lat-ui); font-size: 10.5px; line-height: 1.5; letter-spacing: 0.03em;
+  color: rgba(20, 17, 13, 0.6); font-weight: 600;
+}
+
+/* ---- the said line, answered: what you said stays where you said it ----------------------------- */
+.cv-said {
+  display: flex; align-items: baseline; gap: 12px; padding: 6px 2px 8px;
+  box-shadow: inset 0 -2px 0 var(--hi);
+}
+.cv-said b {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--jp); font-weight: 400; font-size: 32px; color: var(--ink);
+}
+.cv-said s {
+  flex: none; margin-left: auto; text-decoration: none;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em; color: var(--hi-deep);
+}
+.cv-said s em { font-style: normal; font-family: var(--jp-go); font-size: 10px; letter-spacing: 0.04em; color: rgba(20, 17, 13, 0.45); margin-left: 6px; }
+/* a right answer takes the gold rule and a quiet label -- vermilion is what you owe */
+.cv-said.correct { box-shadow: inset 0 -2px 0 var(--gold); }
+.cv-said.correct s { color: var(--cv-gold-deep); }
+
+/* ---- rows of objectives -------------------------------------------------------------------------- */
+.cv-rows { display: flex; flex-direction: column; }
+.cv-row {
+  display: flex; align-items: baseline; gap: 10px; padding: 4px 0 5px;
+  box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
+  font-family: var(--lat-ui); font-size: 11.5px; letter-spacing: 0.03em; color: var(--ink); font-weight: 600;
+}
+.cv-row > i {
+  flex: none; width: 10px; height: 10px; align-self: center;
+  background: rgba(20, 17, 13, 0.12); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.3);
+}
+.cv-row > i.on { background: var(--gold); }
+.cv-row > i.given { background: rgba(207, 164, 92, 0.25); box-shadow: inset 0 0 0 2px var(--gold); }
+.cv-row > i.opt { background: transparent; }
+.cv-row > i.opt.on { background: var(--gold); }
+.cv-row > s {
+  margin-left: auto; text-decoration: none; font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.42);
+}
+.cv-row > s.g { color: var(--cv-gold-deep); }
+.cv-fold {
+  padding: 8px 0 0; font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em;
+  color: rgba(20, 17, 13, 0.46);
+}
+.cv-score { display: flex; flex-direction: column; align-items: flex-start; padding: 8px 0 10px; }
+.cv-score b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 64px; line-height: 1; color: var(--ink); }
+.cv-score b sup { font-size: 24px; vertical-align: super; color: var(--cv-gold-deep); }
+.cv-score i {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.2em;
+  color: rgba(20, 17, 13, 0.5); margin-top: 2px;
+}
+
+/* ---- the scene before it starts ----------------------------------------------------------------- */
+.cv-title-jp { margin-top: 14px; font-family: var(--jp); font-size: 26px; line-height: 1.22; color: var(--ink); }
+.cv-title-en {
+  margin-top: 4px; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 20px;
+  line-height: 1.18; color: var(--hi-deep);
+}
+.cv-desc { margin: 8px 0 0; }
+.cv-need { margin-top: 14px; padding-bottom: 4px; }
+
+.cv-lvls { display: flex; gap: 12px; }
+.cv-lvl {
+  flex: 1; min-width: 0; border: 0; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 5px; padding: 11px 14px 12px; background: var(--washi-dim);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+}
+.cv-lvl b { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px; color: var(--ink); }
+.cv-lvl span.p { font-family: var(--lat-ui); font-size: 11px; line-height: 1.45; color: rgba(20, 17, 13, 0.66); letter-spacing: 0.02em; }
+.cv-spec { display: flex; gap: 6px; margin-top: 3px; }
+.cv-spec span {
+  padding: 2px 7px 3px; background: rgba(20, 17, 13, 0.08); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.6);
+}
+.cv-lvl.hot {
+  background: var(--washi);
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.cv-note-sm {
+  margin: 0; font-family: var(--lat-ui); font-size: 10px; line-height: 1.5; letter-spacing: 0.02em;
+  color: rgba(20, 17, 13, 0.6); font-weight: 600;
+}
+.cv-note-sm b { color: var(--ink); letter-spacing: 0.16em; font-size: 10px; margin-right: 8px; }
+/* the notes give way before the slab does */
+.cv-notes { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+
+/* ---- drafted cards: one open with its four fields, the rest one line each ------------------------ */
+.cv-cards { display: flex; flex-direction: column; gap: 8px; }
+.cv-card {
+  display: flex; align-items: center; gap: 12px; padding: 6px 12px 7px 14px; background: var(--washi-dim);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  border: 0; text-align: left; cursor: pointer; width: 100%;
+}
+.cv-card u {
+  text-decoration: none; flex: none; width: 22px; height: 22px; display: grid; place-items: center;
+  background: rgba(20, 17, 13, 0.14); color: rgba(20, 17, 13, 0.55);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+}
+.cv-card .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv-card .jp { font-family: var(--jp); font-size: 16px; color: var(--ink); }
+.cv-card .ro { font-family: var(--lat-ui); font-size: 10.5px; letter-spacing: 0.04em; color: rgba(20, 17, 13, 0.55); margin-left: 8px; }
+.cv-card.hot {
+  align-items: stretch; background: var(--washi); padding: 10px 12px 11px 14px; cursor: default;
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+.cv-card.hot u { background: var(--hi); color: #ffe9c9; }
+.cv-fields { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; }
+.cv-fld { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cv-fld em {
+  font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.45);
+}
+.cv-fld input {
+  min-width: 0; border: 0; outline: 0; padding: 3px 6px 4px; min-height: 24px;
+  background: rgba(20, 17, 13, 0.05); box-shadow: inset 0 -2px 0 rgba(20, 17, 13, 0.28);
+  font-family: var(--lat-ui); font-size: 11.5px; color: var(--ink);
+}
+.cv-fld input.jp { font-family: var(--jp); font-size: 15px; }
+.cv-fld input:focus { box-shadow: inset 0 -2px 0 var(--hi); }
+.cv-acts { flex: none; display: flex; flex-direction: column; justify-content: flex-end; }
+
+/* ---- the slab turned into the question it is asking --------------------------------------------- */
+.cv-ask-q {
+  margin: auto -1px -1px; height: 40px; flex: none;
+  display: flex; align-items: center; padding: 0 0 0 16px;
+  background: var(--hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.12em; color: #ffd9a1;
+}
+.cv-ask-q > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv-ask-q > button {
+  flex: none; height: 100%; border: 0; cursor: pointer; padding: 0 14px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em;
+}
+.cv-ask-q > button.yes { background: var(--hi-deep); color: #fff; }
+.cv-ask-q > button.no { background: var(--ink); color: var(--gold-hi); }
+
+/* ---- a finished session's pages, and the past sessions --------------------------------------- */
+.cv-detail { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.cv-dl {
+  display: flex; align-items: baseline; gap: 10px; padding: 5px 0 6px;
+  box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
+}
+.cv-dl em {
+  flex: none; width: 78px; font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.5);
+}
+.cv-dl span {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--lat-ui); font-size: 11.5px; color: var(--ink);
+}
+.cv-dl span.jp { font-family: var(--jp); font-size: 14px; }
+.cv-pager { display: flex; gap: 6px; align-items: center; }
+
+.cv-hist { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow: hidden; }
+.cv-hrow {
+  display: flex; flex-direction: column; gap: 2px; padding: 6px 12px 7px; border: 0; cursor: pointer;
+  text-align: left; background: var(--washi-dim);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+}
+.cv-hrow b { font-family: var(--lat-ui); font-size: 12px; font-weight: 700; color: var(--ink); }
+.cv-hrow s { text-decoration: none; font-family: var(--lat-ui); font-size: 10px; letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.55); }
+.cv-hrow.on {
+  background: var(--washi);
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}

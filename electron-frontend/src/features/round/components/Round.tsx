@@ -53,7 +53,15 @@ export interface RoundProps {
   work: ReactNode
   /** true once the answer is on the screen, which quiets the prompt's kicker */
   said?: boolean
-  foot: { at: number; target: number; trail: readonly boolean[]; note?: string }
+  foot: {
+    at: number; target: number; trail: readonly boolean[]; note?: string
+    /* A STRIP THAT IS NOT A RUN. A conversation's foot band is its objectives, some optional and
+       some given, so it brings its own tick classes, the sentence that stands where `N LEFT` would,
+       and the sentence a screen reader gets for the strip. */
+    marks?: readonly string[]
+    right?: string
+    label?: string
+  }
   onBack: () => void
   backLabel?: string
   backJp?: string
@@ -63,12 +71,14 @@ export interface RoundProps {
   backAria?: string
   /** throw this run away and deal a new one; omitted where there is nothing to throw away */
   onRestart?: () => void
+  /** what the second tab says when it is not "start over" -- a conversation's past sessions */
+  restart?: { en: string; jp: string; aria: string }
   hints: RoundHint[]
 }
 
 export function Round({
   head, cap, run, ask, work, said = false, foot, onBack, backLabel = 'Leave', backJp = '中断',
-  backAria = 'Leave this round', onRestart, hints,
+  backAria = 'Leave this round', onRestart, restart, hints,
 }: RoundProps) {
   const entered = useEntered()
   const frameRef = useFrameFit()
@@ -105,14 +115,18 @@ export function Round({
 
         <div className="rd-foot">
           <b>{foot.note ?? `ROUND ${String(Math.min(foot.at + 1, foot.target)).padStart(2, '0')}`}</b>
-          {folded ? (
+          {foot.marks ? (
+            <span className="rd-ticks" role="img" aria-label={foot.label ?? foot.right ?? ''}>
+              {foot.marks.map((m, i) => <i key={i} className={m || undefined} />)}
+            </span>
+          ) : folded ? (
             <span className="rd-fold">{foot.at} OF {foot.target} ANSWERED</span>
           ) : (
             <span className="rd-ticks" role="img" aria-label={`${foot.at} of ${foot.target} answered`}>
               {ticks.map((t, i) => <i key={i} className={t === 'todo' ? undefined : t} />)}
             </span>
           )}
-          <s>{left} LEFT</s>
+          <s>{foot.right ?? `${left} LEFT`}</s>
         </div>
 
         {/* TWO TABS, NOT ONE. Leaving and starting over are the two things you can do to a run from
@@ -124,8 +138,9 @@ export function Round({
             <span className="bt-en">{backLabel}</span><span className="bt-jp">{backJp}</span>
           </button>
           {onRestart ? (
-            <button type="button" onClick={onRestart} aria-label="Restart challenge">
-              <span className="bt-en">Start over</span><span className="bt-jp">やり直し</span>
+            <button type="button" onClick={onRestart} aria-label={restart?.aria ?? 'Restart challenge'}>
+              <span className="bt-en">{restart?.en ?? 'Start over'}</span>
+              <span className="bt-jp">{restart?.jp ?? 'やり直し'}</span>
             </button>
           ) : null}
         </div>

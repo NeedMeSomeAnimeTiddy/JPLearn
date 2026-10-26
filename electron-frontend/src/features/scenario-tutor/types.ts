@@ -408,3 +408,6 @@ export interface ScenarioHistoryEntry {
   summary: ScenarioSummary
   transcript: ScenarioTurnRecord[]
 }
+
+/** Where saving a finished session stands — see `useScenarioTutor`'s `retrySessionSave`. */
+export type ScenarioSessionSave = 'idle' | 'saving' | 'saved' | 'failed' | 'unavailable'

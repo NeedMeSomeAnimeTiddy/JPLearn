@@ -114,7 +114,7 @@ import {
   type TutorSettingsFields,
 } from './features/tutor'
 import type { AssistantToast } from './features/tutor/types'
-import { useScenarioTutor } from './features/scenario-tutor'
+import { Conversation, useScenarioTutor } from './features/scenario-tutor'
 import { useCursor, CursorFollower, type CursorSettings } from './features/cursor'
 import { useWindowDrag } from './features/window-drag'
 import { usePomodoro, BreakOverlay, type PomodoroSettingsFields } from './features/pomodoro'
@@ -317,7 +317,7 @@ function App() {
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
       { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu'], action: () => tutor.openTutorPanel() },
       { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei'], action: () => tutor.openTutorPanel('chat') },
-      { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => tutor.openTutorPanel('scenarios') },
+      { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => openScenesRef.current() },
       { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate'], action: () => tutor.openTutorPanel('ocr') },
     ]
 
@@ -617,6 +617,9 @@ function App() {
      do not have to move, and the palette does not re-register on every render. */
   const openExamLadderRef = useRef<() => void>(() => {})
   const openLibraryRef = useRef<() => void>(() => {})
+  /* AND THE SCENES, which every way into a scenario now lands on -- the palette, the curriculum --
+     because the conversation is a screen that starts from The World's TALK lane, not a pop-up. */
+  const openScenesRef = useRef<() => void>(() => {})
   /* AND THE TWO THE SCRIPT HUB LEFT BEHIND. Every route that used to navigate to it means one of
      exactly two things -- put me in front of this deck, or run this drill -- and both of those are
      built from `menuPath`, which is declared six hundred lines below the curriculum's destination
@@ -734,7 +737,7 @@ function App() {
         openLibraryRef.current()
         return
       case 'scenarios':
-        tutor.openTutorPanel('scenarios')
+        openScenesRef.current()
         return
       case 'tutor':
         tutor.openTutorPanel('chat')
@@ -1383,6 +1386,20 @@ function App() {
   openExamLadderRef.current = openExamLadder
   openLibraryRef.current = openLibrary
 
+  const openScenes = useCallback(() => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    tutor.closeTutorPanel()
+    navigate('home', 'back')
+    menuPath.enterSection('READING')
+    menuPath.enterScreen('scenes')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
+  }, [navigate, menuPath, tutor])
+  openScenesRef.current = openScenes
+
 
   /* ==================================================================================================
      THE UNLOCK MOMENT, WHICH IS AN EVENT AND NOT A PLACE.
@@ -1450,6 +1467,16 @@ function App() {
      `useWorldData`. `worldLanes` is memoised because `Lanes` watches the array it is given, and a
      fresh one on every render would re-subscribe its keydown listener for nothing. */
   const worldOpen = view === 'home' && menuLevel === 2 && menuPath.section === 'READING'
+  /* AND WHETHER A CONVERSATION STANDS ON THE SCENES. It is TALK's level three with a scene chosen,
+     so it is a flag over that screen rather than a view of its own; the session itself lives in
+     `useScenarioTutor`, so leaving the screen any way but LEAVE keeps it, and picking the same
+     scene again resumes it. */
+  const [conversationOpen, setConversationOpen] = useState(false)
+  const scenesUp = view === 'home' && menuLevel === 3 && menuPath.screen === 'scenes'
+  useEffect(() => { if (!scenesUp) setConversationOpen(false) }, [scenesUp])
+  const conversationUp = scenesUp && conversationOpen
+  const conversationUpRef = useRef(conversationUp)
+  conversationUpRef.current = conversationUp
   const world = useWorldData(worldOpen)
   const worldCards = useMemo(
     () => worldLanes({
@@ -1690,6 +1717,12 @@ function App() {
           return
         }
 
+        /* THE CONVERSATION KEEPS ITS OWN ESCAPE: it asks before it leaves, so it is not a key
+           that takes the menu up a level underneath it. */
+        if (conversationUpRef.current) {
+          return
+        }
+
         /* THE TREE FIRST, THEN THE FLAT MAP. Inside the menu, Escape means "up one level"; the
            `up()` boolean is what stops it becoming a key that silently does nothing at the root,
            where it must fall through to the app's own parent chain instead. */
@@ -1710,6 +1743,8 @@ function App() {
       }
 
       if (showSettings || showCloseDialog || commandPalette.isOpen || tutor.tutorPanelOpen || isInput) return
+      /* and the digits do not leave a conversation for a deck */
+      if (conversationUpRef.current) return
 
       if (event.key === '6') {
         setDictionaryOpen(false)
@@ -2693,19 +2728,35 @@ function App() {
         <Wall onUp={leaveMenuLevel} />
       ) : null}
 
-      {view === 'home' && menuLevel === 3 && menuPath.screen === 'scenes' ? (
+      {conversationUp ? (
+        <Conversation
+          scenarioTutor={scenarioTutor}
+          played={buildScenes(world.sessions).find((s) => s.id === scenarioTutor.selectedScenario?.id)?.played ?? null}
+          romajiEnabled={settings.romajiConversionEnabled}
+          onToggleRomaji={() => setSettings((previous) => ({ ...previous, romajiConversionEnabled: !previous.romajiConversionEnabled }))}
+          audioEnabled={settings.assistantChatAudioEnabled}
+          onToggleAudio={() => {
+            if (settings.assistantChatAudioEnabled) voice.cancelAssistantSpeech()
+            setSettings((previous) => ({ ...previous, assistantChatAudioEnabled: !previous.assistantChatAudioEnabled }))
+          }}
+          onLeave={() => setConversationOpen(false)}
+        />
+      ) : scenesUp ? (
         <Scenes
           scenes={buildScenes(world.sessions)}
           onPick={(scenarioId) => {
             if (scenarioId) {
-              /* the SCENE, not the picker: `selectScenario` is the scenario tutor's own call and
-                 the panel opens already standing on it */
-              scenarioTutor.selectScenario(scenarioId)
-              tutor.openTutorPanel('scenarios')
+              /* THE SCENE, AND THEN ITS SCREEN. A conversation already under way in this scene is
+                 resumed where it stood; any other pick starts at choosing how much help. */
+              const running = scenarioTutor.session?.status === 'active'
+                && scenarioTutor.selectedScenario?.id === scenarioId
+                && scenarioTutor.screen === 'session'
+              if (!running) scenarioTutor.selectScenario(scenarioId)
+              setConversationOpen(true)
               return
             }
-            /* free talk is not a scene and never was -- it is the tutor's own chat */
-            tutor.openTutorPanel('chat')
+            /* free talk is not a scene and never was -- it is a question to the tutor */
+            lookup.open('', 'tutor')
           }}
           onUp={leaveMenuLevel}
         />

@@ -77,3 +77,43 @@ export const SCENARIO_COPY = {
     'a local AI model may help judge unclear answers only if one is installed and enabled in Settings. ' +
     'Raw audio recordings are never saved. Transcripts are stored on this device only after you complete a scenario.',
 } as const
+
+/* ==================================================================================================
+   THE CONVERSATION SCREEN — the round's sheet with a character on it (canvas-kanji-conversation,
+   boards ConvLevel / ConvAsking / ConvAnswered / ConvFinished / ConvStates). English leads every
+   label and the Japanese stands beside it as texture; nothing on the sheet scrolls, so each list
+   below has a row budget and what does not fit is counted instead.
+   ================================================================================================== */
+
+/** what the answered line is stamped with, by how the engine graded it */
+export const CONVERSATION_OUTCOME: Record<'correct' | 'partial' | 'incorrect' | 'unclear', { en: string; jp: string }> = {
+  correct: { en: 'RIGHT', jp: '正解' },
+  partial: { en: 'PARTIAL', jp: '部分' },
+  incorrect: { en: 'NOT QUITE', jp: '誤り' },
+  unclear: { en: 'NOT UNDERSTOOD', jp: '不明' },
+}
+
+/** the drafted cards on show at once: the open one and the one-line cards under it */
+export const CONVERSATION_CARD_ROWS = 4
+/** the hints on the sheet at once; earlier ones are counted */
+export const CONVERSATION_HINT_ROWS = 2
+/** the lines on one page of a finished session's details and transcript */
+export const CONVERSATION_DETAIL_ROWS = 8
+/** the objectives the level screen lists before it counts the rest */
+export const CONVERSATION_OBJECTIVE_ROWS = 7
+/** past sessions on one page of the history */
+export const CONVERSATION_HISTORY_ROWS = 6
+
+export const CONVERSATION_COPY = {
+  leaveAsk: 'LEAVE THIS SCENARIO?',
+  restartAsk: 'START OVER?',
+  leaveNote: 'Your progress in this session will be discarded.',
+  restartNote: 'Your current progress will be discarded.',
+  yes: 'YES, DISCARD',
+  no: 'KEEP GOING',
+  placeholder: 'type your reply in Japanese',
+  saving: 'SAVING THE SESSION…',
+  endedEarly: 'A CONVERSATION THAT ENDED EARLY IS NOT SAVED, SO IT DRAFTS NO CARDS.',
+  noCards: 'NO CARDS LEFT TO REVIEW',
+  historyEmpty: 'No completed sessions yet.',
+} as const

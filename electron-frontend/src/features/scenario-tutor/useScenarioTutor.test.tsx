@@ -223,6 +223,39 @@ describe('useScenarioTutor — persistence, SRS draft review, and history', () =
 
     await waitFor(() => expect(result.current.persistenceNote).toContain('disk full'))
     expect(result.current.srsDrafts).toEqual([])
+    expect(result.current.sessionSave).toBe('failed')
+  })
+
+  it('saves the same session again on retry, and drafts its cards once that lands', async () => {
+    let calls = 0
+    const saveScenarioSession = vi.fn(async (payload: { sessionId: string }) => {
+      calls += 1
+      if (calls === 1) throw new Error('database is locked')
+      return { id: payload.sessionId }
+    })
+    window.jplearnDesktop = { saveScenarioSession } as unknown as Window['jplearnDesktop']
+
+    const { result } = renderHook(() => useScenarioTutor())
+    completeCafeOrder(result)
+    await waitFor(() => expect(result.current.sessionSave).toBe('failed'))
+
+    act(() => result.current.retrySessionSave())
+    await waitFor(() => expect(result.current.sessionSave).toBe('saved'))
+    expect(result.current.persistenceNote).toBeNull()
+    expect(result.current.srsDrafts.length).toBeGreaterThan(0)
+    /* the same session id both times -- the backend ignores an id it already holds */
+    expect(saveScenarioSession).toHaveBeenCalledTimes(2)
+    const [first, second] = saveScenarioSession.mock.calls.map(([payload]) => payload.sessionId)
+    expect(second).toBe(first)
+  })
+
+  it('does not offer a retry when this build cannot save at all', async () => {
+    window.jplearnDesktop = {} as unknown as Window['jplearnDesktop']
+    const { result } = renderHook(() => useScenarioTutor())
+    completeCafeOrder(result)
+    await waitFor(() => expect(result.current.sessionSave).toBe('unavailable'))
+    act(() => result.current.retrySessionSave())
+    expect(result.current.sessionSave).toBe('unavailable')
   })
 
   it('drops a late persistence result after the session is abandoned before it resolves', async () => {

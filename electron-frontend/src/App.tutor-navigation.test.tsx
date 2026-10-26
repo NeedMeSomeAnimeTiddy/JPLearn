@@ -112,17 +112,17 @@ describe('Shared Tutor popup navigation', () => {
     expect(within(dialog).getByRole('button', { name: 'Image Translation' })).toBeTruthy()
   })
 
-  it('all four command palette entries open the shared popup at the right place', async () => {
+  it('all four command palette entries open the right place', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
 
+    /* Scenario Practice is a screen now: the palette lands on The World's scenes, not a pop-up */
     fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
     let search = await screen.findByRole('textbox', { name: /search commands/i })
     fireEvent.change(search, { target: { value: 'Scenario Practice' } })
     fireEvent.click(await screen.findByRole('option', { name: 'Scenario Practice' }))
-    await screen.findByRole('dialog', { name: 'Scenario practice panel' })
-    expect(screen.getByRole('button', { name: 'Back to Tutor menu' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Close Tutor panel' }))
+    await screen.findByRole('group', { name: 'Conversations' })
+    expect(screen.queryByRole('dialog', { name: 'Scenario practice panel' })).toBeNull()
 
     fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
     search = await screen.findByRole('textbox', { name: /search commands/i })
