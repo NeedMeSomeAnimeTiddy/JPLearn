@@ -91,7 +91,7 @@ from domain.blocks import (  # noqa: E402
 from domain.cards import Card, Deck  # noqa: E402
 from domain.distractors import rank_distractor_ids  # noqa: E402
 from domain.decks import ALL_DECKS  # noqa: E402
-from domain.scheduler import ReviewState, get_weights, set_weights as set_scheduler_weights, update  # noqa: E402
+from domain.scheduler import ReviewState, get_weights, has_been_reviewed, set_weights as set_scheduler_weights, update  # noqa: E402
 from domain.word_of_the_day import WordOfDay, select_word_of_the_day  # noqa: E402
 from domain.queue_builder import build_study_queue  # noqa: E402
 from domain.decks import (  # noqa: E402
@@ -1538,7 +1538,7 @@ def build_vocab_feed(slug: str, budget: int | None = None) -> dict[str, object]:
     deck = factory()
     card_ids = [card.id for card in deck.cards]
     states = load_review_states(deck.name, card_ids)
-    started = {cid for cid in card_ids if getattr(states.get(cid), "repetitions", 0) >= 1}
+    started = {cid for cid, state in states.items() if has_been_reviewed(state)}
     known = _known_kanji()
 
     # the theme survives the blocks going, and it is the one label a word still carries
@@ -2268,7 +2268,7 @@ def _build_category_metrics_for_node(node_id: str, *, n5_only: bool = False) -> 
         deck_keys.append(_normalize_deck_key(deck.name))
 
         for state in load_review_states(deck.name, card_ids).values():
-            if state.repetitions <= 0:
+            if not has_been_reviewed(state):
                 new_count += 1
             elif state.next_review <= today:
                 if state.next_review < today:
@@ -2915,7 +2915,7 @@ def build_study_queue_payload(slug: str) -> dict[str, object]:
     card_ids = [card.id for card in deck.cards]
     states = load_review_states(deck.name, card_ids)
     due_card_ids = {card_id for card_id, state in states.items() if state.is_due()}
-    new_card_ids = {card_id for card_id, state in states.items() if state.repetitions <= 0}
+    new_card_ids = {card_id for card_id, state in states.items() if not has_been_reviewed(state)}
     leech_card_ids = load_active_leech_card_ids(deck.name)
     game_miss_card_ids = DailyGamesRepository().load_active_game_miss_card_ids(
         deck.name,

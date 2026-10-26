@@ -715,7 +715,13 @@ def test_study_queue_keeps_due_and_leech_ahead_of_daily_game_miss_reviews(
     database.init_db()
     database.save_state(
         deck.name,
-        ReviewState(card_id=1, repetitions=1, interval=1, next_review=today),
+        ReviewState(
+            card_id=1,
+            repetitions=1,
+            interval=1,
+            next_review=today,
+            last_review=today - timedelta(days=1),
+        ),
     )
     for card_id in (2, 3, 4):
         database.save_state(
@@ -725,6 +731,7 @@ def test_study_queue_keeps_due_and_leech_ahead_of_daily_game_miss_reviews(
                 repetitions=1,
                 interval=1,
                 next_review=today + timedelta(days=1),
+                last_review=today,
             ),
         )
     with database._connect() as conn:  # type: ignore[attr-defined]
