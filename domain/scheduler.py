@@ -56,7 +56,9 @@ def has_been_reviewed(state: ReviewState) -> bool:
 
     Lapses retain their review date and stability. Positive repetitions also
     cover pre-FSRS rows, whose date and stability migration left unset; the
-    repetitions-only backfill preserves those missing fields.
+    repetitions-only backfill preserves those missing fields. A pre-FSRS row
+    whose last answer was a lapse carries none of the three markers and still
+    reads as never reviewed; ``data/state_rebuild.py`` repairs it from the log.
     """
     return state.last_review is not None or state.stability > 0 or state.repetitions > 0
 
