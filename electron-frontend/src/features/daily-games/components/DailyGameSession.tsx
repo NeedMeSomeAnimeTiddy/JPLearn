@@ -36,7 +36,7 @@ const PUZZLE_TEXT: Record<DailyGameType, { title: string; resultsTitle: string; 
 
 /* shortcut: the puzzles not yet moved onto the sheet keep their old board and result overlay until
    their own step of the build order lands; this set empties as they move */
-const ON_THE_SHEET: ReadonlySet<DailyGameType> = new Set(['typing_blitz'])
+const ON_THE_SHEET: ReadonlySet<DailyGameType> = new Set(['typing_blitz', 'match_pairs'])
 
 function getAttemptMissedWords(data: DailyGamesStatePayload, attempt: DailyGamesAttemptRequest): DailyGamesMissedWordPayload[] {
   return attempt.outcomes.flatMap((outcome) => {
@@ -241,6 +241,9 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         />
       )
     }
+    if (gameType === 'match_pairs' && seed !== null) {
+      return <MatchPairsGame pairs={pairs} isSaving={isSaving} onComplete={(next) => completeGame({ ...next, targetCount: pairs.length / 2 })} shell={shell} />
+    }
     if (gameType === 'typing_blitz' && seed !== null) {
       return <TypingBlitzGame words={typingBlitzWords} isSaving={isSaving} onComplete={completeGame} shell={shell} />
     }
@@ -291,7 +294,6 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
       {isLoading ? <div className="daily-games-skeleton" role="status" aria-label={fillCopy(DAILY_GAMES_COPY.loadingGame, { title: text.title })}><span /><span /></div> : null}
       {!isLoading && error && !attempt ? <section className="daily-games-state" role="alert"><h2>{DAILY_GAMES_COPY.gameUnavailable}</h2><p>{error}</p><button type="button" className="daily-games-retry" onClick={onBack}>{DAILY_GAMES_COPY.retryGame}</button></section> : null}
       {!isLoading && crosswordBoard && !result && gameType === 'crossword' ? <CrosswordGame board={crosswordBoard} isSaving={isSaving} onComplete={completeGame} /> : null}
-      {!isLoading && seed !== null && !result && gameType === 'match_pairs' ? <MatchPairsGame pairs={pairs} isSaving={isSaving} onComplete={(next) => completeGame({ ...next, targetCount: pairs.length / 2 })} /> : null}
       {!isLoading && wordSearchBoard && !result && gameType === 'word_search' ? <WordSearchGame board={wordSearchBoard} isSaving={isSaving} onComplete={completeGame} /> : null}
       {attempt && error ? <section className="daily-games-state" role="alert"><h2>{DAILY_GAMES_COPY.gameUnavailable}</h2><p>{error}</p><button type="button" className="daily-games-retry" onClick={() => void recordAttempt(attempt)}>{DAILY_GAMES_COPY.retryGame}</button></section> : null}
       {result ? <GameResultsOverlay mode={result.isFallback ? 'practice' : mode} score={result.score} pairCount={result.pairCount} clipboard={dependencies.clipboard} onDone={onBack} missedWords={result.missedWords} onReviewMissedWords={onReviewMissedWords} {...(gameType === 'crossword' ? { title: CROSSWORD_COPY.resultsTitle, dailyResults: CROSSWORD_COPY.dailyResults, practiceResults: CROSSWORD_COPY.practiceResults, countLabel: CROSSWORD_COPY.words } : gameType === 'word_search' ? { title: WORD_SEARCH_COPY.resultsTitle, dailyResults: WORD_SEARCH_COPY.dailyResults, practiceResults: WORD_SEARCH_COPY.practiceResults, countLabel: WORD_SEARCH_COPY.words } : {})} /> : null}

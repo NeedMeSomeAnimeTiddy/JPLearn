@@ -714,7 +714,7 @@ input.dp-cell { width: 100%; height: 100%; caret-color: var(--hi); }
 .dp-list { margin: 0; padding: 0; list-style: none; }
 .dp-row {
   display: flex; align-items: baseline; gap: 11px;
-  width: 100%; margin: 0; padding: 6px 0 7px; border: 0;
+  width: 100%; margin: 0; padding: 5px 0 6px; border: 0;
   background: none; text-align: left;
   box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
   font-family: var(--lat-ui); color: var(--ink);
@@ -761,3 +761,47 @@ button.dp-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px
 
 /* ---- the ending: the result, as the work cell ---------------------------------------------------- */
 .dp-end .rd-note { margin: 0 0 6px; }
+
+/* ---- what a cell's board stands in: the space under the kicker, centred, never scrolled --------- */
+.dp-stage {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 0 14px; overflow: hidden;
+}
+.rd-work .dp-stage { padding-top: 0; }
+
+/* ---- match pairs: two columns of up to six on each side of the hairline ------------------------- */
+.dp-tiles {
+  width: 100%; height: 100%;
+  display: grid; grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(var(--dp-rows), minmax(0, 45px));
+  gap: 5px 8px; align-content: center;
+}
+.dp-tile {
+  min-width: 0; min-height: 0; padding: 0 10px; border: 0; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: var(--washi-dim); color: var(--ink);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  transition: background 0.14s ease, box-shadow 0.14s ease;
+}
+.dp-tile.jp { font-family: var(--jp); font-weight: 400; font-size: 21px; }
+.dp-tile.lat {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.01em;
+}
+.dp-tile:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+.dp-tile:disabled { cursor: default; }
+/* the one you are holding: lifted, the vermilion edge the slips use for the one in hand */
+.dp-tile.here {
+  background: var(--washi);
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+/* a pair you made is earned, and it stays where it is */
+.dp-tile.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.3); }
+/* a wrong pair flashes once, for as long as the board holds it */
+@keyframes dpFlash { from { background: var(--hi); color: #ffe9c9; } to { background: var(--washi-dim); } }
+.dp-tile.bad { animation: dpFlash 0.4s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dp-tile { transition: none; }
+  .dp-tile.bad { animation: none; background: var(--hi); color: #ffe9c9; }
+}
