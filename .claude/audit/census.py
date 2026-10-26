@@ -13,6 +13,7 @@ working directory, so a commit audited in its own worktree is counted there):
 
 Options:
     --json      emit machine-readable output instead of the report
+    --records   include prior findings and debt triggers (for Reconcile)
     --top N     how many entries to show in ranked lists (default 12)
 
 Stdlib only, no network. Each section prints the paths and patterns it used, so
@@ -62,7 +63,10 @@ STDIN_ERROR = re.compile(r"\.stdin\??\.on\(\s*['\"]error['\"]")
 
 # Section 5
 URL_HOST = re.compile(r"https?://([A-Za-z0-9.-]+)")
-NET_CALL = re.compile(r"https\.get\(|https\.request\(|\bfetch\(|\burllib\b|\brequests\.\w")
+NET_CALL = re.compile(r"https\.get\(|https\.request\(|\bfetch\(|\burllib\b|\brequests\.\w"
+                      r"|\bnet\.request\s*\(|\bautoUpdater\b|update-electron-app")
+RENDERER_NET_CALL = re.compile(r"\bfetch\s*\(|\bXMLHttpRequest\b|\bnew\s+WebSocket\b"
+                               r"|\bEventSource\b|https?://[^\s'\"`<>]+")
 
 # Section 6
 USE_STATE = re.compile(r"\buseState\b(?:<[^>]*>)?\(")
@@ -91,13 +95,18 @@ TODO_AREAS = [Path("domain"), Path("data"), Path("scripts"), Path("tests"), SRC,
 TRIGGER = re.compile(r"\*\*(?:The\s+)?[Tt]rigger(?!s?\s+(?:has\s+not\s+)?fired)")
 FINDINGS_HEADING = "## 8. Findings"
 
+# Reset for each section by collect(). A section with unreadable input is withheld
+# rather than publishing incomplete counts as though they were complete.
+_READ_ERRORS: dict[str, str] = {}
+
 
 def sh(cmd: list[str]) -> str:
-    try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=30,
-                              encoding="utf-8", errors="replace").stdout.strip()
-    except Exception:
-        return ""
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30,
+                            encoding="utf-8", errors="replace")
+    if result.returncode:
+        reason = result.stderr.strip() or result.stdout.strip() or "no diagnostic output"
+        raise RuntimeError(f"exit {result.returncode}: {reason}")
+    return result.stdout.strip()
 
 
 def walk(root: Path, exts: tuple[str, ...]) -> list[Path]:
@@ -122,7 +131,8 @@ def is_generated(p: Path) -> bool:
 def read(p: Path) -> str:
     try:
         return p.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    except OSError as exc:
+        _READ_ERRORS[posix(p)] = f"{type(exc).__name__}: {exc}"
         return ""
 
 
@@ -130,7 +140,8 @@ def first_line(p: Path) -> str:
     try:
         with p.open(encoding="utf-8", errors="replace") as fh:
             return fh.readline()
-    except OSError:
+    except OSError as exc:
+        _READ_ERRORS[posix(p)] = f"{type(exc).__name__}: {exc}"
         return ""
 
 
@@ -163,13 +174,28 @@ def renderer_files(exts: tuple[str, ...] = (".ts", ".tsx")) -> list[Path]:
 # --- 1. header -------------------------------------------------------------
 
 def header() -> dict[str, Any]:
-    porcelain = sh(["git", "status", "--porcelain"]).splitlines()
+    errors: list[dict[str, Any]] = []
+
+    def git(args: list[str], fields: list[str]) -> str | None:
+        cmd = ["git", *args]
+        try:
+            return sh(cmd)
+        except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+            errors.append({"section": "header", "fields": fields, "command": cmd,
+                           "reason": f"{type(exc).__name__}: {exc}"})
+            return None
+
+    status = git(["status", "--porcelain"], ["uncommitted_tracked", "untracked"])
+    porcelain = status.splitlines() if status is not None else None
     return {
-        "commit": sh(["git", "rev-parse", "--short", "HEAD"]),
-        "subject": sh(["git", "log", "-1", "--format=%s"]),
-        "branch": sh(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
-        "uncommitted_tracked": sum(1 for ln in porcelain if not ln.startswith("??")),
-        "untracked": sum(1 for ln in porcelain if ln.startswith("??")),
+        "commit": git(["rev-parse", "--short", "HEAD"], ["commit"]),
+        "subject": git(["log", "-1", "--format=%s"], ["subject"]),
+        "branch": git(["rev-parse", "--abbrev-ref", "HEAD"], ["branch"]),
+        "uncommitted_tracked": (sum(1 for ln in porcelain if not ln.startswith("??"))
+                                if porcelain is not None else None),
+        "untracked": (sum(1 for ln in porcelain if ln.startswith("??"))
+                      if porcelain is not None else None),
+        "errors": errors,
     }
 
 
@@ -250,10 +276,10 @@ def electron_main() -> dict[str, Any]:
 
 # --- 5. network ------------------------------------------------------------
 
-def network_hits(text: str) -> dict[str, list[str]]:
+def network_hits(text: str, pattern: re.Pattern[str] = NET_CALL) -> dict[str, list[str]]:
     hosts = sorted(set(URL_HOST.findall(text)))
     calls = [f"{i}: {ln.strip()[:100]}" for i, ln in enumerate(text.splitlines(), 1)
-             if NET_CALL.search(ln)]
+             if pattern.search(ln)]
     return {"hosts": hosts, "calls": calls}
 
 
@@ -264,6 +290,13 @@ def network() -> dict[str, dict[str, list[str]]]:
         if is_test(p) or is_auto_generated(p):
             continue
         hits = network_hits(read(p))
+        if hits["hosts"] or hits["calls"]:
+            out[posix(p)] = hits
+    renderer = walk(SRC, (".ts", ".tsx", ".css", ".html")) + [FRONTEND / "index.html"]
+    for p in renderer:
+        if is_test(p):
+            continue
+        hits = network_hits(read(p), RENDERER_NET_CALL)
         if hits["hosts"] or hits["calls"]:
             out[posix(p)] = hits
     return out
@@ -357,19 +390,25 @@ def open_findings(text: str) -> list[tuple[str, str]]:
 def open_triggers(text: str) -> list[tuple[int, str, str]]:
     """Every OPEN debt entry's triggers: (number, title, trigger text).
 
-    Closed is a wholly struck heading or one saying closed/resolved; a partly
-    struck title is still open. Triggers are not line-anchored -- one written
+    Closed is a wholly struck heading/title or a heading containing the exact
+    **CLOSED YYYY-MM-DD** marker; a partly struck title is still open.
+    Triggers are not line-anchored -- one written
     mid-paragraph is as real as one at column zero.
     """
     heads = list(re.finditer(r"^## (.+)$", text, re.M))
     out: list[tuple[int, str, str]] = []
     for i, h in enumerate(heads):
-        head = h.group(1)
-        num = re.match(r"(?:~~)?(\d+)\.", head)
-        if not num or head.startswith("~~") or re.search(r"closed|resolved", head, re.I):
+        head = h.group(1).strip()
+        struck = re.fullmatch(r"~~((?:(?!~~).)+)~~", head)
+        num = re.match(r"(?:~~)?(\d+)\.\s*(.*)", struck.group(1) if struck else head)
+        if not num:
+            continue
+        title = num.group(2).strip()
+        if (struck or re.fullmatch(r"~~(?:(?!~~).)+~~", title)
+                or re.search(r"\*\*CLOSED \d{4}-\d{2}-\d{2}\*\*", head)):
             continue
         body = text[h.end():heads[i + 1].start() if i + 1 < len(heads) else len(text)]
-        title = plain(re.sub(r"^\d+\.\s*", "", head))
+        title = plain(title)
         for m in TRIGGER.finditer(body):
             raw = body[m.start():m.start() + 400].split("\n\n")[0]
             trig = re.sub(r"^(?:The\s+)?[Tt]rigger[:.]?\s*", "", plain(raw))
@@ -394,19 +433,37 @@ def todos() -> dict[str, int]:
             for a in TODO_AREAS}
 
 
-def collect() -> dict[str, Any]:
-    return {
-        "header": header(),
-        "largest_files": largest_files(),
-        "bridge": bridge(),
-        "electron_main": electron_main(),
-        "network": network(),
-        "renderer": renderer(),
-        "decks": decks(),
-        "tests": tests(),
-        "records": records(),
-        "todos": todos(),
-    }
+def collect(include_records: bool = False) -> dict[str, Any]:
+    collectors = [header, largest_files, bridge, electron_main, network, renderer, decks, tests]
+    if include_records:
+        collectors.append(records)
+    collectors.append(todos)
+    data: dict[str, Any] = {}
+    errors: list[dict[str, Any]] = []
+    read_errors: dict[str, dict[str, Any]] = {}
+    partial: list[str] = []
+    for collector in collectors:
+        name = collector.__name__
+        _READ_ERRORS.clear()
+        result = collector()
+        if name == "header":
+            errors.extend(result.pop("errors"))
+            if errors:
+                partial.append(name)
+        if _READ_ERRORS:
+            partial.append(name)
+            for path, reason in _READ_ERRORS.items():
+                errors.append({"section": name, "path": path, "reason": reason})
+                entry = read_errors.setdefault(path, {"path": path, "reason": reason, "sections": []})
+                entry["sections"].append(name)
+            # Counts based on incomplete input must never appear as a complete zero.
+            result = None
+        data[name] = result
+    _READ_ERRORS.clear()
+    data["errors"] = errors
+    data["read_errors"] = {"count": len(read_errors), "files": list(read_errors.values())}
+    data["partial_sections"] = partial
+    return data
 
 
 # --- report ----------------------------------------------------------------
@@ -423,119 +480,147 @@ def ranked(a: Any, rows: list[tuple[str, int]], top: int, indent: str = "      "
 def report(d: dict[str, Any], top: int) -> str:
     L: list[str] = []
     a = L.append
+
+    def unavailable(key: str, field: str | None = None) -> str:
+        reasons = dict.fromkeys(e["reason"] for e in d["errors"]
+                                if e["section"] == key and (field is None or field in e.get("fields", [])))
+        return f"unavailable ({'; '.join(reasons)})"
+
+    def shown(value: Any, key: str, field: str) -> str:
+        return str(value) if value is not None else unavailable(key, field)
+
+    def heading(key: str, title: str) -> bool:
+        a(title + (" [partial]" if key in d["partial_sections"] else ""))
+        if d[key] is None:
+            a(f"  {unavailable(key)}")
+            a("")
+            return False
+        return True
+
     h = d["header"]
-    a("1. HEADER")
-    a(f"JPLearn census - {h['commit']} {plain(h['subject'])!r} on {h['branch']}")
+    heading("header", "1. HEADER")
+    subject = repr(plain(h["subject"])) if h["subject"] is not None else unavailable("header", "subject")
+    a(f"JPLearn census - {shown(h['commit'], 'header', 'commit')} {subject} "
+      f"on {shown(h['branch'], 'header', 'branch')}")
     a(f"Root: {Path.cwd().resolve()}")
-    a(f"Working tree: {h['uncommitted_tracked']} uncommitted tracked, {h['untracked']} untracked")
+    a(f"Working tree: {shown(h['uncommitted_tracked'], 'header', 'uncommitted_tracked')} uncommitted tracked, "
+      f"{shown(h['untracked'], 'header', 'untracked')} untracked")
     a("Counts only. Nothing here is a finding; every number is somewhere to start reading.")
     a("")
 
-    a(f"2. LARGEST HAND-WRITTEN FILES (lines, top {top})  - first line '{AUTO_GENERATED}' skipped;")
-    a(f"   never descends into {', '.join(sorted(SKIP_DIRS))}")
-    roots = {"python": "domain/ data/ scripts/ *.py", "ts_tsx": "electron-frontend/src *.ts(x), not src/generated",
-             "cjs": "electron-frontend/electron *.cjs", "css": "electron-frontend/src *.css"}
-    for kind, rows in d["largest_files"].items():
-        a(f"  {kind}  ({roots[kind]})")
-        ranked(a, rows, top)
-    a("")
+    if heading("largest_files", f"2. LARGEST HAND-WRITTEN FILES (lines, top {top})  - first line '{AUTO_GENERATED}' skipped;"):
+        a(f"   never descends into {', '.join(sorted(SKIP_DIRS))}")
+        roots = {"python": "*.py under domain/ data/ scripts/", "ts_tsx": "electron-frontend/src *.ts(x), not src/generated",
+                 "cjs": "electron-frontend/electron *.cjs", "css": "electron-frontend/src *.css"}
+        for kind, rows in d["largest_files"].items():
+            a(f"  {kind}  ({roots[kind]})")
+            ranked(a, rows, top)
+        a("")
 
-    b = d["bridge"]
-    a("3. PYTHON BRIDGE")
-    a(f"  commands in {BRIDGE.as_posix()} _COMMAND_HANDLERS: {b['commands']}")
-    a(f"  _connect( / shared_connection( call sites in data/ (defs excluded): {b['connect_sites_total']}")
-    ranked(a, b["connect_sites_by_file"], top)
-    a("")
+    if heading("bridge", "3. PYTHON BRIDGE"):
+        b = d["bridge"]
+        a(f"  commands in {BRIDGE.as_posix()} _COMMAND_HANDLERS: {b['commands']}")
+        a(f"  _connect( / shared_connection( call sites in data/ (defs excluded): {b['connect_sites_total']}")
+        ranked(a, b["connect_sites_by_file"], top)
+        a("")
 
-    e = d["electron_main"]
-    a("4. ELECTRON MAIN  (electron-frontend/electron *.cjs, tests excluded)")
-    a("  ipcMain.handle( per file:")
-    ranked(a, e["ipc_handle_by_file"], top)
-    cands = e["unvalidated_candidates"]
-    with_input = [c["channel"] for c in cands if c["takes_input"]]
-    no_input = [c["channel"] for c in cands if not c["takes_input"]]
-    a(f"  unvalidated candidates in {IPC_HANDLERS.as_posix()}: {len(cands)}  - body names no imported")
-    a("  ipc_security validate* function (assertTrustedIpcSender does not count)")
-    a(f"    taking arguments beyond event ({len(with_input)}):")
-    for i in range(0, len(with_input), 3):
-        a("      " + "  ".join(f"{n:<36}" for n in with_input[i:i + 3]).rstrip())
-    a(f"    event only ({len(no_input)}): listed in --json")
-    a("  spawn( / execFile( / fork( (and *Sync) per file:")
-    ranked(a, e["spawn_sites_by_file"], top)
-    a("  .stdin.on('error' per file:")
-    ranked(a, e["stdin_error_by_file"], top)
-    a("")
+    if heading("electron_main", "4. ELECTRON MAIN  (electron-frontend/electron *.cjs, tests excluded)"):
+        e = d["electron_main"]
+        a("  ipcMain.handle( per file:")
+        ranked(a, e["ipc_handle_by_file"], top)
+        cands = e["unvalidated_candidates"]
+        with_input = [c["channel"] for c in cands if c["takes_input"]]
+        no_input = [c["channel"] for c in cands if not c["takes_input"]]
+        a(f"  unvalidated candidates in {IPC_HANDLERS.as_posix()}: {len(cands)}  - body names no imported")
+        a("  ipc_security validate* function (assertTrustedIpcSender does not count)")
+        a(f"    taking arguments beyond event ({len(with_input)}):")
+        for i in range(0, len(with_input), 3):
+            a("      " + "  ".join(f"{n:<36}" for n in with_input[i:i + 3]).rstrip())
+        a(f"    event only ({len(no_input)}): listed in --json")
+        a("  spawn( / execFile( / fork( (and *Sync) per file:")
+        ranked(a, e["spawn_sites_by_file"], top)
+        a("  .stdin.on('error' per file:")
+        ranked(a, e["stdin_error_by_file"], top)
+        a("")
 
-    a("5. NETWORK  (electron/, scripts/, data/, domain/; tests excluded)")
-    a(f"  URL hosts /https?://host/ and calls /{NET_CALL.pattern}/")
-    if not d["network"]:
-        a("      none")
-    for path, hits in d["network"].items():
-        a(f"  {path}")
-        if hits["hosts"]:
-            a(f"      hosts: {', '.join(hits['hosts'])}")
-        for c in hits["calls"][:top]:
-            a(f"      {c}")
-        if len(hits["calls"]) > top:
-            a(f"        ... {len(hits['calls']) - top} more calls")
-    a("")
+    if heading("network", "5. NETWORK  (electron/, scripts/, data/, domain/, renderer src/ and index.html; tests excluded)"):
+        a(f"  URL hosts /https?://host/ and calls /{NET_CALL.pattern}/")
+        a(f"  renderer .ts/.tsx/.css/.html lines /{RENDERER_NET_CALL.pattern}/ (including src/generated)")
+        if not d["network"]:
+            a("      none")
+        for path, hits in d["network"].items():
+            a(f"  {path}")
+            if hits["hosts"]:
+                a(f"      hosts: {', '.join(hits['hosts'])}")
+            for c in hits["calls"][:top]:
+                a(f"      {c}")
+            if len(hits["calls"]) > top:
+                a(f"        ... {len(hits['calls']) - top} more calls")
+        a("")
 
-    r = d["renderer"]
-    a(f"6. RENDERER  (electron-frontend/src, tests and src/generated excluded)")
-    a(f"  App.tsx: {r['app_tsx_lines']} lines, {r['app_tsx_use_state']} useState(")
-    storage = r["local_storage_by_file"]
-    a(f"  localStorage. call sites: {sum(len(v) for v in storage.values())} in {len(storage)} files")
-    for path, sites in sorted(storage.items(), key=lambda kv: -len(kv[1]))[:top]:
-        a(f"    {len(sites):>3}  {path}")
-        for s in sorted(set(sites)):
-            a(f"           {s}")
-    for name, rows in r["loops_by_file"].items():
-        a(f"  {name} per file (total {sum(n for _, n in rows)}):")
-        ranked(a, rows, top)
-    hexes = r["hex_colours_by_file"]
-    a(f"  hex colour literals /{HEX_COLOUR.pattern}/ in .ts/.tsx/.css (total {sum(n for _, n in hexes)}):")
-    ranked(a, hexes, top)
-    radius = r["border_radius_nonzero_by_file"]
-    a(f"  border-radius not 0 in src CSS (total {sum(n for _, n in radius)}):")
-    ranked(a, radius, top)
-    a("")
+    if heading("renderer", f"6. RENDERER  (electron-frontend/src, tests and src/generated excluded)"):
+        r = d["renderer"]
+        a(f"  App.tsx: {r['app_tsx_lines']} lines, {r['app_tsx_use_state']} useState(")
+        storage = r["local_storage_by_file"]
+        a(f"  localStorage. call sites: {sum(len(v) for v in storage.values())} in {len(storage)} files")
+        for path, sites in sorted(storage.items(), key=lambda kv: -len(kv[1]))[:top]:
+            a(f"    {len(sites):>3}  {path}")
+            for s in sorted(set(sites)):
+                a(f"           {s}")
+        for name, rows in r["loops_by_file"].items():
+            a(f"  {name} per file (total {sum(n for _, n in rows)}):")
+            ranked(a, rows, top)
+        hexes = r["hex_colours_by_file"]
+        a(f"  hex colour literals /{HEX_COLOUR.pattern}/ in .ts/.tsx/.css (total {sum(n for _, n in hexes)}):")
+        ranked(a, hexes, top)
+        radius = r["border_radius_nonzero_by_file"]
+        a(f"  border-radius not 0 in src CSS (total {sum(n for _, n in radius)}):")
+        ranked(a, radius, top)
+        a("")
 
-    k = d["decks"]
-    a(f"7. DECKS  - ALL_DECKS[ outside tests in domain/ data/ scripts/: {k['all_decks_total']}")
-    a("   (deck builders are uncached and rebuild on every call)")
-    ranked(a, k["all_decks_by_file"], top)
-    a("")
+    if heading("decks", "7. DECKS  - ALL_DECKS[ outside tests in domain/ data/ scripts/"):
+        k = d["decks"]
+        a(f"  total: {k['all_decks_total']}")
+        ranked(a, k["all_decks_by_file"], top)
+        a("")
 
-    a("8. TESTS  (pytest `def test_` in tests/test_*.py; vitest it(/test( in *.test.*)")
-    for area, t in d["tests"].items():
-        a(f"  {area:<28} {t['files']:>4} files  {t['tests']:>5} tests")
-    a("")
+    if heading("tests", "8. TESTS  (pytest `def test_` in tests/test_*.py; vitest it(/test( in *.test.*)"):
+        for area, t in d["tests"].items():
+            a(f"  {area:<28} {t['files']:>4} files  {t['tests']:>5} tests")
+        a("")
 
-    rec = d["records"]
-    findings = rec["architecture_open_findings"]
-    a(f"9. RECORDS  - {ARCHITECTURE.as_posix()} '{FINDINGS_HEADING}' rows whose id is not ~~struck~~: {len(findings)}")
-    for rid, text in findings:
-        a(f"  {plain(rid):>4}  {text}")
-    if not rec["debt_present"]:
-        a(f"  {DEBT.as_posix()}: absent")
-    else:
-        trig = rec["debt_open_triggers"]
-        fired = [t for t in trig if "FIRED" in t[2]]
-        a(f"  {DEBT.as_posix()}: {len(trig)} triggers in open entries, {len(fired)} marked FIRED")
-        for num, title, text in sorted(trig, key=lambda t: "FIRED" not in t[2]):
-            a(f"  {num:>3}  {title[:66]}")
-            a(f"       -> {text[:150]}")
-    a("")
+    if "records" in d:
+        if heading("records", "9. RECORDS  - prior findings and debt triggers (--records)"):
+            rec = d["records"]
+            findings = rec["architecture_open_findings"]
+            a(f"  {ARCHITECTURE.as_posix()} '{FINDINGS_HEADING}' rows whose id is not ~~struck~~: {len(findings)}")
+            for rid, text in findings:
+                a(f"  {plain(rid):>4}  {text}")
+            if not rec["debt_present"]:
+                a(f"  {DEBT.as_posix()}: absent")
+            else:
+                trig = rec["debt_open_triggers"]
+                fired = [t for t in trig if "FIRED" in t[2]]
+                a(f"  {DEBT.as_posix()}: {len(trig)} triggers in open entries, {len(fired)} marked FIRED")
+                for num, title, text in sorted(trig, key=lambda t: "FIRED" not in t[2]):
+                    a(f"  {num:>3}  {title[:66]}")
+                    a(f"       -> {text[:150]}")
+            a("")
 
-    a(f"10. TODO / FIXME / HACK  /{TODO.pattern}/")
-    for area, n in d["todos"].items():
-        a(f"  {n:>5}  {area}")
+    if heading("todos", f"10. TODO / FIXME / HACK  /{TODO.pattern}/"):
+        for area, n in d["todos"].items():
+            a(f"  {n:>5}  {area}")
+        a("")
+    a(f"Read errors: {d['read_errors']['count']} files; partial sections with unreadable input have counts withheld")
+    for entry in d["read_errors"]["files"]:
+        a(f"  {entry['path']}: {entry['reason']} (sections: {', '.join(entry['sections'])})")
     return "\n".join(L)
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--records", action="store_true")
     ap.add_argument("--top", type=int, default=12)
     args = ap.parse_args(argv)
 
@@ -546,7 +631,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    data = collect()
+    data = collect(include_records=args.records)
     print(json.dumps(data, indent=2) if args.json else report(data, args.top))
     return 0
 
