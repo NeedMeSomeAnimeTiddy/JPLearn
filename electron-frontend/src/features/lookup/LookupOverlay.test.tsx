@@ -349,6 +349,42 @@ describe('LookupOverlay', () => {
     expect((await run(document.querySelector('.lk-open') as Element)).violations).toEqual([])
   })
 
+  /* WHAT THE TUTOR POP-UP'S SHELL PROMISED, now that its two activities live here: a modal with its
+     focus on the field, Tab kept inside it, the scrim and ESC both closing it, and focus handed back
+     to whatever opened it. */
+  it('is a modal that keeps Tab inside, closes on the scrim, and gives focus back', async () => {
+    installApi()
+    render(<Harness assistant={withModel()} />)
+    const opener = screen.getByText('open lookup')
+    opener.focus()
+    fireEvent.click(opener)
+    const dialog = await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    await waitFor(() => expect(document.activeElement).toBe(field()))
+
+    const routes = Array.from(dialog.querySelectorAll<HTMLButtonElement>('.lk-r:not(:disabled)'))
+    const last = routes[routes.length - 1]
+    last.focus()
+    fireEvent.keyDown(last, { key: 'Tab' })
+    expect(document.activeElement).toBe(field())
+    fireEvent.keyDown(field(), { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close lookup' }))
+    await waitFor(() => expect(document.querySelector('.lk-open')).toBeNull())
+    expect(document.activeElement).toBe(opener)
+  })
+
+  it('with the chat turned off, dims A QUESTION but keeps A SCREENSHOT answerable', async () => {
+    installApi()
+    render(<Harness assistant={withModel({ enabled: false })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+    expect((screen.getByRole('button', { name: /A QUESTION/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: /A SCREENSHOT/ }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByText(/FOUR ANSWERS/)).toBeTruthy()
+  })
+
   it('survives the desktop bridge being absent entirely', async () => {
     window.jplearnDesktop = undefined as unknown as Window['jplearnDesktop']
     open('語')

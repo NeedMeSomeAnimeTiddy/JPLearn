@@ -263,7 +263,7 @@ export function useScenarioTutor({
   }, [selectedScenario, session])
 
   // --- Voice: NPC playback -------------------------------------------------
-  // Text is always rendered by ScenarioPlayer; audio is decoration. A failed
+  // Text is always rendered on the conversation screen; audio is decoration. A failed
   // or unavailable playback returns false and is ignored — it can never block
   // or alter progression.
 

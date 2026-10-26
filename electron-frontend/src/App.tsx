@@ -110,7 +110,7 @@ import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { useVoice, splitSpeechSegments, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
 import {
-  useTutor, TutorPanel, TutorToast, ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB, ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
+  useTutor, TutorToast, ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB, ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
   type TutorSettingsFields,
 } from './features/tutor'
 import type { AssistantToast } from './features/tutor/types'
@@ -225,7 +225,6 @@ function App() {
      character opened from there has nowhere to be sent back to. */
   const [kanjiDetailFrom, setKanjiDetailFrom] = useState<'lookup' | 'mastery' | null>(null)
   const kanjiDetailTriggerRef = useRef<HTMLElement | null>(null)
-  const tutorTitlebarButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const openKanjiDetail = useCallback((character: string, trigger: HTMLElement, from: 'lookup' | 'mastery' | null = null) => {
     kanjiDetailTriggerRef.current = trigger
@@ -294,6 +293,9 @@ function App() {
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
   const lookup = useLookup()
+  /* the palette registers once, so the lookup it opens is read at press time */
+  const lookupRef = useRef(lookup)
+  lookupRef.current = lookup
 
   /* AND THE PUZZLES DO TOO, for the reason the shelf and the ladder already moved: `daily_games`
      is one puzzle now and cannot be opened without naming which. Every route that used to mean
@@ -315,10 +317,12 @@ function App() {
       { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { openDeckScreenRef.current('katakana') } },
       { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { closeKanjiDetail(); setShowSettings(true) } },
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
-      { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu'], action: () => tutor.openTutorPanel() },
-      { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei'], action: () => tutor.openTutorPanel('chat') },
+      /* THE TUTOR LIVES IN LOOK IT UP: its chat is A QUESTION and its image translation is A
+         SCREENSHOT, so each of these opens the lookup on its route (tools.html, plate 9) */
+      { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu', 'look up'], action: () => lookupRef.current.open() },
+      { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei', 'question'], action: () => lookupRef.current.open('', 'tutor') },
       { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => openScenesRef.current() },
-      { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate'], action: () => tutor.openTutorPanel('ocr') },
+      { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate', 'screenshot'], action: () => lookupRef.current.open('', 'ocr') },
     ]
 
     for (const script of scripts) {
@@ -413,7 +417,6 @@ function App() {
     setShowOverview(false)
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
-    tutor.closeTutorPanel()
     setXpDetailsOpen(false)
     setStreakDetailsOpen(false)
     setDictionarySeedQuery(seedQuery)
@@ -720,7 +723,6 @@ function App() {
     const destination = node.destination
     switch (destination.kind) {
       case 'script':
-        tutor.closeTutorPanel()
         /* A MILESTONE ABOUT A MODE RUNS THE MODE. LISTENING names hiragana AND a minigame: it is
            about the drill, not about hiragana's blocks, which the HIRAGANA milestone two rows above
            already draws. Every other script milestone opens its deck. */
@@ -740,13 +742,13 @@ function App() {
         openScenesRef.current()
         return
       case 'tutor':
-        tutor.openTutorPanel('chat')
+        lookup.open('', 'tutor')
         return
       case 'none':
         // `tutorial` — a one-time, skippable flow with nothing to re-enter.
         return
     }
-  }, [navigate, setActiveGame, setActiveScript, tutor])
+  }, [navigate, setActiveGame, setActiveScript, lookup])
 
   // Scenario Practice shares the tutor's single audio channel (same run-id ref
   // and the same coach-audio toggle), so NPC playback and chat replies can
@@ -803,17 +805,6 @@ function App() {
       maxMb: ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB,
     },
   }
-
-  // Restores focus to the Tutor titlebar button when the popup closes —
-  // Back (within the popup) restores focus to the menu item instead, via
-  // TutorMenu's own autofocus bookkeeping.
-  const tutorPanelWasOpenRef = useRef(false)
-  useEffect(() => {
-    if (tutorPanelWasOpenRef.current && !tutor.tutorPanelOpen) {
-      tutorTitlebarButtonRef.current?.focus()
-    }
-    tutorPanelWasOpenRef.current = tutor.tutorPanelOpen
-  }, [tutor.tutorPanelOpen])
 
   // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
   useEffect(() => {
@@ -1317,7 +1308,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     /* dead while every section has a level two, and kept for the same reason `useMenuPath`
        keeps the mechanism: it is what a section without one falls through to. STUDY's is the deck
        screen for whichever deck you are standing on. */
@@ -1340,7 +1330,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     navigate('home', 'back')
     menuPath.enterSection('READING')
     menuPath.enterScreen('library')
@@ -1353,7 +1342,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     /* ONLY WHEN THERE IS SOMEWHERE TO COME BACK FROM. The history stack is driven by `view`
        changing, so navigating home from home is a no-op — but navigating home from a VIEW and then
        into a puzzle pushes two entries where the walk was one, and Back then lands on a home the
@@ -1376,7 +1364,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     navigate('home', 'back')
     menuPath.enterSection('JLPT')
     setShortcutMenuOpen(false)
@@ -1390,7 +1377,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     navigate('home', 'back')
     menuPath.enterSection('READING')
     menuPath.enterScreen('scenes')
@@ -1544,7 +1530,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     const owner = progression.nodes.find((node) => (
       node.destination.kind === 'script'
       && node.destination.script === script
@@ -1624,7 +1609,6 @@ function App() {
           setShowSettings(false)
         } else {
           setDictionaryOpen(false)
-          tutor.closeTutorPanel()
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -1650,7 +1634,6 @@ function App() {
           setShowSettings(false)
         } else {
           setDictionaryOpen(false)
-          tutor.closeTutorPanel()
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -1696,20 +1679,6 @@ function App() {
           return
         }
 
-        if (tutor.tutorPanelOpen) {
-          // The shell's own Escape handler (TutorPanelShell) normally
-          // catches this first and stops propagation while focus is inside
-          // the popup; this is a defensive fallback for the rare case focus
-          // isn't there. Same policy: close at the menu, back to the menu
-          // from any activity — Escape never abandons a scenario.
-          if (tutor.tutorPanelMode === 'menu') {
-            tutor.closeTutorPanel()
-          } else {
-            tutor.returnToTutorMenu()
-          }
-          return
-        }
-
         // An in-progress missed-word review returns to the Daily Games hub
         // before Escape is allowed to leave the minigame view at all.
         if (view === 'minigame' && explicitReviewItemsRef.current) {
@@ -1742,7 +1711,7 @@ function App() {
         }
       }
 
-      if (showSettings || showCloseDialog || commandPalette.isOpen || tutor.tutorPanelOpen || isInput) return
+      if (showSettings || showCloseDialog || commandPalette.isOpen || isInput) return
       /* and the digits do not leave a conversation for a deck */
       if (conversationUpRef.current) return
 
@@ -1779,7 +1748,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
+  }, [closeKanjiDetail, kanjiDetailCharacter, loadSummary, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
 
   const streak = useMemo(
     () => summary?.streak ?? { current_days: 0, best_days: 0, freezes_available: 0 },
@@ -1920,7 +1889,6 @@ function App() {
     navigate('home', 'back')
     resetSessionCore()
     setShowSettings(false)
-    tutor.closeTutorPanel()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, resetSessionCore])
 
@@ -1939,7 +1907,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(true)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     void loadSummary()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
@@ -2038,7 +2005,6 @@ function App() {
     setDictionaryOpen(false)
     setShowSettings(true)
     setShowOverview(false)
-    tutor.closeTutorPanel()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, closeShortcutMenu])
@@ -2416,18 +2382,17 @@ function App() {
     openDictionary(roundState?.focusText ?? roundState?.answer ?? '')
   }, [openDictionary, roundState])
 
-  const toggleTutorPanelFromTitlebar = useCallback(() => {
+  /* THE TITLEBAR'S TUTOR BUTTON TOGGLES LOOK IT UP, where the tutor's two routes are now -- one
+     entry, the same one `/` is (tools.html, plate 9) */
+  const toggleLookupFromTitlebar = useCallback(() => {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
-    if (tutor.tutorPanelOpen) {
-      tutor.closeTutorPanel()
-    } else {
-      tutor.openTutorPanel()
-    }
-  }, [setDictionaryOpen, tutor])
+    if (lookup.isOpen) lookup.close()
+    else lookup.open()
+  }, [setDictionaryOpen, lookup])
 
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
@@ -2962,7 +2927,6 @@ function App() {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            tutor.closeTutorPanel()
 
             if (sectionId === 'jlpt_prep') {
               openExamLadderRef.current()
@@ -3130,9 +3094,8 @@ function App() {
         titlebarHistoryForward={nav.historyForward}
         settings={settings}
         pomodoro={pomodoro}
-        tutor={tutor}
-        tutorTitlebarButtonRef={tutorTitlebarButtonRef}
-        toggleTutorPanelFromTitlebar={toggleTutorPanelFromTitlebar}
+        lookupOpen={lookup.isOpen}
+        toggleLookupFromTitlebar={toggleLookupFromTitlebar}
         streak={streak}
         streakDetailsOpen={streakDetailsOpen}
         streakDetailsRef={streakDetailsRef}
@@ -3298,16 +3261,6 @@ function App() {
         onQuit={handleCloseQuit}
         onClose={() => setShowCloseDialog(false)}
       />
-
-      {tutor.tutorPanelOpen ? (
-        <TutorPanel
-          tutor={tutor}
-          scenarioTutor={scenarioTutor}
-          settings={settings as TutorSettingsFields}
-          setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>}
-          cancelAssistantSpeech={voice.cancelAssistantSpeech}
-        />
-      ) : null}
 
       {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
 

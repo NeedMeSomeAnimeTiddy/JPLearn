@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 
 vi.mock('react-type-animation', () => ({
@@ -43,6 +43,8 @@ const desktopApi = {
   getAssistantEvents: async () => ({ ok: true, events: [] }),
   consumeAssistantEvents: async () => ({ ok: true }),
   getAssistantSnapshot: async () => ({ ok: true }),
+  // A QUESTION is answerable only with a chat runtime to send to
+  sendAssistantChatMessage: async () => ({ text: 'ok', provider: 'llama' }),
 }
 
 Object.defineProperty(window, 'matchMedia', {
@@ -65,51 +67,64 @@ function mount() {
   return render(<App />)
 }
 
-/* THE APP IS READY WHEN THE TITLEBAR IS. These suites waited on `HomeView`'s own Daily Games
-   button purely as a "the app has finished loading" signal, and that screen retired with phase 6's
-   toggle. The titlebar is on every surface, so its shortcuts button does not depend on which
-   screen won the race. */
-describe('Shared Tutor popup navigation', () => {
-  it('renders exactly one Tutor entry point in the titlebar (no separate Tutor-chat or OCR buttons)', async () => {
+async function palette(label: string) {
+  fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+  const search = await screen.findByRole('textbox', { name: /search commands/i })
+  fireEvent.change(search, { target: { value: label } })
+  fireEvent.click(await screen.findByRole('option', { name: label }))
+}
+
+function route(name: RegExp) {
+  return screen.getByRole('button', { name }) as HTMLButtonElement
+}
+
+async function closeLookup() {
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'What to look up' }), { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Look it up' })).toBeNull())
+}
+
+/* THE TUTOR POP-UP IS RETIRED. Its chat is Look it up's A QUESTION, its image translation is A
+   SCREENSHOT, and its scenarios are a screen of their own on The World's scenes. These are the
+   pop-up's navigation promises, kept against where each thing lives now (tools.html, plate 9). */
+describe('The tutor, now inside Look it up', () => {
+  it('renders exactly one tutor entry point in the titlebar (no separate Tutor-chat or OCR buttons)', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
-    expect(screen.getAllByRole('button', { name: /open tutor|close tutor/i })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /the tutor \(look it up\)/i })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: /open ocr translator|close ocr translator/i })).toBeNull()
   })
 
-  it('opens the Tutor menu by default and navigates into an activity via Back/Close semantics', async () => {
+  it('the titlebar button toggles Look it up, and focus goes back to it when it closes', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    expect(within(dialog).getByRole('button', { name: 'Chat with Tutor' })).toBeTruthy()
-    expect(within(dialog).getByRole('button', { name: 'Scenario Practice' })).toBeTruthy()
-    expect(within(dialog).getByRole('button', { name: 'Image Translation' })).toBeTruthy()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Scenario Practice' }))
-    await screen.findByRole('dialog', { name: 'Scenario practice panel' })
-    expect(screen.getByRole('button', { name: 'Back to Tutor menu' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Tutor menu' }))
-    await screen.findByRole('dialog', { name: 'Tutor menu' })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close Tutor panel' }))
+    const button = screen.getByRole('button', { name: 'Open the tutor (Look it up)' })
+    button.focus()
+    fireEvent.click(button)
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(screen.getByRole('button', { name: 'Close the tutor (Look it up)' }).getAttribute('aria-expanded')).toBe('true')
+    // The menu that used to stand between the button and the activities is gone.
     expect(screen.queryByRole('dialog', { name: 'Tutor menu' })).toBeNull()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open Tutor' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close lookup' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Look it up' })).toBeNull())
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open the tutor (Look it up)' }))
   })
 
-  it('the chat-disabled setting hides only the Chat menu item, never the Tutor button, Scenario Practice, or Image Translation', async () => {
+  it('the chat-disabled setting dims only A QUESTION, never the button, the screenshot route, or the scenes', async () => {
     window.localStorage.setItem('jplearn-desktop-settings-v1', JSON.stringify({ assistantChatEnabled: false }))
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
 
-    expect(screen.getByRole('button', { name: 'Open Tutor' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    expect(within(dialog).queryByRole('button', { name: 'Chat with Tutor' })).toBeNull()
-    expect(within(dialog).getByRole('button', { name: 'Scenario Practice' })).toBeTruthy()
-    expect(within(dialog).getByRole('button', { name: 'Image Translation' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Open the tutor (Look it up)' })).toBeTruthy()
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(route(/A QUESTION/).disabled).toBe(true)
+    expect(screen.getByText('Chatbot is disabled in settings.')).toBeTruthy()
+    expect(route(/A SCREENSHOT/)).toBeTruthy()
+    await closeLookup()
+
+    await palette('Scenario Practice')
+    expect(await screen.findByRole('group', { name: 'Conversations' })).toBeTruthy()
   })
 
   it('all four command palette entries open the right place', async () => {
@@ -117,36 +132,26 @@ describe('Shared Tutor popup navigation', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
 
     /* Scenario Practice is a screen now: the palette lands on The World's scenes, not a pop-up */
-    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
-    let search = await screen.findByRole('textbox', { name: /search commands/i })
-    fireEvent.change(search, { target: { value: 'Scenario Practice' } })
-    fireEvent.click(await screen.findByRole('option', { name: 'Scenario Practice' }))
+    await palette('Scenario Practice')
     await screen.findByRole('group', { name: 'Conversations' })
     expect(screen.queryByRole('dialog', { name: 'Scenario practice panel' })).toBeNull()
 
-    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
-    search = await screen.findByRole('textbox', { name: /search commands/i })
-    fireEvent.change(search, { target: { value: 'Image Translation' } })
-    fireEvent.click(await screen.findByRole('option', { name: 'Image Translation' }))
-    await screen.findByRole('dialog', { name: 'OCR translator panel' })
-    expect(screen.getByRole('button', { name: 'Back to Tutor menu' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Close Tutor panel' }))
+    await palette('Image Translation')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(route(/A SCREENSHOT/).getAttribute('aria-pressed')).toBe('true')
+    await closeLookup()
 
-    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
-    search = await screen.findByRole('textbox', { name: /search commands/i })
-    fireEvent.change(search, { target: { value: 'Chat with Tutor' } })
-    fireEvent.click(await screen.findByRole('option', { name: 'Chat with Tutor' }))
-    await screen.findByRole('dialog', { name: 'Tutor chat panel' })
-    fireEvent.click(screen.getByRole('button', { name: 'Close Tutor panel' }))
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(route(/A QUESTION/).getAttribute('aria-pressed')).toBe('true')
+    await closeLookup()
 
-    // The fourth entry lands on the menu itself rather than an activity.
-    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
-    search = await screen.findByRole('textbox', { name: /search commands/i })
-    fireEvent.change(search, { target: { value: 'Open Tutor' } })
-    fireEvent.click(await screen.findByRole('option', { name: 'Open Tutor' }))
-    const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    // The menu has no Back — it is the popup's root.
-    expect(within(menu).queryByRole('button', { name: 'Back to Tutor menu' })).toBeNull()
+    // The fourth entry opens Look it up empty, standing on no model route.
+    await palette('Open Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect((screen.getByRole('textbox', { name: 'What to look up' }) as HTMLInputElement).value).toBe('')
+    expect(route(/A QUESTION/).getAttribute('aria-pressed')).toBe('false')
+    expect(route(/A SCREENSHOT/).getAttribute('aria-pressed')).toBe('false')
   })
 })
 
@@ -156,72 +161,60 @@ describe('Romaji-to-kana conversion toggle', () => {
     fireEvent.input(field, { target: { value } })
   }
 
-  it('is on by default in the Tutor chat input, and a shared button toggles it off and back on', async () => {
+  it('is on by default on A QUESTION, and its chip toggles it off and back on', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Tutor chat panel' })
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
 
-    const field = within(dialog).getByRole('textbox') as HTMLTextAreaElement
+    const field = screen.getByRole('textbox', { name: 'What to look up' }) as HTMLInputElement
     typeInto(field, 'koohii')
     expect(field.value).toBe('こおひい')
 
-    const toggle = within(dialog).getByRole('button', { name: 'Turn off romaji-to-kana conversion' })
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
     typeInto(field, 'koohii')
     expect(field.value).toBe('koohii')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on romaji-to-kana conversion' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on romaji-to-kana conversion' }))
     typeInto(field, 'koohii')
     expect(field.value).toBe('こおひい')
   })
 
-  it('shares the same toggle state with Scenario Practice — turning it off in chat also turns it off there', async () => {
+  it('shares the same switch with a conversation — turning it off in Look it up also turns it off there', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    let menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
-    let dialog = await screen.findByRole('dialog', { name: 'Tutor chat panel' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
+    await closeLookup()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Tutor menu' }))
-    menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
-    dialog = await screen.findByRole('dialog', { name: 'Scenario practice panel' })
+    await palette('Scenario Practice')
+    const scenes = await screen.findByRole('group', { name: 'Conversations' })
+    fireEvent.click(within(scenes).getByRole('button', { name: /order at a cafe/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Beginner' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start scenario' }))
 
-    // The scenario header shows the toggle already off (shared state).
-    expect(within(dialog).getByRole('button', { name: 'Turn on romaji-to-kana conversion' })).toBeTruthy()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
-
-    const field = within(dialog).getByRole('textbox', { name: 'Your response' }) as HTMLTextAreaElement
+    // The conversation's chip shows the switch already off (shared state).
+    const field = await screen.findByRole('textbox', { name: 'Your response' }) as HTMLInputElement
+    expect(screen.getByRole('button', { name: 'Turn on romaji-to-kana conversion' })).toBeTruthy()
     typeInto(field, 'koohii')
     expect(field.value).toBe('koohii')
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on romaji-to-kana conversion' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on romaji-to-kana conversion' }))
     typeInto(field, 'koohii')
     expect(field.value).toBe('こおひい')
   })
 
-  it('persists the toggle choice across a popup close and reopen', async () => {
+  it('persists the choice across Look it up closing and opening again', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
-    let dialog = await screen.findByRole('dialog', { name: 'Tutor chat panel' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
+    await closeLookup()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Close Tutor panel' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    const reopenedMenu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(reopenedMenu).getByRole('button', { name: 'Chat with Tutor' }))
-    dialog = await screen.findByRole('dialog', { name: 'Tutor chat panel' })
-    expect(within(dialog).getByRole('button', { name: 'Turn on romaji-to-kana conversion' })).toBeTruthy()
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(screen.getByRole('button', { name: 'Turn on romaji-to-kana conversion' })).toBeTruthy()
   })
 })

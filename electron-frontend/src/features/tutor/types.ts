@@ -1,4 +1,3 @@
-import type { LucideIcon } from 'lucide-react'
 import type { MinigameKey, ScriptKey } from '../../types'
 
 // Re-exported, never redeclared. This module used to declare `MinigameKey`
@@ -120,19 +119,3 @@ export interface TutorDeps {
   onToastNavigate: (script: ScriptKey, minigame: MinigameKey, differentScript: boolean) => void
 }
 
-// --- Shared Tutor popup: menu + mode navigation ------------------------------
-
-/** Which activity the shared Tutor popup is showing. 'menu' lists the activities. */
-export type TutorPanelMode = 'menu' | 'chat' | 'scenarios' | 'ocr'
-
-export interface TutorMenuItem {
-  mode: Exclude<TutorPanelMode, 'menu'>
-  label: string
-  description: string
-  icon: LucideIcon
-}
-
-export interface TutorPanelHeaderCopy {
-  title: string
-  catalog: string
-}

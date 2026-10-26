@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { trapFocus } from '../../../lib/focusTrap'
 import { bindWanakanaIme } from '../../../lib/wanakanaBinding'
 import {
   ANSWERABLE_ROUTES, LOOKUP_OCR_EN_CHARS, LOOKUP_REPLY_PAGE_CHARS, LOOKUP_ROUTES, LOOKUP_WORD_LIMIT,
@@ -240,6 +241,8 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
       role="dialog"
       aria-modal="true"
       aria-label="Look it up"
+      /* a modal keeps Tab inside it -- the sheet and its routes, not the page under the scrim */
+      onKeyDown={(event) => { if (frameRef.current) trapFocus(event, frameRef.current) }}
       onPaste={onPaste}
       onDragOver={(event) => { if (event.dataTransfer?.types?.includes('Files')) event.preventDefault() }}
       onDrop={onDrop}
