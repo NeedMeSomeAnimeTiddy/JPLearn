@@ -5,6 +5,7 @@ import { evaluateResponse, toEvaluationResult } from './evaluation'
 import type { ScenarioDefinition, ScenarioSession } from './types'
 import {
   heldAnswer, objectiveFoot, objectiveTally, objectiveTickClass, summaryFold, summaryPages, deriveScenarioSummary,
+  transcriptPages,
 } from './utils'
 
 const cafe = getScenarioById('cafe-order') as ScenarioDefinition
@@ -67,5 +68,21 @@ describe('the conversation sheet’s arithmetic', () => {
     const pages = summaryPages(cafe, session.transcript, summary, 3)
     expect(pages.every((page) => page.length <= 3)).toBe(true)
     expect(pages.flat().some((line) => line.cap === 'YOU' && line.text === 'コーヒー')).toBe(true)
+  })
+
+  it('pages the earlier turns with their English, how each reply went, and its correction', () => {
+    let session = reply(start(), 'こんにちは')
+    session = reply(session, 'コーヒー')
+    const pages = transcriptPages(cafe, session.transcript, 2)
+    expect(pages.every((page) => page.length <= 2)).toBe(true)
+    const lines = pages.flat()
+    const npc = cafe.npc.name.toUpperCase()
+    /* the character's lines carry their English */
+    expect(lines.find((line) => line.cap === npc)?.en).toBe('Welcome!')
+    /* each reply says how it went, and a partial one is followed by its fix */
+    const partial = lines.findIndex((line) => line.cap === 'YOU' && line.text === 'コーヒー')
+    expect(lines[partial].en).toBe('PARTIAL')
+    expect(lines[partial + 1]).toMatchObject({ cap: 'FIX', text: 'コーヒーをください' })
+    expect(transcriptPages(cafe, [], 4)).toEqual([])
   })
 })

@@ -318,7 +318,7 @@ export function useTutor(
       return
     }
     if (!deps.ocrInstalled) {
-      setOcrWorkbenchError('Image Translation is not installed. Install it in Settings > Tutor > Image Translation.')
+      setOcrWorkbenchError('Image Translation is not installed. Install it in Settings › Assistant › Image Translation.')
       return
     }
     const translateAssistantChatOcrText = window.jplearnDesktop?.translateAssistantChatOcrText

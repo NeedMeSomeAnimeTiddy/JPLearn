@@ -389,7 +389,8 @@ export interface ScenarioTranscription {
 
 export type ScenarioActivityScreen = 'select' | 'intro' | 'session' | 'summary' | 'srs-review' | 'history'
 
-export type ScenarioConfirmAction = 'abandon' | 'restart' | null
+/** `switch` is picking another scene while this one is still being played */
+export type ScenarioConfirmAction = 'abandon' | 'restart' | 'switch' | null
 
 export type SrsDraftStatus = 'pending' | 'accepted' | 'dismissed'
 

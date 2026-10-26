@@ -118,4 +118,3 @@ export interface TutorDeps {
   lookupChatVisible?: boolean
   onToastNavigate: (script: ScriptKey, minigame: MinigameKey, differentScript: boolean) => void
 }
-

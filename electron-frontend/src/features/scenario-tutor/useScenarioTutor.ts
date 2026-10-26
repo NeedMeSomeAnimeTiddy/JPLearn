@@ -51,7 +51,18 @@ export interface UseScenarioTutorReturn {
    * `unavailable` means this build has no history to save into, and asking again cannot help. */
   sessionSave: ScenarioSessionSave
 
+  /** Opens a scene. The scene already being played is resumed where it stood; another scene, while
+   * one is being played, is asked about first (`confirmAction` 'switch') and nothing changes until
+   * the switch is confirmed. */
   selectScenario: (scenarioId: string) => void
+  /** the scene a pending 'switch' would open */
+  pendingScenario: ScenarioDefinition | null
+  /** How long the transcript was when the reply on the sheet was sent, while the sheet holds that
+   * answer for reading (null otherwise). Kept here, with the session it belongs to, so leaving the
+   * screen and coming back finds it still held; only ENTER (`releaseAnswer`) or a new session
+   * clears it. */
+  heldFrom: number | null
+  releaseAnswer: () => void
   selectLevel: (level: LearnerLevel) => void
   /** starts on the chosen level, or on `level` when the press that starts it also chooses it */
   startScenario: (level?: LearnerLevel) => void
@@ -198,6 +209,9 @@ export function useScenarioTutor({
   const [session, setSession] = useState<ScenarioSession | null>(null)
   const [learnerInputValue, setLearnerInputValue] = useState('')
   const [confirmAction, setConfirmAction] = useState<ScenarioConfirmAction>(null)
+  const [pendingScenarioId, setPendingScenarioId] = useState<string | null>(null)
+  /* keyed by the session it was held in, so a held answer can never surface on another session */
+  const [held, setHeld] = useState<{ sessionId: string; from: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [persistenceNote, setPersistenceNote] = useState<string | null>(null)
   const [sessionSave, setSessionSave] = useState<ScenarioSessionSave>('idle')
@@ -465,6 +479,8 @@ export function useScenarioTutor({
     }
   }, [])
 
+  const heldFrom = held && session && held.sessionId === session.sessionId ? held.from : null
+
   const selectScenario = useCallback((scenarioId: string) => {
     const scenario = getScenarioById(scenarioId)
     if (!scenario) {
@@ -472,10 +488,26 @@ export function useScenarioTutor({
       return
     }
     setError(null)
+    const sameScene = session !== null && session.scenarioId === scenarioId && selectedScenarioId === scenarioId
+    if (sameScene && session.status === 'active') {
+      setScreen('session') // resumed where it stood
+      return
+    }
+    /* a finished conversation whose last answer is still being read resumes on that answer */
+    if (sameScene && heldFrom !== null) return
+    if (session !== null && session.status === 'active') {
+      /* ANOTHER SCENE ENDS THIS ONE, so it asks first -- on the same slab LEAVE asks on -- and the
+         session stays exactly as it is until the answer is yes */
+      setPendingScenarioId(scenarioId)
+      setConfirmAction('switch')
+      setScreen('session')
+      return
+    }
+    setHeld(null)
     setSelectedScenarioId(scenarioId)
     setSelectedLevel(null)
     setScreen('intro')
-  }, [])
+  }, [session, selectedScenarioId, heldFrom])
 
   const selectLevel = useCallback((level: LearnerLevel) => {
     setSelectedLevel(level)
@@ -487,8 +519,10 @@ export function useScenarioTutor({
     resetTurnAsyncState()
     const { session: newSession, effects } = createSession(scenario, level, newSessionId(), nowIso())
     setSession(newSession)
+    setHeld(null)
     setLearnerInputValue('')
     setConfirmAction(null)
+    setPendingScenarioId(null)
     setPersistenceNote(null)
     setSessionSave('idle')
     setSrsDrafts([])
@@ -567,6 +601,8 @@ export function useScenarioTutor({
     // The turn is committed from here on: an STT result still in flight for it
     // is now stale and will be dropped when it resolves.
     turnEpochRef.current += 1
+    // Everything the transcript gains from here is this answer, held for reading until ENTER.
+    setHeld({ sessionId: session.sessionId, from: session.transcript.length })
     lastTranscriptionRef.current = null
     setHeardTranscript(null)
     setSttError(null)
@@ -613,28 +649,43 @@ export function useScenarioTutor({
     })()
   }, [selectedScenario, session, learnerInputValue, evaluatingResponse, applyTurn, isGuardCurrent])
 
-  const requestAbandon = useCallback(() => setConfirmAction('abandon'), [])
-  const requestRestart = useCallback(() => setConfirmAction('restart'), [])
-  const cancelPendingAction = useCallback(() => setConfirmAction(null), [])
+  const requestAbandon = useCallback(() => { setPendingScenarioId(null); setConfirmAction('abandon') }, [])
+  const requestRestart = useCallback(() => { setPendingScenarioId(null); setConfirmAction('restart') }, [])
+  const cancelPendingAction = useCallback(() => { setPendingScenarioId(null); setConfirmAction(null) }, [])
+  const releaseAnswer = useCallback(() => setHeld(null), [])
 
   const confirmPendingAction = useCallback(() => {
-    if (confirmAction === 'abandon') {
+    if (confirmAction === 'abandon' || confirmAction === 'switch') {
       sessionTokenRef.current += 1
       turnEpochRef.current += 1
       resetTurnAsyncState()
       setSession(null)
+      setHeld(null)
       setLearnerInputValue('')
       setConfirmAction(null)
+      setPendingScenarioId(null)
       setPersistenceNote(null)
       setSessionSave('idle')
       setSrsDrafts([])
+      if (confirmAction === 'switch' && pendingScenarioId && getScenarioById(pendingScenarioId)) {
+        /* the other scene opens where any scene opens: choosing how much help */
+        setSelectedScenarioId(pendingScenarioId)
+        setSelectedLevel(null)
+        setScreen('intro')
+        return
+      }
       setScreen('select')
       return
     }
     if (confirmAction === 'restart' && selectedScenario && selectedLevel) {
       beginSession(selectedScenario, selectedLevel)
     }
-  }, [confirmAction, selectedScenario, selectedLevel, beginSession, resetTurnAsyncState])
+  }, [confirmAction, pendingScenarioId, selectedScenario, selectedLevel, beginSession, resetTurnAsyncState])
+
+  const pendingScenario = useMemo(
+    () => (pendingScenarioId ? getScenarioById(pendingScenarioId) ?? null : null),
+    [pendingScenarioId],
+  )
 
   const replayScenario = useCallback(() => {
     if (!selectedScenario || !selectedLevel) return
@@ -648,8 +699,10 @@ export function useScenarioTutor({
     setSelectedScenarioId(null)
     setSelectedLevel(null)
     setSession(null)
+    setHeld(null)
     setLearnerInputValue('')
     setConfirmAction(null)
+    setPendingScenarioId(null)
     setError(null)
     setPersistenceNote(null)
     setSessionSave('idle')
@@ -801,6 +854,9 @@ export function useScenarioTutor({
     sessionSave,
 
     selectScenario,
+    pendingScenario,
+    heldFrom,
+    releaseAnswer,
     selectLevel,
     startScenario,
     setLearnerInputValue,

@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Volume2 } from 'lucide-react'
 import { bindWanakanaIme } from '../../../lib/wanakanaBinding'
 import { Round } from '../../round'
 import type { RunChip } from '../../round'
 import { screenHead } from '../../menu'
 import {
-  CONVERSATION_COPY, CONVERSATION_HINT_ROWS, CONVERSATION_OUTCOME, SCENARIO_COPY, SCENARIO_LEVEL_LABELS,
-  SCENARIO_TTS_SPEED_SCALE,
+  CONVERSATION_COPY, CONVERSATION_HINT_ROWS, CONVERSATION_OUTCOME, CONVERSATION_TRANSCRIPT_ROWS, SCENARIO_COPY,
+  SCENARIO_LEVEL_LABELS, SCENARIO_TTS_SPEED_SCALE,
 } from '../constants'
-import type { ScenarioDefinition, ScenarioSession } from '../types'
+import type { ScenarioConfirmAction, ScenarioDefinition, ScenarioSession } from '../types'
 import type { UseScenarioTutorReturn } from '../useScenarioTutor'
-import { pressesItself, useSheetKeys } from '../useSheetKeys'
+import { isComposing, pressesItself, useSheetKeys } from '../useSheetKeys'
 import {
-  latestNpcTurn, lineSize, objectiveFoot, objectiveTally, objectiveTickClass, type HeldAnswer,
+  latestNpcTurn, lineSize, objectiveFoot, objectiveTally, objectiveTickClass, transcriptPages, type HeldAnswer,
 } from '../utils'
 
 export interface ConversationTalkProps {
@@ -44,12 +44,29 @@ function micLine(tutor: UseScenarioTutorReturn): { text: string; bad: boolean } 
   }
 }
 
+/** what the slab asks, and the line under the rule that says what a yes costs */
+function confirmCopy(confirm: Exclude<ScenarioConfirmAction, null>, tutor: UseScenarioTutorReturn) {
+  if (confirm === 'switch') {
+    const title = tutor.pendingScenario?.title.toUpperCase() ?? 'ANOTHER SCENE'
+    return { ask: `START ${title} INSTEAD?`, note: CONVERSATION_COPY.switchNote, aria: 'Confirm switching to another scene' }
+  }
+  if (confirm === 'abandon') {
+    return { ask: CONVERSATION_COPY.leaveAsk, note: CONVERSATION_COPY.leaveNote, aria: 'Confirm leaving the scenario' }
+  }
+  return { ask: CONVERSATION_COPY.restartAsk, note: CONVERSATION_COPY.restartNote, aria: 'Confirm restarting the scenario' }
+}
+
 /* ==================================================================================================
    THE CONVERSATION ITSELF (boards ConvAsking, ConvAnswered, ConvStates).
 
    ASKING: the character's line is the prompt -- Japanese, its reading, and the English, which is
    always shown -- and the reply is a rule on the paper with the mic beside it. CTRL+M starts and
-   stops the mic from anywhere on the sheet, including from inside the rule.
+   stops the mic from anywhere on the sheet, including from inside the rule, and starts it only when
+   the mic button could: never while an answer is being checked.
+
+   EARLIER TURNS open in the prompt cell, paged: every line before this one with its English, and
+   every reply with how it went and its correction. The reply cell is left as it is, so what you
+   were typing -- or the answer being held -- is still there when the transcript is put away.
 
    ANSWERED: the engine grades a reply and moves on at once, so the sheet holds what just happened
    until ENTER -- what you said, stamped with how it went, the correction when there is one, and the
@@ -92,9 +109,12 @@ export function ConversationTalk({
   }, [answer, confirm, nodeId])
 
   const toggleMic = () => {
-    if (!canRecord || answer || confirm) return
-    if (recording) tutor.stopRecording()
-    else if (!micBusy) tutor.startRecording()
+    if (!canRecord) return
+    /* a recording under way can always be stopped, whatever else has started meanwhile */
+    if (recording) { tutor.stopRecording(); return }
+    /* starting asks what the mic button asks */
+    if (answer || inputDisabled || micBusy) return
+    tutor.startRecording()
   }
 
   const showHint = () => {
@@ -106,12 +126,37 @@ export function ConversationTalk({
     tutor.revealHint()
   }
 
+  const npc = scenario.npc.name.toUpperCase()
+  const asking = answer ? answer.answering : latestNpcTurn(session.transcript)
+  const earlierTurns = asking?.earlier ?? 0
+  /* the page of earlier turns on show in the prompt cell, or null while the line is */
+  const [transcriptPage, setTranscriptPage] = useState<number | null>(null)
+  const pages = useMemo(
+    () => transcriptPages(scenario, session.transcript.slice(0, earlierTurns), CONVERSATION_TRANSCRIPT_ROWS),
+    [scenario, session.transcript, earlierTurns],
+  )
+  const reading = transcriptPage !== null && pages.length > 0
+  const readingPage = reading ? Math.min(transcriptPage, pages.length - 1) : 0
+  /* the button walks the pages forward and, past the last, back to the line */
+  const turnTranscript = (by: 1 | -1) => {
+    if (pages.length === 0) return
+    if (!reading) { setTranscriptPage(by === 1 ? 0 : pages.length - 1); return }
+    const next = readingPage + by
+    setTranscriptPage(next < 0 || next >= pages.length ? null : next)
+  }
+
   useSheetKeys((event) => {
     if (event.key === 'Escape') {
       event.preventDefault()
       if (confirm) tutor.cancelPendingAction()
+      else if (reading) setTranscriptPage(null)
       else if (active) tutor.requestAbandon()
       else onNext()
+      return
+    }
+    if (event.key === 'PageDown' || event.key === 'PageUp') {
+      event.preventDefault()
+      turnTranscript(event.key === 'PageDown' ? 1 : -1)
       return
     }
     if ((event.ctrlKey || event.metaKey) && (event.key === 'm' || event.key === 'M')) {
@@ -125,8 +170,6 @@ export function ConversationTalk({
     }
   })
 
-  const npc = scenario.npc.name.toUpperCase()
-  const asking = answer ? answer.answering : latestNpcTurn(session.transcript)
   const tally = objectiveTally(scenario, session)
   const duty = answer !== null && answer.turn.outcome !== 'correct'
   const head = screenHead('READING', 'scenes')
@@ -145,13 +188,10 @@ export function ConversationTalk({
 
   const slab = (() => {
     if (confirm) {
+      const copy = confirmCopy(confirm, tutor)
       return (
-        <div
-          className="cv-ask-q"
-          role="alertdialog"
-          aria-label={confirm === 'abandon' ? 'Confirm leaving the scenario' : 'Confirm restarting the scenario'}
-        >
-          <span>{confirm === 'abandon' ? CONVERSATION_COPY.leaveAsk : CONVERSATION_COPY.restartAsk}</span>
+        <div className="cv-ask-q" role="alertdialog" aria-label={copy.aria}>
+          <span>{copy.ask}</span>
           <button type="button" className="yes" onClick={tutor.confirmPendingAction}>{CONVERSATION_COPY.yes}</button>
           {/* the safe answer has the focus, so ENTER on a stray ESC keeps the conversation */}
           <button type="button" className="no" onClick={tutor.cancelPendingAction} autoFocus>{CONVERSATION_COPY.no}</button>
@@ -198,13 +238,15 @@ export function ConversationTalk({
       backAria="Leave scenario"
       onRestart={tutor.requestRestart}
       restart={{ en: 'Start over', jp: '最初から', aria: 'Restart scenario' }}
-      hints={answer
-        ? [{ cap: 'ENTER', en: 'Next', jp: '次へ' }, { cap: 'ESC', en: 'Leave', jp: '中断' }]
-        : [
-          { cap: 'ENTER', en: 'Say it', jp: '送る' },
-          ...(canRecord ? [{ cap: 'CTRL+M', en: 'Speak', jp: '録音' }] : []),
-          { cap: 'ESC', en: 'Leave', jp: '中断' },
-        ]}
+      hints={reading
+        ? [{ cap: 'PGDN', en: 'Next page', jp: '次頁' }, { cap: 'ESC', en: 'Back to the line', jp: '戻る' }]
+        : answer
+          ? [{ cap: 'ENTER', en: 'Next', jp: '次へ' }, { cap: 'ESC', en: 'Leave', jp: '中断' }]
+          : [
+            { cap: 'ENTER', en: 'Say it', jp: '送る' },
+            ...(canRecord ? [{ cap: 'CTRL+M', en: 'Speak', jp: '録音' }] : []),
+            { cap: 'ESC', en: 'Leave', jp: '中断' },
+          ]}
       ask={
         <div className="rd-ask">
           <div className={answer ? 'rd-kick cv-q' : 'rd-kick'}>
@@ -223,25 +265,52 @@ export function ConversationTalk({
               </span>
             ) : null}
           </div>
-          <div className={answer ? 'cv-line quiet' : 'cv-line'} aria-live={answer ? undefined : 'polite'}>
-            {asking ? (
-              <>
-                <b lang="ja" style={{ fontSize: `${lineSize(asking.line.ja)}px` }}>{asking.line.ja}</b>
-                {asking.line.reading && asking.line.reading !== asking.line.ja
-                  ? <i lang="ja">{asking.line.reading}</i> : null}
-                <p>{asking.line.en}</p>
-              </>
-            ) : null}
-          </div>
+          {reading ? (
+            <div className="cv-detail" role="region" aria-label="Earlier turns" aria-live="polite">
+              {(pages[readingPage] ?? []).map((line, i) => (
+                <div className="cv-dl" key={`${readingPage}-${i}`}>
+                  <em>{line.cap}</em>
+                  <span className="cv-dl-t">
+                    <span className={line.jp ? 'jp' : undefined} lang={line.jp ? 'ja' : undefined}>{line.text}</span>
+                    {line.en ? <i>{line.en}</i> : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={answer ? 'cv-line quiet' : 'cv-line'} aria-live={answer ? undefined : 'polite'}>
+              {asking ? (
+                <>
+                  <b lang="ja" style={{ fontSize: `${lineSize(asking.line.ja)}px` }}>{asking.line.ja}</b>
+                  {asking.line.reading && asking.line.reading !== asking.line.ja
+                    ? <i lang="ja">{asking.line.reading}</i> : null}
+                  <p>{asking.line.en}</p>
+                </>
+              ) : null}
+            </div>
+          )}
           <div className="rd-src cv-src">
-            <span className="cv-earlier">
-              {asking && asking.earlier > 0
-                ? `↑ ${asking.earlier} EARLIER TURN${asking.earlier === 1 ? '' : 'S'}`
-                : 'THE FIRST LINE'}
-            </span>
-            {answer
-              ? <span>ATTEMPT <i>{answer.attempt} OF {answer.maxAttempts}</i></span>
-              : <span>AUDIO <i>{tutor.npcAudioAvailable ? `${SCENARIO_TTS_SPEED_SCALE[session.level]}×` : 'OFF'}</i></span>}
+            {pages.length > 0 ? (
+              <button
+                type="button"
+                className={reading ? 'cv-earlier on' : 'cv-earlier'}
+                aria-expanded={reading}
+                aria-label={!reading ? 'Show the earlier turns'
+                  : readingPage + 1 < pages.length ? 'Next page of earlier turns' : 'Back to the line'}
+                onClick={() => turnTranscript(1)}
+              >
+                {!reading
+                  ? `↑ ${earlierTurns} EARLIER TURN${earlierTurns === 1 ? '' : 'S'}`
+                  : readingPage + 1 < pages.length ? 'NEXT PAGE' : 'BACK TO THE LINE'}
+              </button>
+            ) : (
+              <span className="cv-earlier">THE FIRST LINE</span>
+            )}
+            {reading
+              ? <span>PAGE <i>{readingPage + 1} OF {pages.length}</i></span>
+              : answer
+                ? <span>ATTEMPT <i>{answer.attempt} OF {answer.maxAttempts}</i></span>
+                : <span>AUDIO <i>{tutor.npcAudioAvailable ? `${SCENARIO_TTS_SPEED_SCALE[session.level]}×` : 'OFF'}</i></span>}
           </div>
         </div>
       }
@@ -344,7 +413,7 @@ export function ConversationTalk({
                     if (romajiEnabled) tutor.setLearnerInputValue(event.currentTarget.value)
                   }}
                   onKeyDown={(event) => {
-                    if (event.key !== 'Enter' || composing.current) return
+                    if (event.key !== 'Enter' || composing.current || isComposing(event.nativeEvent)) return
                     event.preventDefault()
                     onSend()
                   }}
@@ -354,7 +423,7 @@ export function ConversationTalk({
                     type="button"
                     className={recording ? 'cv-mic on' : 'cv-mic'}
                     onClick={toggleMic}
-                    disabled={inputDisabled || micBusy}
+                    disabled={!recording && (inputDisabled || micBusy)}
                     aria-pressed={recording}
                     aria-label={recording ? SCENARIO_COPY.micStop : SCENARIO_COPY.micStart}
                   >
@@ -369,9 +438,7 @@ export function ConversationTalk({
                 </p>
               ) : null}
               {confirm ? (
-                <p className="cv-status bad">
-                  {confirm === 'abandon' ? CONVERSATION_COPY.leaveNote : CONVERSATION_COPY.restartNote}
-                </p>
+                <p className="cv-status bad">{confirmCopy(confirm, tutor).note}</p>
               ) : tutor.sttError ? (
                 <p className="cv-status bad" role="alert">{tutor.sttError}</p>
               ) : tutor.evaluatingResponse ? (

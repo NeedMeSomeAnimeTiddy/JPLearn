@@ -1,4 +1,5 @@
 import { romajiToKana } from '../../lib/romajiToKana'
+import { CONVERSATION_OUTCOME } from './constants'
 import type {
   ObjectiveStatus,
   ScenarioCorrectionSummary,
@@ -444,6 +445,45 @@ export interface DetailLine {
   text: string
   /** set when the line is Japanese, so it is set in the Japanese face */
   jp?: boolean
+  /** the English under it, when there is one */
+  en?: string
+}
+
+/**
+ * THE TURNS BEFORE THE LINE ON THE SHEET, cut into pages of `rows`: each character line with its
+ * English, each reply with how it went, and each correction the reply drew. `turns` is the part of
+ * the transcript that came before the line being answered.
+ */
+export function transcriptPages(
+  scenario: ScenarioDefinition,
+  turns: ScenarioTurnRecord[],
+  rows: number,
+): DetailLine[][] {
+  const npc = scenario.npc.name.toUpperCase()
+  const lines: DetailLine[] = []
+  for (const turn of turns) {
+    if (turn.npcLine) lines.push({ cap: npc, text: turn.npcLine.ja, jp: true, en: turn.npcLine.en })
+    if (turn.learnerInput !== null) {
+      lines.push({
+        cap: 'YOU',
+        text: turn.learnerInput,
+        jp: true,
+        en: turn.outcome ? CONVERSATION_OUTCOME[turn.outcome].en : undefined,
+      })
+      if (turn.correction) {
+        lines.push({
+          cap: 'FIX',
+          text: turn.correction,
+          jp: true,
+          en: turn.correctionRomaji ?? undefined,
+        })
+      }
+    }
+  }
+  const size = Math.max(1, rows)
+  const pages: DetailLine[][] = []
+  for (let i = 0; i < lines.length; i += size) pages.push(lines.slice(i, i + size))
+  return pages
 }
 
 /** Everything the summary and the transcript say, cut into pages of `rows` lines. */

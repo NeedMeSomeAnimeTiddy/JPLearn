@@ -6,6 +6,21 @@ vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => <span>{sequence[0]}</span>,
 }))
 
+/* the setup report the app reads to know what is installed; A QUESTION answers only with llama.cpp
+   and a tutor model in it */
+function setupInfo({ chatModel = true, ocr = false } = {}) {
+  return async () => ({
+    totalRamGb: 16, gpuVramGb: null,
+    models: [{ tier: 'low' as const, filename: 'm.gguf', sizeMb: 1, label: 'Low', description: '', installed: chatModel }],
+    recommendedTier: 'low', activeModelTier: chatModel ? 'low' : null,
+    activeEmbedderTier: null, activeEmbedderLabel: null, activeEmbedderInstalled: false, activeEmbedderEnabled: false,
+    llamaCppInstalled: chatModel, voiceInstalled: false, voiceModels: [], activeVoiceModel: null,
+    fontsInstalled: true, dictionaryInstalled: false,
+    speechModels: [], ocrModels: [], ocrInstalled: ocr, translationModels: [], translationInstalled: ocr,
+    translationProfiles: [],
+  })
+}
+
 const desktopApi = {
   versions: { chrome: '0', electron: '0', node: '0' },
   getStudySummary: async () => ({
@@ -45,6 +60,7 @@ const desktopApi = {
   getAssistantSnapshot: async () => ({ ok: true }),
   // A QUESTION is answerable only with a chat runtime to send to
   sendAssistantChatMessage: async () => ({ text: 'ok', provider: 'llama' }),
+  getSetupSystemInfo: setupInfo(),
 }
 
 Object.defineProperty(window, 'matchMedia', {
@@ -62,8 +78,8 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-function mount() {
-  window.jplearnDesktop = desktopApi as unknown as typeof window.jplearnDesktop
+function mount(overrides: Record<string, unknown> = {}) {
+  window.jplearnDesktop = { ...desktopApi, ...overrides } as unknown as typeof window.jplearnDesktop
   return render(<App />)
 }
 
@@ -119,12 +135,26 @@ describe('The tutor, now inside Look it up', () => {
     await palette('Chat with Tutor')
     await screen.findByRole('dialog', { name: 'Look it up' })
     expect(route(/A QUESTION/).disabled).toBe(true)
-    expect(screen.getByText('Chatbot is disabled in settings.')).toBeTruthy()
+    expect(screen.getByText('Chat with Tutor is turned off.')).toBeTruthy()
+    expect(screen.getByText(/Turn it on in Settings › Assistant › Tutor Assistant\./)).toBeTruthy()
     expect(route(/A SCREENSHOT/)).toBeTruthy()
     await closeLookup()
 
     await palette('Scenario Practice')
     expect(await screen.findByRole('group', { name: 'Conversations' })).toBeTruthy()
+  })
+
+  it('with the setting on but no tutor model installed, A QUESTION is dimmed and says so -- no ask field', async () => {
+    /* a fresh profile: Chat with Tutor defaults on, and nothing is installed yet */
+    mount({ getSetupSystemInfo: setupInfo({ chatModel: false }) })
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    await palette('Chat with Tutor')
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    await waitFor(() => expect(screen.getByText('No tutor model is installed.')).toBeTruthy())
+    expect(route(/A QUESTION/).disabled).toBe(true)
+    expect(screen.getByText(/Download one in Settings › Assistant › Tutor models\./)).toBeTruthy()
+    expect(screen.getByText('A QUESTION IS DIMMED UNTIL A TUTOR MODEL IS INSTALLED AND CHAT WITH TUTOR IS ON')).toBeTruthy()
+    expect(screen.queryByText('THE TUTOR')).toBeNull()
   })
 
   it('all four command palette entries open the right place', async () => {
@@ -166,6 +196,7 @@ describe('Romaji-to-kana conversion toggle', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     await palette('Chat with Tutor')
     await screen.findByRole('dialog', { name: 'Look it up' })
+    await screen.findByRole('button', { name: 'Turn off romaji-to-kana conversion' })
 
     const field = screen.getByRole('textbox', { name: 'What to look up' }) as HTMLInputElement
     typeInto(field, 'koohii')
@@ -185,7 +216,7 @@ describe('Romaji-to-kana conversion toggle', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     await palette('Chat with Tutor')
     await screen.findByRole('dialog', { name: 'Look it up' })
-    fireEvent.click(screen.getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
     await closeLookup()
 
     await palette('Scenario Practice')
@@ -210,11 +241,11 @@ describe('Romaji-to-kana conversion toggle', () => {
     await screen.findByRole('button', { name: /open shortcuts/i })
     await palette('Chat with Tutor')
     await screen.findByRole('dialog', { name: 'Look it up' })
-    fireEvent.click(screen.getByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Turn off romaji-to-kana conversion' }))
     await closeLookup()
 
     await palette('Chat with Tutor')
     await screen.findByRole('dialog', { name: 'Look it up' })
-    expect(screen.getByRole('button', { name: 'Turn on romaji-to-kana conversion' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Turn on romaji-to-kana conversion' })).toBeTruthy()
   })
 })

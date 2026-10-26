@@ -77,10 +77,12 @@ export interface LookupController {
    App hands the overlay these two slices, so the lookup draws them without owning a second copy.
    ================================================================================================== */
 export interface LookupChat {
-  /** gated on Chat with Tutor in Settings › Assistant */
+  /** gated on the chat being in the build, Chat with Tutor being on, and a tutor model installed */
   enabled: boolean
   /** the app's own sentence for why it is not, shown in the no-model state */
   disabledReason: string
+  /** the one place to fix it */
+  disabledHelp: string
   turns: AssistantChatTurn[]
   loading: boolean
   error: string | null
@@ -101,6 +103,7 @@ export interface LookupOcr {
   /** gated on the image-translation package being installed */
   enabled: boolean
   disabledReason: string
+  disabledHelp: string
   busy: boolean
   error: string | null
   result: OcrWorkbenchResult | null

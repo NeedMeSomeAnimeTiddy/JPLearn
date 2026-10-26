@@ -5,7 +5,8 @@ import type { KanjiDetailPayload } from '../../generated/types'
 import { LookupOverlay } from './components/LookupOverlay'
 import type { LookupAssistant, LookupChat, LookupOcr, LookupRouteKey } from './types'
 import { useLookup } from './useLookup'
-import { pageReply } from './utils'
+import { LOOKUP_GATE_COPY } from './constants'
+import { chatGate, ocrGate, pageReply } from './utils'
 
 /* The overlay is driven entirely by the controller, so the harness mounts the real hook and drives
    the pair -- the sequencing lives in the hook and the absence-drawing lives in the component, and
@@ -35,7 +36,8 @@ function Harness({ seed = '', route, assistant }: {
 
 function chatSlice(overrides: Partial<LookupChat> = {}): LookupChat {
   return {
-    enabled: true, disabledReason: 'Chatbot is disabled in settings.', turns: [], loading: false,
+    enabled: true, disabledReason: LOOKUP_GATE_COPY.chatOff.reason, disabledHelp: LOOKUP_GATE_COPY.chatOff.help,
+    turns: [], loading: false,
     error: null, send: vi.fn(), clear: vi.fn(), speakingKey: null, replay: vi.fn(), stopSpeaking: vi.fn(),
     audioEnabled: true, toggleAudio: vi.fn(), romajiEnabled: false, toggleRomaji: vi.fn(), charLimit: 600,
     ...overrides,
@@ -44,7 +46,8 @@ function chatSlice(overrides: Partial<LookupChat> = {}): LookupChat {
 
 function ocrSlice(overrides: Partial<LookupOcr> = {}): LookupOcr {
   return {
-    enabled: true, disabledReason: 'Image Translation is not installed.', busy: false, error: null,
+    enabled: true, disabledReason: LOOKUP_GATE_COPY.ocrNotInstalled.reason,
+    disabledHelp: LOOKUP_GATE_COPY.ocrNotInstalled.help, busy: false, error: null,
     result: null, submit: vi.fn(), clear: vi.fn(), maxMb: 30,
     ...overrides,
   }
@@ -204,23 +207,90 @@ describe('LookupOverlay', () => {
     open('語')
     await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
 
-    const tutor = screen.getByTitle(/^assistant-chat needs a running model$/i) as HTMLButtonElement
-    const ocr = screen.getByTitle(/assistant-chat-ocr needs a running model/i) as HTMLButtonElement
+    const tutor = screen.getByTitle(/^assistant-chat: /) as HTMLButtonElement
+    const ocr = screen.getByTitle(/^assistant-chat-ocr: /) as HTMLButtonElement
     expect(tutor.disabled).toBe(true)
     expect(ocr.disabled).toBe(true)
   })
 
-  it('keeps the two model routes dimmed and says why when no model is running', async () => {
+  it('keeps the two model routes dimmed and says why when no model is installed', async () => {
     installApi()
     render(<Harness route="tutor" assistant={withoutModel()} />)
     fireEvent.click(screen.getByText('open lookup'))
 
     expect(await screen.findByText('This route needs the tutor model.')).toBeTruthy()
-    expect(screen.getByText('Chatbot is disabled in settings.')).toBeTruthy()
-    expect(screen.getByText(/DIMMED UNTIL A MODEL IS RUNNING/)).toBeTruthy()
-    expect((screen.getByTitle(/^assistant-chat needs a running model$/i) as HTMLButtonElement).disabled).toBe(true)
-    expect((screen.getByTitle(/assistant-chat-ocr needs a running model/i) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(LOOKUP_GATE_COPY.chatOff.reason)).toBeTruthy()
+    expect(screen.getByText(LOOKUP_GATE_COPY.chatOff.help)).toBeTruthy()
+    /* the foot says what the gate checks, not something stricter or looser */
+    expect(screen.getByText('A QUESTION IS DIMMED UNTIL A TUTOR MODEL IS INSTALLED AND CHAT WITH TUTOR IS ON')).toBeTruthy()
+    expect((screen.getByTitle(`assistant-chat: ${LOOKUP_GATE_COPY.chatOff.reason}`) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByTitle(`assistant-chat-ocr: ${LOOKUP_GATE_COPY.ocrNotInstalled.reason}`) as HTMLButtonElement).disabled).toBe(true)
     expect(screen.getByText(/CTRL\+, OPENS SETTINGS/)).toBeTruthy()
+  })
+
+  it('gives A SCREENSHOT one instruction, at the settings location that has it', async () => {
+    installApi()
+    render(<Harness route="ocr" assistant={withoutModel()} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    const state = await screen.findByRole('status')
+    expect(state.textContent).toContain('Image Translation is not installed.')
+    expect(state.textContent).toContain('Install it in Settings › Assistant › Image Translation.')
+    /* one place named, once -- not one sentence per place that ever held it */
+    expect(state.textContent?.match(/Settings/g)).toHaveLength(1)
+    expect(state.textContent).not.toContain('Tutor › Image')
+    expect(screen.getByText('A SCREENSHOT IS DIMMED UNTIL IMAGE TRANSLATION IS INSTALLED')).toBeTruthy()
+  })
+
+  it('asks A SCREENSHOT for an image in its field, not for a word', async () => {
+    installApi()
+    render(<Harness route="ocr" assistant={withModel()} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+    const placeholder = field().getAttribute('placeholder') ?? ''
+    expect(placeholder).toMatch(/pick/i)
+    expect(placeholder).toMatch(/paste/i)
+    expect(placeholder).toMatch(/drop/i)
+    expect(placeholder).not.toMatch(/kanji|word|phrase/)
+  })
+
+  it('gates A QUESTION on a model actually installed, and A SCREENSHOT on image translation', () => {
+    const none = { llamaCppInstalled: true, models: [{ installed: false }], ocrInstalled: false }
+    const some = { llamaCppInstalled: true, models: [{ installed: false }, { installed: true }], ocrInstalled: true }
+    /* the setting alone is not enough: this is what showed an ask field with nothing to answer it */
+    expect(chatGate(true, true, none)).toMatchObject({ enabled: false, reason: LOOKUP_GATE_COPY.chatNoModel.reason })
+    expect(chatGate(true, true, { ...some, llamaCppInstalled: false }).enabled).toBe(false)
+    expect(chatGate(true, true, null).enabled).toBe(false)
+    expect(chatGate(true, false, some)).toMatchObject({ enabled: false, reason: LOOKUP_GATE_COPY.chatOff.reason })
+    expect(chatGate(false, true, some)).toMatchObject({ enabled: false, reason: LOOKUP_GATE_COPY.chatNoRuntime.reason })
+    expect(chatGate(true, true, some).enabled).toBe(true)
+    expect(ocrGate(true, none)).toMatchObject({ enabled: false, reason: LOOKUP_GATE_COPY.ocrNotInstalled.reason })
+    expect(ocrGate(false, some).enabled).toBe(false)
+    expect(ocrGate(true, some).enabled).toBe(true)
+  })
+
+  it('leaves ENTER and ESC to an input method that is still composing', async () => {
+    installApi()
+    const assistant = withModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+
+    /* a word mid-conversion: ENTER picks the candidate, it does not hand off to the dictionary */
+    fireEvent.change(field(), { target: { value: 'がっこう' } })
+    fireEvent.keyDown(field(), { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(field(), { key: 'Enter', keyCode: 229 })
+    expect(onOpenDictionary).not.toHaveBeenCalled()
+    /* and ESC drops the candidate, it does not close the sheet */
+    fireEvent.keyDown(field(), { key: 'Escape', isComposing: true })
+    expect(document.querySelector('.lk-open')).not.toBeNull()
+
+    /* the same on A QUESTION: nothing is sent until the composition is committed */
+    fireEvent.change(field(), { target: { value: 'なぜですか?' } })
+    fireEvent.keyDown(field(), { key: 'Enter', isComposing: true })
+    expect(assistant.chat.send).not.toHaveBeenCalled()
+    fireEvent.keyDown(field(), { key: 'Enter' })
+    expect(assistant.chat.send).toHaveBeenCalledWith('なぜですか?')
   })
 
   it('makes A QUESTION and A SCREENSHOT answerable when the model is running', async () => {
@@ -298,6 +368,46 @@ describe('LookupOverlay', () => {
     const image = new File(['jpg'], 'menu.jpg', { type: 'image/jpeg' })
     fireEvent.drop(document.querySelector('.lk-open') as Element, { dataTransfer: { files: [image], items: [], types: ['Files'] } })
     expect(assistant.ocr.submit).toHaveBeenCalledWith(image)
+  })
+
+  it('cancels a dropped file that is not an image before anything reads it, and says why', async () => {
+    const extract = vi.fn()
+    installApi({ extractAssistantChatImageText: extract })
+    const assistant = withModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+
+    /* left to the browser, a dropped HTML file is a navigation away from the app */
+    const page = new File(['<h1>x</h1>'], 'notes.html', { type: 'text/html' })
+    const allowed = fireEvent.drop(document.querySelector('.lk-open') as Element, {
+      dataTransfer: { files: [page], items: [], types: ['Files'] },
+    })
+    expect(allowed).toBe(false)
+    expect(assistant.ocr.submit).not.toHaveBeenCalled()
+    expect(extract).not.toHaveBeenCalled()
+    expect((await screen.findByRole('alert')).textContent).toContain('“notes.html” is not an image')
+    expect(screen.getByRole('button', { name: /A SCREENSHOT/ }).getAttribute('aria-pressed')).toBe('true')
+
+    /* the next image clears it */
+    fireEvent.drop(document.querySelector('.lk-open') as Element, {
+      dataTransfer: { files: [new File(['p'], 'a.png', { type: 'image/png' })], items: [], types: ['Files'] },
+    })
+    expect(screen.queryByText(/is not an image/)).toBeNull()
+  })
+
+  it('cancels a non-image drop with no model installed too, and says why there', async () => {
+    installApi()
+    const assistant = withoutModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+    const allowed = fireEvent.drop(document.querySelector('.lk-open') as Element, {
+      dataTransfer: { files: [new File(['t'], 'list.txt', { type: 'text/plain' })], items: [], types: ['Files'] },
+    })
+    expect(allowed).toBe(false)
+    expect(assistant.ocr.submit).not.toHaveBeenCalled()
+    expect((await screen.findByRole('alert')).textContent).toContain('“list.txt” is not an image')
   })
 
   it('lands a pasted image on the no-model sentence when image translation is not installed', async () => {

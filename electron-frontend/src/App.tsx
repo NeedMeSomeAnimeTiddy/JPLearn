@@ -51,7 +51,7 @@ import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
-import { useLookup, LookupOverlay, isTypingTarget, type LookupAssistant } from './features/lookup'
+import { useLookup, LookupOverlay, isTypingTarget, chatGate, ocrGate, type LookupAssistant } from './features/lookup'
 import { flyHome, flyToSection } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
@@ -795,13 +795,20 @@ function App() {
      `useTutor`; this only names which of them the overlay draws, and the two switches the
      conversation surfaces keep within reach (sound, romaji), which write the same settings the
      Assistant tab does. */
-  const ocrInstalled = models.tutorInstallInfo?.ocrInstalled ?? false
+  const lookupChatGate = chatGate(
+    typeof window.jplearnDesktop?.sendAssistantChatMessage === 'function',
+    settings.assistantChatEnabled,
+    models.tutorInstallInfo,
+  )
+  const lookupOcrGate = ocrGate(
+    typeof window.jplearnDesktop?.extractAssistantChatImageText === 'function',
+    models.tutorInstallInfo,
+  )
   const lookupAssistant: LookupAssistant = {
     chat: {
-      enabled: settings.assistantChatEnabled && typeof window.jplearnDesktop?.sendAssistantChatMessage === 'function',
-      disabledReason: settings.assistantChatEnabled
-        ? 'Assistant chat runtime is unavailable in this build.'
-        : 'Chatbot is disabled in settings.',
+      enabled: lookupChatGate.enabled,
+      disabledReason: lookupChatGate.reason,
+      disabledHelp: lookupChatGate.help,
       turns: tutor.assistantChatMessages,
       loading: tutor.assistantChatLoading,
       error: tutor.assistantChatError,
@@ -820,10 +827,9 @@ function App() {
       charLimit: ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
     },
     ocr: {
-      enabled: ocrInstalled && typeof window.jplearnDesktop?.extractAssistantChatImageText === 'function',
-      disabledReason: typeof window.jplearnDesktop?.extractAssistantChatImageText !== 'function'
-        ? 'Image Translation is unavailable in this build.'
-        : 'Image Translation is not installed. Install it in Settings > Tutor > Image Translation.',
+      enabled: lookupOcrGate.enabled,
+      disabledReason: lookupOcrGate.reason,
+      disabledHelp: lookupOcrGate.help,
       busy: tutor.ocrWorkbenchBusy,
       error: tutor.ocrWorkbenchError,
       result: tutor.ocrWorkbenchResult,
@@ -2748,11 +2754,9 @@ function App() {
           onPick={(scenarioId) => {
             if (scenarioId) {
               /* THE SCENE, AND THEN ITS SCREEN. A conversation already under way in this scene is
-                 resumed where it stood; any other pick starts at choosing how much help. */
-              const running = scenarioTutor.session?.status === 'active'
-                && scenarioTutor.selectedScenario?.id === scenarioId
-                && scenarioTutor.screen === 'session'
-              if (!running) scenarioTutor.selectScenario(scenarioId)
+                 resumed where it stood; another scene, while one is under way, is asked about on
+                 that conversation's slab first; any other pick starts at choosing how much help. */
+              scenarioTutor.selectScenario(scenarioId)
               setConversationOpen(true)
               return
             }

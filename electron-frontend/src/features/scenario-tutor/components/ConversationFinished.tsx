@@ -5,7 +5,7 @@ import { screenHead } from '../../menu'
 import { CONVERSATION_CARD_ROWS, CONVERSATION_COPY, CONVERSATION_DETAIL_ROWS, SCENARIO_LEVEL_LABELS } from '../constants'
 import type { ScenarioDefinition, ScenarioSession, ScenarioSummary, SrsDraftState } from '../types'
 import type { UseScenarioTutorReturn } from '../useScenarioTutor'
-import { pressesItself, useSheetKeys } from '../useSheetKeys'
+import { editsText, pressesItself, useSheetKeys } from '../useSheetKeys'
 import { objectiveFoot, objectiveTally, objectiveTickClass, summaryFold, summaryPages } from '../utils'
 
 export interface ConversationFinishedProps {
@@ -57,6 +57,9 @@ export function ConversationFinished({ tutor, scenario, session, summary }: Conv
 
   useSheetKeys((event) => {
     if (event.key === 'Escape') { event.preventDefault(); back(); return }
+    /* the open card's fields are text: their arrows move the caret and their ENTER is the field's,
+       so the cards move and accept only from the sheet itself */
+    if (editsText(event.target)) return
     if (event.key === 'PageDown') { event.preventDefault(); turn(1); return }
     if (event.key === 'PageUp') { event.preventDefault(); turn(-1); return }
     if (pending.length === 0) return

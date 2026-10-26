@@ -165,6 +165,75 @@ describe('Scenario Practice — end-to-end typed flow', () => {
     expect(screen.queryByRole('button', { name: 'Start scenario' })).toBeNull()
   })
 
+  it('keeps a held correction across leaving the screen, and ENTER is still what moves on', async () => {
+    mount()
+    await startCafe()
+    await respond('こんにちは')
+    fireEvent.input(screen.getByRole('textbox', { name: 'Your response' }), { target: { value: 'コーヒー' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit response' }))
+    await screen.findByText('TRY SAYING IT LIKE THIS')
+
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    const search = await screen.findByRole('textbox', { name: /search commands/i })
+    fireEvent.change(search, { target: { value: 'Go to Study' } })
+    fireEvent.click(await screen.findByRole('option', { name: 'Go to Study' }))
+    await waitFor(() => expect(screen.queryByText('YOU SAID')).toBeNull())
+
+    const scenes = await openScenes()
+    fireEvent.click(within(scenes).getByRole('button', { name: /order at a cafe/i }))
+    const corrected = (await screen.findByText('TRY SAYING IT LIKE THIS')).closest('.cv-slip') as HTMLElement
+    expect(corrected.textContent).toContain('コーヒーをください')
+    expect(screen.getByText('PARTIAL')).toBeTruthy()
+
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(await screen.findByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    expect(screen.queryByText('TRY SAYING IT LIKE THIS')).toBeNull()
+  })
+
+  it('asks before another scene replaces the one under way: KEEP GOING keeps it, YES opens the other', async () => {
+    mount()
+    await startCafe()
+    await respond('こんにちは')
+    expect(await screen.findByText('What would you like to order?')).toBeTruthy()
+
+    /* back out to the scenes (the session is kept) and pick the other one */
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    const search = await screen.findByRole('textbox', { name: /search commands/i })
+    fireEvent.change(search, { target: { value: 'Go to Study' } })
+    fireEvent.click(await screen.findByRole('option', { name: 'Go to Study' }))
+    let scenes = await openScenes()
+    fireEvent.click(within(scenes).getByRole('button', { name: /directions in shinjuku/i }))
+
+    let ask = await screen.findByRole('alertdialog', { name: 'Confirm switching to another scene' })
+    expect(within(ask).getByText('START ASK FOR DIRECTIONS IN SHINJUKU INSTEAD?')).toBeTruthy()
+    /* the conversation under it is still the cafe, untouched */
+    expect(screen.getByText('What would you like to order?')).toBeTruthy()
+    fireEvent.click(within(ask).getByRole('button', { name: 'KEEP GOING' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    expect(screen.getByText('What would you like to order?')).toBeTruthy()
+
+    /* still resumable from the scenes after saying no */
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    fireEvent.change(await screen.findByRole('textbox', { name: /search commands/i }), { target: { value: 'Go to Study' } })
+    fireEvent.click(await screen.findByRole('option', { name: 'Go to Study' }))
+    scenes = await openScenes()
+    fireEvent.click(within(scenes).getByRole('button', { name: /order at a cafe/i }))
+    expect(await screen.findByText('What would you like to order?')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Start scenario' })).toBeNull()
+
+    /* and saying yes ends it and opens the other scene at choosing how much help */
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    fireEvent.change(await screen.findByRole('textbox', { name: /search commands/i }), { target: { value: 'Go to Study' } })
+    fireEvent.click(await screen.findByRole('option', { name: 'Go to Study' }))
+    scenes = await openScenes()
+    fireEvent.click(within(scenes).getByRole('button', { name: /directions in shinjuku/i }))
+    ask = await screen.findByRole('alertdialog', { name: 'Confirm switching to another scene' })
+    fireEvent.click(within(ask).getByRole('button', { name: 'YES, DISCARD' }))
+    expect(await screen.findByRole('button', { name: 'Start scenario' })).toBeTruthy()
+    expect(screen.getByText('新宿で道を尋ねる')).toBeTruthy()
+  })
+
   it('persists a completed session, opens one drafted card at a time, and only saves accepted drafts', async () => {
     const saveScenarioSession = vi.fn(desktopApi.saveScenarioSession)
     const saveScenarioSrsCard = vi.fn(desktopApi.saveScenarioSrsCard)

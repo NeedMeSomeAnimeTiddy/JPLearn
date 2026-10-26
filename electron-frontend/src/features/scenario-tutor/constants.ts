@@ -104,10 +104,15 @@ export const CONVERSATION_OBJECTIVE_ROWS = 7
 /** past sessions on one page of the history */
 export const CONVERSATION_HISTORY_ROWS = 6
 
+/** earlier turns on one page of the transcript the prompt cell opens mid-session; a turn with its
+ *  English under it is two lines tall, so this is fewer than the finished screen's detail rows */
+export const CONVERSATION_TRANSCRIPT_ROWS = 4
+
 export const CONVERSATION_COPY = {
   leaveAsk: 'LEAVE THIS SCENARIO?',
   restartAsk: 'START OVER?',
   leaveNote: 'Your progress in this session will be discarded.',
+  switchNote: 'Starting another scene discards your progress in this one.',
   restartNote: 'Your current progress will be discarded.',
   yes: 'YES, DISCARD',
   no: 'KEEP GOING',
