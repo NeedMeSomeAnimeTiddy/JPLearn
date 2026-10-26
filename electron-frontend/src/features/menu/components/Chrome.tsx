@@ -81,6 +81,8 @@ export function Stats({ crown }: StatsProps) {
        has to eat the key before the navigation sees it, or opening a chip and pressing Escape leaves
        the screen instead of closing the chip. */
     const key = (e: KeyboardEvent) => {
+      /* an input method's ESC (Look it up can be open over the chip) drops its candidate, nothing more */
+      if (e.isComposing || e.keyCode === 229) return
       if (e.key === 'Escape') { setOpenStat(null); e.stopPropagation() }
     }
     window.addEventListener('click', away)

@@ -264,6 +264,19 @@ describe('Scenario Practice — end-to-end typed flow', () => {
     expect(await screen.findByRole('group', { name: 'Conversations' })).toBeTruthy()
   })
 
+  it('leaves an ESC an input method is still composing with to the input method, not to leaving', async () => {
+    mount()
+    await startCafe()
+    const rule = screen.getByRole('textbox', { name: 'Your response' })
+    fireEvent.keyDown(rule, { key: 'Escape', isComposing: true })
+    fireEvent.keyDown(rule, { key: 'Escape', keyCode: 229 })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    /* a committed ESC still asks */
+    fireEvent.keyDown(rule, { key: 'Escape' })
+    expect(await screen.findByRole('alertdialog', { name: 'Confirm leaving the scenario' })).toBeTruthy()
+  })
+
   it('requires confirmation before Leave discards the session and returns to the scenes', async () => {
     mount()
     await startCafe()
