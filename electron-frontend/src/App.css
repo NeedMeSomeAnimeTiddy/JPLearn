@@ -89,35 +89,6 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   height: 0;
 }
 
-.assistant-overlay {
-  position: relative;
-  display: inline-grid;
-  justify-items: start;
-  gap: 10px;
-  z-index: 950;
-  pointer-events: auto;
-  width: min(420px, calc(100vw - 36px));
-  animation: assistantDockIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-
-.assistant-overlay.is-open {
-  width: min(420px, calc(100vw - 36px));
-  margin-left: 0;
-}
-
-.assistant-overlay-titlebar {
-  width: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-}
-
-.assistant-overlay-titlebar.is-open {
-  width: min(420px, calc(100vw - 36px));
-}
-
 .dictionary-panel {
   position: relative;
   display: grid;
@@ -700,119 +671,6 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   }
 }
 
-@keyframes assistantDockIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.assistant-chat-controls {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.assistant-chat-toggle {
-  pointer-events: auto;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 52%, var(--panel-border));
-  background:
-    radial-gradient(circle at 15% 20%, color-mix(in oklab, var(--tone-ocean) 24%, transparent), transparent 56%),
-    color-mix(in oklab, var(--panel-bg) 92%, black);
-  color: var(--text-main);
-  border-radius: 999px;
-  min-height: 34px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--button-font);
-  font-size: 0.76rem;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  box-shadow:
-    0 16px 24px -18px rgba(0, 0, 0, 0.88),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition:
-    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 160ms ease,
-    box-shadow 180ms ease;
-}
-
-.assistant-chat-toggle:hover {
-  border-color: color-mix(in oklab, var(--tone-ocean) 72%, var(--panel-border));
-  transform: translateY(-1px);
-  box-shadow:
-    0 20px 30px -20px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.assistant-chat-toggle-titlebar {
-  width: calc(46px * var(--ui-scale));
-  height: calc(40px * var(--ui-scale));
-  min-height: 0;
-  padding: 0;
-  border-radius: 0;
-  border: none;
-  background: transparent;
-  color: color-mix(in oklab, var(--text-main) 90%, var(--text-soft));
-  box-shadow: none;
-}
-
-.assistant-chat-toggle-titlebar:hover {
-  background: color-mix(in oklab, var(--tone-ocean) 15%, transparent);
-  color: var(--text-main);
-  box-shadow: none;
-}
-
-.assistant-chat-toggle-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.assistant-chat-subtitle {
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-soft);
-}
-
-.assistant-chat-ocr-summary {
-  margin: 0 10px 8px;
-  padding: 8px 10px;
-  border-radius: 2px;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 48%, var(--panel-border));
-  background: color-mix(in oklab, var(--panel-bg) 84%, var(--tone-ocean) 16%);
-  font-size: 0.71rem;
-  line-height: 1.35;
-  color: var(--text-main);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.assistant-chat-ocr-summary-clear {
-  flex-shrink: 0;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 68%, white 32%);
-  background: color-mix(in oklab, var(--panel-bg) 96%, black);
-  color: var(--text-main);
-  border-radius: 0;
-  font-size: 0.66rem;
-  padding: 4px 8px;
-  cursor: pointer;
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.assistant-chat-ocr-summary-clear:hover {
-  border-color: color-mix(in oklab, var(--tone-ocean) 56%, var(--panel-border));
-}
-
 /* ── Tutor toast (hub chip style) ─────────────────────────────────────────── */
 
 .assistant-toast-anchor {
@@ -1193,11 +1051,6 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
 }
 
 @media (max-width: 720px) {
-  .assistant-overlay.assistant-overlay-titlebar.is-open {
-    width: min(320px, calc(100vw - 20px));
-    margin-left: 4px;
-  }
-
   .assistant-toast-stack {
     width: min(350px, calc(100vw - 20px));
   }
@@ -6061,13 +5914,6 @@ kbd {
   padding: 14px 16px 16px;
 }
 
-.tutor-scenario-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-}
-
 .settings-sheet {
   position: relative;
   width: min(90vw, 900px);
@@ -6159,74 +6005,6 @@ kbd {
 .settings-sheet-body::-webkit-scrollbar {
   width: 0;
   height: 0;
-}
-
-.expertise-backdrop {
-  z-index: 380;
-}
-
-.expertise-panel {
-  max-width: 620px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  height: 520px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 68%, var(--accent) 32%);
-  background:
-    radial-gradient(circle at 80% -10%, color-mix(in oklab, var(--accent) 28%, transparent), transparent 44%),
-    linear-gradient(170deg, color-mix(in oklab, var(--panel-bg-alt) 94%, black), color-mix(in oklab, var(--panel-bg) 96%, black));
-}
-
-.expertise-options {
-  display: grid;
-  gap: 10px;
-}
-
-.expertise-option {
-  border: 1px solid color-mix(in oklab, var(--panel-border) 80%, var(--accent) 20%);
-  background: linear-gradient(150deg, color-mix(in oklab, var(--panel-bg-alt) 90%, black), color-mix(in oklab, var(--panel-bg) 92%, black));
-  border-radius: 14px;
-  color: var(--text-main);
-  text-align: left;
-  padding: 12px 14px;
-  display: grid;
-  gap: 4px;
-  cursor: pointer;
-  transition: border-color 140ms ease, transform 140ms ease, box-shadow 180ms ease;
-}
-
-.expertise-option:hover {
-  border-color: color-mix(in oklab, var(--accent) 56%, var(--panel-border));
-}
-
-.expertise-option.is-active {
-  border-color: color-mix(in oklab, var(--accent) 76%, var(--panel-border));
-  box-shadow: 0 10px 26px -16px color-mix(in oklab, var(--accent) 62%, transparent);
-  transform: translateY(-1px);
-}
-
-.expertise-option-title {
-  font-family: var(--heading-font);
-  font-size: 0.98rem;
-  letter-spacing: 0.01em;
-}
-
-.expertise-option-description {
-  color: var(--text-soft);
-  font-size: 0.86rem;
-}
-
-.expertise-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.expertise-error {
-  margin: 0;
-  color: color-mix(in oklab, #ff8e94 85%, var(--text-main));
-  font-size: 0.86rem;
 }
 
 .settings-control-grid {
