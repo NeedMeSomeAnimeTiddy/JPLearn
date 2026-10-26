@@ -234,7 +234,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
           head={head}
           cap={cap}
           title={unavailable}
-          body={error}
+          body={error === unavailable ? null : error}
           tone="alert"
           slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: onBack }}
           onBack={onBack}
@@ -276,7 +276,6 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         onBack()
       }}
     >
-      <h1 className="sr-only">{text.title}</h1>
       {body()}
     </section>
   )

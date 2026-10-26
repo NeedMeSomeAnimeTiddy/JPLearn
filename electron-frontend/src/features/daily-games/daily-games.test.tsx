@@ -276,12 +276,34 @@ describe('Daily Game lifecycle', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toMatch(/Crossword is unavailable right now/)
     expect(alert.textContent).not.toMatch(/Match Pairs/)
+    /* said once, as the heading -- the body would only have repeated it */
+    expect(alert.querySelector('p')).toBeNull()
   })
 
-  it('gives the puzzle a page heading for screen readers', async () => {
-    render(<DailyGameSession mode="daily" data={state} dependencies={dependencies()} gameType="word_search" onBack={vi.fn()} />)
-    const heading = await screen.findByRole('heading', { level: 1, name: 'Word Search' })
-    expect(heading.classList.contains('sr-only')).toBe(true)
+  it('gives every state of the view exactly one page heading for screen readers', async () => {
+    let release!: (value: DailyGamesStatePayload) => void
+    const getState = vi.fn(() => new Promise<DailyGamesStatePayload>((resolve) => { release = resolve }))
+    render(<DailyGameView gameType="word_search" mode="daily" onBack={vi.fn()} dependencies={dependencies({ getState })} />)
+
+    /* the loading plate has it ... */
+    const headings = () => screen.getAllByRole('heading', { level: 1 })
+    expect(headings()).toHaveLength(1)
+    expect(headings()[0].textContent).toBe('Word Search')
+    expect(headings()[0].classList.contains('sr-only')).toBe(true)
+
+    /* ... and so does the board, still only once */
+    await act(async () => { release(state) })
+    await screen.findByRole('region', { name: 'Word Search board' })
+    expect(headings()).toHaveLength(1)
+    cleanup()
+
+    render(<DailyGameView gameType="crossword" mode="daily" onBack={vi.fn()} dependencies={dependencies({ getState: async () => { throw new Error('offline') } })} />)
+    await screen.findByRole('alert')
+    expect(headings().map((heading) => heading.textContent)).toEqual(['Crossword'])
+    cleanup()
+
+    render(<DailyGameView gameType={null} mode="daily" onBack={vi.fn()} dependencies={dependencies()} />)
+    expect(headings().map((heading) => heading.textContent)).toEqual(['Daily Games'])
   })
 
   it('draws the plate with the road back when the view is reached with no puzzle chosen', () => {

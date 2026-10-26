@@ -54,3 +54,12 @@ describe('the puzzle stylesheet', () => {
     expect(css.includes('border-radius')).toBe(false)
   })
 })
+
+describe('the match-pairs tile', () => {
+  it('keeps two lines of 21px Japanese inside its 45px', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/features/daily-games/daily-games.css'), 'utf8')
+    const lineHeight = Number(/\.dp-tile\.jp > span \{ line-height: ([\d.]+); \}/.exec(css)?.[1])
+    expect(/\.dp-tile\.jp \{[^}]*font-size: 21px;/.test(css)).toBe(true)
+    expect(2 * 21 * lineHeight).toBeLessThanOrEqual(45)
+  })
+})

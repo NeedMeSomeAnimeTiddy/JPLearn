@@ -119,6 +119,8 @@ button.dp-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; white-space: normal; line-height: 1.1; overflow-wrap: anywhere;
 }
+/* 21px Japanese at 1.1 is 46px for two lines, one over the tile; 1.05 keeps it inside */
+.dp-tile.jp > span { line-height: 1.05; }
 .dp-tile:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
 .dp-tile:disabled { cursor: default; }
 /* the one you are holding: lifted, the vermilion edge the slips use for the one in hand */

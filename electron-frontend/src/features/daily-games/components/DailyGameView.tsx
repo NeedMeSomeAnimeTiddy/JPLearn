@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { screenHead } from '../../menu'
 import { puzzleHead } from '../../menu/daily'
-import { DAILY_GAMES_COPY, PUZZLE_COPY } from '../constants'
+import { DAILY_GAME_TILES, DAILY_GAMES_COPY, PUZZLE_COPY } from '../constants'
 import type { DailyGameType, DailyGamesMode, DailyGamesSessionDependencies } from '../types'
 import type { DailyGamesMissedWordPayload } from '../../../generated/types'
 import { getDefaultDailyGamesSessionDependencies, useDailyGames } from '../useDailyGames'
@@ -40,6 +40,7 @@ export function DailyGameView({ gameType, ...rest }: DailyGameViewProps) {
   if (!gameType) {
     return (
       <div className="dp-puzzle">
+        <h1 className="sr-only">{DAILY_GAMES_COPY.title}</h1>
         <PuzzlePlate
           head={screenHead('DRILLS', 'daily')}
           cap={PUZZLE_COPY.noPuzzleCap}
@@ -121,7 +122,13 @@ function ChosenPuzzle({
     )
   }
 
-  return <div className="dp-puzzle" data-puzzle={gameType}>{body()}</div>
+  /* ONE PAGE HEADING FOR EVERY STATE -- the plates and the board alike; the slab's title is not one */
+  return (
+    <div className="dp-puzzle" data-puzzle={gameType}>
+      <h1 className="sr-only">{DAILY_GAME_TILES.find((tile) => tile.type === gameType)?.title}</h1>
+      {body()}
+    </div>
+  )
 }
 
 export default DailyGameView
