@@ -40,6 +40,30 @@ describe('fsrs:optimize', () => {
     expect(options.runPythonBridgeWithArgs).toHaveBeenCalledWith(['fsrs-reload-weights'])
   })
 
+  it('starts the reload only after optimize settles, and answers only after the reload', async () => {
+    let finishOptimize: (value: unknown) => void = () => {}
+    let finishReload: (value: unknown) => void = () => {}
+    const { optimize, options } = registerOptimizeHandler({
+      runPythonBridgeIsolated: vi.fn(() => new Promise((resolve) => { finishOptimize = resolve })),
+      runPythonBridgeWithArgs: vi.fn(() => new Promise((resolve) => { finishReload = resolve })),
+    })
+    let answered = false
+    const pending = optimize(createValidEvent()).then((value: unknown) => {
+      answered = true
+      return value
+    })
+
+    await Promise.resolve()
+    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+
+    finishOptimize({ ok: true })
+    await vi.waitFor(() => expect(options.runPythonBridgeWithArgs).toHaveBeenCalledTimes(1))
+    expect(answered).toBe(false)
+
+    finishReload({ ok: true, is_custom: true })
+    await expect(pending).resolves.toEqual({ ok: true })
+  })
+
   it('does not reload when optimize reports it saved nothing', async () => {
     const result = { ok: false, error: 'Insufficient review data (need 5+ cards with 2+ reviews).' }
     const { optimize, options } = registerOptimizeHandler({
