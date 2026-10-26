@@ -42,8 +42,13 @@ copy, with the worktree as the working folder).
   - `python scripts/dev.py --full`: everything plus packaging and a packaged smoke run; slow.
 - **Launch gate.** Anything that opens the app (`npm run start`, `test:e2e`, the packaged smoke)
   must run with a throwaway profile: `JPLEARN_DOCUMENTS_DIR` pointed at a scratch copy and its own
-  `--user-data-dir`. The real database is `Documents\JPLearn\data\jplearn.db`; nothing an audit runs
-  may write to it. Robbie's progress is test data, but the rule stands.
+  `--user-data-dir`. With `JPLEARN_DOCUMENTS_DIR` unset, the app keeps the real database at
+  `Documents\JPLearn Progress\data\jplearn.db` (`electron/main.cjs::resolveProgressDocumentsDir`;
+  `data/database.py` falls back to the repo's `data/jplearn.db` when run outside the app). Nothing
+  an audit runs may write to either, and the verifier checks which path a run resolved before
+  trusting it. The packaged smoke resets its database by default; since 2026-10-26 it sets its own
+  `JPLEARN_DOCUMENTS_DIR`, and before that it wiped the real one. Robbie's progress is test data,
+  but the rule stands.
 - An audit rarely needs any of these: reading source establishes almost everything.
 - **Robbie does not read Japanese.** In the report, name every word, card, screen and system in
   English. A Japanese term may follow in brackets, never stand alone as the handle for a thing.

@@ -6,6 +6,10 @@ const repoRoot = path.resolve(__dirname, '..')
 const outDir = path.join(repoRoot, 'out')
 const smokeDir = path.join(repoRoot, '.smoke')
 const appDataRoot = path.join(smokeDir, 'appdata')
+// The smoke run resets the database (JPLEARN_SMOKE_RESET_DB defaults to 1), and the app keeps it
+// under JPLEARN_DOCUMENTS_DIR, or the real Documents folder when that is unset. So the run always
+// gets its own: overriding APPDATA alone left it wiping the learner's real progress.
+const documentsRoot = path.join(appDataRoot, 'documents')
 const smokeLogPath = path.join(smokeDir, 'packaged-smoke-log.txt')
 const journeyReportPath = path.join(appDataRoot, 'study-journey-smoke.json')
 // 45s suits a developer machine, where startup telemetry lands in about six
@@ -209,6 +213,7 @@ async function main() {
       ELECTRON_DEV: '0',
       APPDATA: appDataRoot,
       JPLEARN_USER_DATA_DIR: appDataRoot,
+      JPLEARN_DOCUMENTS_DIR: documentsRoot,
       JPLEARN_SMOKE_JOURNEY: process.env.JPLEARN_SMOKE_JOURNEY || '1',
       JPLEARN_SMOKE_DECK: process.env.JPLEARN_SMOKE_DECK || 'hiragana',
       JPLEARN_SMOKE_MINIGAME: process.env.JPLEARN_SMOKE_MINIGAME || 'particle_cloze',
