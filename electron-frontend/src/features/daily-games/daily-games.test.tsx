@@ -239,6 +239,21 @@ describe('Daily Game lifecycle', () => {
     window.removeEventListener('keydown', appEscapeHandler)
   })
 
+  it('spends Word Search’s first Escape cancelling the selection, and only the next one leaves', async () => {
+    const onBack = vi.fn()
+    render(<DailyGameSession mode="daily" data={state} dependencies={dependencies()} gameType="word_search" onBack={onBack} />)
+    const start = await screen.findByRole('button', { name: /Row 1, column 1:/ })
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+    fireEvent.keyDown(start, { key: 'Escape' })
+
+    expect(onBack).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toMatch(/cancelled/i)
+
+    fireEvent.keyDown(start, { key: 'Escape' })
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+
   it('cleans up Typing Blitz timers when navigating away', async () => {
     vi.useFakeTimers()
     const recordAttempt = vi.fn(async () => state)

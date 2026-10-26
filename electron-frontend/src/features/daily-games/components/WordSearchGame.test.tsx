@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import * as axeCore from 'axe-core'
-import type { WordSearchBoard } from '../types'
-import { buildWordSearch } from '../utils'
+import type { PuzzleShell, WordSearchBoard } from '../types'
+import { boardCell, buildWordSearch } from '../utils'
 import { WordSearchGame } from './WordSearchGame'
 
 const board = buildWordSearch([], 12)
@@ -20,12 +20,22 @@ const diagonalBoard: WordSearchBoard = {
 diagonalBoard.grid[0][0] = '山'
 diagonalBoard.grid[1][1] = '川'
 
+const shell: PuzzleShell = {
+  head: null, cap: '', hints: [], onBack: () => undefined, backAria: 'Back to the daily road',
+  spent: { key: 'spent', value: '00:00', label: 'SPENT' }, ending: null,
+}
+/* the diagonal target sits at pool position 1, so its English is the second word */
+const words = [
+  { deck_slug: 'n5', deck_name: 'N5', card_id: 1, character: '猫', romaji: 'neko', meaning: 'cat', source: 'deck' },
+  { deck_slug: 'n5', deck_name: 'N5', card_id: 2, character: '山川', romaji: 'yamakawa', meaning: 'mountains and rivers', source: 'deck' },
+]
+
 function cellName(row: number, column: number): RegExp {
   return new RegExp(`Row ${row + 1}, column ${column + 1}:`)
 }
 
 function renderGame(onComplete = vi.fn()): ReturnType<typeof render> {
-  return render(<WordSearchGame board={board} isSaving={false} onComplete={onComplete} />)
+  return render(<WordSearchGame board={board} words={[]} isSaving={false} onComplete={onComplete} shell={shell} />)
 }
 
 const runAxe = (axeCore as unknown as { default?: typeof axeCore; run?: typeof axeCore.run }).default?.run ?? axeCore.run
@@ -66,7 +76,7 @@ describe('WordSearchGame', () => {
 
   it('supports diagonal keyboard selection and Escape cancellation', () => {
     const onComplete = vi.fn()
-    render(<WordSearchGame board={diagonalBoard} isSaving={false} onComplete={onComplete} />)
+    render(<WordSearchGame board={diagonalBoard} words={words} isSaving={false} onComplete={onComplete} shell={shell} />)
     const start = screen.getByRole('button', { name: cellName(0, 0) })
     start.focus()
     fireEvent.keyDown(start, { key: 'Enter' })
@@ -107,10 +117,25 @@ describe('WordSearchGame', () => {
     expect(await runAxe(container)).toHaveProperty('violations', [])
   })
 
-  it('contains its board in a labelled, keyboard-focusable scroll region', () => {
+  it('stands its board in the prompt cell at the solved cell size, with nothing to scroll', () => {
     renderGame()
     const boardRegion = screen.getByRole('region', { name: 'Word Search board' })
-    expect(boardRegion.getAttribute('tabindex')).toBe('0')
-    expect(boardRegion.classList.contains('daily-game-board-scroll')).toBe(true)
+    expect(boardRegion.closest('.rd-ask')).toBeTruthy()
+    const grid = boardRegion.querySelector('.dp-board') as HTMLElement
+    expect(grid.style.getPropertyValue('--dp-cell')).toBe(`${boardCell(board.grid.length)}px`)
+    expect(grid.style.getPropertyValue('--dp-n')).toBe(String(board.grid.length))
+  })
+
+  it('lists each target English first, Japanese beside it, and strikes it in gold once found', () => {
+    render(<WordSearchGame board={diagonalBoard} words={words} isSaving={false} onComplete={vi.fn()} shell={shell} />)
+    const list = screen.getByRole('list', { name: 'Words to find' })
+    const row = list.querySelector('li') as HTMLElement
+    expect(row.querySelector('b')?.textContent).toBe('mountains and rivers')
+    expect(row.querySelector('i')?.textContent).toBe('山川')
+    expect(row.classList.contains('on')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: cellName(0, 0) }))
+    fireEvent.click(screen.getByRole('button', { name: cellName(1, 1) }))
+    expect(list.querySelector('li')?.classList.contains('on')).toBe(true)
   })
 })

@@ -1,32 +1,34 @@
 import { cva } from 'class-variance-authority'
 import { startTransition, useCallback, useEffect, useOptimistic, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
-import { WORD_SEARCH_COPY } from '../constants'
-import type { DailyGamesAttemptOutcomeInput, WordSearchBoard, WordSearchCoordinate, WordSearchTarget } from '../types'
+import type { CSSProperties, KeyboardEvent } from 'react'
+import { RoundWork } from '../../round'
+import type { DailyGamesWordPayload } from '../../../generated/types'
+import { CROSSWORD_COPY, WORD_SEARCH_COPY, WORD_SEARCH_MAX_TARGETS } from '../constants'
+import type { DailyGamesAttemptOutcomeInput, PuzzleShell, WordSearchBoard, WordSearchCoordinate, WordSearchTarget } from '../types'
+import { boardCell, pad2 } from '../utils'
+import { PuzzleRound, PuzzleRows } from './PuzzleRound'
 
-const wordSearchCell = cva('word-search-cell', {
-  variants: {
-    selected: { true: 'is-selected', false: '' },
-    found: { true: 'is-found', false: '' },
-  },
-})
+/* ==================================================================================================
+   WORD SEARCH ON THE SHEET. The grid is the prompt cell, sized to its 278px content box by
+   `boardCell`; the words to find are the work cell, English first with the Japanese beside it,
+   struck in gold as you find them. Selection, dragging, the keyboard and Escape cancelling a
+   half-made line are the same code they were -- that last one still wins over leaving.
+   ================================================================================================== */
 
-const wordSearchGrid = cva('word-search-grid', {
+const wordSearchCell = cva('dp-cell', {
   variants: {
-    size: {
-      8: 'is-size-8',
-      9: 'is-size-9',
-      10: 'is-size-10',
-      11: 'is-size-11',
-      12: 'is-size-12',
-    },
+    selected: { true: 'here', false: '' },
+    found: { true: 'on', false: '' },
   },
 })
 
 interface WordSearchGameProps {
   board: WordSearchBoard
+  /** today's pool, which is where each target's English comes from */
+  words: readonly DailyGamesWordPayload[]
   isSaving: boolean
   onComplete: (result: { score: number; targetCount: number; outcomes: DailyGamesAttemptOutcomeInput[] }) => void
+  shell: PuzzleShell
 }
 
 function coordinateKey({ row, column }: WordSearchCoordinate): string {
@@ -55,7 +57,7 @@ function getCellLabel(row: number, column: number, character: string): string {
   return WORD_SEARCH_COPY.cellLabel.replace('{row}', String(row + 1)).replace('{column}', String(column + 1)).replace('{character}', character)
 }
 
-export function WordSearchGame({ board, isSaving, onComplete }: WordSearchGameProps) {
+export function WordSearchGame({ board, words, isSaving, onComplete, shell }: WordSearchGameProps) {
   const [selectionStart, setSelectionStart] = useState<WordSearchCoordinate | null>(null)
   const [selection, setSelection] = useState<WordSearchCoordinate[]>([])
   const [foundTargetIds, setFoundTargetIds] = useState<Set<string>>(() => new Set())
@@ -159,67 +161,101 @@ export function WordSearchGame({ board, isSaving, onComplete }: WordSearchGamePr
   }
 
   const selectedCells = new Set(selection.map(coordinateKey))
+  const columns = board.grid[0]?.length ?? board.grid.length
+  const cell = boardCell(columns)
+  const found = optimisticFoundTargetIds.size
   return (
-    <section className="word-search-game" aria-labelledby="word-search-title">
-      <header className="word-search-header">
-        <div>
-          <h1 id="word-search-title">{WORD_SEARCH_COPY.title}</h1>
-          <p>{WORD_SEARCH_COPY.instructions}</p>
+    <PuzzleRound
+      shell={shell}
+      run={[
+        { key: 'found', value: pad2(found), of: `/ ${board.targets.length}`, label: 'FOUND' },
+        shell.spent,
+      ]}
+      /* nothing in a word search can be got wrong, so every mark is gold -- in the order found */
+      foot={{ at: found, target: board.targets.length, trail: Array.from({ length: found }, () => true) }}
+      hints={[
+        { cap: '←↑↓→', en: 'Move', jp: '移動' },
+        { cap: 'ENTER', en: 'Mark', jp: '選択' },
+        { cap: 'ESC', en: 'Cancel, then back', jp: '取消' },
+      ]}
+      ask={(
+        <div className="rd-ask">
+          <div className="rd-kick"><span>THE GRID</span><em>升目</em></div>
+          <div className="dp-stage">
+            <div role="region" aria-label={WORD_SEARCH_COPY.boardLabel} aria-describedby="word-search-instructions">
+              <div className="dp-board" style={{ '--dp-n': columns, '--dp-cell': `${cell}px` } as CSSProperties}>
+                {board.grid.map((gridRow, row) => gridRow.map((character, column) => {
+                  const coordinate = { row, column }
+                  const isFound = board.targets.some((target) => optimisticFoundTargetIds.has(target.id) && target.path.some((item) => coordinateKey(item) === coordinateKey(coordinate)))
+                  return (
+                    <button
+                      key={coordinateKey(coordinate)}
+                      ref={(element) => { (cellRefs.current[row] ??= [])[column] = element }}
+                      type="button"
+                      lang="ja"
+                      className={wordSearchCell({ selected: selectedCells.has(coordinateKey(coordinate)), found: isFound })}
+                      aria-label={getCellLabel(row, column, character)}
+                      disabled={isSaving || completed.current}
+                      onClick={() => {
+                        if (suppressClick.current) {
+                          suppressClick.current = false
+                          return
+                        }
+                        selectCell(coordinate)
+                      }}
+                      onKeyDown={(event) => handleKeyDown(event, coordinate)}
+                      onPointerDown={() => {
+                        if (isSaving) return
+                        dragStart.current = coordinate
+                        dragEnd.current = coordinate
+                        setSelectionStart(coordinate)
+                        setSelection([coordinate])
+                        setStatus(WORD_SEARCH_COPY.selectionReady)
+                      }}
+                      onPointerEnter={() => {
+                        if (dragStart.current) {
+                          dragEnd.current = coordinate
+                          setSelection(createSelection(dragStart.current, coordinate))
+                        }
+                      }}
+                    >
+                      {character}
+                    </button>
+                  )
+                }))}
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="word-search-progress">{WORD_SEARCH_COPY.progress}: <strong>{optimisticFoundTargetIds.size}/{board.targets.length}</strong></p>
-      </header>
-      <div className="word-search-layout">
-        <div className="daily-game-board-scroll" role="region" aria-label={WORD_SEARCH_COPY.boardLabel} tabIndex={0}>
-         <div className={wordSearchGrid({ size: board.grid.length as 8 | 9 | 10 | 11 | 12 })}>
-          {board.grid.map((gridRow, row) => gridRow.map((character, column) => {
-            const coordinate = { row, column }
-            const isFound = board.targets.some((target) => optimisticFoundTargetIds.has(target.id) && target.path.some((item) => coordinateKey(item) === coordinateKey(coordinate)))
-            return (
-              <button
-                key={coordinateKey(coordinate)}
-                ref={(element) => { (cellRefs.current[row] ??= [])[column] = element }}
-                type="button"
-                className={wordSearchCell({ selected: selectedCells.has(coordinateKey(coordinate)), found: isFound })}
-                aria-label={getCellLabel(row, column, character)}
-                disabled={isSaving || completed.current}
-                onClick={() => {
-                  if (suppressClick.current) {
-                    suppressClick.current = false
-                    return
-                  }
-                  selectCell(coordinate)
-                }}
-                onKeyDown={(event) => handleKeyDown(event, coordinate)}
-                onPointerDown={() => {
-                  if (isSaving) return
-                  dragStart.current = coordinate
-                  dragEnd.current = coordinate
-                  setSelectionStart(coordinate)
-                  setSelection([coordinate])
-                  setStatus(WORD_SEARCH_COPY.selectionReady)
-                }}
-                onPointerEnter={() => {
-                  if (dragStart.current) {
-                    dragEnd.current = coordinate
-                    setSelection(createSelection(dragStart.current, coordinate))
-                  }
-                }}
-              >
-                {character}
-              </button>
-            )
-          }))}
-         </div>
-        </div>
-        <aside className="word-search-targets" aria-label={WORD_SEARCH_COPY.targetList}>
-          <h2>{WORD_SEARCH_COPY.targetList}</h2>
-          <ul>
-            {board.targets.map((target) => <li key={target.id} className={optimisticFoundTargetIds.has(target.id) ? 'is-found' : ''}>{target.value}{optimisticFoundTargetIds.has(target.id) ? ` (${WORD_SEARCH_COPY.found})` : ''}</li>)}
-          </ul>
-        </aside>
-      </div>
-      <p className="word-search-status" role="status">{status}</p>
-      {isSaving ? <p className="daily-game-saving" role="status">{WORD_SEARCH_COPY.selectionMatched}</p> : null}
-    </section>
+      )}
+      work={(
+        <RoundWork
+          kick="WORDS TO FIND"
+          kickJp="単語"
+          slab={{ text: selectionStart ? 'NOW ITS LAST LETTER' : 'MARK A FIRST LETTER', jp: '単語探し', tone: 'calm' }}
+          after={<p className="dp-status" role="status">{status}</p>}
+        >
+          <p id="word-search-instructions" className="sr-only">{WORD_SEARCH_COPY.instructions}</p>
+          <PuzzleRows
+            items={board.targets}
+            label={WORD_SEARCH_COPY.targetList}
+            limit={WORD_SEARCH_MAX_TARGETS}
+            render={(target, index) => {
+              const isFound = optimisticFoundTargetIds.has(target.id)
+              /* ENGLISH LEADS -- it is the half of the word you can read the list by */
+              const meaning = target.poolPosition === null ? CROSSWORD_COPY.fallbackClue : (words[target.poolPosition]?.meaning ?? target.value)
+              return (
+                <li key={target.id} className={isFound ? 'dp-row on' : 'dp-row'}>
+                  <u aria-hidden="true">{pad2(index + 1)}</u>
+                  <b>{meaning}</b>
+                  <i lang="ja">{target.value}</i>
+                  {isFound ? <s>{WORD_SEARCH_COPY.found.toUpperCase()}</s> : null}
+                </li>
+              )
+            }}
+          />
+        </RoundWork>
+      )}
+    />
   )
 }
