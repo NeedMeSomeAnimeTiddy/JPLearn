@@ -550,7 +550,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 |---|---|---|
 | D1 | `App.tsx` is down to 2,880 lines / 67 `useState` — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
 | ~~D2~~ | ~~`desktop_bridge.py` was 6,122 lines mixing OCR, MT, dictionary, deck, and dispatch logic in `scripts/`~~ — now ~3,690. MT deleted (was dead code), dictionary moved to `data/dictionary_repository.py`, dispatch converted to a route table, OCR moved to `scripts/ocr_extraction.py` behind its own process. What remains is deck/JLPT/progression assembly, which belongs in `scripts/` (see §2). | #70, #74 |
-| D3 | ~~`arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`.~~ Done — `scripts` is now a checked layer (forbids `→ ui`) with a non-fatal size-warning threshold. | #70 (step 1) |
+| ~~D3~~ | ~~`arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`.~~ Done — `scripts` is now a checked layer (forbids `→ ui`) with a non-fatal size-warning threshold. | #70 (step 1) |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
 | D5 | Empty legacy packages `src/` and `ui/` (only `__pycache__`); stray zero-byte `nul` file at repo root. | none |
 | D6 | 4 feature modules incomplete vs the checklist: card-notes, heatmap, models, window-drag. | none |

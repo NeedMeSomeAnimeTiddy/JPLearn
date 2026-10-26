@@ -38,7 +38,7 @@ GENERATED = SRC / "generated"
 BRIDGE = Path("scripts/desktop_bridge.py")
 IPC_HANDLERS = ELECTRON / "ipc_handlers.cjs"
 ARCHITECTURE = Path("ARCHITECTURE.md")
-DEBT = Path("docs/DEBT.md")
+DEBT = Path("DEBT.md")
 
 PY_ROOTS = [Path("domain"), Path("data"), Path("scripts")]
 SKIP_DIRS = {"node_modules", "out", "dist", "python-bundle", ".venv", "mockups",
