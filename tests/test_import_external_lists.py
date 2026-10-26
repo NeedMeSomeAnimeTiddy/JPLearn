@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from scripts import import_external_lists
 
 
@@ -509,3 +511,20 @@ def test_generate_external_deck_module_keep_last_resolves_conflicts(tmp_path: Pa
     content = output_py.read_text(encoding="utf-8")
     assert "('共通', 'kyoutsuu', 'first meaning')" not in content
     assert "('共通', 'kyoutsuu', 'last meaning')" in content
+
+
+def test_read_csv_strips_dangling_comma_from_meaning(tmp_path: Path) -> None:
+    source = tmp_path / "words.csv"
+    source.write_text('character,romaji,meaning\n指す,sasu,"to point,"\n', encoding="utf-8")
+
+    sheet = import_external_lists._read_csv(source, "words")
+
+    assert [row[2] for row in sheet.rows] == ["to point"]
+
+
+def test_read_csv_rejects_unquoted_comma_in_meaning(tmp_path: Path) -> None:
+    source = tmp_path / "words.csv"
+    source.write_text("character,romaji,meaning\nある,aru,There is (for objects, polite)\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="more fields than the header"):
+        import_external_lists._read_csv(source, "words")

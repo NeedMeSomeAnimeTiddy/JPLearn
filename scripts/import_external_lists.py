@@ -71,9 +71,13 @@ def _read_csv(path: Path, name: str) -> CsvSheet:
         seen: set[tuple[str, str]] = set()
         duplicates_removed = 0
         for line_index, row in enumerate(reader, start=2):
+            if None in row:
+                # csv files an unquoted comma's spill-over under None; the meaning is cut short
+                raise ValueError(f"{path}:{line_index} has more fields than the header (an unquoted comma?)")
             character = normalize_japanese_text(row.get("character", ""))
             romaji = _normalize_text(row.get("romaji", ""))
-            meaning = _normalize_text(row.get("meaning", ""))
+            # A dozen source meanings end in a dangling comma ("to point,"), cut off upstream.
+            meaning = _normalize_text(row.get("meaning", "")).rstrip(" ,")
 
             if not character or not romaji or not meaning:
                 raise ValueError(f"{path}:{line_index} has empty required fields")
