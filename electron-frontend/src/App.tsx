@@ -294,6 +294,20 @@ function App() {
   const openDailyGamesRef = useRef<() => void>(() => {})
   function openDailyGames(): void { openDailyGamesRef.current() }
 
+  /* THE TITLEBAR'S OWN TOOLS, for the palette. The titlebar is bare on every screen now, so its
+     timer chip and its Refresh Data and Developer Tools menu cannot be seen -- the palette is the
+     way to reach them. The handlers are defined far below and change identity, so the palette
+     reaches them through this ref, assigned where they are. */
+  const titlebarToolsRef = useRef<{
+    toggleTimer: () => void
+    refreshData: () => void
+    openDevDashboard: () => void
+    inspectElement: () => void | Promise<void>
+    runCheck: (checkName: string) => void
+    restartBridge: () => void | Promise<void>
+    clearCaches: () => void | Promise<void>
+  } | null>(null)
+
   useEffect(() => {
     const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
     const commands: Command[] = [
@@ -310,7 +324,20 @@ function App() {
       { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei'], action: () => tutor.openTutorPanel('chat') },
       { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => tutor.openTutorPanel('scenarios') },
       { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate'], action: () => tutor.openTutorPanel('ocr') },
+      { id: 'refresh-data', label: 'Refresh Data', category: 'settings', keywords: ['reload', 'summary'], action: () => { titlebarToolsRef.current?.refreshData() } },
+      { id: 'dev-dashboard', label: 'Developer Dashboard', category: 'debug', keywords: ['developer', 'dev', 'tools'], action: () => { titlebarToolsRef.current?.openDevDashboard() } },
+      { id: 'dev-inspect-element', label: 'Inspect Element', category: 'debug', keywords: ['developer', 'devtools'], action: () => { void titlebarToolsRef.current?.inspectElement() } },
+      { id: 'dev-check-arch', label: 'Architecture Check', category: 'debug', keywords: ['run', 'checks', 'developer'], action: () => { titlebarToolsRef.current?.runCheck('arch') } },
+      { id: 'dev-check-db', label: 'DB Schema Check', category: 'debug', keywords: ['run', 'checks', 'developer', 'database'], action: () => { titlebarToolsRef.current?.runCheck('db') } },
+      { id: 'dev-check-srs', label: 'SRS Integrity Check', category: 'debug', keywords: ['run', 'checks', 'developer'], action: () => { titlebarToolsRef.current?.runCheck('srs') } },
+      { id: 'dev-restart-bridge', label: 'Restart Bridge', category: 'debug', keywords: ['developer', 'python'], action: () => { void titlebarToolsRef.current?.restartBridge() } },
+      { id: 'dev-clear-caches', label: 'Clear Caches', category: 'debug', keywords: ['developer', 'bridge'], action: () => { void titlebarToolsRef.current?.clearCaches() } },
     ]
+    /* THE TIMER IS OFFERED ONLY WHILE IT IS ENABLED, as its titlebar chip was: with the setting off
+       nothing draws the countdown, so starting one would run a timer nobody can see. */
+    if (settings.pomodoroEnabled) {
+      commands.push({ id: 'timer-toggle', label: 'Start or Pause Focus Timer', category: 'study', keywords: ['pomodoro', 'timer', 'focus', 'start', 'pause', 'resume'], action: () => { titlebarToolsRef.current?.toggleTimer() } })
+    }
 
     for (const script of scripts) {
       const games = SCRIPT_MINIGAMES[script]
@@ -343,7 +370,7 @@ function App() {
 
     commandPalette.registerCommands(commands)
     // oxlint-disable-next-line react-hooks/exhaustive-deps — registerCommands is stable, other deps are stable setters
-  }, [commandPalette.registerCommands, activeScript])
+  }, [commandPalette.registerCommands, activeScript, settings.pomodoroEnabled])
 
   useEffect(() => {
     const cleanup = window.jplearnDesktop?.onTrayAction?.((action: string) => {
@@ -1973,6 +2000,15 @@ function App() {
       // best effort
     }
   }, [closeShortcutMenu])
+  titlebarToolsRef.current = {
+    toggleTimer: pomodoro.toggle,
+    refreshData: refreshDataFromMenu,
+    openDevDashboard,
+    inspectElement: inspectElementFromMenu,
+    runCheck: runCheckFromMenu,
+    restartBridge: restartBridgeFromMenu,
+    clearCaches: clearCachesFromMenu,
+  }
 
   const resetStudyDb = useCallback(async () => {
     setResettingDb(true)
@@ -2881,28 +2917,35 @@ function App() {
         />
       ) : null}
 
+      {/* THE THREE SCREENS WITH NO CHROME OF THEIR OWN -- the exam, the passage and the puzzle --
+          each get a boundary whose fallback offers Back, because the titlebar is bare everywhere
+          and a crash would otherwise leave nothing to press. Back is the screen's own `onBack`. */}
       {view === 'jlpt_prep' && examRun ? (
-        <JLPTPrepView
-          level={examRun.level}
-          mode={examRun.mode}
-          onBack={() => {
-            setExamRun(null)
-            navigate('home', 'back')
-          }}
-        />
+        <ErrorBoundary onBack={() => { setExamRun(null); navigate('home', 'back') }}>
+          <JLPTPrepView
+            level={examRun.level}
+            mode={examRun.mode}
+            onBack={() => {
+              setExamRun(null)
+              navigate('home', 'back')
+            }}
+          />
+        </ErrorBoundary>
       ) : null}
 
       {view === 'passage_hub' && readingPassageId ? (
-        <PassageHubView
-          passageId={readingPassageId}
-          onBack={() => {
-            setReadingPassageId(null)
-            navigate('home', 'back')
-          }}
-          onOpenDictionary={(query) => openDictionary(query ?? '')}
-          onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
-          voiceBusy={voice.voiceBusy}
-        />
+        <ErrorBoundary onBack={() => { setReadingPassageId(null); navigate('home', 'back') }}>
+          <PassageHubView
+            passageId={readingPassageId}
+            onBack={() => {
+              setReadingPassageId(null)
+              navigate('home', 'back')
+            }}
+            onOpenDictionary={(query) => openDictionary(query ?? '')}
+            onPlayAudio={(text) => { void voice.playQuestionAudio(text) }}
+            voiceBusy={voice.voiceBusy}
+          />
+        </ErrorBoundary>
       ) : null}
 
       {/* A PUZZLE STANDS BARE, the way the exam run does: the sheet is the whole screen, so the old
@@ -2911,7 +2954,7 @@ function App() {
           tablet you pressed still on it. With nothing chosen (history forward after Back cleared it)
           the view draws its own plate offering the road rather than a blank window. */}
       {view === 'daily_games' ? (
-        <ErrorBoundary>
+        <ErrorBoundary onBack={() => { setDailyPlay(null); navigate('home', 'back') }}>
           <Suspense fallback={<div className="dp-puzzle" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
             <DailyGameView
               gameType={dailyPlay?.type ?? null}
@@ -2925,21 +2968,20 @@ function App() {
     </>
   )
 
-  /* EVERY SCREEN THAT STANDS ON THE ROUND'S SHEET STANDS ON THE VALLEY TOO, so the shell has to stop
-     painting a ground over it. `mn-showing` is the one line that makes the app's own panel
-     transparent -- see `menu.css` -- and the round, the daily puzzles, the exam and the passage are
-     all menu screens that happen to be sessions. */
-  const onTheSheet = view === 'home' || view === 'minigame' || view === 'daily_games'
-    || view === 'jlpt_prep' || view === 'passage_hub'
+  /* THE SHELL IS ALWAYS THE VALLEY'S, AND THE TITLEBAR IS ALWAYS BARE. Every view the app has --
+     home, the round, the daily puzzles, the exam, the passage -- stands on the round's sheet, so
+     the shell never paints a ground of its own (`mn-showing` makes the panel transparent, see
+     `menu.css`) and the 40px dark titlebar is never drawn over a heading slab. What the full
+     titlebar held is reached from the command palette (Ctrl+K) instead; its code is still in
+     `AppTitlebar` and is unused for now. */
   return (
-    <main className={onTheSheet ? 'app-shell mn-showing' : 'app-shell'}>
+    <main className="app-shell mn-showing">
       <AppTitlebar
-        /* BARE OVER A MENU SCREEN, AND EVERY SCREEN ON THE ROUND'S SHEET IS ONE NOW. The full
-           titlebar is 40px of dark chrome at the top of the window, and the heading slab is authored
-           at y 20 of a board that starts at the window's own top edge -- so a round, a puzzle, an
-           exam or a passage with the ordinary titlebar had the bar drawn straight through its
-           heading. Every other screen on this stage is already bare. */
-        bare={onTheSheet}
+        /* ALWAYS BARE: the full titlebar is 40px of dark chrome at the top of the window, and the
+           heading slab is authored at y 20 of a board that starts at the window's own top edge, so
+           it was drawn straight through the heading of every screen on the sheet -- which is all
+           of them. */
+        bare
         windowDrag={windowDrag}
         shortcutMenuRef={shortcutMenuRef}
         shortcutMenuOpen={shortcutMenuOpen}

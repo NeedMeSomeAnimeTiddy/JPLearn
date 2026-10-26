@@ -1,10 +1,12 @@
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
-import { AlertTriangle, RotateCw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, RotateCw } from 'lucide-react'
 
 interface ErrorBoundaryProps {
   children: ReactNode
   fallback?: ReactNode
+  /** A way out of a crashed screen that has no chrome of its own: the titlebar is bare everywhere. */
+  onBack?: () => void
 }
 
 interface ErrorBoundaryState {
@@ -55,6 +57,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <RotateCw size={14} strokeWidth={2.2} aria-hidden="true" />
               Try again
             </button>
+            {this.props.onBack ? (
+              <button
+                type="button"
+                className="error-boundary-retry btn-primary"
+                onClick={this.props.onBack}
+              >
+                <ArrowLeft size={14} strokeWidth={2.2} aria-hidden="true" />
+                Back
+              </button>
+            ) : null}
           </div>
         </div>
       )

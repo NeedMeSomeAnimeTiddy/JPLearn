@@ -18,10 +18,11 @@
  * asserted here — it has to be checked by eye at each call site.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { openDeck, openGame } from './test-entry'
 import { SCREEN_NAMES } from './features/menu'
 import App from './App'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { VIEW_PARENT } from './features/navigation'
 
 vi.mock('react-type-animation', () => ({
@@ -243,15 +244,29 @@ describe('view -> parent (Escape back-navigation)', () => {
     expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
   })
 
-  it('draws the bare titlebar over a daily puzzle, as over every screen on the round sheet', async () => {
+  it('keeps the bare titlebar and the valley shell on every view the app has', async () => {
+    /* ALL FIVE VIEWS WEAR THE SAME SHELL, because it is one unconditional line in App.tsx. Home, the
+       round and the puzzle are walked here; `jlpt_prep` and `passage_hub` run an exam or a text and
+       cannot be entered without a payload this file has no cheap way to supply (see above), so they
+       are covered by being the same <main> and the same <AppTitlebar bare> as these three. */
+    const expectBareShell = () => {
+      expect(document.querySelector('main.app-shell.mn-showing')).toBeTruthy()
+      expect(document.querySelector('.window-titlebar.is-bare')).toBeTruthy()
+      expect(document.querySelector('.window-titlebar:not(.is-bare)')).toBeNull()
+    }
     render(<App />)
     await expectView('home')
-    expect(document.querySelector('.window-titlebar.is-bare')).toBeTruthy()
+    expectBareShell()
+
+    await openGame('Hiragana', 'Meaning Match')
+    await expectView('minigame')
+    expectBareShell()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await expectView('home')
 
     await openDailyPuzzle()
     await expectView('daily_games')
-    expect(document.querySelector('.window-titlebar.is-bare')).toBeTruthy()
-    expect(document.querySelector('.app-shell.mn-showing')).toBeTruthy()
+    expectBareShell()
   })
 
   it('still parents the two views the shortcut menu no longer opens directly', () => {
@@ -288,6 +303,11 @@ describe('view -> parent (Escape back-navigation)', () => {
   })
 })
 
+/* THESE TWO TESTS COVER THE INTERNAL HISTORY LOGIC ONLY. The titlebar is bare on every screen, and
+   `.window-titlebar.is-bare .window-titlebar-drag > *` hides its Back and Forward buttons (menu.css),
+   so a user cannot click them -- jsdom loads no CSS, which is the only reason this file still can.
+   What is pinned is the stack the buttons read (order of visit, truncation), not a control the user
+   has; keyboard and in-screen Back are how a user leaves a view. */
 describe('history stack (titlebar back/forward)', () => {
   it('walks back and forward across a multi-hop trail, in order of visit', async () => {
     render(<App />)
@@ -367,6 +387,112 @@ describe('history stack (titlebar back/forward)', () => {
     await waitForEnabled(/^Back$/)
     fireEvent.click(screen.getByRole('button', { name: /^Back$/ }))
     await expectView('minigame')
+  })
+})
+
+/* THE BARE TITLEBAR HIDES ITS TIMER CHIP, REFRESH DATA AND DEVELOPER TOOLS, so the palette is the way
+   to them. Each entry is found by typing its label into the palette and must reach the handler the
+   titlebar's own menu calls. */
+describe('titlebar-only tools in the command palette', () => {
+  async function runPaletteCommand(label: string): Promise<void> {
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    const search = await screen.findByRole('textbox', { name: /search commands/i })
+    fireEvent.change(search, { target: { value: label } })
+    fireEvent.click(await screen.findByRole('option', { name: label }))
+  }
+
+  it('refreshes the study data', async () => {
+    const getStudySummary = vi.fn(window.jplearnDesktop!.getStudySummary)
+    window.jplearnDesktop = { ...window.jplearnDesktop!, getStudySummary } as typeof window.jplearnDesktop
+    render(<App />)
+    await expectView('home')
+    await waitFor(() => expect(getStudySummary).toHaveBeenCalled())
+    const before = getStudySummary.mock.calls.length
+
+    await runPaletteCommand('Refresh Data')
+    await waitFor(() => expect(getStudySummary.mock.calls.length).toBeGreaterThan(before))
+  })
+
+  it('restarts the bridge, clears its caches and opens the inspector', async () => {
+    const restartBridge = vi.fn(async () => ({ ok: true }))
+    const clearBridgeCaches = vi.fn(async () => ({ ok: true }))
+    const openInspectElement = vi.fn(async () => ({ ok: true }))
+    window.jplearnDesktop = {
+      ...window.jplearnDesktop!, restartBridge, clearBridgeCaches, openInspectElement,
+    } as unknown as typeof window.jplearnDesktop
+    render(<App />)
+    await expectView('home')
+
+    await runPaletteCommand('Restart Bridge')
+    await waitFor(() => expect(restartBridge).toHaveBeenCalledTimes(1))
+    await runPaletteCommand('Clear Caches')
+    await waitFor(() => expect(clearBridgeCaches).toHaveBeenCalledTimes(1))
+    await runPaletteCommand('Inspect Element')
+    await waitFor(() => expect(openInspectElement).toHaveBeenCalledTimes(1))
+  })
+
+  it('opens the developer dashboard, and runs each check inside it', async () => {
+    const runCheck = vi.fn(async () => ({ ok: true, output: '' }))
+    window.jplearnDesktop = { ...window.jplearnDesktop!, runCheck } as unknown as typeof window.jplearnDesktop
+    render(<App />)
+    await expectView('home')
+
+    await runPaletteCommand('Developer Dashboard')
+    const dashboard = await screen.findByRole('dialog', { name: 'Developer Dashboard' })
+    fireEvent.click(within(dashboard).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Developer Dashboard' })).toBeNull())
+
+    for (const [label, key] of [['Architecture Check', 'arch'], ['DB Schema Check', 'db'], ['SRS Integrity Check', 'srs']]) {
+      await runPaletteCommand(label)
+      const open = await screen.findByRole('dialog', { name: 'Developer Dashboard' })
+      await waitFor(() => expect(runCheck).toHaveBeenLastCalledWith(key))
+      fireEvent.click(within(open).getByRole('button', { name: 'Close' }))
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Developer Dashboard' })).toBeNull())
+    }
+  })
+
+  it('starts and pauses the focus timer, and offers it only while the timer is enabled', async () => {
+    render(<App />)
+    await expectView('home')
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    fireEvent.change(await screen.findByRole('textbox', { name: /search commands/i }), { target: { value: 'Focus Timer' } })
+    expect(screen.queryByRole('option', { name: 'Start or Pause Focus Timer' })).toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    cleanup()
+
+    window.localStorage.setItem('jplearn-desktop-settings-v1', JSON.stringify({ pomodoroEnabled: true }))
+    render(<App />)
+    await expectView('home')
+    expect(screen.getByRole('button', { name: 'Start timer' })).toBeTruthy()
+
+    await runPaletteCommand('Start or Pause Focus Timer')
+    await screen.findByRole('button', { name: /^Pause timer/ })
+    await runPaletteCommand('Start or Pause Focus Timer')
+    await screen.findByRole('button', { name: /^Resume timer/ })
+  })
+})
+
+/* A CRASHED PUZZLE, EXAM OR PASSAGE HAS NO CHROME TO LEAVE BY, so its boundary's fallback carries Back.
+   App.tsx hands each of the three routes the same `onBack` the screen itself uses. */
+describe('ErrorBoundary Back', () => {
+  function Boom(): never {
+    throw new Error('the screen broke')
+  }
+
+  it('offers no Back unless the screen gave it somewhere to go', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<ErrorBoundary><Boom /></ErrorBoundary>)
+    expect(screen.getByRole('alert').textContent).toContain('the screen broke')
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
+  })
+
+  it('shows a Back action on a crashed screen and calls it', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onBack = vi.fn()
+    render(<ErrorBoundary onBack={onBack}><Boom /></ErrorBoundary>)
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
   })
 })
 
