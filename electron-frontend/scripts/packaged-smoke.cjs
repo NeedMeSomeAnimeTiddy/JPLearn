@@ -214,6 +214,7 @@ async function main() {
       APPDATA: appDataRoot,
       JPLEARN_USER_DATA_DIR: appDataRoot,
       JPLEARN_DOCUMENTS_DIR: documentsRoot,
+      JPLEARN_SESSION_DATA_DIR: path.join(appDataRoot, 'session'),
       JPLEARN_SMOKE_JOURNEY: process.env.JPLEARN_SMOKE_JOURNEY || '1',
       JPLEARN_SMOKE_DECK: process.env.JPLEARN_SMOKE_DECK || 'hiragana',
       JPLEARN_SMOKE_MINIGAME: process.env.JPLEARN_SMOKE_MINIGAME || 'particle_cloze',

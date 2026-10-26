@@ -1,4 +1,6 @@
 import { _electron, type ElectronApplication, type Page } from 'playwright'
+import { mkdtempSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 export type LaunchResult = {
@@ -17,6 +19,9 @@ export type LaunchResult = {
  * The remaining page is the main window.
  */
 export async function launchApp(): Promise<LaunchResult> {
+  // Each launch gets its own Documents, profile and session folders. Without them the app opens the
+  // learner's real database (Documents\JPLearn Progress) and Electron profile.
+  const scratch = mkdtempSync(path.join(os.tmpdir(), 'jplearn-e2e-'))
   const app = await _electron.launch({
     args: ['.'],
     cwd: path.resolve(__dirname, '..', '..'),
@@ -24,6 +29,9 @@ export async function launchApp(): Promise<LaunchResult> {
       ...process.env,
       NODE_ENV: 'production',
       ELECTRON_DEV: '0',
+      JPLEARN_DOCUMENTS_DIR: path.join(scratch, 'documents'),
+      JPLEARN_USER_DATA_DIR: path.join(scratch, 'userdata'),
+      JPLEARN_SESSION_DATA_DIR: path.join(scratch, 'session'),
     },
   })
 
