@@ -1,9 +1,9 @@
 """Built-in decks: Hiragana, Katakana, JLPT Kanji, JLPT Vocabulary, Grammar Patterns, Sentence Examples, Conjugation Training."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from functools import lru_cache
-from types import ModuleType
+from types import MappingProxyType, ModuleType
 from typing import cast
 
 from domain.cards import Card, Deck
@@ -878,7 +878,7 @@ def _repeat_key(family: str, card: Card) -> str | tuple[str, str]:
 
 
 @lru_cache(maxsize=None)
-def _hidden_repeat_ids_by_level(family: str) -> dict[str, frozenset[int]]:
+def _hidden_repeat_ids_by_level(family: str) -> Mapping[str, frozenset[int]]:
     """Walk one family's unfiltered decks once, N5 first, and collect the repeats.
 
     The lowest level always keeps the card. The corpora are static module data,
@@ -895,7 +895,8 @@ def _hidden_repeat_ids_by_level(family: str) -> dict[str, frozenset[int]]:
             else:
                 seen.add(key)
         by_level[level] = frozenset(hidden)
-    return by_level
+    # Read-only: the cache hands every caller this same object.
+    return MappingProxyType(by_level)
 
 
 def hidden_repeat_ids(family: str, level: str) -> frozenset[int]:
@@ -904,17 +905,19 @@ def hidden_repeat_ids(family: str, level: str) -> frozenset[int]:
     return _hidden_repeat_ids_by_level(family)[level]
 
 
-def hidden_repeat_ids_by_deck_name() -> dict[str, frozenset[int]]:
+@lru_cache(maxsize=None)
+def hidden_repeat_ids_by_deck_name() -> Mapping[str, frozenset[int]]:
     """Return every level deck's hidden repeat ids, keyed by deck name.
 
     For readers of stored per-card rows (leeches, review state) that are keyed by
-    deck name rather than built from a deck's cards.
+    deck name rather than built from a deck's cards. Cached, and read-only for
+    that reason, because it runs on the startup path.
     """
-    return {
+    return MappingProxyType({
         _RAW_LEVEL_BUILDERS[key]().name: hidden_repeat_ids(*key)
         for key in _RAW_LEVEL_BUILDERS
         if hidden_repeat_ids(*key)
-    }
+    })
 
 
 def _level_deck(family: str, level: str) -> Deck:
