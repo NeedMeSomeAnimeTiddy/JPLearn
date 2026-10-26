@@ -305,7 +305,7 @@ describe('Accessibility — zero axe violations', () => {
 
     fireEvent.click(chooserButton)
     fireEvent.click(screen.getByRole('button', { name: 'View details for 本' }))
-    fireEvent.pointerDown(screen.getByTestId('kanji-detail-backdrop'))
+    fireEvent.click(document.querySelector('.kx-open .lk-scrim') as HTMLElement)
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kanji details: 本' })).toBeNull())
     expect(screen.getByRole('dialog', { name: 'Dictionary lookup panel' })).toBeTruthy()
   })

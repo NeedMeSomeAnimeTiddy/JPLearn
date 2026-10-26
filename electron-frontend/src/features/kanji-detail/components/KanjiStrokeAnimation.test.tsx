@@ -55,17 +55,16 @@ describe('KanjiStrokeAnimation', () => {
       return writer
     })
 
-    const view = render(<KanjiStrokeAnimation character="日" strokeCount={4} />)
-    const canvas = document.querySelector('.kanji-detail-stroke-canvas') as HTMLDivElement
+    const view = render(<KanjiStrokeAnimation character="日" />)
+    const canvas = document.querySelector('.kx-slate') as HTMLDivElement
     expect(loadHandwritingCharacterData).toHaveBeenCalledOnce()
     await waitFor(() => expect(createWriter).toHaveBeenCalledOnce())
     expect(createWriter.mock.calls[0][1]).toBe('日')
-    expect(createWriter.mock.calls[0][2]).toMatchObject({ width: 176, height: 176, padding: 8 })
+    expect(createWriter.mock.calls[0][2]).toMatchObject({ width: 150, height: 150, padding: 8, strokeColor: '#14110d' })
     expect(createWriter.mock.calls[0][2].charDataLoader()).toEqual(characterData)
 
     fireEvent.click(screen.getByRole('button', { name: 'Replay stroke order' }))
     expect(writer.animateCharacter).toHaveBeenCalledOnce()
-    expect(screen.getByText('4 strokes')).toBeTruthy()
 
     expect(canvas.children.length).toBe(1)
     view.unmount()
@@ -74,14 +73,26 @@ describe('KanjiStrokeAnimation', () => {
     expect(canvas.children.length).toBe(0)
   })
 
+  it('replays when the sheet bumps its signal, which is how ENTER reaches it', async () => {
+    setReducedMotion(false)
+    loadHandwritingCharacterData.mockResolvedValue(characterData)
+    createWriter.mockReturnValue(writer)
+
+    const { rerender } = render(<KanjiStrokeAnimation character="日" replaySignal={0} />)
+    await screen.findByRole('button', { name: 'Replay stroke order' })
+    expect(writer.animateCharacter).not.toHaveBeenCalled()
+    rerender(<KanjiStrokeAnimation character="日" replaySignal={1} />)
+    expect(writer.animateCharacter).toHaveBeenCalledOnce()
+  })
+
   it('replaces and cleans up its writer when the character changes', async () => {
     setReducedMotion(false)
     loadHandwritingCharacterData.mockResolvedValue(characterData)
     createWriter.mockReturnValue(writer)
 
-    const { rerender } = render(<KanjiStrokeAnimation character="日" strokeCount={4} />)
+    const { rerender } = render(<KanjiStrokeAnimation character="日" />)
     await waitFor(() => expect(createWriter).toHaveBeenCalledOnce())
-    rerender(<KanjiStrokeAnimation character="月" strokeCount={4} />)
+    rerender(<KanjiStrokeAnimation character="月" />)
 
     await waitFor(() => expect(createWriter).toHaveBeenCalledTimes(2))
     expect(loadHandwritingCharacterData).toHaveBeenNthCalledWith(1, '日')
@@ -94,7 +105,7 @@ describe('KanjiStrokeAnimation', () => {
     loadHandwritingCharacterData.mockResolvedValue(characterData)
     createWriter.mockReturnValue(writer)
 
-    render(<KanjiStrokeAnimation character="日" strokeCount={4} />)
+    render(<KanjiStrokeAnimation character="日" />)
     await screen.findByText('Stroke-order animation disabled by reduced-motion preference.')
     expect(screen.queryByRole('button', { name: 'Replay stroke order' })).toBeNull()
 
@@ -109,7 +120,7 @@ describe('KanjiStrokeAnimation', () => {
     loadHandwritingCharacterData.mockResolvedValue(characterData)
     createWriter.mockReturnValue(writer)
 
-    render(<KanjiStrokeAnimation character="日" strokeCount={4} />)
+    render(<KanjiStrokeAnimation character="日" />)
     expect(await screen.findByText('Stroke-order animation disabled by reduced-motion preference.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Replay stroke order' })).toBeNull()
   })
@@ -118,7 +129,7 @@ describe('KanjiStrokeAnimation', () => {
     setReducedMotion(false)
     loadHandwritingCharacterData.mockRejectedValue(new Error('unavailable'))
 
-    render(<KanjiStrokeAnimation character="日" strokeCount={4} />)
+    render(<KanjiStrokeAnimation character="日" />)
     expect(await screen.findByText('Stroke-order data is not available for this kanji.')).toBeTruthy()
     expect(loadHandwritingCharacterData).toHaveBeenCalledOnce()
     expect(screen.queryByRole('button', { name: 'Replay stroke order' })).toBeNull()

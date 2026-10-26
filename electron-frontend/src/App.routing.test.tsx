@@ -277,6 +277,41 @@ describe('view -> parent (Escape back-navigation)', () => {
   })
 })
 
+describe('the character sheet goes up one level', () => {
+  it('Escape on a character opened from Look it up returns to Look it up, standing on it', async () => {
+    const getKanjiDetail = vi.fn(async () => ({
+      character: '語', meanings: [], on_readings: [], kun_readings: [], radicals: [],
+      components: ['言', '口', '五'], jlpt_level: 'N5', jlpt_level_source: 'deck', stroke_count: null,
+      classical_radical_number: null, tags: ['kanji', 'n5'], categories: ['Kanji N5'], compounds: [],
+      has_more_compounds: false, source: 'deck_only',
+    }))
+    window.jplearnDesktop = {
+      ...makeApi(),
+      getKanjiDetail,
+      searchDictionary: async (query: string) => ({ query, source: 'loaded_cards', results: [] }),
+      lookupSentence: async () => ({ jp: null, en: null, romaji: null }),
+    } as unknown as typeof window.jplearnDesktop
+    render(<App />)
+    await expectView('home')
+
+    fireEvent.keyDown(window, { key: '/' })
+    const field = await screen.findByLabelText('What to look up')
+    fireEvent.change(field, { target: { value: '語' } })
+    await waitFor(() => expect(getKanjiDetail).toHaveBeenCalledWith('語'))
+    await waitFor(() => expect(document.querySelector('.lk-line em')?.textContent).toBe('LEVEL'))
+
+    fireEvent.keyDown(field, { key: 'Enter' })
+    const sheet = await screen.findByRole('dialog', { name: 'Kanji details: 語' })
+    expect(screen.queryByRole('dialog', { name: 'Look it up' })).toBeNull()
+
+    fireEvent.keyDown(sheet.querySelector('.kx-sheet') as HTMLElement, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kanji details: 語' })).toBeNull())
+    const back = await screen.findByLabelText('What to look up')
+    expect((back as HTMLInputElement).value).toBe('語')
+    expect(screen.getByRole('dialog', { name: 'Look it up' })).toBeTruthy()
+  })
+})
+
 describe('history stack (titlebar back/forward)', () => {
   it('walks back and forward across a multi-hop trail, in order of visit', async () => {
     render(<App />)

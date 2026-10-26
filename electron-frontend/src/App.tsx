@@ -217,15 +217,21 @@ function App() {
   const warnedSectionsRef = useRef<Set<string>>(new Set())
 
   const [kanjiDetailCharacter, setKanjiDetailCharacter] = useState<string | null>(null)
+  /* WHICH SHEET OPENED THE CHARACTER, because Escape goes up one level: back to Look it up or to
+     Every character, whichever it came from. The dictionary popup stays open under it, so a
+     character opened from there has nowhere to be sent back to. */
+  const [kanjiDetailFrom, setKanjiDetailFrom] = useState<'lookup' | 'mastery' | null>(null)
   const kanjiDetailTriggerRef = useRef<HTMLElement | null>(null)
   const tutorTitlebarButtonRef = useRef<HTMLButtonElement | null>(null)
 
-  const openKanjiDetail = useCallback((character: string, trigger: HTMLElement) => {
+  const openKanjiDetail = useCallback((character: string, trigger: HTMLElement, from: 'lookup' | 'mastery' | null = null) => {
     kanjiDetailTriggerRef.current = trigger
+    setKanjiDetailFrom(from)
     setKanjiDetailCharacter(character)
   }, [])
 
   const closeKanjiDetail = useCallback(() => {
+    setKanjiDetailFrom(null)
     const trigger = kanjiDetailTriggerRef.current
     if (!trigger) {
       setKanjiDetailCharacter(null)
@@ -417,6 +423,30 @@ function App() {
     setDictionaryOpen(false)
     setDictionarySeedQuery('')
   }, [closeKanjiDetail])
+
+  /* ESC ON THE CHARACTER GOES UP ONE LEVEL rather than all the way out: the sheet that opened it
+     comes back, standing where it was. Look it up is reopened on the character itself, which is the
+     query it was showing when it handed over. */
+  const leaveKanjiDetail = () => {
+    const character = kanjiDetailCharacter
+    if (kanjiDetailFrom === 'lookup' && character) {
+      kanjiDetailTriggerRef.current = null
+      setKanjiDetailFrom(null)
+      setKanjiDetailCharacter(null)
+      lookup.open(character)
+      return
+    }
+    if (kanjiDetailFrom === 'mastery') {
+      kanjiDetailTriggerRef.current = null
+      setKanjiDetailFrom(null)
+      setKanjiDetailCharacter(null)
+      setShowOverview(true)
+      return
+    }
+    closeKanjiDetail()
+  }
+  const leaveKanjiDetailRef = useRef(leaveKanjiDetail)
+  leaveKanjiDetailRef.current = leaveKanjiDetail
 
   useEffect(() => {
     if (availableMinigames.includes(activeGame)) return
@@ -1560,7 +1590,7 @@ function App() {
         }
 
         if (kanjiDetailCharacter) {
-          closeKanjiDetail()
+          leaveKanjiDetailRef.current()
           return
         }
 
@@ -3092,14 +3122,14 @@ function App() {
         scores={cardScores}
         onClose={() => setShowOverview(false)}
         onRefresh={() => void loadSummary()}
-        onOpenKanjiDetail={openKanjiDetail}
+        onOpenKanjiDetail={(character, trigger) => openKanjiDetail(character, trigger, 'mastery')}
       />
 
       {/* the lookup is chrome, not session UI -- it stands above everything and is reachable
           from any screen, which is the one thing the app's own dictionary could never be */}
       <LookupOverlay
         controller={lookup}
-        onOpenKanjiDetail={openKanjiDetail}
+        onOpenKanjiDetail={(character, trigger) => openKanjiDetail(character, trigger, 'lookup')}
         onOpenDictionary={(query) => openDictionary(query)}
       />
 
@@ -3116,7 +3146,11 @@ function App() {
       />
 
       {kanjiDetailCharacter ? (
-        <KanjiDetailPanel character={kanjiDetailCharacter} onClose={closeKanjiDetail} />
+        <KanjiDetailPanel
+          character={kanjiDetailCharacter}
+          onClose={leaveKanjiDetail}
+          backTo={kanjiDetailFrom === 'lookup' ? 'Look it up' : kanjiDetailFrom === 'mastery' ? 'Every character' : null}
+        />
       ) : null}
 
       </SessionProvider>

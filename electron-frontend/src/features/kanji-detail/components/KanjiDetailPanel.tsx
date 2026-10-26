@@ -1,191 +1,174 @@
-import { X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import type { KanjiCompound, KanjiDetailPayload, KanjiReading } from '../../../generated/types'
+import { createPortal } from 'react-dom'
+import type { KanjiDetailPayload } from '../../../generated/types'
+import { boardScale } from '../../menu/useScreen'
 import { KANJI_DETAIL_COPY } from '../constants'
 import type { KanjiDetailPanelProps, KanjiDetailRequestState } from '../types'
 import { useKanjiDetail } from '../useKanjiDetail'
 import {
   formatKanjiDetailTag,
   formatKanjiReading,
+  kanjiParts,
+  kanjiSheetRows,
+  missingFromDeck,
   trapFocus,
 } from '../utils'
 import { KanjiStrokeAnimation } from './KanjiStrokeAnimation'
+import '../../../styles/stage.css'
+import '../../lookup/lookup.css'
+import '../../mastery/mastery.css'
 import '../kanji-detail.css'
 
-function MissingData() {
-  return <p className="kanji-detail-empty">{KANJI_DETAIL_COPY.missingData}</p>
+/* ==================================================================================================
+   THE CHARACTER — a sheet over the dimmed scene, on Look it up's scrim and Every character's shell.
+
+   ONE OBJECT IN TWO STATES. With the offline dictionary the middle column holds readings and
+   compounds; without it the same column, at the same width, names what is missing as hatched
+   absences. The shell, the three column edges, Escape and replay never move between the two, so a
+   learner who installs the dictionary sees the sheet fill in rather than turn into another one.
+   See `design-system/canvas-kanji-conversation/Main.dc.html` and `KanjiDictionary.dc.html`.
+
+   NOTHING SCROLLS. The middle column has a budget of rows (`kanjiSheetRows`) and what does not fit
+   is a count in its kicker.
+   ================================================================================================== */
+
+function isDeckOnly(detail: KanjiDetailPayload): boolean {
+  if (detail.source === 'deck_only') return true
+  return detail.meanings.length === 0
+    && detail.on_readings.length + detail.kun_readings.length === 0
+    && detail.stroke_count == null
 }
 
-function ReadingGroup({ heading, readings }: { heading: string; readings: KanjiReading[] }) {
+function Facts({ detail, deckOnly }: { detail: KanjiDetailPayload; deckOnly: boolean }) {
+  const level = detail.jlpt_level?.toUpperCase() ?? null
+  const theme = detail.categories.join(' · ')
+  const tags = detail.tags.map(formatKanjiDetailTag).join(' · ')
   return (
-    <section className="kanji-detail-reading-group" aria-label={heading}>
-      <h3>{heading}</h3>
-      {readings.length === 0 ? <MissingData /> : (
-        <ul className="kanji-detail-reading-list">
-          {readings.map((reading) => (
-            <li key={`${heading}-${reading.reading}`} className="kanji-detail-reading-entry">
-              <span className="kanji-detail-reading" lang="ja">{formatKanjiReading(reading.reading)}</span>
-              {reading.examples.length === 0 ? (
-                <span className="kanji-detail-example-empty">{KANJI_DETAIL_COPY.noVerifiedExample}</span>
-              ) : (
-                <ul className="kanji-detail-example-list">
-                  {reading.examples.map((example, index) => (
-                    <li key={`${example.word}-${example.reading}-${index}`}>
-                      <span lang="ja">{example.word}</span>
-                      <span className="kanji-detail-kana" lang="ja">{example.reading}</span>
-                      {example.meanings.length > 0 && <span>{example.meanings.join('; ')}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="kx-facts">
+      {!deckOnly && detail.stroke_count != null ? (
+        <div><em>STROKES</em><span className="x">{detail.stroke_count}</span></div>
+      ) : null}
+      <div>
+        <em>LEVEL</em>
+        {level ? (
+          <span className="x">
+            {level}
+            {deckOnly && detail.jlpt_level_source ? <i>TAGGED FROM THE {detail.jlpt_level_source.toUpperCase()}</i> : null}
+          </span>
+        ) : <span className="none">Not listed</span>}
+      </div>
+      {theme ? <div><em>THEME</em><span>{theme}</span></div> : null}
+      {deckOnly && tags ? <div><em>TAGS</em><span>{tags}</span></div> : null}
+    </div>
   )
 }
 
-function CompoundList({ compounds, hasMore }: { compounds: KanjiCompound[]; hasMore: boolean }) {
-  if (compounds.length === 0) return <MissingData />
+function DeckOnlyColumn({ detail }: { detail: KanjiDetailPayload }) {
+  const missing = missingFromDeck(detail)
   return (
     <>
-      <ul className="kanji-detail-compound-list">
-        {compounds.map((compound) => (
-          <li key={`${compound.word}-${compound.reading}`}>
-            <span className="kanji-detail-compound-word" lang="ja">{compound.word}</span>
-            <span className="kanji-detail-kana" lang="ja">{compound.reading}</span>
-            {compound.meanings.length > 0 && <span>{compound.meanings.join('; ')}</span>}
-          </li>
-        ))}
-      </ul>
-      {hasMore && <p className="kanji-detail-meta">Showing the first 12 matching compounds.</p>}
+      <div className="mx-kick"><span>DECK ONLY</span><s>{missing.length} NEED THE DICTIONARY</s></div>
+      {missing.map((label) => (
+        /* AN ABSENCE IS A HATCH AND A DASH, NEVER A ZERO -- The Exam's rule for a figure it cannot
+           give */
+        <div key={label} className="kx-gh"><em>{label}</em><span aria-label="Not available">—</span></div>
+      ))}
+      <p className="kx-why">{KANJI_DETAIL_COPY.deckOnly}</p>
+      <div className="kx-fix">
+        <div><span>OFFLINE DICTIONARY</span><s>NOT INSTALLED</s></div>
+        <div>ADD IT IN SETTINGS › OFFLINE DICTIONARY</div>
+      </div>
     </>
   )
 }
 
-function ReadyDetail({ detail }: { detail: KanjiDetailPayload }) {
+function DictionaryColumn({ detail }: { detail: KanjiDetailPayload }) {
+  const rows = kanjiSheetRows(detail)
+  const compoundCount = `${rows.compounds.length} OF ${rows.compoundTotal}${rows.hasMoreCompounds ? '+' : ''}`
   return (
-    <div className="kanji-detail-content">
-      {/* The bridge degrades to committed deck data when the optional
-          dictionary is absent or predates the kanji tables. Saying so beats
-          leaving three sections reading "not available" with no reason. */}
-      {detail.source === 'deck_only' ? (
-        <p className="kanji-detail-notice" role="status">{KANJI_DETAIL_COPY.deckOnly}</p>
-      ) : null}
-      <section className="kanji-detail-section kanji-detail-summary" aria-labelledby="kanji-detail-summary-heading">
-        <div className="kanji-detail-glyph" lang="ja" aria-hidden="true">{detail.character}</div>
-        <div className="kanji-detail-summary-main">
-          <h2 id="kanji-detail-summary-heading">Summary</h2>
-          <p className="kanji-detail-meanings">
-            {detail.meanings.length > 0 ? detail.meanings.join(' · ') : KANJI_DETAIL_COPY.missingData}
-          </p>
-          <dl className="kanji-detail-facts">
-            <div>
-              <dt>JLPT</dt>
-              <dd>{detail.jlpt_level ?? 'JLPT level not listed'}</dd>
+    <>
+      <div className="mx-kick">
+        <span>READINGS</span>
+        <s>
+          {rows.onCount} ON · {rows.kunCount} KUN
+          {rows.readingsHidden > 0 ? ` · ${rows.readingsHidden} MORE` : ''}
+        </s>
+      </div>
+      {rows.readings.map((row, index) => {
+        if (!row.reading) {
+          return (
+            <div key={`${row.kind}-none`} className="kx-rd none">
+              <u>{row.kind}</u><b>—</b><span>{KANJI_DETAIL_COPY.missingData}</span>
             </div>
-            <div>
-              <dt>Strokes</dt>
-              <dd>{detail.stroke_count ?? KANJI_DETAIL_COPY.missingData}</dd>
-            </div>
-          </dl>
-          {detail.tags.length === 0 && detail.categories.length === 0 ? <MissingData /> : (
-            <div className="kanji-detail-chip-groups" aria-label="Tags and categories">
-            {detail.tags.length > 0 && (
-              <ul className="kanji-detail-chips" aria-label="Tags">
-                {detail.tags.map((tag) => <li key={tag}>{formatKanjiDetailTag(tag)}</li>)}
-              </ul>
-            )}
-            {detail.categories.length > 0 && (
-              <ul className="kanji-detail-chips" aria-label="Categories">
-                {detail.categories.map((category) => <li key={category}>{category}</li>)}
-              </ul>
-            )}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <div className="kanji-detail-primary-grid">
-        <section className="kanji-detail-section" aria-labelledby="kanji-detail-readings-heading">
-          <h2 id="kanji-detail-readings-heading">Readings</h2>
-          <div className="kanji-detail-readings-grid">
-            <ReadingGroup heading="On’yomi" readings={detail.on_readings} />
-            <ReadingGroup heading="Kun’yomi" readings={detail.kun_readings} />
+          )
+        }
+        const example = row.reading.examples[0]
+        return (
+          <div key={`${row.kind}-${row.reading.reading}-${index}`} className="kx-rd">
+            <u>{row.kind}</u>
+            <b lang="ja">{formatKanjiReading(row.reading.reading)}</b>
+            {example ? (
+              <span>
+                <span className="jp" lang="ja">{example.word}</span>
+                <span className="kana" lang="ja">{example.reading}</span>
+                {example.meanings[0] ?? ''}
+              </span>
+            ) : <span className="none">No verified example.</span>}
           </div>
-        </section>
-
-        <section className="kanji-detail-section" aria-labelledby="kanji-detail-radicals-heading">
-          <h2 id="kanji-detail-radicals-heading">Radicals and components</h2>
-          {/* `components` ships with the app; `radicals` needs the optional
-              dictionary. Showing the components first means this section says
-              something useful even when nothing was downloaded. */}
-          {detail.components.length > 0 ? (
-            <p className="kanji-detail-components">
-              <span className="kanji-detail-components-label">{KANJI_DETAIL_COPY.componentsHeading}</span>
-              {detail.components.map((component) => (
-                <span key={component} className="kanji-detail-component" lang="ja">{component}</span>
-              ))}
-            </p>
-          ) : null}
-          {detail.radicals.length === 0 ? (
-            detail.components.length === 0 ? <MissingData /> : null
-          ) : (
-            <ol className="kanji-detail-radical-list">
-              {detail.radicals.map((radical) => (
-                <li key={`${radical.position}-${radical.radical}`}>
-                  <span className="kanji-detail-radical" lang="ja">{radical.radical}</span>
-                  <span>{radical.stroke_count === null ? KANJI_DETAIL_COPY.missingData : `${radical.stroke_count} strokes`}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
+        )
+      })}
+      <div className="mx-kick kx-kick-gap">
+        <span>COMPOUNDS</span>
+        <s>{rows.compoundTotal > 0 ? `${compoundCount} · COMMON FIRST` : 'NONE RECORDED'}</s>
       </div>
-
-      <section className="kanji-detail-section" aria-labelledby="kanji-detail-compounds-heading">
-        <h2 id="kanji-detail-compounds-heading">Compounds</h2>
-        <CompoundList compounds={detail.compounds} hasMore={detail.has_more_compounds} />
-      </section>
-
-      <section className="kanji-detail-section kanji-detail-stroke-section" aria-labelledby="kanji-detail-strokes-heading">
-        <h2 id="kanji-detail-strokes-heading">Stroke order</h2>
-        <KanjiStrokeAnimation character={detail.character} strokeCount={detail.stroke_count} />
-      </section>
-    </div>
+      {rows.compounds.length === 0 ? (
+        <div className="kx-rd none"><span>{KANJI_DETAIL_COPY.missingData}</span></div>
+      ) : rows.compounds.map((compound) => (
+        <div key={`${compound.word}-${compound.reading}`} className="kx-cp">
+          <b lang="ja">{compound.word}</b>
+          <i lang="ja">{compound.reading}</i>
+          <span>{compound.meanings.join('; ')}</span>
+        </div>
+      ))}
+    </>
   )
 }
 
-function DetailState({ state, retry }: { state: KanjiDetailRequestState; retry: () => void }) {
-  if (state.status === 'ready') return <ReadyDetail detail={state.detail} />
-  if (state.status === 'error') {
-    return (
-      <div className="kanji-detail-state" role="status" aria-live="polite">
-        <p>{state.message}</p>
-        <button type="button" className="kanji-detail-secondary-action" onClick={retry}>Retry</button>
-      </div>
-    )
-  }
+function StateColumn({ state, retry }: { state: KanjiDetailRequestState; retry: () => void }) {
+  if (state.status === 'ready') return null
   return (
-    <div className="kanji-detail-state" role="status" aria-live="polite">
-      <p>{state.message}</p>
+    <div className="kx-state" role="status" aria-live="polite">
+      <div className="mx-kick"><span>{state.status === 'loading' ? 'ONE MOMENT' : 'NOT AVAILABLE'}</span></div>
+      <p className={state.status === 'loading' ? 'kx-small' : 'kx-why'}>{state.message}</p>
+      {state.status === 'error' ? (
+        <button type="button" className="kx-btn ink" onClick={retry}>Retry</button>
+      ) : null}
     </div>
   )
 }
 
-export function KanjiDetailPanel({ character, onClose }: KanjiDetailPanelProps) {
+export function KanjiDetailPanel({ character, onClose, backTo = null }: KanjiDetailPanelProps) {
   const request = useKanjiDetail(character)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  const sheetRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
+  const [replaySignal, setReplaySignal] = useState(0)
+
+  useLayoutEffect(() => {
+    const fit = () => frameRef.current?.style.setProperty('--lk-u', String(boardScale()))
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
 
   useEffect(() => {
     if (restoreFocusRef.current === null && document.activeElement instanceof HTMLElement) {
       restoreFocusRef.current = document.activeElement
     }
-    closeButtonRef.current?.focus()
+    /* THE SHEET TAKES FOCUS, NOT A BUTTON ON IT, because ENTER is the replay key and a focused button
+       would take ENTER for itself -- landing on the close control would make ENTER close the sheet */
+    sheetRef.current?.focus()
   }, [character])
 
   useEffect(() => () => {
@@ -200,50 +183,94 @@ export function KanjiDetailPanel({ character, onClose }: KanjiDetailPanelProps) 
       onClose()
       return
     }
-    if (dialogRef.current) trapFocus(event, dialogRef.current)
+    if (event.key === 'Enter') {
+      const target = event.target as HTMLElement
+      if (target.tagName === 'BUTTON') return
+      event.preventDefault()
+      setReplaySignal((n) => n + 1)
+      return
+    }
+    if (sheetRef.current) trapFocus(event, sheetRef.current)
   }
 
-  return (
+  const detail = request.status === 'ready' ? request.detail : null
+  const deckOnly = detail ? isDeckOnly(detail) : false
+  const parts = detail ? kanjiParts(detail) : []
+  const level = detail?.jlpt_level?.toUpperCase() ?? null
+  const backWords = backTo ? `BACK TO ${backTo.toUpperCase()}` : 'BACK'
+  const closeLabel = backTo ? `Back to ${backTo}` : `Close kanji details for ${character}`
+
+  return createPortal(
     <div
-      className="modal-backdrop kanji-detail-backdrop"
-      data-testid="kanji-detail-backdrop"
-      onPointerDown={(event) => {
-        event.stopPropagation()
-        if (event.target === event.currentTarget) onClose()
-      }}
+      className="lk-open kx-open"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Kanji details: ${character}`}
+      onKeyDownCapture={handleKeyDownCapture}
     >
-      <div
-        ref={dialogRef}
-        className="kanji-detail-panel cassette-panel crt-scanlines"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="kanji-detail-heading"
-        aria-describedby="kanji-detail-description"
-        tabIndex={-1}
-        onKeyDownCapture={handleKeyDownCapture}
-      >
-        <div className="crt-vhs-line" />
-        <header className="kanji-detail-header cassette-panel-header">
-          <div aria-hidden="true" />
-          <div className="cassette-panel-header-center">
-            <p id="kanji-detail-description" className="cassette-panel-header-catalog">Offline character index</p>
-            <h1 id="kanji-detail-heading" className="cassette-panel-header-title">
-              Kanji details: <span lang="ja">{character}</span>
-            </h1>
+      <button type="button" className="lk-scrim" aria-label={closeLabel} tabIndex={-1} onClick={onClose} />
+      <div className="lk-frame" ref={frameRef}>
+        <div className="mx-sheet kx-sheet" ref={sheetRef} tabIndex={-1}>
+          <div className="lk-cap">
+            <b lang="ja">字</b><i>CHARACTER</i>
+            <s>
+              <span lang="ja">{character}</span>
+              {detail ? (deckOnly ? ' · FROM THE DECK, NOT THE DICTIONARY' : ' · FROM THE DICTIONARY') : ''}
+            </s>
+            {level ? <u className="lv">{level}</u> : null}
+            <button type="button" className="kx-esc" onClick={onClose} aria-label={closeLabel}>ESC</button>
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="panel-close-button kanji-detail-close"
-            aria-label={`Close kanji details for ${character}`}
-            title="Close kanji details"
-            onClick={onClose}
-          >
-            <X aria-hidden="true" />
-          </button>
-        </header>
-        <DetailState state={request} retry={request.retry} />
+
+          <div className="kx-body">
+            <section className="kx-c1" aria-label="The character">
+              <div className="kx-glyph" lang="ja" aria-hidden="true">{character}</div>
+              {detail && detail.meanings.length > 0 ? (
+                <p className="kx-mean">{detail.meanings.slice(0, 3).join(' · ')}</p>
+              ) : null}
+              {detail ? <Facts detail={detail} deckOnly={deckOnly} /> : null}
+            </section>
+
+            <section className="kx-c2" aria-label={deckOnly ? 'What needs the dictionary' : 'Readings and compounds'}>
+              {detail
+                ? (deckOnly ? <DeckOnlyColumn detail={detail} /> : <DictionaryColumn detail={detail} />)
+                : <StateColumn state={request} retry={request.retry} />}
+            </section>
+
+            <section className="kx-c3" aria-label="Parts and stroke order">
+              <div className="mx-kick">
+                <span>BUILT FROM</span>
+                <s>{detail ? `${parts.length} ${parts.length === 1 ? 'PART' : 'PARTS'}` : ''}</s>
+              </div>
+              {parts.length > 0 ? (
+                <div className="mx-chips">
+                  {parts.map((part) => (
+                    <i key={part} className={parts.length <= 3 ? 'mx-chip big' : 'mx-chip'} lang="ja">{part}</i>
+                  ))}
+                </div>
+              ) : (
+                <div className="kx-gh"><em>PARTS</em><span aria-label="Not available">—</span></div>
+              )}
+              <div className="mx-kick q kx-kick-gap">
+                <span>STROKE ORDER</span>
+                <s>
+                  {detail?.stroke_count != null
+                    ? `${detail.stroke_count} STROKES`
+                    : 'WORKS WITHOUT THE DICTIONARY'}
+                </s>
+              </div>
+              <KanjiStrokeAnimation character={character} replaySignal={replaySignal} />
+            </section>
+          </div>
+
+          <div className="mx-hint">
+            <b>ENTER</b> REPLAY · <b>ESC</b> {backWords}
+          </div>
+        </div>
+        <div className="lk-hint kx-under">
+          {backTo ? `ESC GOES UP ONE LEVEL — BACK TO ${backTo.toUpperCase()}` : 'ESC CLOSES'}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
