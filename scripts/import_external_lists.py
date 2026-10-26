@@ -72,8 +72,8 @@ def _read_csv(path: Path, name: str) -> CsvSheet:
         duplicates_removed = 0
         for line_index, row in enumerate(reader, start=2):
             if None in row:
-                # csv files an unquoted comma's spill-over under None; the meaning is cut short
-                raise ValueError(f"{path}:{line_index} has more fields than the header (an unquoted comma?)")
+                # DictReader puts extra fields under the None key; the meaning has been cut short
+                raise ValueError(f"{path}:{reader.line_num} has more fields than the header (an unquoted comma?)")
             character = normalize_japanese_text(row.get("character", ""))
             romaji = _normalize_text(row.get("romaji", ""))
             # A dozen source meanings end in a dangling comma ("to point,"), cut off upstream.
