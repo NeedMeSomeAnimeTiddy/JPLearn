@@ -1910,7 +1910,18 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('fsrs:optimize', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    return await options.runPythonBridgeIsolated(['fsrs-optimize'])
+    const result = await options.runPythonBridgeIsolated(['fsrs-optimize'])
+    if (result && result.ok === true) {
+      // The one-shot process saved the weights but only activated them in its own
+      // memory; tell the long-lived worker so reviews use them this session.
+      try {
+        await options.runPythonBridgeWithArgs(['fsrs-reload-weights'])
+      } catch (error) {
+        // The weights are saved either way; they apply on next launch.
+        console.error('fsrs:optimize: worker reload failed', error)
+      }
+    }
+    return result
   })
 
   options.ipcMain.handle('fsrs:reset-weights', async (event) => {
