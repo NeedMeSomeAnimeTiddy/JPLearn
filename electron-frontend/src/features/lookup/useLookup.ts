@@ -47,9 +47,9 @@ export function useLookup(): LookupController {
 
   const activeRoute: LookupRouteKey = routeOverride ?? inferRoute(query)
 
-  const open = useCallback((seed = '') => {
+  const open = useCallback((seed = '', route?: LookupRouteKey) => {
     setIsOpen(true)
-    setRouteOverride(null)
+    setRouteOverride(route ?? null)
     setQuery(seed.trim())
     if (!seed.trim()) setAnswers(IDLE)
   }, [])
@@ -61,12 +61,14 @@ export function useLookup(): LookupController {
     setRouteOverride(null)
   }, [])
 
-  const stepRoute = useCallback((direction: 1 | -1) => {
+  const stepRoute = useCallback((direction: 1 | -1, routes: readonly LookupRouteKey[] = ANSWERABLE_ROUTES) => {
     setRouteOverride((current) => {
       const from = current ?? inferRoute(query)
-      const at = ANSWERABLE_ROUTES.indexOf(from)
-      const next = (at + direction + ANSWERABLE_ROUTES.length) % ANSWERABLE_ROUTES.length
-      return ANSWERABLE_ROUTES[next]
+      const at = routes.indexOf(from)
+      /* standing on a route that cannot answer (a question with no model), the arrows still leave it */
+      if (at < 0) return routes[direction === 1 ? 0 : routes.length - 1]
+      const next = (at + direction + routes.length) % routes.length
+      return routes[next]
     })
   }, [query])
 
@@ -183,7 +185,7 @@ export function useLookup(): LookupController {
   }, [isOpen, query])
 
   return useMemo<LookupController>(() => ({
-    isOpen, open, close, query, setQuery, activeRoute, setActiveRoute: setRouteOverride,
-    stepRoute, answers, busy,
-  }), [isOpen, open, close, query, activeRoute, stepRoute, answers, busy])
+    isOpen, open, close, query, setQuery, activeRoute, routePinned: routeOverride !== null,
+    setActiveRoute: setRouteOverride, stepRoute, answers, busy,
+  }), [isOpen, open, close, query, activeRoute, routeOverride, stepRoute, answers, busy])
 }

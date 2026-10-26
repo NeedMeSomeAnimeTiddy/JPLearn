@@ -3,8 +3,10 @@ import type {
   ObjectiveStatus,
   ScenarioCorrectionSummary,
   ScenarioDefinition,
+  NpcLine,
   ScenarioMistakeSummary,
   ScenarioObjectiveSummary,
+  ScenarioSession,
   ScenarioSummary,
   ScenarioTurnRecord,
   SlotSpec,
@@ -297,4 +299,181 @@ export function generateSrsDrafts(scenario: ScenarioDefinition, transcript: Scen
     }
   }
   return drafts
+}
+
+// --- The conversation screen ----------------------------------------------------
+// What the sheet works out before it can draw itself: the objective ticks under it, the answer it
+// holds until ENTER, and the finished session's pages. Pure, so the screen is props and arithmetic.
+
+export type ObjectiveMark = 'todo' | 'here' | 'on' | 'given'
+
+export interface ObjectiveTick {
+  id: string
+  label: string
+  required: boolean
+  mark: ObjectiveMark
+}
+
+export interface ObjectiveTally {
+  ticks: ObjectiveTick[]
+  needed: number
+  neededMet: number
+  optional: number
+  optionalMet: number
+  /** met only because the scenario gave the answer after the last attempt */
+  given: number
+}
+
+/** Each objective's mark: met is gold, given is a gold edge, the ones this turn is about are `here`. */
+export function objectiveTally(scenario: ScenarioDefinition, session: ScenarioSession | null): ObjectiveTally {
+  const status = session?.objectiveStatus ?? {}
+  const node = session && session.status === 'active' ? scenario.nodes[session.currentNodeId] : undefined
+  const here = new Set(node && node.kind === 'learner' ? node.objectiveIds : [])
+  const ticks: ObjectiveTick[] = scenario.objectives.map((objective) => ({
+    id: objective.id,
+    label: objective.label.replace(/\s*\(optional\)$/i, ''),
+    required: objective.required,
+    mark: status[objective.id] === 'met' ? 'on'
+      : status[objective.id] === 'assisted' ? 'given'
+        : here.has(objective.id) ? 'here' : 'todo',
+  }))
+  const required = ticks.filter((tick) => tick.required)
+  const optional = ticks.filter((tick) => !tick.required)
+  return {
+    ticks,
+    needed: required.length,
+    neededMet: required.filter((tick) => tick.mark === 'on').length,
+    optional: optional.length,
+    optionalMet: optional.filter((tick) => tick.mark === 'on').length,
+    given: ticks.filter((tick) => tick.mark === 'given').length,
+  }
+}
+
+/** The foot band's sentence: what is owed before, how it is going during, how it went after. */
+export function objectiveFoot(tally: ObjectiveTally, phase: 'before' | 'during' | 'after'): string {
+  const needed = `${tally.neededMet} OF ${tally.needed} NEEDED`
+  if (phase === 'before') return tally.optional ? `${needed} · ${tally.optional} OPTIONAL` : needed
+  if (phase === 'during') return tally.optional ? `${needed} · ${tally.optionalMet} OPTIONAL MET` : needed
+  return tally.given ? `${needed} · ${tally.given} GIVEN` : needed
+}
+
+/** The class each tick takes in the round's foot band. */
+export function objectiveTickClass(tick: ObjectiveTick): string {
+  const mark = tick.mark === 'todo' ? '' : tick.mark === 'given' ? 'cv-given' : tick.mark
+  return [tick.required ? '' : 'cv-opt', mark].filter(Boolean).join(' ')
+}
+
+/** The newest line the character has said before `before`, and how many turns came ahead of it. */
+export function latestNpcTurn(
+  transcript: ScenarioTurnRecord[],
+  before = transcript.length,
+): { line: NpcLine; earlier: number } | null {
+  for (let i = Math.min(before, transcript.length) - 1; i >= 0; i--) {
+    const line = transcript[i].npcLine
+    if (line) return { line, earlier: i }
+  }
+  return null
+}
+
+export interface HeldAnswer {
+  /** the learner's own turn, with its outcome and any correction */
+  turn: ScenarioTurnRecord
+  /** which try at this line it was, of how many the line allows */
+  attempt: number
+  maxAttempts: number
+  /** what the character says next, in order */
+  next: NpcLine[]
+  /** the model answer, when the attempts ran out and the scenario moved on without you */
+  given: { answer: string; reading: string | null; romaji: string | null } | null
+  /** the line you were answering */
+  answering: { line: NpcLine; earlier: number } | null
+}
+
+/**
+ * THE ANSWER THE SHEET HOLDS UNTIL ENTER. The engine applies a turn at once and moves on, so the
+ * transcript already holds the reply, its correction and the character's next line; `from` is how
+ * long the transcript was when the reply was sent, and everything after it is this answer.
+ */
+export function heldAnswer(
+  scenario: ScenarioDefinition,
+  transcript: ScenarioTurnRecord[],
+  from: number,
+): HeldAnswer | null {
+  const index = transcript.findIndex((turn, i) => i >= from && turn.learnerInput !== null)
+  if (index < 0) return null
+  const turn = transcript[index]
+  let attempt = 0
+  for (let i = index; i >= 0; i--) {
+    const earlier = transcript[i]
+    if (earlier.learnerInput === null) continue
+    if (earlier.nodeId !== turn.nodeId) break
+    attempt += 1
+  }
+  const node = scenario.nodes[turn.nodeId]
+  const after = transcript.slice(index + 1)
+  const givenTurn = after.find((entry) => entry.assistedAnswer)
+  return {
+    turn,
+    attempt,
+    maxAttempts: node && node.kind === 'learner' ? node.recovery.maxAttempts : attempt,
+    next: after.flatMap((entry) => (entry.npcLine ? [entry.npcLine] : [])),
+    given: givenTurn?.assistedAnswer
+      ? { answer: givenTurn.assistedAnswer, reading: givenTurn.assistedAnswerReading, romaji: givenTurn.assistedAnswerRomaji }
+      : null,
+    answering: latestNpcTurn(transcript, index),
+  }
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? '' : 'S'}`
+}
+
+/** What a finished session's summary holds, as one line of counts. */
+export function summaryFold(summary: ScenarioSummary): string {
+  return [
+    summary.corrections.length ? plural(summary.corrections.length, 'CORRECTION') : null,
+    summary.vocabularyPractised.length ? plural(summary.vocabularyPractised.length, 'WORD') : null,
+    summary.grammarPractised.length ? plural(summary.grammarPractised.length, 'PATTERN') : null,
+    summary.recurringMistakes.length ? plural(summary.recurringMistakes.length, 'REPEATED MISTAKE') : null,
+    summary.suggestedNextSteps.length ? plural(summary.suggestedNextSteps.length, 'NEXT STEP') : null,
+  ].filter(Boolean).join(' · ')
+}
+
+export interface DetailLine {
+  cap: string
+  text: string
+  /** set when the line is Japanese, so it is set in the Japanese face */
+  jp?: boolean
+}
+
+/** Everything the summary and the transcript say, cut into pages of `rows` lines. */
+export function summaryPages(
+  scenario: ScenarioDefinition,
+  transcript: ScenarioTurnRecord[],
+  summary: ScenarioSummary,
+  rows: number,
+): DetailLine[][] {
+  const npc = scenario.npc.name.toUpperCase()
+  const lines: DetailLine[] = [
+    ...summary.corrections.map((c) => ({ cap: 'CORRECTION', text: c.text, jp: true })),
+    ...(summary.vocabularyPractised.length ? [{ cap: 'WORDS', text: summary.vocabularyPractised.join('、'), jp: true }] : []),
+    ...summary.grammarPractised.map((text) => ({ cap: 'PATTERN', text })),
+    ...summary.recurringMistakes.map((m) => ({ cap: 'REPEATED', text: `${m.explanation} (${m.count}×)` })),
+    ...summary.suggestedNextSteps.map((text) => ({ cap: 'NEXT STEP', text })),
+    ...transcript.map((turn) => (turn.npcLine
+      ? { cap: npc, text: turn.npcLine.ja, jp: true }
+      : { cap: 'YOU', text: turn.learnerInput ?? '', jp: true })),
+  ]
+  const size = Math.max(1, rows)
+  const pages: DetailLine[][] = []
+  for (let i = 0; i < lines.length; i += size) pages.push(lines.slice(i, i + size))
+  return pages
+}
+
+/** The character's line is the prompt: as large as the cell lets it be, smaller as it grows. */
+export function lineSize(text: string): number {
+  const n = [...text].length
+  if (n <= 12) return 28
+  if (n <= 20) return 24
+  return 20
 }

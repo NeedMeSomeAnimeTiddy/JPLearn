@@ -61,7 +61,11 @@ function installDesktopApi(overrides: Partial<Window['jplearnDesktop']> = {}) {
   } as unknown as Window['jplearnDesktop']
 }
 
-describe('useTutor — shared popup mode navigation', () => {
+/* THE POP-UP'S MODES RETIRED WITH IT: chat is Look it up's A QUESTION and image translation its A
+   SCREENSHOT. What these tests held about the pop-up -- that the chat's effects run only while it
+   is showing, and that nothing a learner made is thrown away by moving around -- is held here
+   against Look it up's routes instead. */
+describe('useTutor — the two routes it serves in Look it up', () => {
   beforeEach(() => {
     installDesktopApi()
   })
@@ -71,79 +75,68 @@ describe('useTutor — shared popup mode navigation', () => {
     vi.restoreAllMocks()
   })
 
-  it('opens at the menu by default', () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    expect(result.current.tutorPanelOpen).toBe(false)
-    act(() => result.current.openTutorPanel())
-    expect(result.current.tutorPanelOpen).toBe(true)
-    expect(result.current.tutorPanelMode).toBe('menu')
-  })
-
-  it.each(['chat', 'scenarios', 'ocr'] as const)('openTutorPanel(%s) opens directly into that mode', (mode) => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel(mode))
-    expect(result.current.tutorPanelOpen).toBe(true)
-    expect(result.current.tutorPanelMode).toBe(mode)
-    // A specific-mode entry still records a return-focus target for Back.
-    expect(result.current.tutorPanelReturnFocusMode).toBe(mode)
-  })
-
-  it('setTutorPanelMode switches activity without closing the popup', () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel())
-    act(() => result.current.setTutorPanelMode('scenarios'))
-    expect(result.current.tutorPanelOpen).toBe(true)
-    expect(result.current.tutorPanelMode).toBe('scenarios')
-  })
-
-  it('returnToTutorMenu goes back to the menu without closing the popup', () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('chat'))
-    act(() => result.current.returnToTutorMenu())
-    expect(result.current.tutorPanelOpen).toBe(true)
-    expect(result.current.tutorPanelMode).toBe('menu')
-  })
-
-  it('closeTutorPanel hides the popup but remembers the last mode', () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('ocr'))
-    act(() => result.current.closeTutorPanel())
-    expect(result.current.tutorPanelOpen).toBe(false)
-    expect(result.current.tutorPanelMode).toBe('ocr')
-  })
-
-  it('assistantChatOpen and ocrWorkbenchOpen are derived from tutorPanelOpen + tutorPanelMode', () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('chat'))
+  it('counts the chat as showing exactly while Look it up stands on A QUESTION', () => {
+    const { result, rerender } = renderHook(
+      ({ visible }) => useTutor(baseSettings(), baseDeps({ lookupChatVisible: visible })),
+      { initialProps: { visible: false } },
+    )
+    expect(result.current.assistantChatOpen).toBe(false)
+    rerender({ visible: true })
     expect(result.current.assistantChatOpen).toBe(true)
-    expect(result.current.ocrWorkbenchOpen).toBe(false)
-
-    act(() => result.current.setTutorPanelMode('ocr'))
+    rerender({ visible: false })
     expect(result.current.assistantChatOpen).toBe(false)
-    expect(result.current.ocrWorkbenchOpen).toBe(true)
-
-    act(() => result.current.closeTutorPanel())
-    expect(result.current.assistantChatOpen).toBe(false)
-    expect(result.current.ocrWorkbenchOpen).toBe(false)
   })
 
-  it('chat draft input and messages survive a mode switch and a full close+reopen cycle', async () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('chat'))
-    act(() => result.current.setAssistantChatInput('こんにちは'))
-    expect(result.current.assistantChatInput).toBe('こんにちは')
-
-    act(() => result.current.setTutorPanelMode('ocr'))
-    expect(result.current.assistantChatInput).toBe('こんにちは')
-
-    act(() => result.current.closeTutorPanel())
-    act(() => result.current.openTutorPanel('chat'))
-    expect(result.current.assistantChatInput).toBe('こんにちは')
+  it('reads the chat history in only while A QUESTION is showing', async () => {
+    const getAssistantChatHistory = vi.fn(async () => ({ ok: true, turns: [] }))
+    installDesktopApi({ getAssistantChatHistory } as unknown as Partial<Window['jplearnDesktop']>)
+    const { rerender } = renderHook(
+      ({ visible }) => useTutor(baseSettings(), baseDeps({ lookupChatVisible: visible })),
+      { initialProps: { visible: false } },
+    )
+    const before = getAssistantChatHistory.mock.calls.length
+    rerender({ visible: true })
+    await waitFor(() => expect(getAssistantChatHistory.mock.calls.length).toBeGreaterThan(before))
   })
 
-  it('closeTutorPanel does not clear an OCR error — only explicit Clear does', async () => {
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('ocr'))
+  it('keeps the conversation when A QUESTION is left and come back to', async () => {
+    const sendAssistantChatMessage = vi.fn(async () => ({ text: 'Both are し plus a small kana.', provider: 'llama' }))
+    const turns = [
+      { role: 'user', content: 'why しゃ?', created_at_utc: '2026-10-26T00:00:00Z' },
+      { role: 'assistant', content: 'Both are し plus a small kana.', created_at_utc: '2026-10-26T00:00:01Z' },
+    ]
+    installDesktopApi({
+      sendAssistantChatMessage,
+      getAssistantChatHistory: vi.fn(async () => ({ ok: true, turns })),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result, rerender } = renderHook(
+      ({ visible }) => useTutor(baseSettings(), baseDeps({ lookupChatVisible: visible })),
+      { initialProps: { visible: true } },
+    )
+    await act(async () => { await result.current.sendAssistantChat('why しゃ?') })
+    expect(sendAssistantChatMessage).toHaveBeenCalledWith(expect.objectContaining({ message: 'why しゃ?' }))
+    await waitFor(() => expect(result.current.assistantChatMessages).toHaveLength(2))
+
+    rerender({ visible: false })
+    rerender({ visible: true })
+    expect(result.current.assistantChatMessages).toHaveLength(2)
+  })
+
+  it('refuses an empty question and one over the length limit without calling the model', async () => {
+    const sendAssistantChatMessage = vi.fn(async () => ({ text: 'x' }))
+    installDesktopApi({ sendAssistantChatMessage } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps({ lookupChatVisible: true })))
+    await act(async () => { await result.current.sendAssistantChat('   ') })
+    await act(async () => { await result.current.sendAssistantChat('あ'.repeat(5000)) })
+    expect(sendAssistantChatMessage).not.toHaveBeenCalled()
+    expect(result.current.assistantChatError).toContain('limited to')
+  })
+
+  it('keeps an OCR error through the lookup closing and opening -- only Clear removes it', async () => {
+    const { result, rerender } = renderHook(
+      ({ visible }) => useTutor(baseSettings(), baseDeps({ lookupChatVisible: visible })),
+      { initialProps: { visible: false } },
+    )
 
     // An oversized file is rejected synchronously, before any image decoding,
     // so this exercises the real error-setting path without needing canvas/Image.
@@ -154,38 +147,36 @@ describe('useTutor — shared popup mode navigation', () => {
     })
     await waitFor(() => expect(result.current.ocrWorkbenchError).toContain('limited to'))
 
-    act(() => result.current.setTutorPanelMode('chat'))
-    expect(result.current.ocrWorkbenchError).toContain('limited to')
-
-    act(() => result.current.closeTutorPanel())
-    act(() => result.current.openTutorPanel('ocr'))
+    rerender({ visible: true })
+    rerender({ visible: false })
     expect(result.current.ocrWorkbenchError).toContain('limited to')
 
     act(() => result.current.clearOcrWorkbenchResult())
     expect(result.current.ocrWorkbenchError).toBeNull()
   })
 
-  it('keeps an OCR result across Back, mode switches, and close+reopen until Clear', async () => {
+  it('keeps an OCR result, with its lines and the image, until Clear', async () => {
     installDesktopApi({
-      extractAssistantChatImageText: vi.fn(async () => ({ text: '日本語', lineCount: 1 })),
+      extractAssistantChatImageText: vi.fn(async () => ({
+        text: '日本語', lineCount: 1, lines: [{ text: '日本語', confidence: 0.97 }],
+      })),
       translateAssistantChatOcrText: vi.fn(async () => ({ text: 'Japanese' })),
     } as unknown as Partial<Window['jplearnDesktop']>)
 
-    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('ocr'))
+    const { result, rerender } = renderHook(
+      ({ visible }) => useTutor(baseSettings(), baseDeps({ lookupChatVisible: visible })),
+      { initialProps: { visible: false } },
+    )
     await act(async () => {
       await result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'sign.png', { type: 'image/png' }))
     })
     await waitFor(() => expect(result.current.ocrWorkbenchResult?.englishText).toBe('Japanese'))
+    expect(result.current.ocrWorkbenchResult?.lines).toEqual([{ text: '日本語', confidence: 0.97 }])
+    expect(result.current.ocrWorkbenchResult?.imageUrl).toBe('data:image/png;base64,AAAA')
+    expect(result.current.ocrWorkbenchResult?.minConfidence).toBe(0.5)
 
-    act(() => result.current.returnToTutorMenu())
-    expect(result.current.ocrWorkbenchResult?.fileName).toBe('sign.png')
-
-    act(() => result.current.setTutorPanelMode('scenarios'))
-    expect(result.current.ocrWorkbenchResult?.fileName).toBe('sign.png')
-
-    act(() => result.current.closeTutorPanel())
-    act(() => result.current.openTutorPanel('ocr'))
+    rerender({ visible: true })
+    rerender({ visible: false })
     expect(result.current.ocrWorkbenchResult?.fileName).toBe('sign.png')
     expect(result.current.ocrWorkbenchResult?.japaneseText).toBe('日本語')
 
@@ -206,7 +197,6 @@ describe('useTutor — shared popup mode navigation', () => {
     } as unknown as Partial<Window['jplearnDesktop']>)
 
     const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('ocr'))
 
     // Two images in flight; the learner picked the second one last.
     act(() => { void result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'first.png', { type: 'image/png' })) })
@@ -221,6 +211,8 @@ describe('useTutor — shared popup mode navigation', () => {
 
     expect(result.current.ocrWorkbenchResult?.fileName).toBe('second.png')
     expect(result.current.ocrWorkbenchResult?.japaneseText).toBe('二番目')
+    // a line count with no per-line detail still gives the lines, with no confidence claimed
+    expect(result.current.ocrWorkbenchResult?.lines.map((line) => line.text)).toEqual(['二番目'])
     expect(result.current.ocrWorkbenchBusy).toBe(false)
     expect(result.current.ocrWorkbenchError).toBeNull()
   })
@@ -237,7 +229,6 @@ describe('useTutor — shared popup mode navigation', () => {
     } as unknown as Partial<Window['jplearnDesktop']>)
 
     const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
-    act(() => result.current.openTutorPanel('ocr'))
     act(() => { void result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'first.png', { type: 'image/png' })) })
     await waitFor(() => expect(extractAssistantChatImageText).toHaveBeenCalledTimes(1))
     act(() => { void result.current.handleOcrWorkbenchImageSelected(new File(['b'], 'second.png', { type: 'image/png' })) })
@@ -253,17 +244,16 @@ describe('useTutor — shared popup mode navigation', () => {
     expect(result.current.ocrWorkbenchResult?.fileName).toBe('second.png')
   })
 
-  it('disabling chat in settings redirects out of chat mode back to the menu', () => {
+  it('disabling chat in settings stops the chat and unloads its runtime, wherever it was showing', async () => {
+    const unloadAssistantChatRuntime = vi.fn(async () => ({ ok: true }))
+    installDesktopApi({ unloadAssistantChatRuntime } as unknown as Partial<Window['jplearnDesktop']>)
     const { result, rerender } = renderHook(
-      ({ settings }) => useTutor(settings, baseDeps()),
+      ({ settings }) => useTutor(settings, baseDeps({ lookupChatVisible: true })),
       { initialProps: { settings: baseSettings({ assistantChatEnabled: true }) } },
     )
-    act(() => result.current.openTutorPanel('chat'))
-    expect(result.current.tutorPanelMode).toBe('chat')
-
     rerender({ settings: baseSettings({ assistantChatEnabled: false }) })
-    expect(result.current.tutorPanelMode).toBe('menu')
-    // The popup itself is not force-closed — only chat mode is redirected away from.
-    expect(result.current.tutorPanelOpen).toBe(true)
+    await waitFor(() => expect(unloadAssistantChatRuntime).toHaveBeenCalled())
+    expect(result.current.assistantChatLoading).toBe(false)
+    expect(result.current.assistantChatError).toBeNull()
   })
 })

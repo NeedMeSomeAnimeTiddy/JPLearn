@@ -1,472 +1,178 @@
-.kanji-detail-backdrop {
-  z-index: 1200;
-  align-items: flex-start;
-  padding-top: 3rem;
-  background: rgba(21, 17, 14, 0.76);
+/* ==================================================================================================
+   THE CHARACTER — on Look it up's scrim (`lookup.css`) in Every character's 900-wide shell. The shell's
+   box is restated here rather than borrowed as `.mx-sheet`: that class is how the app tells Every
+   character is open, and the character sheet is a different screen standing in the same place. The
+   kick, chips and hint are `mastery.css`'s own (`.mx-kick`, `.mx-chip`, `.mx-hint`). What is here is
+   the three columns of the approved boards, 200 / 330 / 370 on a 316 body.
+   Square corners, one skew (the sheet's own), one hard shadow.
+   ================================================================================================== */
+.kx-sheet {
+  position: absolute; left: 190px; top: 150px; width: 900px;
+  display: flex; flex-direction: column;
+  transform: skewX(-8deg) rotate(-1.2deg);
+  background: var(--washi);
+  box-shadow: 12px 15px 0 rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(20, 17, 13, 0.18);
+}
+.kx-sheet:focus { outline: none; }
+.kx-sheet:focus-visible { outline: 2px solid var(--hi); outline-offset: 3px; }
+
+.kx-sheet .lk-cap u {
+  text-decoration: none; padding: 1px 8px 2px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+  background: rgba(242, 234, 216, 0.14); color: var(--gold-hi);
+}
+.kx-sheet .lk-cap u.lv { background: var(--gold); color: var(--ink); }
+.kx-esc {
+  border: 0; cursor: pointer; padding: 1px 8px 2px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.14em;
+  background: rgba(242, 234, 216, 0.14); color: var(--gold-hi);
+}
+.kx-esc:hover { background: var(--hi); color: #ffe9c9; }
+.kx-esc:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 1px; }
+
+.kx-body { display: flex; height: 316px; }
+.kx-c1 {
+  flex: none; width: 200px; display: flex; flex-direction: column; padding: 16px 18px 14px;
+  box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.16);
+}
+.kx-c2 {
+  flex: none; width: 330px; display: flex; flex-direction: column; padding: 14px 20px 12px;
+  box-shadow: inset -1px 0 0 rgba(20, 17, 13, 0.16); overflow: hidden;
+}
+.kx-c3 { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 14px 20px 12px; overflow: hidden; }
+
+.kx-glyph {
+  width: 128px; height: 128px; display: grid; place-items: center; background: var(--ink);
+  font-family: var(--jp); font-weight: 700; font-size: 88px; line-height: 1; color: var(--gold-hi);
+}
+.kx-mean {
+  margin: 12px 0 0; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 19px;
+  line-height: 1.15; color: var(--hi-deep);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.kx-facts { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+.kx-facts div { display: flex; align-items: baseline; gap: 8px; }
+.kx-facts em {
+  flex: none; width: 52px; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.45);
+}
+.kx-facts span {
+  min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 11.5px; line-height: 1.3;
+  color: var(--ink); letter-spacing: 0.02em;
+}
+.kx-facts span.x { font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 14px; }
+.kx-facts span.none { color: rgba(20, 17, 13, 0.4); font-style: italic; }
+.kx-facts span i {
+  display: block; font-style: normal; font-family: var(--lat-ui); font-weight: 700; font-size: 8.5px;
+  letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.42); margin-top: 1px;
 }
 
-.kanji-detail-panel {
-  display: flex;
-  width: min(92vw, 64rem);
-  max-height: min(84dvh, 52rem);
-  flex-direction: column;
-  overflow: hidden;
-  color: var(--text-main);
-  animation: enterUp 220ms ease both;
+.kx-kick-gap { margin-top: 14px; }
+.kx-sheet .mx-kick.q { color: rgba(20, 17, 13, 0.55); padding-bottom: 0; }
+
+/* readings: the kind on an ink tab, the reading, its first verified example */
+.kx-rd {
+  display: flex; align-items: baseline; gap: 10px; padding: 5px 0 6px;
+  box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
+}
+.kx-rd u {
+  flex: none; width: 34px; text-decoration: none; text-align: center; padding: 2px 0 3px;
+  background: var(--ink); color: var(--gold-hi);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+}
+.kx-rd > b { flex: none; font-family: var(--jp); font-weight: 700; font-size: 20px; color: var(--ink); min-width: 46px; }
+.kx-rd > span {
+  min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 11px; line-height: 1.4;
+  color: rgba(20, 17, 13, 0.66); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kx-rd > span .jp { font-family: var(--jp); font-size: 15px; color: var(--ink); }
+.kx-rd > span .kana { font-family: var(--jp-go); font-size: 10px; color: rgba(20, 17, 13, 0.5); margin: 0 5px; }
+.kx-rd.none > span, .kx-rd > span.none { font-style: italic; color: rgba(20, 17, 13, 0.4); }
+
+/* compounds, in the lookup's own row form */
+.kx-cp {
+  display: flex; align-items: baseline; gap: 9px; padding: 5px 0 6px;
+  box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.08);
+}
+.kx-cp b { flex: none; font-family: var(--jp); font-weight: 700; font-size: 17px; color: var(--ink); }
+.kx-cp i {
+  flex: none; font-style: normal; font-family: var(--jp-go); font-size: 10px;
+  color: rgba(20, 17, 13, 0.5); width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kx-cp span {
+  min-width: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 11px; color: rgba(20, 17, 13, 0.7);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.kanji-detail-header {
-  flex: 0 0 auto;
+/* AN ABSENCE IS DRAWN AS A HATCH AND A DASH, NEVER AS A ZERO */
+.kx-gh { display: flex; align-items: center; gap: 10px; height: 31px; }
+.kx-gh em {
+  flex: none; width: 112px; font-style: normal; font-family: var(--lat-ui); font-weight: 700;
+  font-size: 10px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5);
 }
-
-.kanji-detail-header h1,
-.kanji-detail-section h2,
-.kanji-detail-reading-group h3 {
-  margin: 0;
+.kx-gh span {
+  flex: 1; height: 21px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 12px; color: rgba(20, 17, 13, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  background: repeating-linear-gradient(135deg, rgba(20, 17, 13, 0.09) 0 3px, transparent 3px 7px);
 }
-
-.kanji-detail-header h1 {
-  font-size: 1.14rem;
+.kx-why {
+  margin: 10px 0 0; font-family: var(--lat-ui); font-weight: 700; font-size: 11px; line-height: 1.5;
+  letter-spacing: 0.04em; color: var(--hi-deep);
 }
-
-.kanji-detail-close {
-  position: relative;
-  z-index: 3;
+.kx-fix {
+  margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 8px;
+  box-shadow: inset 0 1px 0 rgba(20, 17, 13, 0.14);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
+  color: rgba(20, 17, 13, 0.55);
 }
-
-.kanji-detail-close svg {
-  width: 1rem;
-  height: 1rem;
+.kx-fix > div { display: flex; align-items: center; gap: 10px; }
+.kx-fix s {
+  margin-left: auto; text-decoration: none; padding: 3px 9px 4px; background: var(--hi); color: #ffe9c9;
+  font-size: 10px; letter-spacing: 0.12em;
 }
+.kx-state { display: flex; flex-direction: column; gap: 10px; }
 
-.kanji-detail-secondary-action {
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  background: var(--bg-main);
-  color: var(--text-main);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
-  cursor: pointer;
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  transition: transform 80ms ease, border-color 140ms ease, color 140ms ease;
+/* the parts are Every character's chip; standing alone they are not buttons and not stretched */
+.kx-c3 .mx-chips { flex: none; overflow: visible; gap: 6px; }
+.kx-c3 .mx-chip {
+  cursor: default; padding: 4px 9px 6px; min-width: 40px; text-align: center;
+  font-style: normal; font-size: 24px;
 }
+.kx-c3 .mx-chip:hover { background: rgba(20, 17, 13, 0.05); }
+.kx-c3 .mx-chip.big { font-size: 34px; min-width: 56px; padding: 5px 12px 7px; }
 
-.kanji-detail-secondary-action:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.kanji-detail-secondary-action:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
-}
-
-.kanji-detail-close:focus-visible,
-.kanji-detail-secondary-action:focus-visible,
-.kanji-detail-reading-entry:focus-within {
-  outline: 2px solid var(--tone-ocean);
-  outline-offset: 2px;
-}
-
-.kanji-detail-secondary-action:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-
-.kanji-detail-content,
-.kanji-detail-state {
-  position: relative;
-  z-index: 2;
-  overflow-y: auto;
-  padding: 1rem 1.25rem 1.5rem;
-  scrollbar-color: var(--panel-border) transparent;
-}
-
-.kanji-detail-content {
-  display: grid;
-  gap: 1rem;
-}
-
-.kanji-detail-state {
-  display: grid;
-  min-height: 9rem;
-  align-content: center;
-  gap: 0.75rem;
-}
-
-.kanji-detail-section {
-  min-width: 0;
-  border-top: 1px solid color-mix(in oklab, var(--accent-soft) 42%, var(--panel-border));
-  padding-top: 0.75rem;
-}
-
-.kanji-detail-section h2 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  color: var(--text-main);
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.kanji-detail-section h2::after {
-  height: 1px;
-  flex: 1;
-  background: linear-gradient(90deg, var(--accent-soft), transparent);
-  content: '';
-  opacity: 0.65;
-}
-
-.kanji-detail-summary {
-  display: grid;
-  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr);
-  gap: 1rem;
-  border-top: 0;
-  padding-top: 0;
-}
-
-.kanji-detail-glyph {
-  display: grid;
-  min-height: 8rem;
-  place-items: center;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 42%, var(--panel-border));
+.kx-stroke { display: flex; gap: 16px; align-items: flex-end; margin-top: 10px; }
+.kx-slate {
+  position: relative; flex: none; width: 150px; height: 150px;
   background:
-    linear-gradient(90deg, color-mix(in oklab, var(--tone-ocean) 10%, transparent), transparent),
-    var(--bg-main);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent-soft) 12%, transparent);
-  color: var(--text-main);
-  font-size: clamp(4rem, 10vw, 6.5rem);
-  line-height: 1;
+    linear-gradient(rgba(20, 17, 13, 0.14), rgba(20, 17, 13, 0.14)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(rgba(20, 17, 13, 0.14), rgba(20, 17, 13, 0.14)) 0 50% / 100% 1px no-repeat,
+    rgba(20, 17, 13, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.28);
 }
-
-.kanji-detail-summary-main {
-  min-width: 0;
+.kx-slate svg { display: block; }
+.kx-side { display: flex; flex-direction: column; gap: 8px; padding-bottom: 2px; min-width: 0; }
+.kx-small {
+  margin: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 10.5px; line-height: 1.5;
+  letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.6);
 }
-
-.kanji-detail-meanings {
-  margin: 0 0 0.75rem;
-  color: var(--text-main);
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.35;
+.kx-btn {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  border: 0; cursor: pointer; padding: 5px 10px 6px;
+  background: rgba(20, 17, 13, 0.08); color: rgba(20, 17, 13, 0.66);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.14em;
 }
+.kx-btn.ink { background: var(--ink); color: var(--gold-hi); box-shadow: none; }
+.kx-btn:hover:not(:disabled) { background: var(--hi); color: #ffe9c9; }
+.kx-btn:disabled { opacity: 0.55; cursor: default; }
+.kx-btn:focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
 
-.kanji-detail-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0 0 0.75rem;
-}
-
-.kanji-detail-facts div {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.35rem;
-  border-left: 2px solid var(--accent-soft);
-  background: color-mix(in oklab, var(--panel-bg) 84%, var(--bg-main));
-  padding: 0.3rem 0.5rem;
-}
-
-.kanji-detail-facts dt {
-  color: var(--text-soft);
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.kanji-detail-facts dd {
-  margin: 0;
-  font-weight: 700;
-}
-
-.kanji-detail-meta,
-.kanji-detail-kana,
-.kanji-detail-example-empty,
-.kanji-detail-empty {
-  color: var(--text-soft);
-}
-
-.kanji-detail-empty,
-.kanji-detail-example-empty {
-  margin: 0;
-  font-size: 0.76rem;
-}
-
-.kanji-detail-chip-groups,
-.kanji-detail-chips,
-.kanji-detail-reading-list,
-.kanji-detail-example-list,
-.kanji-detail-radical-list,
-.kanji-detail-compound-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Components ship with the app, so this row is present even with no dictionary
-   installed — it carries the section on its own in that case. */
-.kanji-detail-components {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0 0 0.5rem;
-}
-
-.kanji-detail-components-label {
-  color: var(--text-soft);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-right: 0.15rem;
-}
-
-.kanji-detail-component {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.7rem;
-  padding: 0.15rem 0.35rem;
-  border: 1px solid var(--card-border);
-  border-radius: 2px;
-  background: var(--panel-bg);
-  font-family: var(--display-font);
-  font-size: 1.05rem;
-}
-
-.kanji-detail-notice {
-  margin: 0 0 0.6rem;
-  padding: 0.45rem 0.6rem;
-  border-left: 2px solid var(--accent);
-  background: color-mix(in oklab, var(--accent) 8%, transparent);
-  color: var(--text-soft);
-  font-size: 0.78rem;
-}
-
-.kanji-detail-chip-groups {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.kanji-detail-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.kanji-detail-chips li {
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 38%, var(--chip-border));
-  border-radius: 0;
-  background: color-mix(in oklab, var(--tone-ocean) 10%, var(--chip-bg));
-  color: color-mix(in oklab, var(--tone-ocean) 80%, var(--text-main));
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.03em;
-  padding: 0.25rem 0.4rem;
-}
-
-.kanji-detail-primary-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(13rem, 0.8fr);
-  gap: 1rem;
-}
-
-.kanji-detail-primary-grid .kanji-detail-section {
-  margin: 0;
-}
-
-.kanji-detail-readings-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.kanji-detail-reading-group {
-  min-width: 0;
-  border-left: 2px solid color-mix(in oklab, var(--tone-ocean) 55%, var(--panel-border));
-  padding-left: 0.6rem;
-}
-
-.kanji-detail-reading-group h3 {
-  margin-bottom: 0.4rem;
-  color: var(--text-soft);
-  font-family: var(--mono);
-  font-size: 0.67rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.kanji-detail-reading-list {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.kanji-detail-reading-entry {
-  display: grid;
-  gap: 0.2rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--panel-border) 62%, transparent);
-  padding-bottom: 0.35rem;
-}
-
-.kanji-detail-reading {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.kanji-detail-example-list {
-  display: grid;
-  gap: 0.16rem;
-}
-
-.kanji-detail-example-list li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  color: var(--text-soft);
-  font-size: 0.76rem;
-  line-height: 1.35;
-}
-
-.kanji-detail-radical-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.kanji-detail-radical-list li {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid var(--chip-border);
-  background: var(--chip-bg);
-  color: var(--text-soft);
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  padding: 0.3rem 0.4rem;
-}
-
-.kanji-detail-radical {
-  color: var(--text-main);
-  font-family: var(--display-font);
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.kanji-detail-compound-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.kanji-detail-compound-list li {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: baseline;
-  gap: 0.35rem;
-  border-left: 2px solid color-mix(in oklab, var(--accent-soft) 58%, var(--panel-border));
-  background: color-mix(in oklab, var(--panel-bg) 84%, var(--bg-main));
-  padding: 0.35rem 0.45rem;
-  font-size: 0.8rem;
-  line-height: 1.35;
-}
-
-.kanji-detail-compound-word {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.kanji-detail-stroke-section {
-  padding-bottom: 0.25rem;
-}
-
-.kanji-detail-stroke {
-  display: grid;
-  grid-template-columns: minmax(8.5rem, 12rem) minmax(0, 1fr);
-  align-items: center;
-  gap: 0.75rem;
-  border: 1px solid var(--panel-border);
-  background: color-mix(in oklab, var(--panel-bg) 88%, var(--bg-main));
-  padding: 0.5rem;
-}
-
-.kanji-detail-stroke-canvas {
-  display: grid;
-  width: 100%;
-  max-width: 11rem;
-  aspect-ratio: 1;
-  min-height: 0;
-  justify-self: center;
-  overflow: hidden;
-  place-items: center;
-  border: 1px solid color-mix(in oklab, var(--tone-ocean) 32%, var(--panel-border));
-  background: var(--bg-main);
-}
-
-.kanji-detail-stroke-canvas svg {
-  display: block;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  width: auto !important;
-  height: auto !important;
-}
-
-.kanji-detail-stroke-controls p {
-  margin: 0 0 0.6rem;
-  font-size: 0.8rem;
-}
-
-@media (max-width: 48rem) {
-  .kanji-detail-primary-grid,
-  .kanji-detail-readings-grid,
-  .kanji-detail-compound-list {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 38rem) {
-  .kanji-detail-backdrop {
-    align-items: end;
-    padding: 0;
-  }
-
-  .kanji-detail-panel {
-    width: 100%;
-    max-height: 92dvh;
-  }
-
-  .kanji-detail-header {
-    padding-inline: 1rem;
-  }
-
-  .kanji-detail-content,
-  .kanji-detail-state {
-    padding-inline: 1rem;
-  }
-
-  .kanji-detail-summary,
-  .kanji-detail-stroke {
-    grid-template-columns: 1fr;
-  }
-
-  .kanji-detail-glyph {
-    min-height: 6rem;
-  }
-}
+/* Look it up's hint line, under a sheet 900 wide rather than 780 */
+.kx-under { left: 190px; top: 606px; width: 900px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .kanji-detail-stroke-canvas *,
-  .kanji-detail-panel {
-    animation: none !important;
-    transition: none !important;
-  }
+  .kx-slate * { animation: none !important; transition: none !important; }
 }
-
-html[data-reduced-motion='true'] .kanji-detail-stroke-canvas *,
-html[data-reduced-motion='true'] .kanji-detail-panel {
-  animation: none !important;
-  transition: none !important;
-}
+html[data-reduced-motion='true'] .kx-slate * { animation: none !important; transition: none !important; }

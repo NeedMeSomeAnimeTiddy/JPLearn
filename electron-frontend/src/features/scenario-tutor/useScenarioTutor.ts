@@ -28,6 +28,7 @@ import type {
   ScenarioHint,
   ScenarioHistoryEntry,
   ScenarioSession,
+  ScenarioSessionSave,
   ScenarioSummary,
   ScenarioTranscription,
   ScenarioTurnRecord,
@@ -46,10 +47,14 @@ export interface UseScenarioTutorReturn {
   confirmAction: ScenarioConfirmAction
   error: string | null
   persistenceNote: string | null
+  /** Where saving the finished session stands. `failed` is the one state a retry can change --
+   * `unavailable` means this build has no history to save into, and asking again cannot help. */
+  sessionSave: ScenarioSessionSave
 
   selectScenario: (scenarioId: string) => void
   selectLevel: (level: LearnerLevel) => void
-  startScenario: () => void
+  /** starts on the chosen level, or on `level` when the press that starts it also chooses it */
+  startScenario: (level?: LearnerLevel) => void
   setLearnerInputValue: (value: string) => void
   submitResponse: () => void
   requestAbandon: () => void
@@ -58,6 +63,9 @@ export interface UseScenarioTutorReturn {
   cancelPendingAction: () => void
   replayScenario: () => void
   returnToSelect: () => void
+  /** Saves the finished session again after a failure. The session id is unchanged, and the
+   * backend's insert ignores an id it already holds, so a save that half-landed cannot double. */
+  retrySessionSave: () => void
 
   // SRS draft review (Phase 5)
   srsDrafts: SrsDraftState[]
@@ -192,6 +200,7 @@ export function useScenarioTutor({
   const [confirmAction, setConfirmAction] = useState<ScenarioConfirmAction>(null)
   const [error, setError] = useState<string | null>(null)
   const [persistenceNote, setPersistenceNote] = useState<string | null>(null)
+  const [sessionSave, setSessionSave] = useState<ScenarioSessionSave>('idle')
 
   const [srsDrafts, setSrsDrafts] = useState<SrsDraftState[]>([])
   const [srsReviewError, setSrsReviewError] = useState<string | null>(null)
@@ -254,7 +263,7 @@ export function useScenarioTutor({
   }, [selectedScenario, session])
 
   // --- Voice: NPC playback -------------------------------------------------
-  // Text is always rendered by ScenarioPlayer; audio is decoration. A failed
+  // Text is always rendered on the conversation screen; audio is decoration. A failed
   // or unavailable playback returns false and is ignored — it can never block
   // or alter progression.
 
@@ -427,9 +436,11 @@ export function useScenarioTutor({
     if (!save) {
       if (sessionTokenRef.current === token) {
         setPersistenceNote('Scenario history is unavailable in this build — this session was not saved.')
+        setSessionSave('unavailable')
       }
       return
     }
+    if (sessionTokenRef.current === token) setSessionSave('saving')
     try {
       await save({
         sessionId: completedSession.sessionId,
@@ -442,12 +453,14 @@ export function useScenarioTutor({
       })
       if (sessionTokenRef.current !== token) return // superseded by abandon/restart while saving
       setPersistenceNote(null)
+      setSessionSave('saved')
       const drafts = generateSrsDrafts(scenario, completedSession.transcript)
       setSrsDrafts(drafts.map((draft) => ({ ...draft, status: 'pending' as const })))
     } catch (saveError) {
       if (sessionTokenRef.current !== token) return
       const detail = saveError instanceof Error ? saveError.message : 'Unknown error'
       setPersistenceNote(`This session could not be saved (${detail}), so no SRS drafts are available for it.`)
+      setSessionSave('failed')
       setSrsDrafts([])
     }
   }, [])
@@ -477,15 +490,18 @@ export function useScenarioTutor({
     setLearnerInputValue('')
     setConfirmAction(null)
     setPersistenceNote(null)
+    setSessionSave('idle')
     setSrsDrafts([])
     setSrsReviewError(null)
     setScreen('session')
     speakEffects(effects, level)
   }, [resetTurnAsyncState, speakEffects])
 
-  const startScenario = useCallback(() => {
-    if (!selectedScenario || !selectedLevel) return
-    beginSession(selectedScenario, selectedLevel)
+  const startScenario = useCallback((level?: LearnerLevel) => {
+    const chosen = level ?? selectedLevel
+    if (!selectedScenario || !chosen) return
+    if (level) setSelectedLevel(level)
+    beginSession(selectedScenario, chosen)
     if (aiEvaluationEnabledRef.current) {
       // Warm the local model so the first uncertain turn isn't paying for a
       // cold start. A failure here changes nothing — evaluation is optional.
@@ -610,6 +626,7 @@ export function useScenarioTutor({
       setLearnerInputValue('')
       setConfirmAction(null)
       setPersistenceNote(null)
+      setSessionSave('idle')
       setSrsDrafts([])
       setScreen('select')
       return
@@ -635,10 +652,17 @@ export function useScenarioTutor({
     setConfirmAction(null)
     setError(null)
     setPersistenceNote(null)
+    setSessionSave('idle')
     setSrsDrafts([])
     setSrsReviewError(null)
     setScreen('select')
   }, [resetTurnAsyncState])
+
+  const retrySessionSave = useCallback(() => {
+    if (!selectedScenario || !session || session.status !== 'success' || sessionSave !== 'failed') return
+    const summaryValue = deriveScenarioSummary(selectedScenario, session.transcript, session.objectiveStatus)
+    void persistCompletedSession(selectedScenario, session, summaryValue, sessionTokenRef.current)
+  }, [selectedScenario, session, sessionSave, persistCompletedSession])
 
   const currentHints = useMemo(
     () => (selectedScenario && session ? hintsForCurrentNode(selectedScenario, session) : []),
@@ -774,6 +798,7 @@ export function useScenarioTutor({
     confirmAction,
     error,
     persistenceNote,
+    sessionSave,
 
     selectScenario,
     selectLevel,
@@ -786,6 +811,7 @@ export function useScenarioTutor({
     cancelPendingAction,
     replayScenario,
     returnToSelect,
+    retrySessionSave,
 
     srsDrafts,
     srsReviewError,

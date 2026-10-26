@@ -79,194 +79,192 @@ function mount() {
   return render(<App />)
 }
 
-async function openScenarioPractice() {
+/* THE SCENES ARE THE WAY IN. Every route into a scenario -- the palette, the curriculum, The
+   World's TALK lane -- lands on The World's scenes at level three, and picking one opens the
+   conversation on the round's sheet. */
+async function openScenes() {
   await screen.findByRole('button', { name: /open shortcuts/i })
-  fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-  const menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-  fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
-  return screen.findByRole('dialog', { name: 'Scenario practice panel' })
+  fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+  const search = await screen.findByRole('textbox', { name: /search commands/i })
+  fireEvent.change(search, { target: { value: 'Scenario Practice' } })
+  fireEvent.click(await screen.findByRole('option', { name: 'Scenario Practice' }))
+  return screen.findByRole('group', { name: 'Conversations' })
 }
 
-function respondWithin(dialog: HTMLElement, text: string) {
-  const input = within(dialog).getByRole('textbox', { name: 'Your response' })
+async function startCafe() {
+  const scenes = await openScenes()
+  fireEvent.click(within(scenes).getByRole('button', { name: /order at a cafe/i }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Beginner' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Start scenario' }))
+  await screen.findByRole('textbox', { name: 'Your response' })
+}
+
+/** says a line, reads the held answer, and goes on with ENTER */
+async function respond(text: string) {
+  const input = screen.getByRole('textbox', { name: 'Your response' })
   // The field is bound to the wanakana romaji→kana IME, so it reads committed
   // text from the native input event rather than React's onChange.
   fireEvent.input(input, { target: { value: text } })
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Submit response' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Submit response' }))
+  await screen.findByText('YOU SAID')
+  fireEvent.keyDown(document.body, { key: 'Enter' })
 }
+
+const CAFE = ['こんにちは', 'コーヒーをください', 'レギュラーでお願いします', 'ここで食べます', 'はい、お願いします', 'ありがとうございます']
 
 /* THE APP IS READY WHEN THE TITLEBAR IS. These suites waited on `HomeView`'s own Daily Games
    button purely as a "the app has finished loading" signal, and that screen retired with phase 6's
    toggle. The titlebar is on every surface, so its shortcuts button does not depend on which
    screen won the race. */
 describe('Scenario Practice — end-to-end typed flow', () => {
-  it('completes Order at a Cafe through the real UI, then replays and returns to the Tutor menu', async () => {
+  it('completes Order at a Cafe through the real UI, then replays, and leaves back to the scenes', async () => {
     mount()
-    let dialog = await openScenarioPractice()
+    await startCafe()
+    for (const line of CAFE) await respond(line)
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
+    expect(await screen.findByText('SESSION COMPLETE')).toBeTruthy()
 
-    respondWithin(dialog, 'こんにちは')
-    respondWithin(dialog, 'コーヒーをください')
-    respondWithin(dialog, 'レギュラーでお願いします')
-    respondWithin(dialog, 'ここで食べます')
-    respondWithin(dialog, 'はい、お願いします')
-    respondWithin(dialog, 'ありがとうございます')
+    fireEvent.click(screen.getByRole('button', { name: 'Replay scenario' }))
+    expect(await screen.findByRole('textbox', { name: 'Your response' })).toBeTruthy()
 
-    expect(await within(dialog).findByText('Session complete!')).toBeTruthy()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Replay scenario' }))
-    expect(await within(dialog).findByRole('textbox', { name: 'Your response' })).toBeTruthy()
-
-    // Return to the Tutor menu from a fresh replayed session.
-    fireEvent.keyDown(dialog, { key: 'Escape' })
-    await screen.findByRole('dialog', { name: 'Tutor menu' })
+    // Leaving a fresh replayed session asks first, then goes back to the scenes.
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    const ask = await screen.findByRole('alertdialog', { name: 'Confirm leaving the scenario' })
+    fireEvent.click(within(ask).getByRole('button', { name: 'YES, DISCARD' }))
+    expect(await screen.findByRole('group', { name: 'Conversations' })).toBeTruthy()
   })
 
-  it('preserves an in-progress scenario when switching to Chat and back, and on popup close/reopen', async () => {
+  it('preserves an in-progress scenario across Look it up and across leaving the screen', async () => {
     mount()
-    let dialog = await openScenarioPractice()
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
-    respondWithin(dialog, 'こんにちは')
-    respondWithin(dialog, 'コーヒーをください')
-    expect(await within(dialog).findByText('What size would you like?')).toBeTruthy()
+    await startCafe()
+    await respond('こんにちは')
+    await respond('コーヒーをください')
+    expect(await screen.findByText('What size would you like?')).toBeTruthy()
 
-    // Switch to Chat and back — the scenario must resume at the same node.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Tutor menu' }))
-    let menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Chat with Tutor' }))
-    dialog = await screen.findByRole('dialog', { name: 'Tutor chat panel' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Tutor menu' }))
-    menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
-    dialog = await screen.findByRole('dialog', { name: 'Scenario practice panel' })
-    expect(await within(dialog).findByText('What size would you like?')).toBeTruthy()
+    // Look it up stands over the conversation and closes back onto it.
+    fireEvent.keyDown(document.body, { key: '/' })
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'What to look up' }), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Look it up' })).toBeNull())
+    expect(screen.getByText('What size would you like?')).toBeTruthy()
+    // ...and its ESC was the lookup's, not a request to leave the conversation.
+    expect(screen.queryByRole('alertdialog')).toBeNull()
 
-    // Close the whole popup and reopen — still resumes at the same node.
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Close Tutor panel' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Open Tutor' }))
-    menu = await screen.findByRole('dialog', { name: 'Tutor menu' })
-    fireEvent.click(within(menu).getByRole('button', { name: 'Scenario Practice' }))
-    dialog = await screen.findByRole('dialog', { name: 'Scenario practice panel' })
-    expect(await within(dialog).findByText('What size would you like?')).toBeTruthy()
+    // Leave the screen for somewhere else entirely, then come back through the scenes.
+    fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true })
+    const search = await screen.findByRole('textbox', { name: /search commands/i })
+    fireEvent.change(search, { target: { value: 'Go to Study' } })
+    fireEvent.click(await screen.findByRole('option', { name: 'Go to Study' }))
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Your response' })).toBeNull())
+
+    const scenes = await openScenes()
+    fireEvent.click(within(scenes).getByRole('button', { name: /order at a cafe/i }))
+    // The same scene resumes where it stood, rather than asking for a level again.
+    expect(await screen.findByText('What size would you like?')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Start scenario' })).toBeNull()
   })
 
-  it('persists a completed session, shows the SRS draft review step, and only saves accepted drafts', async () => {
+  it('persists a completed session, opens one drafted card at a time, and only saves accepted drafts', async () => {
     const saveScenarioSession = vi.fn(desktopApi.saveScenarioSession)
     const saveScenarioSrsCard = vi.fn(desktopApi.saveScenarioSrsCard)
     window.jplearnDesktop = { ...desktopApi, saveScenarioSession, saveScenarioSrsCard } as unknown as typeof window.jplearnDesktop
     render(<App />)
-    const dialog = await openScenarioPractice()
+    await startCafe()
+    for (const line of CAFE) await respond(line)
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
-
-    respondWithin(dialog, 'こんにちは')
-    respondWithin(dialog, 'コーヒーをください')
-    respondWithin(dialog, 'レギュラーでお願いします')
-    respondWithin(dialog, 'ここで食べます')
-    respondWithin(dialog, 'はい、お願いします')
-    respondWithin(dialog, 'ありがとうございます')
-
-    await within(dialog).findByText('Session complete!')
-    await within(dialog).findByRole('button', { name: /review \d+ suggested card/i })
+    await screen.findByText('SESSION COMPLETE')
+    const accept = await screen.findByRole('button', { name: /^Accept card: / })
     expect(saveScenarioSession).toHaveBeenCalledOnce()
+    // One card open, one ACCEPT on the slab.
+    expect(screen.getAllByRole('button', { name: /^Accept card: / })).toHaveLength(1)
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /review \d+ suggested card/i }))
-    await within(dialog).findByText('Review suggested SRS cards')
-
-    const acceptButtons = within(dialog).getAllByRole('button', { name: /accept card/i })
-    const dismissButtons = within(dialog).getAllByRole('button', { name: /dismiss card/i })
-    expect(acceptButtons.length).toBeGreaterThan(0)
-
-    fireEvent.click(acceptButtons[0])
+    fireEvent.click(accept)
     await waitFor(() => expect(saveScenarioSrsCard).toHaveBeenCalledOnce())
 
-    if (dismissButtons.length > 0) {
-      fireEvent.click(within(dialog).getAllByRole('button', { name: /dismiss card/i })[0])
-    }
+    const dismiss = screen.queryByRole('button', { name: /^Dismiss card: / })
+    if (dismiss) fireEvent.click(dismiss)
     // Whatever remains pending is skipped — dismissed/skipped drafts must never call saveScenarioSrsCard.
-    const skipAll = within(dialog).queryByRole('button', { name: 'Skip all' })
+    const skipAll = screen.queryByRole('button', { name: 'Skip all' })
     if (skipAll) fireEvent.click(skipAll)
 
     expect(saveScenarioSrsCard).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText(/NO CARDS LEFT TO REVIEW/)).toBeTruthy()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Return to Tutor menu' }))
-    await screen.findByRole('dialog', { name: 'Tutor menu' })
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the scenes' }))
+    expect(await screen.findByRole('group', { name: 'Conversations' })).toBeTruthy()
   })
 
-  it('requires confirmation before Leave discards the session and returns to scenario select', async () => {
+  it('requires confirmation before Leave discards the session and returns to the scenes', async () => {
     mount()
-    const dialog = await openScenarioPractice()
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
+    await startCafe()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Leave scenario' }))
-    let confirmBanner = await within(dialog).findByRole('alertdialog', { name: 'Confirm leaving the scenario' })
+    fireEvent.click(screen.getByRole('button', { name: 'Leave scenario' }))
+    let confirmBanner = await screen.findByRole('alertdialog', { name: 'Confirm leaving the scenario' })
     // Cancelling keeps the session intact.
-    fireEvent.click(within(confirmBanner).getByRole('button', { name: 'Keep going' }))
-    expect(within(dialog).getByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    fireEvent.click(within(confirmBanner).getByRole('button', { name: 'KEEP GOING' }))
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeTruthy()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Leave scenario' }))
-    confirmBanner = await within(dialog).findByRole('alertdialog', { name: 'Confirm leaving the scenario' })
-    fireEvent.click(within(confirmBanner).getByRole('button', { name: 'Yes, discard' }))
-    expect(await within(dialog).findByRole('button', { name: /order at a cafe/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Leave scenario' }))
+    confirmBanner = await screen.findByRole('alertdialog', { name: 'Confirm leaving the scenario' })
+    fireEvent.click(within(confirmBanner).getByRole('button', { name: 'YES, DISCARD' }))
+    const scenes = await screen.findByRole('group', { name: 'Conversations' })
+    expect(within(scenes).getByRole('button', { name: /order at a cafe/i })).toBeTruthy()
   })
 })
 
 describe('Scenario Practice — hints and corrections', () => {
-  it('reveals escalating hints with kana and romaji from a hint button, without affecting the turn', async () => {
+  it('reveals escalating hints with kana and romaji when asked, without affecting the turn', async () => {
     mount()
-    const dialog = await openScenarioPractice()
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
+    await startCafe()
 
-    // Nothing is given away until the learner asks — the hint trigger is a
-    // small icon button next to the input, not an inline block under the chat.
-    expect(screen.queryByRole('dialog', { name: 'Hints for this turn' })).toBeNull()
-    expect(within(dialog).queryByText("kon'nichiwa")).toBeNull()
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Need a hint?' }))
-    // The popover portals to document.body (like the minigame hint popover),
-    // so it is not a DOM descendant of the Tutor popup dialog.
-    const popover = await screen.findByRole('dialog', { name: 'Hints for this turn' })
-    expect(popover).toBeTruthy()
+    // Nothing is given away until the learner asks.
+    expect(screen.queryByText("kon'nichiwa")).toBeNull()
 
     // Step 0 is an English-only nudge; step 1 adds the Japanese example.
-    fireEvent.click(within(popover).getByRole('button', { name: 'Show another hint' }))
-    fireEvent.click(within(popover).getByRole('button', { name: 'Show another hint' }))
-    // The model answer arrives in Japanese AND romaji, inside the popover only.
-    expect(within(popover).getByText('こんにちは')).toBeTruthy()
-    expect(within(popover).getByText("kon'nichiwa", { exact: false })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Need a hint?' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show another hint' }))
+    // The model answer arrives in Japanese AND romaji.
+    expect(screen.getByText('こんにちは')).toBeTruthy()
+    expect(screen.getByText("kon'nichiwa", { exact: false })).toBeTruthy()
 
     // Asking for hints never counts as an answer — the turn is still open.
-    expect(within(dialog).getByRole('textbox', { name: 'Your response' })).toBeTruthy()
-    respondWithin(dialog, 'こんにちは')
-    expect(await within(dialog).findByText('What would you like to order?')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    await respond('こんにちは')
+    expect(await screen.findByText('What would you like to order?')).toBeTruthy()
   })
 
-  it('shows a prominent correction with kana and romaji when an answer is only partially right', async () => {
+  it('shows a prominent correction with kana and romaji when an answer is only partially right, held until ENTER', async () => {
     mount()
-    const dialog = await openScenarioPractice()
-    fireEvent.click(within(dialog).getByRole('button', { name: /order at a cafe/i }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Beginner' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start scenario' }))
-    respondWithin(dialog, 'こんにちは')
+    await startCafe()
+    await respond('こんにちは')
 
     // A bare drink name: understood, but missing the polite request.
-    respondWithin(dialog, 'コーヒー')
+    const input = screen.getByRole('textbox', { name: 'Your response' })
+    fireEvent.input(input, { target: { value: 'コーヒー' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit response' }))
 
-    // The correction lives directly on the learner's own transcript turn —
-    // there is no separate floating feedback box to duplicate it.
-    const correctedTurn = await within(dialog).findByText(/Try saying it like this/)
-    expect(correctedTurn.textContent).toContain('コーヒーをください')
-    expect(correctedTurn.textContent).toContain('ko-hi- wo kudasai')
+    const corrected = (await screen.findByText('TRY SAYING IT LIKE THIS')).closest('.cv-slip') as HTMLElement
+    expect(corrected.textContent).toContain('コーヒーをください')
+    expect(corrected.textContent).toContain('ko-hi- wo kudasai')
+    expect(screen.getByText('PARTIAL')).toBeTruthy()
+
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(await screen.findByRole('textbox', { name: 'Your response' })).toBeTruthy()
+    expect(screen.queryByText('TRY SAYING IT LIKE THIS')).toBeNull()
+  })
+})
+
+describe('Scenario Practice — the ways in', () => {
+  it('the palette lands on the scenes at level three, and FREE TALK asks the tutor in Look it up', async () => {
+    mount()
+    const scenes = await openScenes()
+    expect(within(scenes).getAllByRole('button').length).toBeGreaterThan(1)
+    // No pop-up opened on the way.
+    expect(screen.queryByRole('dialog', { name: /tutor|scenario practice panel/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /free talk/i }))
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    expect(screen.getByRole('button', { name: /A QUESTION/ }).getAttribute('aria-pressed')).toBe('true')
   })
 })

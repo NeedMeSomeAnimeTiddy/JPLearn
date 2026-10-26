@@ -10,7 +10,6 @@ import type {
 } from '../types'
 import type { WindowDragHandlers } from '../features/window-drag/useWindowDrag'
 import type { usePomodoro } from '../features/pomodoro'
-import type { useTutor } from '../features/tutor'
 import { TutorTitlebarButton } from '../features/tutor'
 import { MinigameIcon } from './MinigameIcon'
 import { DAILY_GAMES_COPY } from '../features/daily-games/constants'
@@ -61,9 +60,9 @@ export interface AppTitlebarProps {
   titlebarHistoryForward: () => void
   settings: AppSettings
   pomodoro: ReturnType<typeof usePomodoro>
-  tutor: ReturnType<typeof useTutor>
-  tutorTitlebarButtonRef: RefObject<HTMLButtonElement | null>
-  toggleTutorPanelFromTitlebar: () => void
+  /** whether Look it up is open, which the tutor button toggles */
+  lookupOpen: boolean
+  toggleLookupFromTitlebar: () => void
   streak: NonNullable<StudySummaryPayload>['streak']
   streakDetailsOpen: boolean
   streakDetailsRef: RefObject<HTMLDivElement | null>
@@ -112,9 +111,8 @@ export function AppTitlebar({
   titlebarHistoryForward,
   settings,
   pomodoro,
-  tutor,
-  tutorTitlebarButtonRef,
-  toggleTutorPanelFromTitlebar,
+  lookupOpen,
+  toggleLookupFromTitlebar,
   streak,
   streakDetailsOpen,
   streakDetailsRef,
@@ -431,11 +429,7 @@ export function AppTitlebar({
           >
             <Settings className="window-nav-icon" strokeWidth={2.2} />
           </button>
-          <TutorTitlebarButton
-            ref={tutorTitlebarButtonRef}
-            tutorPanelOpen={tutor.tutorPanelOpen}
-            onClick={toggleTutorPanelFromTitlebar}
-          />
+          <TutorTitlebarButton open={lookupOpen} onClick={toggleLookupFromTitlebar} />
         </div>
       </div>
       <div className="titlebar-progress-cluster">

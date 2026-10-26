@@ -1,6 +1,7 @@
 export { useScenarioTutor } from './useScenarioTutor'
 export type { UseScenarioTutorReturn } from './useScenarioTutor'
-export { ScenarioActivity } from './components/ScenarioActivity'
+export { Conversation } from './components/Conversation'
+export type { ConversationProps } from './components/Conversation'
 export * from './types'
 export * from './constants'
 export { validateScenarioDefinition } from './validation'

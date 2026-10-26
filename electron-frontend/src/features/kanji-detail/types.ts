@@ -15,4 +15,6 @@ export type KanjiDetailRequest = KanjiDetailRequestState & {
 export interface KanjiDetailPanelProps {
   character: string
   onClose: () => void
+  /** the screen ESC returns to -- "Look it up", "Every character" -- or null when it just closes */
+  backTo?: string | null
 }

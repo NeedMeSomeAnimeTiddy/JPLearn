@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { RefObject, SetStateAction, Dispatch } from 'react'
 import type {
   AssistantChatRuntimeStatus,
   AssistantChatTurn,
@@ -7,7 +6,6 @@ import type {
   AssistantToast,
   OcrWorkbenchResult,
   TutorDeps,
-  TutorPanelMode,
   TutorSettingsFields,
 } from './types'
 import {
@@ -27,45 +25,26 @@ import {
 } from './utils'
 
 export interface UseTutorReturn {
-  // Shared Tutor popup: open/closed + active mode. Replaces the old
-  // independent assistantChatOpen/ocrWorkbenchOpen booleans and their manual
-  // mutual exclusion — there is exactly one popup with one active mode.
-  tutorPanelOpen: boolean
-  tutorPanelMode: TutorPanelMode
-  /** Which menu item to restore focus to when navigating back to 'menu'. */
-  tutorPanelReturnFocusMode: TutorPanelMode | null
-  /** Opens the popup. Omit `mode` (or pass 'menu') to land on the menu; a
-   * specific mode opens that activity directly, with Back still available. */
-  openTutorPanel: (mode?: TutorPanelMode) => void
-  /** Hides the popup. Chat/OCR/scenario state is preserved, not reset. */
-  closeTutorPanel: () => void
-  /** Switches the visible activity without closing the popup. */
-  setTutorPanelMode: (mode: TutorPanelMode) => void
-  /** Convenience for setTutorPanelMode('menu'). */
-  returnToTutorMenu: () => void
-
+  /* THE CHAT AND THE IMAGE TRANSLATION ARE LOOK IT UP'S TWO MODEL ROUTES now (A QUESTION and A
+     SCREENSHOT); the pop-up that held them is retired. This hook keeps their state and their calls,
+     and "the chat is showing" is whether Look it up is standing on A QUESTION (`lookupChatVisible`). */
   assistantChatOpen: boolean
   assistantChatMessages: AssistantChatTurn[]
   assistantChatLoading: boolean
   assistantChatError: string | null
-  assistantChatInput: string
-  setAssistantChatInput: Dispatch<SetStateAction<string>>
   assistantSpeakingTurnKey: string | null
   assistantChatStatus: AssistantChatRuntimeStatus | null
   clearAssistantChat: () => Promise<void>
-  sendAssistantChat: (forcedMessage?: string) => Promise<void>
+  sendAssistantChat: (message: string) => Promise<void>
   replayAssistantTurn: (content: string, turnKey: string) => void
-  ocrWorkbenchOpen: boolean
   ocrWorkbenchBusy: boolean
   ocrWorkbenchError: string | null
   ocrWorkbenchResult: OcrWorkbenchResult | null
   handleOcrWorkbenchImageSelected: (file: File) => Promise<void>
   clearOcrWorkbenchResult: () => void
-  ocrWorkbenchImageInputRef: RefObject<HTMLInputElement | null>
   activeAssistantToast: AssistantToast | null
   dismissAssistantToast: (id: number) => void
   launchAssistantToastAction: (toast: AssistantToast) => void
-  assistantChatLogRef: RefObject<HTMLDivElement | null>
   queueAssistantToast: (toast: AssistantToast | null) => void
 }
 
@@ -74,10 +53,6 @@ export function useTutor(
   deps: TutorDeps,
 ): UseTutorReturn {
   const [assistantToasts, setAssistantToasts] = useState<AssistantToast[]>([])
-  const [tutorPanelOpen, setTutorPanelOpenState] = useState(false)
-  const [tutorPanelMode, setTutorPanelModeState] = useState<TutorPanelMode>('menu')
-  const [tutorPanelReturnFocusMode, setTutorPanelReturnFocusMode] = useState<TutorPanelMode | null>(null)
-  const [assistantChatInput, setAssistantChatInput] = useState('')
   const [assistantChatMessages, setAssistantChatMessages] = useState<AssistantChatTurn[]>([])
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
@@ -89,42 +64,16 @@ export function useTutor(
   const [ocrWorkbenchError, setOcrWorkbenchError] = useState<string | null>(null)
   const [ocrWorkbenchResult, setOcrWorkbenchResult] = useState<OcrWorkbenchResult | null>(null)
 
-  // Derived, not independent state: the popup has exactly one active mode,
-  // so "is chat/OCR visible" is simply "is the popup open at that mode" —
-  // this replaces the old independently-toggled booleans and their manual
-  // mutual exclusion in App.tsx.
-  const assistantChatOpen = tutorPanelOpen && tutorPanelMode === 'chat'
-  const ocrWorkbenchOpen = tutorPanelOpen && tutorPanelMode === 'ocr'
+  // Derived, not independent state: the chat is showing exactly when Look it
+  // up stands on A QUESTION.
+  const assistantChatOpen = Boolean(deps.lookupChatVisible)
 
   const assistantChatHistoryHydratedRef = useRef(false)
-  const assistantChatLogRef = useRef<HTMLDivElement | null>(null)
-  const ocrWorkbenchImageInputRef = useRef<HTMLInputElement | null>(null)
   const assistantChatClearTokenRef = useRef(0)
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const ocrRequestTokenRef = useRef(0)
 
   const { voice } = deps
-
-  const openTutorPanel = useCallback((mode: TutorPanelMode = 'menu') => {
-    setTutorPanelOpenState(true)
-    setTutorPanelModeState(mode)
-    if (mode !== 'menu') setTutorPanelReturnFocusMode(mode)
-  }, [])
-
-  const setTutorPanelMode = useCallback((mode: TutorPanelMode) => {
-    setTutorPanelModeState(mode)
-    if (mode !== 'menu') setTutorPanelReturnFocusMode(mode)
-  }, [])
-
-  const returnToTutorMenu = useCallback(() => {
-    setTutorPanelModeState('menu')
-  }, [])
-
-  const closeTutorPanel = useCallback(() => {
-    // Hides the popup only. Chat messages/input, OCR result/error, and any
-    // active scenario session are preserved — nothing here resets them.
-    setTutorPanelOpenState(false)
-  }, [])
 
   const speakAssistantReply = useCallback(async (text: string, turnKey?: string): Promise<void> => {
     if (!settings.assistantChatAudioEnabled) {
@@ -289,7 +238,7 @@ export function useTutor(
     }
   }, [])
 
-  const sendAssistantChat = useCallback(async (forcedMessage?: string) => {
+  const sendAssistantChat = useCallback(async (text: string) => {
     if (!settings.assistantChatEnabled) {
       setAssistantChatError('Chatbot is disabled in settings.')
       return
@@ -301,7 +250,7 @@ export function useTutor(
       return
     }
 
-    const message = (forcedMessage ?? assistantChatInput).trim()
+    const message = text.trim()
     if (!message) {
       return
     }
@@ -316,7 +265,6 @@ export function useTutor(
       created_at_utc: new Date().toISOString(),
     }
     setAssistantChatMessages((previous) => [...previous, optimisticTurn])
-    setAssistantChatInput('')
     setAssistantChatLoading(true)
     setAssistantChatError(null)
     setAssistantChatWarmup(!assistantChatStatus?.loaded)
@@ -347,7 +295,7 @@ export function useTutor(
     } finally {
       setAssistantChatLoading(false)
     }
-  }, [assistantChatInput, assistantChatStatus?.loaded, deps.activeSessionId, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
+  }, [assistantChatStatus?.loaded, deps.activeSessionId, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
 
   const clearOcrWorkbenchResult = useCallback(() => {
     setOcrWorkbenchResult(null)
@@ -420,12 +368,26 @@ export function useTutor(
       const lineCount = Number.isFinite(ocrResponse?.lineCount)
         ? Math.max(0, Math.trunc(ocrResponse.lineCount))
         : extractedText.split(/\n+/).filter(Boolean).length
+      /* THE PER-LINE CONFIDENCE WAS ALWAYS IN THE PAYLOAD and the renderer used to drop it. Kept, so
+         a line read at 22% can be marked as the one worth checking. Falls back to the text's own
+         lines (at no stated confidence) for a runtime that does not send them. */
+      const lines = Array.isArray(ocrResponse?.lines) && ocrResponse.lines.length > 0
+        ? ocrResponse.lines
+          .filter((line) => typeof line?.text === 'string' && line.text.trim())
+          .map((line) => ({
+            text: line.text.trim(),
+            confidence: typeof line.confidence === 'number' ? line.confidence : 0,
+          }))
+        : extractedText.split(/\n+/).filter(Boolean).map((text) => ({ text, confidence: Number.NaN }))
 
       setOcrWorkbenchResult({
         fileName: file.name,
         lineCount,
         japaneseText: extractedText,
         englishText: finalEnglishText,
+        lines,
+        imageUrl: `data:${payload.mimeType};base64,${payload.imageBase64}`,
+        minConfidence: settings.assistantChatOcrMinConfidence,
       })
     } catch (error: unknown) {
       if (isStale()) return
@@ -524,9 +486,8 @@ export function useTutor(
     }
 
     assistantChatHistoryHydratedRef.current = false
-    // Chat was just disabled in settings — if it's the visible activity,
-    // fall back to the menu (where the now-hidden Chat item won't reopen it).
-    setTutorPanelModeState((currentMode) => (currentMode === 'chat' ? 'menu' : currentMode))
+    // Chat was just disabled in settings: A QUESTION dims to its no-model
+    // state, and nothing it was doing is left running.
     setAssistantChatLoading(false)
     setAssistantChatWarmup(false)
     setAssistantChatError(null)
@@ -658,50 +619,26 @@ export function useTutor(
     }
   }, [assistantToasts, trackAssistantToastInteraction])
 
-  useEffect(() => {
-    if (!assistantChatOpen) {
-      return
-    }
-    const log = assistantChatLogRef.current
-    if (!log) {
-      return
-    }
-    log.scrollTop = log.scrollHeight
-  }, [assistantChatOpen, assistantChatMessages, assistantChatLoading])
-
   const activeAssistantToast = useMemo(() => assistantToasts[0] ?? null, [assistantToasts])
 
   return {
-    tutorPanelOpen,
-    tutorPanelMode,
-    tutorPanelReturnFocusMode,
-    openTutorPanel,
-    closeTutorPanel,
-    setTutorPanelMode,
-    returnToTutorMenu,
-
     assistantChatOpen,
     assistantChatMessages,
     assistantChatLoading,
     assistantChatError,
-    assistantChatInput,
-    setAssistantChatInput,
     assistantSpeakingTurnKey,
     assistantChatStatus,
     clearAssistantChat,
     sendAssistantChat,
     replayAssistantTurn,
-    ocrWorkbenchOpen,
     ocrWorkbenchBusy,
     ocrWorkbenchError,
     ocrWorkbenchResult,
     handleOcrWorkbenchImageSelected,
     clearOcrWorkbenchResult,
-    ocrWorkbenchImageInputRef,
     activeAssistantToast,
     dismissAssistantToast,
     launchAssistantToastAction,
-    assistantChatLogRef,
     queueAssistantToast,
   }
 }

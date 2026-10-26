@@ -1,28 +1,26 @@
-import type { ButtonHTMLAttributes, Ref } from 'react'
+import type { ButtonHTMLAttributes } from 'react'
 import { GraduationCap } from 'lucide-react'
 
 interface TutorTitlebarButtonProps extends Pick<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
-  tutorPanelOpen: boolean
-  ref?: Ref<HTMLButtonElement>
+  /** whether Look it up is open */
+  open: boolean
 }
 
 /**
- * The single Tutor entry point in the titlebar — replaces the old separate
- * Tutor-chat and OCR buttons. Always rendered (never hidden by settings):
- * disabling chat only hides the Chat menu item, never this button, so
- * Scenario Practice and Image Translation stay reachable regardless.
+ * The tutor's one entry in the titlebar. The tutor's chat and image translation are Look it up's
+ * A QUESTION and A SCREENSHOT routes, so the button toggles Look it up -- the same door `/` is.
+ * Always rendered: with no model running, those two routes say what is missing rather than the
+ * door disappearing.
  */
-export function TutorTitlebarButton({ tutorPanelOpen, onClick, ref }: TutorTitlebarButtonProps) {
+export function TutorTitlebarButton({ open, onClick }: TutorTitlebarButtonProps) {
   return (
     <button
-      ref={ref}
       type="button"
       className="window-nav-button"
       onClick={onClick}
-      aria-expanded={tutorPanelOpen}
-      aria-controls="tutor-panel"
-      aria-label={tutorPanelOpen ? 'Close Tutor' : 'Open Tutor'}
-      title={tutorPanelOpen ? 'Close Tutor' : 'Open Tutor'}
+      aria-expanded={open}
+      aria-label={open ? 'Close the tutor (Look it up)' : 'Open the tutor (Look it up)'}
+      title={open ? 'Close Look it up' : 'Ask the tutor or read a screenshot — Look it up (/)'}
     >
       <GraduationCap className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
     </button>

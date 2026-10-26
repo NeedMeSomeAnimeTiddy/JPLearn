@@ -1,4 +1,5 @@
 import type { KanjiDetailPayload } from '../../generated/types'
+import type { AssistantChatTurn, OcrWorkbenchResult } from '../tutor/types'
 
 /* The payload types come off the preload surface rather than being re-declared, the same trick
    DictionaryPopup uses -- these shapes are generated from Python dataclasses and hand-copies of
@@ -53,15 +54,62 @@ export interface LookupAnswers {
 
 export interface LookupController {
   isOpen: boolean
-  open: (seed?: string) => void
+  /** opens on `seed`; `route` pins the route rather than letting the query pick it */
+  open: (seed?: string, route?: LookupRouteKey) => void
   close: () => void
   query: string
   setQuery: (value: string) => void
   /** the route whose answer is on screen; inferred from the query, overridable with the arrows */
   activeRoute: LookupRouteKey
+  /** true when the route was chosen rather than inferred */
+  routePinned: boolean
   setActiveRoute: (route: LookupRouteKey) => void
-  stepRoute: (direction: 1 | -1) => void
+  /** steps through `routes`, which are the ones that can answer right now */
+  stepRoute: (direction: 1 | -1, routes?: readonly LookupRouteKey[]) => void
   answers: LookupAnswers
   /** true while any route is still being asked */
   busy: boolean
+}
+
+/* ==================================================================================================
+   THE TWO ROUTES THAT NEED A MODEL, as the overlay sees them. The state and the calls stay in
+   `features/tutor` (`useTutor`), which is what talks to `assistant-chat` and `assistant-chat-ocr`;
+   App hands the overlay these two slices, so the lookup draws them without owning a second copy.
+   ================================================================================================== */
+export interface LookupChat {
+  /** gated on Chat with Tutor in Settings › Assistant */
+  enabled: boolean
+  /** the app's own sentence for why it is not, shown in the no-model state */
+  disabledReason: string
+  turns: AssistantChatTurn[]
+  loading: boolean
+  error: string | null
+  send: (message: string) => void
+  clear: () => void
+  speakingKey: string | null
+  replay: (content: string, key: string) => void
+  stopSpeaking: () => void
+  audioEnabled: boolean
+  toggleAudio: () => void
+  romajiEnabled: boolean
+  toggleRomaji: () => void
+  /** the longest message the tutor takes */
+  charLimit: number
+}
+
+export interface LookupOcr {
+  /** gated on the image-translation package being installed */
+  enabled: boolean
+  disabledReason: string
+  busy: boolean
+  error: string | null
+  result: OcrWorkbenchResult | null
+  submit: (file: File) => void
+  clear: () => void
+  maxMb: number
+}
+
+export interface LookupAssistant {
+  chat: LookupChat
+  ocr: LookupOcr
 }

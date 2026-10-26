@@ -22,7 +22,47 @@ export function isSingleKanji(query: string): boolean {
    -- `lookup-sentence` finds a sentence containing whatever you typed, so it complements every
    query rather than competing with one. */
 export function inferRoute(query: string): LookupRouteKey {
-  return isSingleKanji(query) ? 'kanji' : 'word'
+  if (isSingleKanji(query)) return 'kanji'
+  /* A QUESTION IS A QUESTION MARK. Option A on the tools card infers A QUESTION from what you type;
+     the narrowest reading of that is the one sign a lookup never ends in, so "school" is still a
+     word and "why is it は here?" goes to the tutor. Nothing is sent until ENTER. */
+  if (/[?？]\s*$/.test(query.trim())) return 'tutor'
+  return 'word'
+}
+
+/** a reply cut into pages at word (or, in Japanese, character) boundaries near `budget` */
+export function pageReply(text: string, budget: number): string[] {
+  const clean = text.trim()
+  if (!clean) return []
+  const pages: string[] = []
+  let rest = clean
+  while (rest.length > budget) {
+    const window = rest.slice(0, budget + 1)
+    /* prefer the end of a sentence in the back third of the page, then a space, then a hard cut */
+    const sentence = Math.max(window.lastIndexOf('. '), window.lastIndexOf('。'), window.lastIndexOf('! '), window.lastIndexOf('? '))
+    const space = window.lastIndexOf(' ')
+    let cut = sentence > budget * 0.66 ? sentence + 1 : space > budget * 0.5 ? space : budget
+    if (cut <= 0) cut = budget
+    pages.push(rest.slice(0, cut).trim())
+    rest = rest.slice(cut).trim()
+  }
+  if (rest) pages.push(rest)
+  return pages
+}
+
+/** the image in a paste or a drop, if there is one */
+export function imageFileFrom(data: DataTransfer | null): File | null {
+  if (!data) return null
+  for (const file of Array.from(data.files ?? [])) {
+    if (file.type.startsWith('image/')) return file
+  }
+  for (const item of Array.from(data.items ?? [])) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) return file
+    }
+  }
+  return null
 }
 
 /** every kanji in the query, de-duplicated, in the order they appear */

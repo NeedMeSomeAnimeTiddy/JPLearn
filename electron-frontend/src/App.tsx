@@ -51,7 +51,7 @@ import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
-import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
+import { useLookup, LookupOverlay, isTypingTarget, type LookupAssistant } from './features/lookup'
 import { flyHome, flyToSection } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
@@ -109,9 +109,12 @@ import { computeMinigameLockReasons } from './lib/minigameAvailability'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { useVoice, splitSpeechSegments, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
-import { useTutor, TutorPanel, TutorToast, type TutorSettingsFields } from './features/tutor'
+import {
+  useTutor, TutorToast, ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB, ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
+  type TutorSettingsFields,
+} from './features/tutor'
 import type { AssistantToast } from './features/tutor/types'
-import { useScenarioTutor } from './features/scenario-tutor'
+import { Conversation, useScenarioTutor } from './features/scenario-tutor'
 import { useCursor, CursorFollower, type CursorSettings } from './features/cursor'
 import { useWindowDrag } from './features/window-drag'
 import { usePomodoro, BreakOverlay, type PomodoroSettingsFields } from './features/pomodoro'
@@ -217,15 +220,20 @@ function App() {
   const warnedSectionsRef = useRef<Set<string>>(new Set())
 
   const [kanjiDetailCharacter, setKanjiDetailCharacter] = useState<string | null>(null)
+  /* WHICH SHEET OPENED THE CHARACTER, because Escape goes up one level: back to Look it up or to
+     Every character, whichever it came from. The dictionary popup stays open under it, so a
+     character opened from there has nowhere to be sent back to. */
+  const [kanjiDetailFrom, setKanjiDetailFrom] = useState<'lookup' | 'mastery' | null>(null)
   const kanjiDetailTriggerRef = useRef<HTMLElement | null>(null)
-  const tutorTitlebarButtonRef = useRef<HTMLButtonElement | null>(null)
 
-  const openKanjiDetail = useCallback((character: string, trigger: HTMLElement) => {
+  const openKanjiDetail = useCallback((character: string, trigger: HTMLElement, from: 'lookup' | 'mastery' | null = null) => {
     kanjiDetailTriggerRef.current = trigger
+    setKanjiDetailFrom(from)
     setKanjiDetailCharacter(character)
   }, [])
 
   const closeKanjiDetail = useCallback(() => {
+    setKanjiDetailFrom(null)
     const trigger = kanjiDetailTriggerRef.current
     if (!trigger) {
       setKanjiDetailCharacter(null)
@@ -285,6 +293,9 @@ function App() {
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
   const lookup = useLookup()
+  /* the palette registers once, so the lookup it opens is read at press time */
+  const lookupRef = useRef(lookup)
+  lookupRef.current = lookup
 
   /* AND THE PUZZLES DO TOO, for the reason the shelf and the ladder already moved: `daily_games`
      is one puzzle now and cannot be opened without naming which. Every route that used to mean
@@ -320,10 +331,12 @@ function App() {
       { id: 'script-katakana', label: 'Katakana', category: 'navigation', keywords: ['katakana', 'script'], action: () => { openDeckScreenRef.current('katakana') } },
       { id: 'open-settings', label: 'Open Settings', category: 'settings', shortcut: 'Ctrl+,', action: () => { closeKanjiDetail(); setShowSettings(true) } },
       { id: 'open-keyboard-cheatsheet', label: 'Keyboard Shortcuts', category: 'settings', action: () => { closeKeyboardCheatsheet(); setTimeout(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })) }, 50) } },
-      { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu'], action: () => tutor.openTutorPanel() },
-      { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei'], action: () => tutor.openTutorPanel('chat') },
-      { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => tutor.openTutorPanel('scenarios') },
-      { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate'], action: () => tutor.openTutorPanel('ocr') },
+      /* THE TUTOR LIVES IN LOOK IT UP: its chat is A QUESTION and its image translation is A
+         SCREENSHOT, so each of these opens the lookup on its route (tools.html, plate 9) */
+      { id: 'tutor-open-menu', label: 'Open Tutor', category: 'navigation', keywords: ['tutor', 'menu', 'look up'], action: () => lookupRef.current.open() },
+      { id: 'tutor-open-chat', label: 'Chat with Tutor', category: 'navigation', keywords: ['tutor', 'chat', 'sensei', 'question'], action: () => lookupRef.current.open('', 'tutor') },
+      { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => openScenesRef.current() },
+      { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate', 'screenshot'], action: () => lookupRef.current.open('', 'ocr') },
       { id: 'refresh-data', label: 'Refresh Data', category: 'settings', keywords: ['reload', 'summary'], action: () => { titlebarToolsRef.current?.refreshData() } },
       { id: 'dev-dashboard', label: 'Developer Dashboard', category: 'debug', keywords: ['developer', 'dev', 'tools'], action: () => { titlebarToolsRef.current?.openDevDashboard() } },
       { id: 'dev-inspect-element', label: 'Inspect Element', category: 'debug', keywords: ['developer', 'devtools'], action: () => { void titlebarToolsRef.current?.inspectElement() } },
@@ -431,7 +444,6 @@ function App() {
     setShowOverview(false)
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
-    tutor.closeTutorPanel()
     setXpDetailsOpen(false)
     setStreakDetailsOpen(false)
     setDictionarySeedQuery(seedQuery)
@@ -444,6 +456,30 @@ function App() {
     setDictionaryOpen(false)
     setDictionarySeedQuery('')
   }, [closeKanjiDetail])
+
+  /* ESC ON THE CHARACTER GOES UP ONE LEVEL rather than all the way out: the sheet that opened it
+     comes back, standing where it was. Look it up is reopened on the character itself, which is the
+     query it was showing when it handed over. */
+  const leaveKanjiDetail = () => {
+    const character = kanjiDetailCharacter
+    if (kanjiDetailFrom === 'lookup' && character) {
+      kanjiDetailTriggerRef.current = null
+      setKanjiDetailFrom(null)
+      setKanjiDetailCharacter(null)
+      lookup.open(character)
+      return
+    }
+    if (kanjiDetailFrom === 'mastery') {
+      kanjiDetailTriggerRef.current = null
+      setKanjiDetailFrom(null)
+      setKanjiDetailCharacter(null)
+      setShowOverview(true)
+      return
+    }
+    closeKanjiDetail()
+  }
+  const leaveKanjiDetailRef = useRef(leaveKanjiDetail)
+  leaveKanjiDetailRef.current = leaveKanjiDetail
 
   useEffect(() => {
     if (availableMinigames.includes(activeGame)) return
@@ -611,6 +647,9 @@ function App() {
      do not have to move, and the palette does not re-register on every render. */
   const openExamLadderRef = useRef<() => void>(() => {})
   const openLibraryRef = useRef<() => void>(() => {})
+  /* AND THE SCENES, which every way into a scenario now lands on -- the palette, the curriculum --
+     because the conversation is a screen that starts from The World's TALK lane, not a pop-up. */
+  const openScenesRef = useRef<() => void>(() => {})
   /* AND THE TWO THE SCRIPT HUB LEFT BEHIND. Every route that used to navigate to it means one of
      exactly two things -- put me in front of this deck, or run this drill -- and both of those are
      built from `menuPath`, which is declared six hundred lines below the curriculum's destination
@@ -682,6 +721,7 @@ function App() {
       activeSessionId,
       activeScript,
       ocrInstalled: models.tutorInstallInfo?.ocrInstalled ?? false,
+      lookupChatVisible: lookup.isOpen && lookup.activeRoute === 'tutor',
       onToastNavigate: (script, game, differentScript) => {
         const minigame = resolveScriptMinigame(script, game)
         setActiveGame(minigame)
@@ -710,7 +750,6 @@ function App() {
     const destination = node.destination
     switch (destination.kind) {
       case 'script':
-        tutor.closeTutorPanel()
         /* A MILESTONE ABOUT A MODE RUNS THE MODE. LISTENING names hiragana AND a minigame: it is
            about the drill, not about hiragana's blocks, which the HIRAGANA milestone two rows above
            already draws. Every other script milestone opens its deck. */
@@ -727,16 +766,16 @@ function App() {
         openLibraryRef.current()
         return
       case 'scenarios':
-        tutor.openTutorPanel('scenarios')
+        openScenesRef.current()
         return
       case 'tutor':
-        tutor.openTutorPanel('chat')
+        lookup.open('', 'tutor')
         return
       case 'none':
         // `tutorial` — a one-time, skippable flow with nothing to re-enter.
         return
     }
-  }, [navigate, setActiveGame, setActiveScript, tutor])
+  }, [navigate, setActiveGame, setActiveScript, lookup])
 
   // Scenario Practice shares the tutor's single audio channel (same run-id ref
   // and the same coach-audio toggle), so NPC playback and chat replies can
@@ -752,16 +791,47 @@ function App() {
     aiEvaluationEnabled: settings.scenarioAiEvaluationEnabled,
   })
 
-  // Restores focus to the Tutor titlebar button when the popup closes —
-  // Back (within the popup) restores focus to the menu item instead, via
-  // TutorMenu's own autofocus bookkeeping.
-  const tutorPanelWasOpenRef = useRef(false)
-  useEffect(() => {
-    if (tutorPanelWasOpenRef.current && !tutor.tutorPanelOpen) {
-      tutorTitlebarButtonRef.current?.focus()
-    }
-    tutorPanelWasOpenRef.current = tutor.tutorPanelOpen
-  }, [tutor.tutorPanelOpen])
+  /* THE TWO MODEL ROUTES OF LOOK IT UP, read off the tutor. The chat's state and calls stay in
+     `useTutor`; this only names which of them the overlay draws, and the two switches the
+     conversation surfaces keep within reach (sound, romaji), which write the same settings the
+     Assistant tab does. */
+  const ocrInstalled = models.tutorInstallInfo?.ocrInstalled ?? false
+  const lookupAssistant: LookupAssistant = {
+    chat: {
+      enabled: settings.assistantChatEnabled && typeof window.jplearnDesktop?.sendAssistantChatMessage === 'function',
+      disabledReason: settings.assistantChatEnabled
+        ? 'Assistant chat runtime is unavailable in this build.'
+        : 'Chatbot is disabled in settings.',
+      turns: tutor.assistantChatMessages,
+      loading: tutor.assistantChatLoading,
+      error: tutor.assistantChatError,
+      send: (message) => { void tutor.sendAssistantChat(message) },
+      clear: () => { void tutor.clearAssistantChat() },
+      speakingKey: tutor.assistantSpeakingTurnKey,
+      replay: tutor.replayAssistantTurn,
+      stopSpeaking: voice.cancelAssistantSpeech,
+      audioEnabled: settings.assistantChatAudioEnabled,
+      toggleAudio: () => {
+        if (settings.assistantChatAudioEnabled) voice.cancelAssistantSpeech()
+        setSettings((previous) => ({ ...previous, assistantChatAudioEnabled: !previous.assistantChatAudioEnabled }))
+      },
+      romajiEnabled: settings.romajiConversionEnabled,
+      toggleRomaji: () => setSettings((previous) => ({ ...previous, romajiConversionEnabled: !previous.romajiConversionEnabled })),
+      charLimit: ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
+    },
+    ocr: {
+      enabled: ocrInstalled && typeof window.jplearnDesktop?.extractAssistantChatImageText === 'function',
+      disabledReason: typeof window.jplearnDesktop?.extractAssistantChatImageText !== 'function'
+        ? 'Image Translation is unavailable in this build.'
+        : 'Image Translation is not installed. Install it in Settings > Tutor > Image Translation.',
+      busy: tutor.ocrWorkbenchBusy,
+      error: tutor.ocrWorkbenchError,
+      result: tutor.ocrWorkbenchResult,
+      submit: (file) => { void tutor.handleOcrWorkbenchImageSelected(file) },
+      clear: tutor.clearOcrWorkbenchResult,
+      maxMb: ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB,
+    },
+  }
 
   // oxlint-disable react-hooks/exhaustive-deps — models from useModels hook is not a stable ref
   useEffect(() => {
@@ -1265,7 +1335,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     /* dead while every section has a level two, and kept for the same reason `useMenuPath`
        keeps the mechanism: it is what a section without one falls through to. STUDY's is the deck
        screen for whichever deck you are standing on. */
@@ -1288,7 +1357,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     navigate('home', 'back')
     menuPath.enterSection('READING')
     menuPath.enterScreen('library')
@@ -1301,7 +1369,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     /* ONLY WHEN THERE IS SOMEWHERE TO COME BACK FROM. The history stack is driven by `view`
        changing, so navigating home from home is a no-op — but navigating home from a VIEW and then
        into a puzzle pushes two entries where the walk was one, and Back then lands on a home the
@@ -1324,7 +1391,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     navigate('home', 'back')
     menuPath.enterSection('JLPT')
     setShortcutMenuOpen(false)
@@ -1333,6 +1399,19 @@ function App() {
   }, [navigate, menuPath, tutor])
   openExamLadderRef.current = openExamLadder
   openLibraryRef.current = openLibrary
+
+  const openScenes = useCallback(() => {
+    setDictionaryOpen(false)
+    setShowOverview(false)
+    setShowSettings(false)
+    navigate('home', 'back')
+    menuPath.enterSection('READING')
+    menuPath.enterScreen('scenes')
+    setShortcutMenuOpen(false)
+    setActiveShortcutFlyout(null)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- tutor from useTutor is not a stable ref
+  }, [navigate, menuPath, tutor])
+  openScenesRef.current = openScenes
 
 
   /* ==================================================================================================
@@ -1401,6 +1480,16 @@ function App() {
      `useWorldData`. `worldLanes` is memoised because `Lanes` watches the array it is given, and a
      fresh one on every render would re-subscribe its keydown listener for nothing. */
   const worldOpen = view === 'home' && menuLevel === 2 && menuPath.section === 'READING'
+  /* AND WHETHER A CONVERSATION STANDS ON THE SCENES. It is TALK's level three with a scene chosen,
+     so it is a flag over that screen rather than a view of its own; the session itself lives in
+     `useScenarioTutor`, so leaving the screen any way but LEAVE keeps it, and picking the same
+     scene again resumes it. */
+  const [conversationOpen, setConversationOpen] = useState(false)
+  const scenesUp = view === 'home' && menuLevel === 3 && menuPath.screen === 'scenes'
+  useEffect(() => { if (!scenesUp) setConversationOpen(false) }, [scenesUp])
+  const conversationUp = scenesUp && conversationOpen
+  const conversationUpRef = useRef(conversationUp)
+  conversationUpRef.current = conversationUp
   const world = useWorldData(worldOpen)
   const worldCards = useMemo(
     () => worldLanes({
@@ -1468,7 +1557,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     const owner = progression.nodes.find((node) => (
       node.destination.kind === 'script'
       && node.destination.script === script
@@ -1542,11 +1630,12 @@ function App() {
 
       if ((event.ctrlKey || event.metaKey) && event.key === ',') {
         event.preventDefault()
+        /* the no-model routes say CTRL+, OPENS SETTINGS, and settings opens under the scrim */
+        lookup.close()
         if (showSettings) {
           setShowSettings(false)
         } else {
           setDictionaryOpen(false)
-          tutor.closeTutorPanel()
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -1572,7 +1661,6 @@ function App() {
           setShowSettings(false)
         } else {
           setDictionaryOpen(false)
-          tutor.closeTutorPanel()
           setShowOverview(false)
           setShowSettings(true)
         }
@@ -1587,7 +1675,7 @@ function App() {
         }
 
         if (kanjiDetailCharacter) {
-          closeKanjiDetail()
+          leaveKanjiDetailRef.current()
           return
         }
 
@@ -1618,24 +1706,16 @@ function App() {
           return
         }
 
-        if (tutor.tutorPanelOpen) {
-          // The shell's own Escape handler (TutorPanelShell) normally
-          // catches this first and stops propagation while focus is inside
-          // the popup; this is a defensive fallback for the rare case focus
-          // isn't there. Same policy: close at the menu, back to the menu
-          // from any activity — Escape never abandons a scenario.
-          if (tutor.tutorPanelMode === 'menu') {
-            tutor.closeTutorPanel()
-          } else {
-            tutor.returnToTutorMenu()
-          }
-          return
-        }
-
         // An in-progress missed-word review returns to the Daily Games hub
         // before Escape is allowed to leave the minigame view at all.
         if (view === 'minigame' && explicitReviewItemsRef.current) {
           returnToDailyGames()
+          return
+        }
+
+        /* THE CONVERSATION KEEPS ITS OWN ESCAPE: it asks before it leaves, so it is not a key
+           that takes the menu up a level underneath it. */
+        if (conversationUpRef.current) {
           return
         }
 
@@ -1658,7 +1738,9 @@ function App() {
         }
       }
 
-      if (showSettings || showCloseDialog || commandPalette.isOpen || tutor.tutorPanelOpen || isInput) return
+      if (showSettings || showCloseDialog || commandPalette.isOpen || isInput) return
+      /* and the digits do not leave a conversation for a deck */
+      if (conversationUpRef.current) return
 
       if (event.key === '6') {
         setDictionaryOpen(false)
@@ -1693,7 +1775,7 @@ function App() {
     // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, tutor.tutorPanelOpen, tutor.tutorPanelMode, tutor.closeTutorPanel, tutor.returnToTutorMenu, loadSummary, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
+  }, [closeKanjiDetail, kanjiDetailCharacter, loadSummary, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
 
   const streak = useMemo(
     () => summary?.streak ?? { current_days: 0, best_days: 0, freezes_available: 0 },
@@ -1834,7 +1916,6 @@ function App() {
     navigate('home', 'back')
     resetSessionCore()
     setShowSettings(false)
-    tutor.closeTutorPanel()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, resetSessionCore])
 
@@ -1853,7 +1934,6 @@ function App() {
     setDictionaryOpen(false)
     setShowOverview(true)
     setShowSettings(false)
-    tutor.closeTutorPanel()
     void loadSummary()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
@@ -1952,7 +2032,6 @@ function App() {
     setDictionaryOpen(false)
     setShowSettings(true)
     setShowOverview(false)
-    tutor.closeTutorPanel()
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   }, [closeKanjiDetail, closeShortcutMenu])
@@ -2339,18 +2418,17 @@ function App() {
     openDictionary(roundState?.focusText ?? roundState?.answer ?? '')
   }, [openDictionary, roundState])
 
-  const toggleTutorPanelFromTitlebar = useCallback(() => {
+  /* THE TITLEBAR'S TUTOR BUTTON TOGGLES LOOK IT UP, where the tutor's two routes are now -- one
+     entry, the same one `/` is (tools.html, plate 9) */
+  const toggleLookupFromTitlebar = useCallback(() => {
     setDictionaryOpen(false)
     setShowOverview(false)
     setShowSettings(false)
     setShortcutMenuOpen(false)
     setActiveShortcutFlyout(null)
-    if (tutor.tutorPanelOpen) {
-      tutor.closeTutorPanel()
-    } else {
-      tutor.openTutorPanel()
-    }
-  }, [setDictionaryOpen, tutor])
+    if (lookup.isOpen) lookup.close()
+    else lookup.open()
+  }, [setDictionaryOpen, lookup])
 
   const xpInLevel = xpProgress ? Math.max(0, xpProgress.xp_for_current_level - xpProgress.xp_to_next_level) : 0
   const xpLevelCap = xpProgress?.xp_for_current_level ?? 0
@@ -2651,19 +2729,35 @@ function App() {
         <Wall onUp={leaveMenuLevel} />
       ) : null}
 
-      {view === 'home' && menuLevel === 3 && menuPath.screen === 'scenes' ? (
+      {conversationUp ? (
+        <Conversation
+          scenarioTutor={scenarioTutor}
+          played={buildScenes(world.sessions).find((s) => s.id === scenarioTutor.selectedScenario?.id)?.played ?? null}
+          romajiEnabled={settings.romajiConversionEnabled}
+          onToggleRomaji={() => setSettings((previous) => ({ ...previous, romajiConversionEnabled: !previous.romajiConversionEnabled }))}
+          audioEnabled={settings.assistantChatAudioEnabled}
+          onToggleAudio={() => {
+            if (settings.assistantChatAudioEnabled) voice.cancelAssistantSpeech()
+            setSettings((previous) => ({ ...previous, assistantChatAudioEnabled: !previous.assistantChatAudioEnabled }))
+          }}
+          onLeave={() => setConversationOpen(false)}
+        />
+      ) : scenesUp ? (
         <Scenes
           scenes={buildScenes(world.sessions)}
           onPick={(scenarioId) => {
             if (scenarioId) {
-              /* the SCENE, not the picker: `selectScenario` is the scenario tutor's own call and
-                 the panel opens already standing on it */
-              scenarioTutor.selectScenario(scenarioId)
-              tutor.openTutorPanel('scenarios')
+              /* THE SCENE, AND THEN ITS SCREEN. A conversation already under way in this scene is
+                 resumed where it stood; any other pick starts at choosing how much help. */
+              const running = scenarioTutor.session?.status === 'active'
+                && scenarioTutor.selectedScenario?.id === scenarioId
+                && scenarioTutor.screen === 'session'
+              if (!running) scenarioTutor.selectScenario(scenarioId)
+              setConversationOpen(true)
               return
             }
-            /* free talk is not a scene and never was -- it is the tutor's own chat */
-            tutor.openTutorPanel('chat')
+            /* free talk is not a scene and never was -- it is a question to the tutor */
+            lookup.open('', 'tutor')
           }}
           onUp={leaveMenuLevel}
         />
@@ -2869,7 +2963,6 @@ function App() {
             setDictionaryOpen(false)
             setShowOverview(false)
             setShowSettings(false)
-            tutor.closeTutorPanel()
 
             if (sectionId === 'jlpt_prep') {
               openExamLadderRef.current()
@@ -3012,9 +3105,8 @@ function App() {
         titlebarHistoryForward={nav.historyForward}
         settings={settings}
         pomodoro={pomodoro}
-        tutor={tutor}
-        tutorTitlebarButtonRef={tutorTitlebarButtonRef}
-        toggleTutorPanelFromTitlebar={toggleTutorPanelFromTitlebar}
+        lookupOpen={lookup.isOpen}
+        toggleLookupFromTitlebar={toggleLookupFromTitlebar}
         streak={streak}
         streakDetailsOpen={streakDetailsOpen}
         streakDetailsRef={streakDetailsRef}
@@ -3103,15 +3195,16 @@ function App() {
         scores={cardScores}
         onClose={() => setShowOverview(false)}
         onRefresh={() => void loadSummary()}
-        onOpenKanjiDetail={openKanjiDetail}
+        onOpenKanjiDetail={(character, trigger) => openKanjiDetail(character, trigger, 'mastery')}
       />
 
       {/* the lookup is chrome, not session UI -- it stands above everything and is reachable
           from any screen, which is the one thing the app's own dictionary could never be */}
       <LookupOverlay
         controller={lookup}
-        onOpenKanjiDetail={openKanjiDetail}
+        onOpenKanjiDetail={(character, trigger) => openKanjiDetail(character, trigger, 'lookup')}
         onOpenDictionary={(query) => openDictionary(query)}
+        assistant={lookupAssistant}
       />
 
       <DictionaryPopup
@@ -3127,7 +3220,11 @@ function App() {
       />
 
       {kanjiDetailCharacter ? (
-        <KanjiDetailPanel character={kanjiDetailCharacter} onClose={closeKanjiDetail} />
+        <KanjiDetailPanel
+          character={kanjiDetailCharacter}
+          onClose={leaveKanjiDetail}
+          backTo={kanjiDetailFrom === 'lookup' ? 'Look it up' : kanjiDetailFrom === 'mastery' ? 'Every character' : null}
+        />
       ) : null}
 
       </SessionProvider>
@@ -3175,16 +3272,6 @@ function App() {
         onQuit={handleCloseQuit}
         onClose={() => setShowCloseDialog(false)}
       />
-
-      {tutor.tutorPanelOpen ? (
-        <TutorPanel
-          tutor={tutor}
-          scenarioTutor={scenarioTutor}
-          settings={settings as TutorSettingsFields}
-          setSettings={setSettings as unknown as Dispatch<SetStateAction<TutorSettingsFields>>}
-          cancelAssistantSpeech={voice.cancelAssistantSpeech}
-        />
-      ) : null}
 
       {cursor.cursorMode === 'animated' && createPortal(<CursorFollower {...cursor} />, document.body)}
 
