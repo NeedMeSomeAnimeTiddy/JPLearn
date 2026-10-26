@@ -21,9 +21,11 @@ export const DAILY_GAMES_COPY = {
   play: 'Play',
   matchPairsHint: 'Match each Japanese word with its meaning.',
   typingBlitzHint: 'Type each Japanese word before time runs out.',
-  loadingGame: 'Preparing Match Pairs',
+  /* `{title}` is the puzzle's own name -- this said "Match Pairs" over all four */
+  loadingGame: 'Preparing {title}',
+  puzzleUnavailable: '{title} is unavailable right now.',
   gameUnavailable: 'Match Pairs is unavailable right now.',
-  backToGames: 'Back to games',
+  backToGames: 'Back to the daily road',
   retryGame: 'Try again',
   matchPairsTitle: 'Match Pairs',
   matchPairsInstructions: 'Select a Japanese word, then its matching meaning.',
@@ -139,4 +141,55 @@ export const CROSSWORD_COPY = {
   practiceResults: 'Practice complete. Today’s daily progress and streak are unchanged.',
   words: 'Words',
   fallbackClue: 'Practice',
+} as const
+
+/* ==================================================================================================
+   THE PUZZLES ON THE SHEET -- the round's own shell (`features/round`), with the board in the
+   prompt cell and the list in the work cell. See `past-three.html` plate THREE.
+   ================================================================================================== */
+
+/** the prompt cell's content box: `.rd-ask` is 322 wide with 22 of padding on each side */
+export const PUZZLE_ASK_W = 278
+/** the hairline between two cells of a board -- one pixel, so twelve columns still fit 278 */
+export const PUZZLE_BOARD_GAP = 1
+/** how many rows the work cell's list draws before what is left becomes a count */
+export const PUZZLE_LIST_ROWS = 6
+/** the line where the blitz clock stops being a figure and starts being a warning */
+export const TYPING_BLITZ_WARN_SECONDS = 10
+
+export const PUZZLE_COPY = {
+  backLabel: 'Back',
+  backJp: '戻る',
+  escHint: { cap: 'ESC', en: 'Back', jp: '戻る' },
+  dailyCap: 'TODAY’S POOL · {count} WORDS',
+  practiceCap: 'PRACTICE · NOT COUNTED',
+  loadingCap: 'READING TODAY’S POOL',
+  unavailableCap: 'TODAY’S POOL DID NOT LOAD',
+  emptyCap: 'TODAY’S POOL · NO WORDS',
+  preparingCap: 'DEALING THE BOARD',
+  savingCap: 'SAVING YOUR RESULT',
+  plateKick: 'THE BOARD',
+  plateKickJp: '盤',
+  waitSlab: 'ONE MOMENT',
+  waitSlabJp: '準備',
+  retrySlab: 'TRY AGAIN',
+  retrySlabJp: '再試行',
+  roadSlab: 'BACK TO THE ROAD',
+  roadSlabJp: '戻る',
+  endKick: 'HOW IT WENT',
+  endKickJp: '結果',
+  missedKick: 'MISSED',
+  reviewSlab: 'REVIEW MISSED · {count}',
+  reviewSlabJp: '復習',
+  reviewLabel: 'Review missed words · {count}',
+  reviewingSlab: 'OPENING REVIEW',
+  shareSlab: 'SHARE',
+  shareSlabJp: '共有',
+  savingSlab: 'SAVING',
+  savingSlabJp: '保存',
+  noMisses: 'NOTHING MISSED',
+  more: '{count} MORE',
+  words: '{count} WORDS',
+  score: 'SCORE',
+  spent: 'SPENT',
 } as const

@@ -1,6 +1,8 @@
 import { DAILY_GAME_TILES } from '../daily-games'
 import type { DailyGameType } from '../daily-games'
 import type { DailyGamesStatePayload } from '../../generated/types'
+import { screenHead } from './chrome'
+import type { ScreenHead } from './chrome'
 
 /* ==================================================================================================
    THE DAILY ROAD — PRACTICE's third level three, and a deletion rather than a redesign.
@@ -88,6 +90,20 @@ export function dailyRows(data: DailyGamesStatePayload | null): DailyRow[] {
             : `SCORE ${attempt.score}`,
     }
   })
+}
+
+/* THE PUZZLE'S OWN HEADING, which is the tablet you pressed carried one step further in. The names
+   and the order are the road's -- the same two words, in the same order, under the same mark -- so
+   the screen you land on says which tablet it is rather than re-labelling it. */
+export function puzzleHead(type: DailyGameType): ScreenHead | null {
+  const index = DAILY_GAME_TILES.findIndex((tile) => tile.type === type)
+  const head = screenHead('DRILLS', 'daily', {
+    en: (DAILY_GAME_TILES[index]?.title ?? '').toUpperCase(),
+    jp: JP[type],
+  })
+  if (!head) return null
+  const of = String(DAILY_GAME_TILES.length).padStart(2, '0')
+  return { ...head, kick: `DAILY · PUZZLE ${String(index + 1).padStart(2, '0')} OF ${of}` }
 }
 
 /** what the heading slab says about the whole day, counted rather than stated */

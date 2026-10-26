@@ -245,11 +245,41 @@ describe('Daily Game lifecycle', () => {
     const onBack = vi.fn()
     const { rerender } = render(<DailyGameSession mode="daily" data={state} dependencies={dependencies({ recordAttempt })} gameType="typing_blitz" onBack={onBack} />)
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: /back to games/i }))
+    fireEvent.click(screen.getByRole('button', { name: /back to the daily road/i }))
     rerender(<div />)
     act(() => { vi.advanceTimersByTime(15_000) })
     expect(onBack).toHaveBeenCalledOnce()
     expect(recordAttempt).not.toHaveBeenCalled()
+  })
+
+  it('keeps the finished board on the sheet while saving, and retries a save that failed', async () => {
+    const recordAttempt = vi.fn()
+      .mockRejectedValueOnce(new Error('disk unavailable'))
+      .mockResolvedValueOnce(state)
+    render(<DailyGameSession mode="daily" data={state} dependencies={dependencies({ recordAttempt })} gameType="typing_blitz" onBack={vi.fn()} />)
+    const input = await screen.findByLabelText(/type the japanese word/i)
+    fireEvent.change(input, { target: { value: '猫' } })
+    fireEvent.submit(input.closest('form')!)
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/disk unavailable/i)
+    expect(document.querySelector('.rd-sheet')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }))
+    expect(await screen.findByRole('region', { name: /typing blitz complete/i })).toBeTruthy()
+    expect(recordAttempt).toHaveBeenCalledTimes(2)
+    expect(recordAttempt.mock.calls[1][0]).toEqual(recordAttempt.mock.calls[0][0])
+  })
+
+  it('offers no review slab in practice, only the road back', async () => {
+    const onReviewMissedWords = vi.fn(async () => undefined)
+    render(<DailyGameSession mode="practice" data={state} dependencies={dependencies()} gameType="typing_blitz" onBack={vi.fn()} onReviewMissedWords={onReviewMissedWords} />)
+    const input = await screen.findByLabelText(/type the japanese word/i)
+    fireEvent.change(input, { target: { value: 'wrong' } })
+    fireEvent.submit(input.closest('form')!)
+
+    expect(await screen.findByRole('region', { name: /typing blitz complete/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /review missed/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /back to the road/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /share result/i })).toBeTruthy()
   })
 
   it('announces clipboard failures through the injected clipboard dependency', async () => {
