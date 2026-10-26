@@ -28,8 +28,8 @@ class ReviewState:
             comparable to ``interval`` in the app's mastered rule
             (``repetitions >= 3 AND interval >= 21``). A successful review
             always leaves this at 1 or more, including one that recovers a card
-            in the same session it lapsed, because code elsewhere reads
-            ``repetitions > 0`` as "this card has been seen".
+            in the same session it lapsed. Use :func:`has_been_reviewed` to
+            distinguish reviewed cards from never-seen cards after a lapse.
         next_review: Date on which this card is next due.
         stability: FSRS memory stability in days. ``0.0`` means "never reviewed".
         difficulty: FSRS difficulty on a 1 (easiest) to 10 (hardest) scale.
@@ -49,6 +49,16 @@ class ReviewState:
     def is_due(self) -> bool:
         """Return ``True`` if this card is due for review today or earlier."""
         return date.today() >= self.next_review
+
+
+def has_been_reviewed(state: ReviewState) -> bool:
+    """Return whether a card carries a current or legacy review marker.
+
+    Lapses retain their review date and stability. Positive repetitions also
+    cover pre-FSRS rows, whose date and stability migration left unset; the
+    repetitions-only backfill preserves those missing fields.
+    """
+    return state.last_review is not None or state.stability > 0 or state.repetitions > 0
 
 
 # Quality ratings (Anki-style, 0-5 scale kept for call-site compatibility).
@@ -156,8 +166,8 @@ def next_repetitions(repetitions: int, rating: int, *, is_same_day: bool) -> int
 
     Counts distinct days carrying a successful review since the last lapse. The
     ``repetitions > 0`` guard keeps a successful review always worth at least
-    one count, so a card recovered in the same session it lapsed still reads as
-    seen to the ``repetitions > 0`` checks elsewhere in the app.
+    one count, so a card recovered in the same session it lapsed starts a new
+    successful-day streak.
 
     Shared by :func:`update` and by log replay so the two cannot disagree about
     what a review is worth.

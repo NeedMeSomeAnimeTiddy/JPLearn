@@ -9,10 +9,26 @@ from domain.scheduler import (
     HARD,
     ReviewState,
     get_weights,
+    has_been_reviewed,
     reset_weights,
     set_weights,
     update,
 )
+
+
+def test_has_been_reviewed_uses_current_and_legacy_markers() -> None:
+    assert not has_been_reviewed(ReviewState(card_id=1))
+    assert has_been_reviewed(ReviewState(card_id=1, stability=2.4))
+    assert has_been_reviewed(ReviewState(card_id=1, repetitions=1))
+    assert has_been_reviewed(ReviewState(card_id=1, last_review=date(2026, 3, 1)))
+
+
+def test_lapse_keeps_card_reviewed_when_repetitions_reset() -> None:
+    state = update(ReviewState(card_id=1), GOOD, today=date(2026, 3, 1))
+    update(state, AGAIN, today=date(2026, 3, 2))
+
+    assert state.repetitions == 0
+    assert has_been_reviewed(state)
 
 
 def test_first_review_seeds_stability_and_difficulty() -> None:
