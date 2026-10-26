@@ -68,11 +68,22 @@ export interface AssistantChatRuntimeStatus {
   lastError?: string | null
 }
 
+export interface OcrWorkbenchLine {
+  text: string
+  confidence: number
+}
+
 export interface OcrWorkbenchResult {
   fileName: string
   lineCount: number
   japaneseText: string
   englishText: string
+  /** each line the OCR kept, with its own confidence (the payload has always carried it) */
+  lines: OcrWorkbenchLine[]
+  /** what was read, as a data URL, so the lines can stand beside the image they came from */
+  imageUrl: string | null
+  /** the filter the lines were read with; a line under it was kept because it is Japanese */
+  minConfidence: number
 }
 
 export interface TutorSettingsFields {
@@ -104,6 +115,8 @@ export interface TutorDeps {
   activeSessionId: string | null
   activeScript: ScriptKey
   ocrInstalled: boolean
+  /** true while Look it up is standing on A QUESTION -- the chat is on screen there */
+  lookupChatVisible?: boolean
   onToastNavigate: (script: ScriptKey, minigame: MinigameKey, differentScript: boolean) => void
 }
 

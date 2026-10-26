@@ -51,7 +51,7 @@ import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
-import { useLookup, LookupOverlay, isTypingTarget } from './features/lookup'
+import { useLookup, LookupOverlay, isTypingTarget, type LookupAssistant } from './features/lookup'
 import { flyHome, flyToSection } from './valley/flights'
 import {
   useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
@@ -109,7 +109,10 @@ import { computeMinigameLockReasons } from './lib/minigameAvailability'
 import { useTheme, type ThemeSettingsFields } from './features/theme'
 import { useVoice, splitSpeechSegments, type VoiceSettingsFields } from './features/voice'
 import { useModels } from './features/models'
-import { useTutor, TutorPanel, TutorToast, type TutorSettingsFields } from './features/tutor'
+import {
+  useTutor, TutorPanel, TutorToast, ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB, ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
+  type TutorSettingsFields,
+} from './features/tutor'
 import type { AssistantToast } from './features/tutor/types'
 import { useScenarioTutor } from './features/scenario-tutor'
 import { useCursor, CursorFollower, type CursorSettings } from './features/cursor'
@@ -685,6 +688,7 @@ function App() {
       activeSessionId,
       activeScript,
       ocrInstalled: models.tutorInstallInfo?.ocrInstalled ?? false,
+      lookupChatVisible: lookup.isOpen && lookup.activeRoute === 'tutor',
       onToastNavigate: (script, game, differentScript) => {
         const minigame = resolveScriptMinigame(script, game)
         setActiveGame(minigame)
@@ -754,6 +758,48 @@ function App() {
     audioEnabled: settings.assistantChatAudioEnabled,
     aiEvaluationEnabled: settings.scenarioAiEvaluationEnabled,
   })
+
+  /* THE TWO MODEL ROUTES OF LOOK IT UP, read off the tutor. The chat's state and calls stay in
+     `useTutor`; this only names which of them the overlay draws, and the two switches the
+     conversation surfaces keep within reach (sound, romaji), which write the same settings the
+     Assistant tab does. */
+  const ocrInstalled = models.tutorInstallInfo?.ocrInstalled ?? false
+  const lookupAssistant: LookupAssistant = {
+    chat: {
+      enabled: settings.assistantChatEnabled && typeof window.jplearnDesktop?.sendAssistantChatMessage === 'function',
+      disabledReason: settings.assistantChatEnabled
+        ? 'Assistant chat runtime is unavailable in this build.'
+        : 'Chatbot is disabled in settings.',
+      turns: tutor.assistantChatMessages,
+      loading: tutor.assistantChatLoading,
+      error: tutor.assistantChatError,
+      send: (message) => { void tutor.sendAssistantChat(message) },
+      clear: () => { void tutor.clearAssistantChat() },
+      speakingKey: tutor.assistantSpeakingTurnKey,
+      replay: tutor.replayAssistantTurn,
+      stopSpeaking: voice.cancelAssistantSpeech,
+      audioEnabled: settings.assistantChatAudioEnabled,
+      toggleAudio: () => {
+        if (settings.assistantChatAudioEnabled) voice.cancelAssistantSpeech()
+        setSettings((previous) => ({ ...previous, assistantChatAudioEnabled: !previous.assistantChatAudioEnabled }))
+      },
+      romajiEnabled: settings.romajiConversionEnabled,
+      toggleRomaji: () => setSettings((previous) => ({ ...previous, romajiConversionEnabled: !previous.romajiConversionEnabled })),
+      charLimit: ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
+    },
+    ocr: {
+      enabled: ocrInstalled && typeof window.jplearnDesktop?.extractAssistantChatImageText === 'function',
+      disabledReason: typeof window.jplearnDesktop?.extractAssistantChatImageText !== 'function'
+        ? 'Image Translation is unavailable in this build.'
+        : 'Image Translation is not installed. Install it in Settings > Tutor > Image Translation.',
+      busy: tutor.ocrWorkbenchBusy,
+      error: tutor.ocrWorkbenchError,
+      result: tutor.ocrWorkbenchResult,
+      submit: (file) => { void tutor.handleOcrWorkbenchImageSelected(file) },
+      clear: tutor.clearOcrWorkbenchResult,
+      maxMb: ASSISTANT_CHAT_MAX_IMAGE_UPLOAD_MB,
+    },
+  }
 
   // Restores focus to the Tutor titlebar button when the popup closes —
   // Back (within the popup) restores focus to the menu item instead, via
@@ -1545,6 +1591,8 @@ function App() {
 
       if ((event.ctrlKey || event.metaKey) && event.key === ',') {
         event.preventDefault()
+        /* the no-model routes say CTRL+, OPENS SETTINGS, and settings opens under the scrim */
+        lookup.close()
         if (showSettings) {
           setShowSettings(false)
         } else {
@@ -3131,6 +3179,7 @@ function App() {
         controller={lookup}
         onOpenKanjiDetail={(character, trigger) => openKanjiDetail(character, trigger, 'lookup')}
         onOpenDictionary={(query) => openDictionary(query)}
+        assistant={lookupAssistant}
       />
 
       <DictionaryPopup

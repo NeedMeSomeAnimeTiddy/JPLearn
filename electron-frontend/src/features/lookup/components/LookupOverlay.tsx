@@ -1,8 +1,12 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ANSWERABLE_ROUTES, LOOKUP_ROUTES, LOOKUP_WORD_LIMIT } from '../constants'
-import type { LookupController, LookupRouteKey, LookupStatus } from '../types'
-import { kanjiIn } from '../utils'
+import { bindWanakanaIme } from '../../../lib/wanakanaBinding'
+import {
+  ANSWERABLE_ROUTES, LOOKUP_OCR_EN_CHARS, LOOKUP_REPLY_PAGE_CHARS, LOOKUP_ROUTES, LOOKUP_WORD_LIMIT,
+} from '../constants'
+import type { LookupAssistant, LookupController, LookupRouteKey, LookupStatus } from '../types'
+import { imageFileFrom, kanjiIn, pageReply } from '../utils'
+import { QuestionBody, ScreenshotBody } from './AssistantBodies'
 import '../../../styles/stage.css'
 import '../lookup.css'
 import { boardScale } from '../../menu/useScreen'
@@ -14,6 +18,8 @@ export interface LookupOverlayProps {
    *  gone by then, so it hands back whatever had focus before the overlay opened. */
   onOpenKanjiDetail: (character: string, trigger: HTMLElement) => void
   onOpenDictionary: (query: string) => void
+  /** the tutor's chat and image translation; absent, both routes draw their no-model state */
+  assistant?: LookupAssistant
 }
 
 /** a one-word state for the route strip, so you can see where the answers are without visiting */
@@ -37,11 +43,54 @@ function Line({ label, value, absent, jp }: {
   )
 }
 
-export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary }: LookupOverlayProps) {
-  const { isOpen, close, query, setQuery, activeRoute, setActiveRoute, stepRoute, answers, busy } = controller
+export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary, assistant }: LookupOverlayProps) {
+  const {
+    isOpen, close, query, setQuery, activeRoute, routePinned, setActiveRoute, stepRoute, answers, busy,
+  } = controller
   const inputRef = useRef<HTMLInputElement | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const restoreFocusRef = useRef<HTMLElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [page, setPage] = useState(0)
+
+  const chat = assistant?.chat
+  const ocr = assistant?.ocr
+  /* the routes that can answer right now -- the arrows walk these and skip the dimmed ones */
+  const live = useMemo<LookupRouteKey[]>(() => [
+    ...ANSWERABLE_ROUTES,
+    ...(chat?.enabled ? ['tutor' as const] : []),
+    ...(ocr?.enabled ? ['ocr' as const] : []),
+  ], [chat?.enabled, ocr?.enabled])
+
+  /* THE REPLY ON SCREEN IS THE LATEST ONE, paged. A follow-up replaces it; the earlier turns are
+     kept by the tutor and counted on the note line rather than stacked into a log that scrolls. */
+  const lastReply = useMemo(() => {
+    const turns = chat?.turns ?? []
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (turns[i].role === 'assistant') return { turn: turns[i], key: `${turns[i].created_at_utc}-${i}` }
+    }
+    return null
+  }, [chat?.turns])
+  const replyPages = useMemo(
+    () => pageReply(lastReply?.turn.content ?? '', LOOKUP_REPLY_PAGE_CHARS),
+    [lastReply],
+  )
+  const enPages = useMemo(
+    () => pageReply(ocr?.result?.englishText ?? '', LOOKUP_OCR_EN_CHARS),
+    [ocr?.result?.englishText],
+  )
+  const pages = activeRoute === 'tutor' ? replyPages : activeRoute === 'ocr' ? enPages : []
+  useEffect(() => { setPage(0) }, [lastReply?.key, ocr?.result, activeRoute])
+
+  /* ROMAJI BECOMES KANA ONLY ON A QUESTION YOU CHOSE TO ASK. Bound while the route is pinned to A
+     QUESTION -- inferred from a trailing "?", it would turn the English already typed into kana on
+     the next keystroke. The same switch the conversation screen uses. */
+  const romajiBound = isOpen && activeRoute === 'tutor' && routePinned && Boolean(chat?.enabled && chat.romajiEnabled)
+  useEffect(() => {
+    const element = inputRef.current
+    if (!romajiBound || !element) return
+    return bindWanakanaIme(element, 'toHiragana')
+  }, [romajiBound])
 
   /* the board is 1280x720 and the window is not, so it is scaled to fit -- the same `--u` the
      menu will use in phase 2, computed here because this is the first screen to need it */
@@ -79,9 +128,43 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary 
     if (key === 'phrase') return answers.phrase.status
     return 'unavailable'
   }
+  /* the two model routes carry a count once they have one -- pages of a reply, lines of an image */
+  const markOf = (key: LookupRouteKey): string => {
+    if (key === 'tutor') {
+      if (chat?.loading) return '…'
+      if (chat?.error) return '!'
+      return replyPages.length > 0 ? String(replyPages.length) : ''
+    }
+    if (key === 'ocr') {
+      if (ocr?.busy) return '…'
+      if (ocr?.error) return '!'
+      return ocr?.result ? String(ocr.result.lines.length) : ''
+    }
+    return mark(statusOf(key))
+  }
+
+  /* AN IMAGE IS A SCREENSHOT, however it arrives -- picked, pasted or dropped. It goes to A
+     SCREENSHOT whether or not that route can answer, so a paste with no model lands on the sentence
+     that says what is missing rather than on nothing. */
+  const takeImage = (file: File) => {
+    setActiveRoute('ocr')
+    if (ocr?.enabled && !ocr.busy) ocr.submit(file)
+  }
 
   const handoff = () => {
     const trimmed = query.trim()
+    if (activeRoute === 'tutor') {
+      if (!trimmed || !chat?.enabled || chat.loading) return
+      chat.send(trimmed)
+      /* the question stays in the field, selected, so the next keystroke is the follow-up */
+      setActiveRoute('tutor')
+      window.setTimeout(() => inputRef.current?.select(), 0)
+      return
+    }
+    if (activeRoute === 'ocr') {
+      if (ocr?.enabled && !ocr.busy) fileInputRef.current?.click()
+      return
+    }
     if (!trimmed) return
     const trigger = restoreFocusRef.current ?? document.body
     if (activeRoute === 'kanji' && answers.kanji.detail) {
@@ -105,25 +188,68 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary 
       handoff()
       return
     }
+    /* A PAGED ANSWER TAKES THE UP AND DOWN ARROWS for its pages, and the routes stay on Alt with the
+       side arrows -- the same pair that has always walked them without moving the caret */
+    if (pages.length > 1 && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'PageDown' || event.key === 'PageUp')) {
+      event.preventDefault()
+      const by = event.key === 'ArrowDown' || event.key === 'PageDown' ? 1 : -1
+      setPage((p) => Math.max(0, Math.min(pages.length - 1, p + by)))
+      return
+    }
     /* the arrows walk the routes, but only when they are not being used to move the caret */
     if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') || (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight'))) {
       event.preventDefault()
-      stepRoute(event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1)
+      stepRoute(event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1, live)
     }
   }
+
+  const onPaste = (event: React.ClipboardEvent) => {
+    const file = imageFileFrom(event.clipboardData)
+    if (!file) return
+    event.preventDefault()
+    takeImage(file)
+  }
+
+  const onDrop = (event: React.DragEvent) => {
+    const file = imageFileFrom(event.dataTransfer)
+    if (!file) return
+    event.preventDefault()
+    takeImage(file)
+  }
+
+  const answerable = live.length
+  const hint = (() => {
+    if (activeRoute === 'tutor' && !chat?.enabled) return 'CTRL+, OPENS SETTINGS · ↑ ↓ ROUTE · ESC CLOSES'
+    if (activeRoute === 'ocr' && !ocr?.enabled) return 'CTRL+, OPENS SETTINGS · ↑ ↓ ROUTE · ESC CLOSES'
+    if (activeRoute === 'tutor') {
+      return `${pages.length > 1 ? '↓ NEXT PAGE · ALT ← → ROUTE' : '↑ ↓ ROUTE'} · ENTER ASKS · ESC CLOSES`
+    }
+    if (activeRoute === 'ocr') {
+      return `${pages.length > 1 ? '↓ NEXT PAGE · ALT ← → ROUTE' : '↑ ↓ ROUTE'} · CTRL+V ANOTHER IMAGE · ENTER PICKS A FILE · ESC CLOSES`
+    }
+    return '↑ ↓ ROUTE · ENTER OPENS IT IN FULL · ESC CLOSES'
+  })()
 
   /* PORTALLED TO THE BODY, because z-index is only ever a rank within a stacking context. Rendered
      in place, the sheet sits inside App's tree and the window titlebar paints straight through it
      -- measured: elementFromPoint over the titlebar returned the titlebar, not the scrim, at
      z-index 10050. A modal has to escape its ancestors, not out-number them. */
   return createPortal(
-    <div className="lk-open" role="dialog" aria-modal="true" aria-label="Look it up">
+    <div
+      className="lk-open"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Look it up"
+      onPaste={onPaste}
+      onDragOver={(event) => { if (event.dataTransfer?.types?.includes('Files')) event.preventDefault() }}
+      onDrop={onDrop}
+    >
       <button type="button" className="lk-scrim" aria-label="Close lookup" onClick={close} />
       <div className="lk-frame" ref={frameRef}>
         <div className="lk-sheet">
           <div className="lk-cap">
             <b>引く</b><i>LOOK IT UP</i>
-            <s>ONE FIELD · THREE ANSWERS · ANY LEVEL</s>
+            <s>ONE FIELD · {answerable === 5 ? 'FIVE' : answerable === 4 ? 'FOUR' : 'THREE'} ANSWERS · ANY LEVEL</s>
           </div>
 
           <div className="lk-field">
@@ -133,33 +259,44 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary 
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="a kanji, a word, a phrase"
+              placeholder={activeRoute === 'tutor' ? 'ask the tutor a question' : 'a kanji, a word, a phrase'}
               aria-label="What to look up"
+              maxLength={activeRoute === 'tutor' && chat ? chat.charLimit : undefined}
               spellCheck={false}
               autoComplete="off"
             />
-            <span className={busy ? 'lk-route busy' : 'lk-route'}>{route.command}</span>
+            <span className={busy ? 'lk-route busy' : 'lk-route'}>
+              {activeRoute === 'tutor' && chat?.enabled && query.length > 0
+                ? `${query.length} / ${chat.charLimit}`
+                : route.command}
+            </span>
           </div>
 
-          <LookupAnswerBody controller={controller} />
+          {activeRoute === 'tutor' ? (
+            <QuestionBody chat={chat} pages={replyPages} page={page} replyKey={lastReply?.key ?? null} />
+          ) : activeRoute === 'ocr' ? (
+            <ScreenshotBody ocr={ocr} fileInputRef={fileInputRef} enPages={enPages} page={page} />
+          ) : (
+            <LookupAnswerBody controller={controller} />
+          )}
 
           <div className="lk-routes">
             {LOOKUP_ROUTES.map((entry) => {
-              const answerable = ANSWERABLE_ROUTES.includes(entry.key)
+              const answerableNow = live.includes(entry.key)
               const classes = ['lk-r']
               if (entry.key === activeRoute) classes.push('on')
-              if (!answerable) classes.push('off')
+              if (!answerableNow) classes.push('off')
               return (
                 <button
                   key={entry.key}
                   type="button"
                   className={classes.join(' ')}
-                  disabled={!answerable}
+                  disabled={!answerableNow}
                   aria-pressed={entry.key === activeRoute}
-                  title={entry.needsModel ? `${entry.command} needs a running model` : entry.command}
-                  onClick={() => answerable && setActiveRoute(entry.key)}
+                  title={entry.needsModel && !answerableNow ? `${entry.command} needs a running model` : entry.command}
+                  onClick={() => answerableNow && setActiveRoute(entry.key)}
                 >
-                  <u aria-hidden="true">{answerable ? mark(statusOf(entry.key)) : ''}</u>
+                  <u aria-hidden="true">{answerableNow ? markOf(entry.key) : ''}</u>
                   <b>{entry.en}</b>
                   <i>{entry.jp}</i>
                 </button>
@@ -167,8 +304,21 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary 
             })}
           </div>
         </div>
-        <div className="lk-hint">↑ ↓ ROUTE · ENTER OPENS IT IN FULL · ESC CLOSES</div>
+        <div className="lk-hint">{hint}</div>
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="lk-file"
+        tabIndex={-1}
+        aria-label="Pick an image to translate"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          if (file) takeImage(file)
+        }}
+      />
     </div>,
     document.body,
   )

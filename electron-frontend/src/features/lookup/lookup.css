@@ -149,10 +149,12 @@
 .lk-r.on { background: var(--ink); box-shadow: none; }
 .lk-r.on b { color: rgba(232, 196, 124, 0.65); }
 .lk-r.on i { color: var(--gold-hi); }
-/* the two that need a model running are dimmed always -- they are doors, and this overlay does
-   not pretend to have walked through them */
+/* a route whose model is not running is dimmed -- still drawn, because a door that disappears
+   reads as a feature the app does not have */
 .lk-r.off { cursor: default; }
 .lk-r.off b, .lk-r.off i { color: rgba(20, 17, 13, 0.28); }
+/* standing on a dimmed route -- a question typed, no model -- marks it without lighting it */
+.lk-r.on.off { background: transparent; box-shadow: inset 0 -3px 0 var(--hi), inset -1px 0 0 rgba(20, 17, 13, 0.14); }
 /* a route that answered gets a mark, so you can see where the answers are without visiting each */
 .lk-r u {
   float: right; text-decoration: none; font-family: var(--lat-ui); font-weight: 900;
@@ -167,6 +169,115 @@
   color: var(--gold-hi); paint-order: stroke fill;
   -webkit-text-stroke: 0.2em rgba(8, 11, 18, 0.8);
 }
+
+/* ==================================================================================================
+   A QUESTION AND A SCREENSHOT — tools.html option A, plates 8a-8c. The reply and the read lines
+   stand on the same answer area as the three lookups; nothing here scrolls, a long reply pages.
+   ================================================================================================== */
+.lk-nomodel {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 0 6px;
+}
+.lk-nomodel h3 {
+  margin: 0; font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 22px; color: var(--ink);
+}
+.lk-nomodel p {
+  margin: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 12px; line-height: 1.55;
+  color: rgba(20, 17, 13, 0.66); max-width: 520px;
+}
+.lk-nomodel p.bad { color: var(--hi-deep); font-weight: 700; letter-spacing: 0.06em; }
+
+.lk-reply { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lk-reply-who, .lk-ocr .lk-reply-who {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10.5px; letter-spacing: 0.16em; color: var(--hi-deep);
+}
+.lk-reply-who s { margin-left: auto; text-decoration: none; color: rgba(20, 17, 13, 0.45); letter-spacing: 0.13em; }
+.lk-hear {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  border: 0; cursor: pointer; padding: 2px 8px 3px; background: rgba(20, 17, 13, 0.08);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.13em; color: rgba(20, 17, 13, 0.6);
+}
+.lk-hear:hover:not(:disabled) { background: var(--gold); color: var(--ink); }
+.lk-hear:disabled { cursor: default; color: rgba(20, 17, 13, 0.3); }
+.lk-reply p, .lk-ocr p {
+  margin: 0; font-family: var(--lat-ui); font-weight: 600; font-size: 13px; line-height: 1.55;
+  color: rgba(20, 17, 13, 0.82); letter-spacing: 0.02em; overflow-wrap: anywhere;
+}
+.lk-reply p.lk-quiet, .lk-ocr p.lk-quiet { color: rgba(20, 17, 13, 0.45); font-style: italic; }
+.lk-reply p.lk-thinking, .lk-ocr p.lk-thinking { color: rgba(20, 17, 13, 0.55); letter-spacing: 0.14em; font-weight: 700; font-size: 11px; }
+.lk-reply p.lk-bad, .lk-ocr p.lk-bad { color: var(--hi-deep); font-weight: 700; font-size: 12px; }
+.lk-pager {
+  margin-top: auto; align-self: flex-end; display: flex; gap: 8px; align-items: center; padding-top: 6px;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5);
+}
+.lk-pager b { padding: 3px 9px 4px; background: var(--ink); color: var(--gold-hi); letter-spacing: 0.14em; }
+
+/* the note line carries the conversation's own switches, calm, on the right */
+.lk-note-row { display: flex; align-items: center; gap: 12px; }
+.lk-chips-row { margin-left: auto; display: flex; gap: 6px; flex: none; }
+.lk-chip {
+  border: 0; cursor: pointer; padding: 3px 8px 4px;
+  background: rgba(20, 17, 13, 0.08); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.6);
+}
+.lk-chip.on { background: var(--ink); color: var(--gold-hi); box-shadow: none; }
+.lk-chip:hover:not(:disabled) { background: var(--gold); color: var(--ink); }
+.lk-chip:disabled { cursor: default; color: rgba(20, 17, 13, 0.3); }
+.lk-chip:focus-visible, .lk-hear:focus-visible, .lk-ways button:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+
+/* the image on the left, as it was read */
+.lk-shot-col { flex: none; display: flex; flex-direction: column; }
+.lk-shot {
+  position: relative; flex: none; width: 210px; height: 158px; overflow: hidden;
+  display: grid; place-items: center; background: #2b3346;
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.4), 3px 4px 0 rgba(20, 17, 13, 0.25);
+}
+.lk-shot img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.lk-shot-empty {
+  font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.18em; color: rgba(242, 234, 216, 0.6);
+}
+.lk-shot-empty[aria-hidden='true'] { font-family: var(--jp); font-size: 64px; color: rgba(242, 234, 216, 0.25); letter-spacing: 0; }
+.lk-shot u {
+  position: absolute; left: 0; right: 0; bottom: 0; text-decoration: none; padding: 3px 8px 4px;
+  background: rgba(10, 9, 6, 0.8); font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.12em; color: rgba(242, 234, 216, 0.8);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lk-ways { display: flex; gap: 6px; margin-top: 8px; }
+.lk-ways span, .lk-ways button {
+  border: 0; padding: 3px 8px 4px; background: rgba(20, 17, 13, 0.08); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.6);
+}
+.lk-ways button { cursor: pointer; }
+.lk-ways button:hover:not(:disabled) { background: var(--gold); }
+.lk-ways b { color: var(--ink); }
+
+/* and the lines on the right, each with how sure the reader was */
+.lk-ocr { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lk-ocr-l { display: flex; align-items: baseline; gap: 10px; padding: 4px 0 5px; box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1); }
+.lk-ocr-l b {
+  min-width: 0; font-family: var(--jp); font-weight: 700; font-size: 15px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lk-ocr-l s {
+  margin-left: auto; flex: none; text-decoration: none; font-family: var(--lat-ui); font-weight: 700; font-size: 10px;
+  letter-spacing: 0.12em; color: rgba(20, 17, 13, 0.45); font-variant-numeric: tabular-nums;
+}
+.lk-ocr-l.low b { color: rgba(20, 17, 13, 0.55); text-decoration: underline wavy var(--hi) 1px; text-underline-offset: 4px; }
+.lk-ocr-l.low s { color: var(--hi-deep); }
+.lk-ocr .lk-fold {
+  padding-top: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: rgba(20, 17, 13, 0.42);
+}
+.lk-ocr-en {
+  margin-top: 8px; padding: 7px 10px 8px; background: rgba(20, 17, 13, 0.05); box-shadow: inset 3px 0 0 var(--gold);
+  font-family: var(--lat-ui); font-weight: 600; font-size: 12px; line-height: 1.5; color: var(--ink);
+}
+.lk-ocr-en em {
+  display: flex; gap: 8px; font-style: normal; font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.45); margin-bottom: 2px;
+}
+.lk-ocr-en em b { margin-left: auto; color: var(--ink); }
+.lk-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .lk-open * { animation: none !important; transition: none !important; }

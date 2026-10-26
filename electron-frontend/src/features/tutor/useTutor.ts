@@ -93,7 +93,7 @@ export function useTutor(
   // so "is chat/OCR visible" is simply "is the popup open at that mode" —
   // this replaces the old independently-toggled booleans and their manual
   // mutual exclusion in App.tsx.
-  const assistantChatOpen = tutorPanelOpen && tutorPanelMode === 'chat'
+  const assistantChatOpen = (tutorPanelOpen && tutorPanelMode === 'chat') || Boolean(deps.lookupChatVisible)
   const ocrWorkbenchOpen = tutorPanelOpen && tutorPanelMode === 'ocr'
 
   const assistantChatHistoryHydratedRef = useRef(false)
@@ -420,12 +420,26 @@ export function useTutor(
       const lineCount = Number.isFinite(ocrResponse?.lineCount)
         ? Math.max(0, Math.trunc(ocrResponse.lineCount))
         : extractedText.split(/\n+/).filter(Boolean).length
+      /* THE PER-LINE CONFIDENCE WAS ALWAYS IN THE PAYLOAD and the renderer used to drop it. Kept, so
+         a line read at 22% can be marked as the one worth checking. Falls back to the text's own
+         lines (at no stated confidence) for a runtime that does not send them. */
+      const lines = Array.isArray(ocrResponse?.lines) && ocrResponse.lines.length > 0
+        ? ocrResponse.lines
+          .filter((line) => typeof line?.text === 'string' && line.text.trim())
+          .map((line) => ({
+            text: line.text.trim(),
+            confidence: typeof line.confidence === 'number' ? line.confidence : 0,
+          }))
+        : extractedText.split(/\n+/).filter(Boolean).map((text) => ({ text, confidence: Number.NaN }))
 
       setOcrWorkbenchResult({
         fileName: file.name,
         lineCount,
         japaneseText: extractedText,
         englishText: finalEnglishText,
+        lines,
+        imageUrl: `data:${payload.mimeType};base64,${payload.imageBase64}`,
+        minConfidence: settings.assistantChatOcrMinConfidence,
       })
     } catch (error: unknown) {
       if (isStale()) return

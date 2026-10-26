@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import axe from 'axe-core'
 import type { KanjiDetailPayload } from '../../generated/types'
 import { LookupOverlay } from './components/LookupOverlay'
+import type { LookupAssistant, LookupChat, LookupOcr, LookupRouteKey } from './types'
 import { useLookup } from './useLookup'
+import { pageReply } from './utils'
 
 /* The overlay is driven entirely by the controller, so the harness mounts the real hook and drives
    the pair -- the sequencing lives in the hook and the absence-drawing lives in the component, and
@@ -14,18 +16,46 @@ import { useLookup } from './useLookup'
 const onOpenKanjiDetail = vi.fn()
 const onOpenDictionary = vi.fn()
 
-function Harness({ seed = '' }: { seed?: string }) {
+function Harness({ seed = '', route, assistant }: {
+  seed?: string; route?: LookupRouteKey; assistant?: LookupAssistant
+}) {
   const controller = useLookup()
   return (
     <>
-      <button type="button" onClick={() => controller.open(seed)}>open lookup</button>
+      <button type="button" onClick={() => controller.open(seed, route)}>open lookup</button>
       <LookupOverlay
         controller={controller}
         onOpenKanjiDetail={onOpenKanjiDetail}
         onOpenDictionary={onOpenDictionary}
+        assistant={assistant}
       />
     </>
   )
+}
+
+function chatSlice(overrides: Partial<LookupChat> = {}): LookupChat {
+  return {
+    enabled: true, disabledReason: 'Chatbot is disabled in settings.', turns: [], loading: false,
+    error: null, send: vi.fn(), clear: vi.fn(), speakingKey: null, replay: vi.fn(), stopSpeaking: vi.fn(),
+    audioEnabled: true, toggleAudio: vi.fn(), romajiEnabled: false, toggleRomaji: vi.fn(), charLimit: 600,
+    ...overrides,
+  }
+}
+
+function ocrSlice(overrides: Partial<LookupOcr> = {}): LookupOcr {
+  return {
+    enabled: true, disabledReason: 'Image Translation is not installed.', busy: false, error: null,
+    result: null, submit: vi.fn(), clear: vi.fn(), maxMb: 30,
+    ...overrides,
+  }
+}
+
+function withModel(chat: Partial<LookupChat> = {}, ocr: Partial<LookupOcr> = {}): LookupAssistant {
+  return { chat: chatSlice(chat), ocr: ocrSlice(ocr) }
+}
+
+function withoutModel(): LookupAssistant {
+  return withModel({ enabled: false }, { enabled: false })
 }
 
 function kanjiDetail(overrides: Partial<KanjiDetailPayload> = {}): KanjiDetailPayload {
@@ -178,6 +208,145 @@ describe('LookupOverlay', () => {
     const ocr = screen.getByTitle(/assistant-chat-ocr needs a running model/i) as HTMLButtonElement
     expect(tutor.disabled).toBe(true)
     expect(ocr.disabled).toBe(true)
+  })
+
+  it('keeps the two model routes dimmed and says why when no model is running', async () => {
+    installApi()
+    render(<Harness route="tutor" assistant={withoutModel()} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    expect(await screen.findByText('This route needs the tutor model.')).toBeTruthy()
+    expect(screen.getByText('Chatbot is disabled in settings.')).toBeTruthy()
+    expect(screen.getByText(/DIMMED UNTIL A MODEL IS RUNNING/)).toBeTruthy()
+    expect((screen.getByTitle(/^assistant-chat needs a running model$/i) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByTitle(/assistant-chat-ocr needs a running model/i) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(/CTRL\+, OPENS SETTINGS/)).toBeTruthy()
+  })
+
+  it('makes A QUESTION and A SCREENSHOT answerable when the model is running', async () => {
+    installApi()
+    const assistant = withModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+
+    const tutor = screen.getByRole('button', { name: /A QUESTION/ }) as HTMLButtonElement
+    const ocr = screen.getByRole('button', { name: /A SCREENSHOT/ }) as HTMLButtonElement
+    expect(tutor.disabled).toBe(false)
+    expect(ocr.disabled).toBe(false)
+    expect(screen.getByText(/FIVE ANSWERS/)).toBeTruthy()
+
+    /* a question mark is a question, and ENTER is what sends it -- typing never calls the model */
+    fireEvent.change(field(), { target: { value: 'why is it は here?' } })
+    expect(tutor.getAttribute('aria-pressed')).toBe('true')
+    expect(assistant.chat.send).not.toHaveBeenCalled()
+    fireEvent.keyDown(field(), { key: 'Enter' })
+    expect(assistant.chat.send).toHaveBeenCalledWith('why is it は here?')
+    expect(onOpenDictionary).not.toHaveBeenCalled()
+
+    fireEvent.click(ocr)
+    expect(await screen.findByRole('button', { name: /PICK A FILE/ })).toBeTruthy()
+  })
+
+  it('pages a long reply instead of scrolling it, and the arrows turn the pages', async () => {
+    installApi()
+    const reply = Array.from({ length: 60 }, (_, i) => `Sentence number ${i} about small kana.`).join(' ')
+    const pages = pageReply(reply, 460)
+    expect(pages.length).toBeGreaterThan(2)
+    render(<Harness route="tutor" assistant={withModel({
+      turns: [
+        { role: 'user', content: 'why?', created_at_utc: '2026-10-26T00:00:00Z' },
+        { role: 'assistant', content: reply, created_at_utc: '2026-10-26T00:00:01Z' },
+      ],
+    })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    expect(await screen.findByText(`1 OF ${pages.length} ↓`)).toBeTruthy()
+    expect(screen.getByText(pages[0])).toBeTruthy()
+    fireEvent.keyDown(field(), { key: 'ArrowDown' })
+    expect(screen.getByText(`2 OF ${pages.length} ↓`)).toBeTruthy()
+    expect(screen.getByText(pages[1])).toBeTruthy()
+    fireEvent.keyDown(field(), { key: 'ArrowUp' })
+    expect(screen.getByText(`1 OF ${pages.length} ↓`)).toBeTruthy()
+    /* the route keeps its page count on the strip */
+    expect(screen.getByRole('button', { name: /A QUESTION/ }).querySelector('u')?.textContent).toBe(String(pages.length))
+  })
+
+  it('takes a pasted image to A SCREENSHOT and reads it', async () => {
+    installApi()
+    const assistant = withModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+
+    const image = new File(['png'], 'shop-sign.png', { type: 'image/png' })
+    fireEvent.paste(field(), { clipboardData: { files: [image], items: [], types: ['Files'] } })
+    expect(assistant.ocr.submit).toHaveBeenCalledWith(image)
+    expect(screen.getByRole('button', { name: /A SCREENSHOT/ }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('takes a dropped image the same way, and leaves a text paste alone', async () => {
+    installApi()
+    const assistant = withModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+
+    fireEvent.paste(field(), { clipboardData: { files: [], items: [], types: ['text/plain'] } })
+    expect(assistant.ocr.submit).not.toHaveBeenCalled()
+
+    const image = new File(['jpg'], 'menu.jpg', { type: 'image/jpeg' })
+    fireEvent.drop(document.querySelector('.lk-open') as Element, { dataTransfer: { files: [image], items: [], types: ['Files'] } })
+    expect(assistant.ocr.submit).toHaveBeenCalledWith(image)
+  })
+
+  it('lands a pasted image on the no-model sentence when image translation is not installed', async () => {
+    installApi()
+    const assistant = withoutModel()
+    render(<Harness assistant={assistant} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+
+    fireEvent.paste(field(), { clipboardData: { files: [new File(['x'], 'a.png', { type: 'image/png' })], items: [], types: ['Files'] } })
+    expect(assistant.ocr.submit).not.toHaveBeenCalled()
+    expect(await screen.findByText('This route needs image translation.')).toBeTruthy()
+  })
+
+  it('draws the image beside its lines, each with its confidence, and one English for the whole', async () => {
+    installApi()
+    render(<Harness route="ocr" assistant={withModel({}, {
+      result: {
+        fileName: 'shop-sign.png', lineCount: 3, japaneseText: '本日休業\n明日は10時から営業します\nご迷惑をおかけします',
+        englishText: 'Closed today. We open from 10 tomorrow. We apologize for the inconvenience.',
+        imageUrl: 'data:image/png;base64,AAAA', minConfidence: 0.3,
+        lines: [
+          { text: '本日休業', confidence: 0.98 },
+          { text: '明日は10時から営業します', confidence: 0.91 },
+          { text: 'ご迷惑をおかけします', confidence: 0.22 },
+        ],
+      },
+    })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    expect(await screen.findByText('3 LINES')).toBeTruthy()
+    expect(screen.getByText('98%')).toBeTruthy()
+    expect(screen.getByText('22% · KEPT, IT IS JAPANESE').closest('.lk-ocr-l')?.className).toContain('low')
+    expect(screen.getByText(/We apologize for the inconvenience/)).toBeTruthy()
+    expect(screen.getByAltText(/shop-sign\.png/)).toBeTruthy()
+  })
+
+  it('has no accessibility violations on either model route', async () => {
+    installApi()
+    render(<Harness route="tutor" assistant={withModel({
+      turns: [{ role: 'assistant', content: 'Both are し plus a small kana.', created_at_utc: 'x' }],
+    })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await screen.findByText('Both are し plus a small kana.')
+    const run = (axe as { run: (element: Element) => Promise<{ violations: Array<{ id: string }> }> }).run
+    expect((await run(document.querySelector('.lk-open') as Element)).violations).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: /A SCREENSHOT/ }))
+    await screen.findByRole('button', { name: /PICK A FILE/ })
+    expect((await run(document.querySelector('.lk-open') as Element)).violations).toEqual([])
   })
 
   it('survives the desktop bridge being absent entirely', async () => {
