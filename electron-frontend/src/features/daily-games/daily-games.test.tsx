@@ -6,7 +6,8 @@ import type { DailyGamesSessionDependencies } from './types'
 import { buildMatchPairs, buildTypingBlitz, buildWordSearch } from './utils'
 import { buildCrossword } from './crossword'
 import { DailyGameSession } from './components/DailyGameSession'
-import { GameResultsOverlay } from './components/GameResultsOverlay'
+import { DailyGameView } from './components/DailyGameView'
+import { PuzzleEnding } from './components/PuzzleEnding'
 
 const state: DailyGamesStatePayload = {
   pool: {
@@ -239,22 +240,129 @@ describe('Daily Game lifecycle', () => {
     window.removeEventListener('keydown', appEscapeHandler)
   })
 
+  it('spends Word Search’s first Escape cancelling the selection, and only the next one leaves', async () => {
+    const onBack = vi.fn()
+    render(<DailyGameSession mode="daily" data={state} dependencies={dependencies()} gameType="word_search" onBack={onBack} />)
+    const start = await screen.findByRole('button', { name: /Row 1, column 1:/ })
+    start.focus()
+    fireEvent.keyDown(start, { key: 'Enter' })
+    fireEvent.keyDown(start, { key: 'Escape' })
+
+    expect(onBack).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toMatch(/cancelled/i)
+
+    fireEvent.keyDown(start, { key: 'Escape' })
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+
+  it('stops the SPENT chip on the duration the attempt is recorded with', async () => {
+    let clock = new Date(2026, 6, 15, 9, 0, 0).getTime()
+    const recordAttempt = vi.fn(async () => state)
+    render(<DailyGameSession mode="daily" data={state} dependencies={dependencies({ recordAttempt, now: () => new Date(clock) })} gameType="typing_blitz" onBack={vi.fn()} />)
+    const input = await screen.findByLabelText(/type the japanese word/i)
+    clock += 42_000
+    fireEvent.change(input, { target: { value: '猫' } })
+    fireEvent.submit(input.closest('form')!)
+
+    await screen.findByRole('region', { name: /typing blitz complete/i })
+    expect(recordAttempt).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: 42 }))
+    const spent = [...document.querySelectorAll('.rd-run .stat-chip')].find((chip) => chip.textContent?.includes('SPENT'))
+    expect(spent?.textContent).toContain('00:42')
+  })
+
+  it('names the puzzle that is unavailable, never another one', async () => {
+    const noSeeds: DailyGamesStatePayload = { ...state, pool: { ...state.pool, game_seeds: {} } }
+    render(<DailyGameSession mode="daily" data={noSeeds} dependencies={dependencies()} gameType="crossword" onBack={vi.fn()} />)
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toMatch(/Crossword is unavailable right now/)
+    expect(alert.textContent).not.toMatch(/Match Pairs/)
+    /* said once, as the heading -- the body would only have repeated it */
+    expect(alert.querySelector('p')).toBeNull()
+  })
+
+  it('gives every state of the view exactly one page heading for screen readers', async () => {
+    let release!: (value: DailyGamesStatePayload) => void
+    const getState = vi.fn(() => new Promise<DailyGamesStatePayload>((resolve) => { release = resolve }))
+    render(<DailyGameView gameType="word_search" mode="daily" onBack={vi.fn()} dependencies={dependencies({ getState })} />)
+
+    /* the loading plate has it ... */
+    const headings = () => screen.getAllByRole('heading', { level: 1 })
+    expect(headings()).toHaveLength(1)
+    expect(headings()[0].textContent).toBe('Word Search')
+    expect(headings()[0].classList.contains('sr-only')).toBe(true)
+
+    /* ... and so does the board, still only once */
+    await act(async () => { release(state) })
+    await screen.findByRole('region', { name: 'Word Search board' })
+    expect(headings()).toHaveLength(1)
+    cleanup()
+
+    render(<DailyGameView gameType="crossword" mode="daily" onBack={vi.fn()} dependencies={dependencies({ getState: async () => { throw new Error('offline') } })} />)
+    await screen.findByRole('alert')
+    expect(headings().map((heading) => heading.textContent)).toEqual(['Crossword'])
+    cleanup()
+
+    render(<DailyGameView gameType={null} mode="daily" onBack={vi.fn()} dependencies={dependencies()} />)
+    expect(headings().map((heading) => heading.textContent)).toEqual(['Daily Games'])
+  })
+
+  it('draws the plate with the road back when the view is reached with no puzzle chosen', () => {
+    const getState = vi.fn(async () => state)
+    const onBack = vi.fn()
+    render(<DailyGameView gameType={null} mode="daily" onBack={onBack} dependencies={dependencies({ getState })} />)
+
+    expect(document.querySelector('.dp-puzzle .rd-sheet')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /back to the road/i }))
+    expect(onBack).toHaveBeenCalledOnce()
+    expect(getState).not.toHaveBeenCalled()
+  })
+
   it('cleans up Typing Blitz timers when navigating away', async () => {
     vi.useFakeTimers()
     const recordAttempt = vi.fn(async () => state)
     const onBack = vi.fn()
     const { rerender } = render(<DailyGameSession mode="daily" data={state} dependencies={dependencies({ recordAttempt })} gameType="typing_blitz" onBack={onBack} />)
     await act(async () => {})
-    fireEvent.click(screen.getByRole('button', { name: /back to games/i }))
+    fireEvent.click(screen.getByRole('button', { name: /back to the daily road/i }))
     rerender(<div />)
     act(() => { vi.advanceTimersByTime(15_000) })
     expect(onBack).toHaveBeenCalledOnce()
     expect(recordAttempt).not.toHaveBeenCalled()
   })
 
+  it('keeps the finished board on the sheet while saving, and retries a save that failed', async () => {
+    const recordAttempt = vi.fn()
+      .mockRejectedValueOnce(new Error('disk unavailable'))
+      .mockResolvedValueOnce(state)
+    render(<DailyGameSession mode="daily" data={state} dependencies={dependencies({ recordAttempt })} gameType="typing_blitz" onBack={vi.fn()} />)
+    const input = await screen.findByLabelText(/type the japanese word/i)
+    fireEvent.change(input, { target: { value: '猫' } })
+    fireEvent.submit(input.closest('form')!)
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/disk unavailable/i)
+    expect(document.querySelector('.rd-sheet')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }))
+    expect(await screen.findByRole('region', { name: /typing blitz complete/i })).toBeTruthy()
+    expect(recordAttempt).toHaveBeenCalledTimes(2)
+    expect(recordAttempt.mock.calls[1][0]).toEqual(recordAttempt.mock.calls[0][0])
+  })
+
+  it('offers no review slab in practice, only the road back', async () => {
+    const onReviewMissedWords = vi.fn(async () => undefined)
+    render(<DailyGameSession mode="practice" data={state} dependencies={dependencies()} gameType="typing_blitz" onBack={vi.fn()} onReviewMissedWords={onReviewMissedWords} />)
+    const input = await screen.findByLabelText(/type the japanese word/i)
+    fireEvent.change(input, { target: { value: 'wrong' } })
+    fireEvent.submit(input.closest('form')!)
+
+    expect(await screen.findByRole('region', { name: /typing blitz complete/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /review missed/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /back to the road/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /share result/i })).toBeTruthy()
+  })
+
   it('announces clipboard failures through the injected clipboard dependency', async () => {
     const clipboard = { writeText: vi.fn(async () => { throw new Error('Denied') }) }
-    render(<GameResultsOverlay mode="practice" score={1} pairCount={1} clipboard={clipboard} onDone={vi.fn()} />)
+    render(<PuzzleEnding mode="practice" puzzle="Match Pairs" title="Match Pairs complete" message="Done." score={1} count={1} clipboard={clipboard} onDone={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: /share result/i }))
     expect((await screen.findByRole('status')).textContent).toMatch(/could not copy/i)
@@ -264,10 +372,13 @@ describe('Daily Game lifecycle', () => {
     const missedWords = [{ word: { ...state.pool.words[0], deck_slug: 'vocab_food', card_id: 7 }, miss_count: 2 }]
     const onReviewMissedWords = vi.fn(async () => undefined)
     const { rerender } = render(
-      <GameResultsOverlay
+      <PuzzleEnding
         mode="daily"
+        puzzle="Match Pairs"
+        title="Match Pairs complete"
+        message="Done."
         score={0}
-        pairCount={1}
+        count={1}
         clipboard={{ writeText: async () => undefined }}
         onDone={vi.fn()}
         missedWords={missedWords}
@@ -278,7 +389,7 @@ describe('Daily Game lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: /review missed words/i }))
     await waitFor(() => expect(onReviewMissedWords).toHaveBeenCalledWith(missedWords))
 
-    rerender(<GameResultsOverlay mode="practice" score={0} pairCount={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missedWords} onReviewMissedWords={onReviewMissedWords} />)
+    rerender(<PuzzleEnding mode="practice" puzzle="Match Pairs" title="Match Pairs complete" message="Done." score={0} count={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missedWords} onReviewMissedWords={onReviewMissedWords} />)
     expect(screen.queryByRole('button', { name: /review missed words/i })).toBeNull()
   })
 
@@ -320,7 +431,7 @@ describe('Daily Game lifecycle', () => {
     await screen.findByRole('button', { name: '猫' })
     expect((await runAxe(container)).violations).toEqual([])
 
-    rerender(<GameResultsOverlay mode="daily" score={1} pairCount={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} />)
+    rerender(<PuzzleEnding mode="daily" puzzle="Match Pairs" title="Match Pairs complete" message="Done." score={1} count={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} />)
     expect((await runAxe(container)).violations).toEqual([])
   })
 })

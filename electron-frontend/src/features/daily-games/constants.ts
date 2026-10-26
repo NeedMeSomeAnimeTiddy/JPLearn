@@ -21,9 +21,11 @@ export const DAILY_GAMES_COPY = {
   play: 'Play',
   matchPairsHint: 'Match each Japanese word with its meaning.',
   typingBlitzHint: 'Type each Japanese word before time runs out.',
-  loadingGame: 'Preparing Match Pairs',
-  gameUnavailable: 'Match Pairs is unavailable right now.',
-  backToGames: 'Back to games',
+  /* `{title}` is the puzzle's own name -- this said "Match Pairs" over all four */
+  loadingGame: 'Preparing {title}',
+  puzzleUnavailable: '{title} is unavailable right now.',
+  gameUnavailable: 'This puzzle is unavailable right now.',
+  backToGames: 'Back to the daily road',
   retryGame: 'Try again',
   matchPairsTitle: 'Match Pairs',
   matchPairsInstructions: 'Select a Japanese word, then its matching meaning.',
@@ -41,7 +43,8 @@ export const DAILY_GAMES_COPY = {
   share: 'Share result',
   shareSuccess: 'Result copied to your clipboard.',
   shareFailure: 'Could not copy the result. Try again.',
-  shareFormat: 'JPLearn Match Pairs: {score}/{pairCount} pairs matched ({mode}).',
+  /* `{title}` is the puzzle's own name -- this said "Match Pairs" for all four */
+  shareFormat: 'JPLearn {title}: {score}/{pairCount} ({mode}).',
   reviewMissedWords: 'Review missed words',
   reviewingMissedWords: 'Opening review',
   reviewMissedWordsFailure: 'Could not open missed-word review. Try again.',
@@ -95,6 +98,8 @@ export const WORD_SEARCH_FILLER_CHARACTERS = Array.from('あいうえおかき�
 export const WORD_SEARCH_COPY = {
   title: 'Word Search',
   hint: 'Find each Japanese word in the grid.',
+  /** what the list says for the fallback target, which has no pool word to take a meaning from */
+  fallbackMeaning: 'Practice word',
   instructions: 'Select a starting cell, then select the last cell in a horizontal, vertical, or diagonal line. You can drag across cells, or use arrow keys and Enter or Space.',
   progress: 'Words found',
   targetList: 'Words to find',
@@ -139,4 +144,55 @@ export const CROSSWORD_COPY = {
   practiceResults: 'Practice complete. Today’s daily progress and streak are unchanged.',
   words: 'Words',
   fallbackClue: 'Practice',
+} as const
+
+/* ==================================================================================================
+   THE PUZZLES ON THE SHEET -- the round's own shell (`features/round`), with the board in the
+   prompt cell and the list in the work cell. See `past-three.html` plate THREE.
+   ================================================================================================== */
+
+/** the prompt cell's content box: `.rd-ask` is 322 wide with 22 of padding on each side */
+export const PUZZLE_ASK_W = 278
+/** the hairline between two cells of a board -- one pixel, so twelve columns still fit 278 */
+export const PUZZLE_BOARD_GAP = 1
+/** how many rows the work cell's list draws before what is left becomes a count */
+export const PUZZLE_LIST_ROWS = 6
+/** the line where the blitz clock stops being a figure and starts being a warning */
+export const TYPING_BLITZ_WARN_SECONDS = 10
+
+export const PUZZLE_COPY = {
+  backLabel: 'Back',
+  backJp: '戻る',
+  escHint: { cap: 'ESC', en: 'Back', jp: '戻る' },
+  dailyCap: 'TODAY’S POOL · {count} WORDS',
+  practiceCap: 'PRACTICE · NOT COUNTED',
+  loadingCap: 'READING TODAY’S POOL',
+  unavailableCap: 'TODAY’S POOL DID NOT LOAD',
+  emptyCap: 'TODAY’S POOL · NO WORDS',
+  noPuzzleCap: 'NO PUZZLE CHOSEN',
+  noPuzzleTitle: 'No puzzle chosen',
+  noPuzzleBody: 'Pick one of today’s four on the daily road.',
+  preparingCap: 'DEALING THE BOARD',
+  plateKick: 'THE BOARD',
+  plateKickJp: '盤',
+  waitSlab: 'ONE MOMENT',
+  waitSlabJp: '準備',
+  retrySlab: 'TRY AGAIN',
+  retrySlabJp: '再試行',
+  roadSlab: 'BACK TO THE ROAD',
+  roadSlabJp: '戻る',
+  endKick: 'HOW IT WENT',
+  endKickJp: '結果',
+  missedKick: 'MISSED',
+  reviewSlab: 'REVIEW MISSED · {count}',
+  reviewSlabJp: '復習',
+  reviewLabel: 'Review missed words · {count}',
+  reviewingSlab: 'OPENING REVIEW',
+  shareSlab: 'SHARE',
+  shareSlabJp: '共有',
+  savingSlab: 'SAVING',
+  savingSlabJp: '保存',
+  noMisses: 'NOTHING MISSED',
+  more: '{count} MORE',
+  words: '{count} WORDS',
 } as const

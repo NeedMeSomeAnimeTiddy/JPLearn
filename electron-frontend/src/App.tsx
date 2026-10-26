@@ -42,7 +42,7 @@ import { MinigameView } from './views/MinigameView'
 import { MasteryOverlay } from './features/mastery'
 import { JLPTPrepView } from './views/JLPTPrepView'
 import { PassageHubView } from './views/PassageHubView'
-import { DAILY_GAMES_COPY, DAILY_GAME_TILES } from './features/daily-games/constants'
+import { DAILY_GAMES_COPY } from './features/daily-games/constants'
 import type { DailyGameType, DailyGamesMode } from './features/daily-games'
 import { dedupeDictionaryCards } from './features/card-notes'
 import { KanjiDetailPanel } from './features/kanji-detail'
@@ -65,7 +65,7 @@ import type { Command } from './features/command-palette'
 import { SessionProvider } from './context/SessionContext'
 import { useAppNavigation, useMenuPath, VIEW_PARENT } from './features/navigation'
 import { KANJI_MEANINGS } from './lib/kanjiMeanings'
-import { ArrowLeft, Trophy } from 'lucide-react'
+import { Trophy } from 'lucide-react'
 import {
   STATS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
@@ -2905,57 +2905,22 @@ function App() {
         />
       ) : null}
 
+      {/* A PUZZLE STANDS BARE, the way the exam run does: the sheet is the whole screen, so the old
+          hub's CRT, glitch corners and nameplate went with it. Back is `navigate('home', 'back')`,
+          which leaves `menuPath` where the road put it -- the DAILY road, level three, with the
+          tablet you pressed still on it. With nothing chosen (history forward after Back cleared it)
+          the view draws its own plate offering the road rather than a blank window. */}
       {view === 'daily_games' ? (
-        <div className={`view-shell view-${navDirection}`}>
-          <div className="hub-crt-surface" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--tl" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--tr" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--bl" aria-hidden="true" />
-          <div className="hub-glitch-corner hub-glitch-corner--br" aria-hidden="true" />
-          <div className="hub-vhs-line" aria-hidden="true" />
-          <div className="hub-crystal hub-crystal--a" aria-hidden="true" />
-          <div className="hub-crystal hub-crystal--b" aria-hidden="true" />
-          <div className="hub-crystal hub-crystal--c" aria-hidden="true" />
-
-          <header className="hub-topbar">
-            <h1 className="sr-only" id="daily-games-title">Daily Games</h1>
-            <button
-              type="button"
-              className="back-button back-button-icon-only"
-              onClick={() => { navigate('home', 'back'); }}
-              aria-label="Back to main menu"
-            >
-              <ArrowLeft aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-            </button>
-
-            <span className="hub-nameplate">
-              <span className="hub-nameplate-mark" aria-hidden="true">JPL-DLY-A</span>
-              <strong className="hub-topbar-title">
-                {/* the road already chose, so this says WHICH rather than repeating the category */}
-                <span className="hub-glitch-text">
-                  {DAILY_GAME_TILES.find((t) => t.type === dailyPlay?.type)?.title ?? DAILY_GAMES_COPY.title}
-                </span>
-              </strong>
-            </span>
-
-            <span className="hub-topbar-sub">DAILY GAMES · 毎日</span>
-          </header>
-
-          <div className="hub-studio">
-            <ErrorBoundary>
-              <Suspense fallback={<div className="daily-games-hub" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
-                {dailyPlay ? (
-                  <DailyGameView
-                    gameType={dailyPlay.type}
-                    mode={dailyPlay.mode}
-                    onBack={() => { setDailyPlay(null); navigate('home', 'back') }}
-                    onReviewMissedWords={startMissedWordReview}
-                  />
-                ) : null}
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        </div>
+        <ErrorBoundary>
+          <Suspense fallback={<div className="dp-puzzle" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
+            <DailyGameView
+              gameType={dailyPlay?.type ?? null}
+              mode={dailyPlay?.mode ?? 'daily'}
+              onBack={() => { setDailyPlay(null); navigate('home', 'back') }}
+              onReviewMissedWords={startMissedWordReview}
+            />
+          </Suspense>
+        </ErrorBoundary>
       ) : null}
     </>
   )

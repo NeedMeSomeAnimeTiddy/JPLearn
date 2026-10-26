@@ -1,677 +1,140 @@
-/* ── Daily Games — CRT / squared aesthetic ─────────────────── */
-
-.daily-games-hub,
-.daily-game-session {
-  color: var(--text-main);
-}
-
-/* A COLUMN, NOT THE WHOLE WINDOW. Four tiles across a 1,550px shell made each one 767 pixels wide
-   for a name, one sentence and two controls -- 338px of nothing between the text and the buttons in
-   the widest of them. Capping the column is what makes the tiles a size rather than a consequence
-   of the monitor, and it centres what is left. */
-.daily-games-hub {
-  padding: 1.5rem;
-  /* `width: 100%` AND NOT JUST THE CAP. This sits in a flex column, and an auto margin on the cross
-     axis stops a flex item stretching -- so `max-width` plus `margin: 0 auto` alone collapsed the
-     hub to its fit-content width of 628px and put the four tiles in one narrow column. */
-  width: 100%;
-  max-width: 1080px;
-  margin: 0 auto;
-}
+/* ==================================================================================================
+   THE PUZZLES ON THE SHEET -- `past-three.html` plate THREE. The sheet, its two cells, the slab, the
+   foot band and the chips are all the round's own (`features/round/round.css`); this is only what a
+   puzzle puts IN those cells. Square corners, the sheet's own ink and gold, nothing that scrolls.
+   ================================================================================================== */
 
 
-/* ── Buttons: squared 3D push-button ──────────────────────── */
-
-.daily-games-back,
-.daily-games-retry,
-.daily-game-button {
-  align-items: center;
-  display: inline-flex;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--button-bg-top);
-  color: var(--text-main);
-  cursor: pointer;
-  font: inherit;
-  box-shadow: 0 2px 0 var(--accent-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
-}
-
-.daily-games-back:hover,
-.daily-games-retry:hover,
-.daily-game-button:hover {
-  border-color: var(--accent);
-}
-
-.daily-games-back:active:not(:disabled),
-.daily-games-retry:active:not(:disabled),
-.daily-game-button:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.daily-game-button.is-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-
-.daily-game-button.is-primary:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent-soft);
-}
-
-.daily-game-button.is-primary:active:not(:disabled) {
-  background: var(--accent-soft);
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-
-/* ── Skeleton (squared) ────────────────────────────────────── */
-
-.daily-games-skeleton {
+/* ---- the board: the prompt cell's whole content box, cells solved in `boardCell` ---------------- */
+.dp-board {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
-}
-
-.daily-games-skeleton span {
-  animation: daily-games-pulse 1.2s ease-in-out infinite alternate;
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  min-height: 10rem;
-}
-
-/* ── State panels (squared) ────────────────────────────────── */
-
-.daily-games-state {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  padding: 1.5rem;
-  text-align: center;
-}
-
-.daily-games-state p {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin: 0.5rem 0 1rem;
-}
-
-.daily-games-state h2 {
-  margin: 0;
-}
-
-.daily-games-heading {
-  align-items: center;
-  display: flex;
-  gap: 0.75rem;
-  text-align: right;
-}
-
-.daily-games-heading p,
-.daily-games-heading h1 {
-  margin: 0;
-}
-
-.daily-games-heading p {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-}
-
-.daily-games-heading h1 {
-  font-size: 1.5rem;
-}
-
-/* ── Session back button ───────────────────────────────────── */
-
-.daily-game-session {
-  color: var(--text-main);
-  margin: 0 auto;
-  max-width: 72rem;
-  padding: 1.5rem;
-}
-
-.daily-game-session > .daily-games-back {
-  margin-bottom: 1.5rem;
-}
-
-/* ── Game session wrappers (2px squared) ───────────────────── */
-
-.match-pairs-game,
-.word-search-game,
-.crossword-game,
-.typing-blitz-game,
-.daily-game-results {
-  background: linear-gradient(145deg, var(--panel-bg), var(--panel-bg-alt));
-  border: 1px solid color-mix(in oklab, var(--panel-border) 72%, transparent);
-  border-radius: 2px;
-  padding: 1.5rem;
-}
-
-.match-pairs-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.word-search-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.crossword-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.crossword-header h1,
-.crossword-header p,
-.crossword-clues h2,
-.crossword-current-clue,
-.crossword-status {
-  margin: 0;
-}
-
-.crossword-header p,
-.crossword-current-clue,
-.crossword-status {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-}
-
-.crossword-layout {
-  align-items: start;
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
-}
-
-.crossword-form {
-  display: grid;
-  gap: 1rem;
-}
-
-.crossword-grid {
-  display: grid;
-  gap: 0.25rem;
-  width: max-content;
-}
-
-.crossword-grid.is-size-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.crossword-grid.is-size-8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
-.crossword-grid.is-size-9 { grid-template-columns: repeat(9, minmax(0, 1fr)); }
-.crossword-grid.is-size-10 { grid-template-columns: repeat(10, minmax(0, 1fr)); }
-.crossword-grid.is-size-11 { grid-template-columns: repeat(11, minmax(0, 1fr)); }
-.crossword-grid.is-size-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-
-.crossword-cell,
-.crossword-block {
-  aspect-ratio: 1;
-  height: 2.5rem;
-  width: 2.5rem;
-}
-
-.crossword-cell {
-  background: var(--panel-bg-alt);
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  color: var(--text-main);
-  font: inherit;
-  font-size: 1rem;
-  padding: 0.25rem;
-  text-align: center;
-}
-
-.crossword-cell.is-active {
-  border-color: var(--accent);
-  outline: 0.125rem solid var(--accent);
-}
-
-.crossword-clues {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  padding: 1rem;
-}
-
-.crossword-clues ol {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0.75rem 0 0;
-  padding-left: 1.5rem;
-}
-
-.crossword-clue-button {
-  background: transparent;
-  border: 0;
-  color: var(--text-main);
-  cursor: pointer;
-  font: inherit;
-  padding: 0.25rem;
-  text-align: left;
-  width: 100%;
-}
-
-.crossword-clue-button[aria-pressed='true'] {
-  color: var(--accent);
-  font-weight: 700;
-}
-
-/* ── Typing Blitz ──────────────────────────────────────────── */
-
-.typing-blitz-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-
-.typing-blitz-header h1,
-.typing-blitz-header p,
-.typing-blitz-target p,
-.typing-blitz-feedback,
-.typing-blitz-form label {
-  margin: 0;
-}
-
-.typing-blitz-header p,
-.typing-blitz-feedback,
-.typing-blitz-target > p,
-.typing-blitz-status dt,
-.typing-blitz-target dt {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-}
-
-.typing-blitz-status,
-.typing-blitz-target dl {
-  display: flex;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.typing-blitz-status div,
-.typing-blitz-target dl div {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  padding: 0.5rem 0.75rem;
-}
-
-.typing-blitz-status dt,
-.typing-blitz-status dd,
-.typing-blitz-target dt,
-.typing-blitz-target dd {
-  margin: 0;
-}
-
-.typing-blitz-status dd,
-.typing-blitz-target dd {
-  font-weight: 700;
-}
-
-.typing-blitz-target {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  display: grid;
-  gap: 0.75rem;
-  padding: 1.5rem;
-}
-
-.typing-blitz-target strong {
-  font-size: 2rem;
-}
-
-.typing-blitz-form {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-
-.typing-blitz-form input {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  color: var(--text-main);
-  font: inherit;
-  min-height: 3rem;
-  padding: 0.75rem 1rem;
-}
-
-.typing-blitz-form input:focus-visible {
-  outline: 0.25rem solid color-mix(in oklab, var(--accent) 60%, transparent);
-  outline-offset: 0.125rem;
-}
-
-.typing-blitz-form .daily-game-button {
-  justify-content: center;
-}
-
-.typing-blitz-feedback {
-  min-height: 1.25rem;
-  margin-top: 0.75rem;
-}
-
-/* ── Word Search ───────────────────────────────────────────── */
-
-.word-search-header h1,
-.word-search-header p,
-.word-search-targets h2,
-.word-search-status {
-  margin: 0;
-}
-
-.word-search-header p,
-.word-search-status {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-}
-
-.word-search-progress {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  padding: 0.5rem 0.75rem;
-  white-space: nowrap;
-}
-
-.word-search-layout {
-  align-items: start;
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
-}
-
-.word-search-grid {
-  display: grid;
-  gap: 0.25rem;
-  width: max-content;
-}
-
-.word-search-grid.is-size-8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
-.word-search-grid.is-size-9 { grid-template-columns: repeat(9, minmax(0, 1fr)); }
-.word-search-grid.is-size-10 { grid-template-columns: repeat(10, minmax(0, 1fr)); }
-.word-search-grid.is-size-11 { grid-template-columns: repeat(11, minmax(0, 1fr)); }
-.word-search-grid.is-size-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-
-.word-search-cell {
-  aspect-ratio: 1;
-  background: var(--panel-bg-alt);
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  color: var(--text-main);
-  cursor: pointer;
-  font: inherit;
-  font-size: 1rem;
-  height: 2.5rem;
-  padding: 0.25rem;
-}
-
-.word-search-cell.is-selected {
-  border-color: var(--accent);
-  outline: 0.125rem solid var(--accent);
-}
-
-.word-search-cell.is-found,
-.word-search-targets .is-found {
-  color: var(--tone-teal);
-  font-weight: 700;
-}
-
-.word-search-targets {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  padding: 1rem;
-}
-
-.word-search-targets ul {
-  display: grid;
-  gap: 0.5rem;
-  list-style: none;
-  margin: 0.75rem 0 0;
-  padding: 0;
-}
-
-/* ── Match Pairs ───────────────────────────────────────────── */
-
-.match-pairs-header h1,
-.match-pairs-header p {
-  margin: 0;
-}
-
-.match-pairs-header p {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-}
-
-.match-pairs-progress {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  padding: 0.5rem 0.75rem;
-  white-space: nowrap;
-}
-
-.match-pairs-grid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.match-pairs-card {
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--button-bg-top);
-  color: var(--text-main);
-  cursor: pointer;
-  font: inherit;
-  min-height: 3.5rem;
-  padding: 0.75rem 1rem;
-  text-align: left;
-  box-shadow: 0 2px 0 var(--accent-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
-}
-
-.match-pairs-card:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.match-pairs-card.is-character {
-  font-size: 1.125rem;
-}
-
-.match-pairs-card.is-selected {
-  border-color: var(--accent);
-  outline: 0.125rem solid var(--accent);
-}
-
-.match-pairs-card.is-matched {
-  color: var(--tone-teal);
-  cursor: default;
-  opacity: 0.7;
-}
-
-.match-pairs-status {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin: 1rem 0 0;
-  min-height: 1.25rem;
-}
-
-/* ── Shared game chrome ────────────────────────────────────── */
-
-.daily-game-board-scroll {
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-}
-
-.daily-game-saving {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin: 1rem 0 0;
-}
-
-/* ── Results overlay ───────────────────────────────────────── */
-
-.daily-game-results {
-  margin: 2rem auto;
-  max-width: 32rem;
-  text-align: center;
-}
-
-.daily-game-results h2,
-.daily-game-results > p,
-.daily-game-share-status {
-  margin: 0;
-}
-
-.daily-game-results > p {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-}
-
-.daily-game-results > svg {
-  color: var(--tone-teal);
-}
-
-.daily-game-results-stats,
-.daily-game-results-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-}
-
-.daily-game-results-stats {
-  margin: 1.5rem 0;
-}
-
-.daily-game-results-stats div {
-  background: var(--panel-bg-alt);
-  border-radius: 0;
-  min-width: 6rem;
-  padding: 0.75rem;
-}
-
-.daily-game-results-stats dt {
-  color: var(--text-soft);
-  font-size: 0.875rem;
-}
-
-.daily-game-results-stats dd {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0.25rem 0 0;
-}
-
-.daily-game-share-status {
-  font-size: 0.875rem;
-  margin-top: 1rem;
-}
-
-.daily-game-share-status.is-success { color: var(--tone-teal); }
-.daily-game-share-status.is-error { color: var(--status-error); }
-
-/* ── Hover / focus ─────────────────────────────────────────── */
-
-.typing-blitz-form input:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.word-search-cell:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.crossword-cell:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.daily-games-back:focus-visible,
-.daily-games-retry:focus-visible,
-.daily-game-button:focus-visible,
-.match-pairs-card:focus-visible {
-  outline: 0.25rem solid color-mix(in oklab, var(--accent) 60%, transparent);
-  outline-offset: 0.125rem;
-}
-
-.typing-blitz-form .daily-game-button:focus-visible {
-  outline: 0.25rem solid color-mix(in oklab, var(--accent) 60%, transparent);
-  outline-offset: 0.125rem;
-}
-
-.word-search-cell:focus-visible {
-  outline: 0.25rem solid color-mix(in oklab, var(--accent) 60%, transparent);
-  outline-offset: 0.125rem;
-}
-
-.crossword-cell:focus-visible,
-.crossword-clue-button:focus-visible {
-  outline: 0.25rem solid color-mix(in oklab, var(--accent) 60%, transparent);
-  outline-offset: 0.125rem;
-}
-
-/* ── Animation ─────────────────────────────────────────────── */
-
-@keyframes daily-games-pulse {
-  to {
-    opacity: 0.55;
-  }
-}
-
-/* ── Responsive (squared) ──────────────────────────────────── */
-
-@media (max-width: 40rem) {
-  
-  .daily-games-heading {
-    text-align: left;
-  }
-
-  .daily-games-skeleton {
-    grid-template-columns: 1fr;
-  }
-
-  .match-pairs-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .match-pairs-header,
-  .word-search-header,
-  .typing-blitz-header,
-  .word-search-layout,
-  .crossword-layout,
-  .daily-game-results-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .word-search-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .crossword-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .typing-blitz-status,
-  .typing-blitz-target dl {
-    flex-wrap: wrap;
-  }
-}
+  grid-template-columns: repeat(var(--dp-n), var(--dp-cell));
+  grid-auto-rows: var(--dp-cell);
+  gap: 1px;
+}
+.dp-cell {
+  min-width: 0; margin: 0; padding: 0; border: 0;
+  display: grid; place-items: center;
+  background: var(--washi);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.4);
+  font-family: var(--jp); font-weight: 400; font-size: calc(var(--dp-cell) * 0.62); line-height: 1;
+  color: var(--ink); text-align: center;
+}
+button.dp-cell { cursor: pointer; }
+.dp-cell:disabled { cursor: default; color: var(--ink); }
+.dp-cell:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
+/* the open squares of a crossword are inputs, and an input brings a width and a caret of its own */
+input.dp-cell { width: 100%; height: 100%; caret-color: var(--hi); }
+.dp-block { background: rgba(20, 17, 13, 0.1); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.1); }
+/* the entry you are on, the line you are drawing -- an ink wash edged in ink. NOT GOLD: gold is
+   earned, and a line you are still drawing has not earned anything yet. */
+.dp-cell.here { background: rgba(20, 17, 13, 0.12); box-shadow: inset 0 0 0 2px var(--ink); }
+/* found is earned, so it is gold */
+.dp-cell.on { background: var(--gold); }
+
+/* ---- the work cell's list: a slip per word, numbered, the state at the end of the line ---------- */
+.dp-rows { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.dp-list { margin: 0; padding: 0; list-style: none; }
+.dp-row {
+  display: flex; align-items: baseline; gap: 11px;
+  width: 100%; margin: 0; padding: 5px 0 6px; border: 0;
+  background: none; text-align: left;
+  box-shadow: inset 0 -1px 0 rgba(20, 17, 13, 0.1);
+  font-family: var(--lat-ui); color: var(--ink);
+}
+button.dp-row { cursor: pointer; }
+button.dp-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
+.dp-row u {
+  flex: none; align-self: center; text-decoration: none;
+  width: 22px; height: 20px; display: grid; place-items: center;
+  background: rgba(20, 17, 13, 0.1); color: var(--ink);
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 11px;
+}
+.dp-row b {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; font-size: 12.5px; letter-spacing: 0.02em;
+}
+.dp-row b.jp { font-family: var(--jp); font-weight: 400; font-size: 17px; letter-spacing: 0; }
+.dp-row i {
+  flex: none; font-style: normal; font-family: var(--jp); font-size: 15px; color: rgba(20, 17, 13, 0.6);
+}
+.dp-row s {
+  flex: none; margin-left: auto; text-decoration: none;
+  font-weight: 700; font-size: 10px; letter-spacing: 0.16em; color: rgba(20, 17, 13, 0.5);
+}
+/* GOLD IS EARNED -- the mark goes gold and the word is struck through as done */
+.dp-row.on u { background: var(--gold); }
+.dp-row.on b { color: rgba(20, 17, 13, 0.5); text-decoration: line-through 2px var(--gold); }
+/* VERMILION IS WHAT YOU OWE */
+.dp-row.bad u { background: var(--hi-deep); color: #ffd9a1; }
+.dp-row.bad s.typed { color: var(--hi-deep); text-decoration: line-through 2px var(--hi); letter-spacing: 0.04em; }
+/* the clue you are on */
+.dp-row.here { box-shadow: inset 3px 0 0 var(--hi), inset 0 -1px 0 rgba(20, 17, 13, 0.1); padding-left: 8px; }
+.dp-row.here u { background: var(--hi); color: #ffe9c9; }
+/* the clue you are on is read in full -- clues run to 120 characters and an ellipsis is not a clue */
+.dp-row.here b { white-space: normal; overflow: visible; text-overflow: clip; }
+.dp-fold, .dp-status {
+  margin: 0; padding: 7px 0 0;
+  font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(20, 17, 13, 0.5);
+}
+.dp-status { min-height: 2.2em; padding-bottom: 6px; letter-spacing: 0.06em; }
+.dp-status.is-bad { color: var(--hi-deep); }
+
+/* ---- typing blitz: the rule sits at the top of the cell, the answers under it ------------------- */
+.dp-type { flex: none; justify-content: flex-start; padding-bottom: 8px; }
+
+/* ---- the ending: the result, as the work cell ---------------------------------------------------- */
+.dp-end .rd-note { margin: 0 0 6px; }
+
+/* ---- what a cell's board stands in: the space under the kicker, centred, never scrolled --------- */
+.dp-stage {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 0 14px; overflow: hidden;
+}
+.rd-work .dp-stage { padding-top: 0; }
+
+/* ---- match pairs: two columns of up to six on each side of the hairline ------------------------- */
+.dp-tiles {
+  width: 100%; height: 100%;
+  display: grid; grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(var(--dp-rows), minmax(0, 45px));
+  gap: 5px 8px; align-content: center;
+}
+.dp-tile {
+  min-width: 0; min-height: 0; padding: 0 10px; border: 0; cursor: pointer;
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--washi-dim); color: var(--ink);
+  box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
+  transition: background 0.14s ease, box-shadow 0.14s ease;
+}
+.dp-tile.jp { font-family: var(--jp); font-weight: 400; font-size: 21px; }
+.dp-tile.lat {
+  font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.01em;
+}
+/* TWO LINES, THEN IT STOPS. A meaning longer than one line is the common case, and two lines of
+   it at 1.1 still fit the 45px tile; the whole of it is the tile's title. */
+.dp-tile > span {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; white-space: normal; line-height: 1.1; overflow-wrap: anywhere;
+}
+/* 21px Japanese at 1.1 is 46px for two lines, one over the tile; 1.05 keeps it inside */
+.dp-tile.jp > span { line-height: 1.05; }
+.dp-tile:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+.dp-tile:disabled { cursor: default; }
+/* the one you are holding: lifted, the vermilion edge the slips use for the one in hand */
+.dp-tile.here {
+  background: var(--washi);
+  box-shadow: 5px 6px 0 rgba(20, 17, 13, 0.3), inset 4px 0 0 var(--hi), inset 0 0 0 1px rgba(20, 17, 13, 0.2);
+}
+/* a pair you made is earned, and it stays where it is */
+.dp-tile.on { background: var(--gold); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.3); }
+/* a wrong pair flashes once, for as long as the board holds it */
+@keyframes dpFlash { from { background: var(--hi); color: #ffe9c9; } to { background: var(--washi-dim); } }
+.dp-tile.bad { animation: dpFlash 0.4s ease both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .daily-games-skeleton span {
-    animation: none;
-  }
+  .dp-tile { transition: none; }
+  .dp-tile.bad { animation: none; background: var(--hi); color: #ffe9c9; }
 }

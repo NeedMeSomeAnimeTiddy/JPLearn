@@ -3,6 +3,8 @@ import {
   DAILY_GAMES_COPY,
   MATCH_PAIRS_MAX_WORDS,
   MATCH_PAIRS_MIN_WORDS,
+  PUZZLE_ASK_W,
+  PUZZLE_BOARD_GAP,
   TYPING_BLITZ_MAX_WORDS,
   WORD_SEARCH_FALLBACK_TARGET,
   WORD_SEARCH_FILLER_CHARACTERS,
@@ -159,9 +161,39 @@ export function buildWordSearch(words: readonly DailyGamesWordPayload[], seed: n
     : buildPlacedBoard(candidates, random) ?? buildWordSearchFallback(seed, null)
 }
 
-export function buildShareResult(score: number, pairCount: number, mode: string): string {
+export function buildShareResult(score: number, pairCount: number, mode: string, title: string): string {
   return DAILY_GAMES_COPY.shareFormat
+    .replace('{title}', title)
     .replace('{score}', String(score))
     .replace('{pairCount}', String(pairCount))
     .replace('{mode}', mode)
+}
+
+/* ==================================================================================================
+   THE BOARD'S CELL, SOLVED FROM THE CELL IT STANDS IN.
+
+   The prompt cell's content box is `PUZZLE_ASK_W` wide and a board is between seven and twelve
+   columns, so the size is the width less the hairlines, shared out and floored -- a fraction of a
+   pixel would blur every one of them. Twelve columns is the widest any builder makes and comes out
+   at 22, which is what the IME's romaji tail is allowed to clip inside.
+   ================================================================================================== */
+export function boardCell(columns: number, width = PUZZLE_ASK_W, gap = PUZZLE_BOARD_GAP): number {
+  const n = Math.max(1, columns)
+  return Math.floor((width - (n - 1) * gap) / n)
+}
+
+/** mm:ss, for the run's clock chips */
+export function formatClock(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds))
+  return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}`
+}
+
+/** a count as the chips print it -- two figures, the way the round prints its own */
+export function pad2(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+/** fill a `{name}` copy template */
+export function fillCopy(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce((text, [key, value]) => text.split(`{${key}}`).join(String(value)), template)
 }

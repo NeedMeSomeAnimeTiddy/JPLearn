@@ -1,4 +1,7 @@
 import type { DailyGamesStatePayload, DailyGamesWordPayload } from '../../generated/types'
+import type { ReactNode } from 'react'
+import type { ScreenHeadSpec } from '../menu'
+import type { RoundHint, RunChip } from '../round'
 import type { CrosswordClueDependencies } from './crosswordClues'
 
 export type DailyGamesMode = 'daily' | 'practice'
@@ -118,4 +121,19 @@ export interface DailyGamesState {
   retry: () => void
   setMode: (mode: DailyGamesMode) => void
   replaceData: (data: DailyGamesStatePayload) => void
+}
+
+/* WHAT THE SESSION HANDS EVERY PUZZLE. Each puzzle draws its own `Round`, because each one owns the
+   state behind both of its cells; these are the parts that are the same for all four. */
+export interface PuzzleShell {
+  head: ScreenHeadSpec | null
+  cap: string
+  /** the keys every puzzle shares -- a puzzle's own keys go first and win on the same cap */
+  hints: RoundHint[]
+  onBack: () => void
+  backAria: string
+  /** how long this board has been in front of you, kept by the session */
+  spent: RunChip
+  /** once the puzzle is over: what the run chips say, and what replaces the work cell */
+  ending: { run?: RunChip[]; work: ReactNode } | null
 }

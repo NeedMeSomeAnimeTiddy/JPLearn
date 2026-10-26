@@ -1,9 +1,12 @@
 import { useMemo } from 'react'
-import { DAILY_GAMES_COPY } from '../constants'
+import { screenHead } from '../../menu'
+import { puzzleHead } from '../../menu/daily'
+import { DAILY_GAME_TILES, DAILY_GAMES_COPY, PUZZLE_COPY } from '../constants'
 import type { DailyGameType, DailyGamesMode, DailyGamesSessionDependencies } from '../types'
 import type { DailyGamesMissedWordPayload } from '../../../generated/types'
 import { getDefaultDailyGamesSessionDependencies, useDailyGames } from '../useDailyGames'
 import { DailyGameSession } from './DailyGameSession'
+import { PuzzlePlate } from './PuzzlePlate'
 import '../daily-games.css'
 
 /* ==================================================================================================
@@ -15,54 +18,98 @@ import '../daily-games.css'
    → DAILY) picks now, and this is entered with the puzzle and the mode already decided, the way the
    exam run is entered with the level and the mode decided.
 
-   THE PUZZLES THEMSELVES ARE STILL THE OLD LANGUAGE. `design-system/components/past-three.html`
-   draws one of the four on the sheet and calls the other three the same job; none of them is built.
-   This file does not pretend otherwise — it fetches the day and hands it to the board that exists.
+   IT STANDS ON THE SHEET IN EVERY STATE. `past-three.html` plate THREE draws the puzzle on the
+   round's own sheet, and the day loading, the day failing and a pool with nothing in it are the
+   same sheet with no board on it yet -- see `PuzzlePlate`. `.dp-puzzle` is the one root all of
+   them share, which is what the routing tests find the view by.
    ================================================================================================== */
 
 export interface DailyGameViewProps {
-  gameType: DailyGameType
+  /** null when the route was reached with nothing chosen -- history forward, say */
+  gameType: DailyGameType | null
   mode: DailyGamesMode
   onBack: () => void
   dependencies?: DailyGamesSessionDependencies
   onReviewMissedWords?: (missedWords: DailyGamesMissedWordPayload[]) => Promise<void>
 }
 
-export function DailyGameView({
+export function DailyGameView({ gameType, ...rest }: DailyGameViewProps) {
+  /* NOTHING CHOSEN IS STILL A SHEET. The route can be reached without a puzzle -- the titlebar's
+     forward after Back cleared it -- and a blank window is the shape of a broken screen. It says
+     so and offers the road, without fetching a day it has no puzzle to deal from. */
+  if (!gameType) {
+    return (
+      <div className="dp-puzzle">
+        <h1 className="sr-only">{DAILY_GAMES_COPY.title}</h1>
+        <PuzzlePlate
+          head={screenHead('DRILLS', 'daily')}
+          cap={PUZZLE_COPY.noPuzzleCap}
+          title={PUZZLE_COPY.noPuzzleTitle}
+          body={PUZZLE_COPY.noPuzzleBody}
+          tone="status"
+          slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: rest.onBack }}
+          onBack={rest.onBack}
+          backAria={DAILY_GAMES_COPY.backToGames}
+        />
+      </div>
+    )
+  }
+  return <ChosenPuzzle gameType={gameType} {...rest} />
+}
+
+function ChosenPuzzle({
   gameType, mode, onBack, dependencies, onReviewMissedWords,
-}: DailyGameViewProps) {
+}: DailyGameViewProps & { gameType: DailyGameType }) {
   const deps = useMemo(
     () => dependencies ?? getDefaultDailyGamesSessionDependencies(),
     [dependencies],
   )
   const { data, error, isLoading, retry, replaceData } = useDailyGames(deps)
+  const head = puzzleHead(gameType)
 
-  if (isLoading) {
+  function body() {
+    if (isLoading) {
+      return (
+        <PuzzlePlate
+          head={head}
+          cap={PUZZLE_COPY.loadingCap}
+          title={DAILY_GAMES_COPY.loading}
+          tone="status"
+          slab={{ text: PUZZLE_COPY.waitSlab, jp: PUZZLE_COPY.waitSlabJp, tone: 'calm' }}
+          onBack={onBack}
+          backAria={DAILY_GAMES_COPY.backToGames}
+        />
+      )
+    }
+    if (error || !data) {
+      return (
+        <PuzzlePlate
+          head={head}
+          cap={PUZZLE_COPY.unavailableCap}
+          title={DAILY_GAMES_COPY.unavailable}
+          body={error}
+          tone="alert"
+          slab={{ text: PUZZLE_COPY.retrySlab, jp: PUZZLE_COPY.retrySlabJp, onClick: retry, label: DAILY_GAMES_COPY.retry }}
+          onBack={onBack}
+          backAria={DAILY_GAMES_COPY.backToGames}
+        />
+      )
+    }
+    if (data.pool.words.length === 0) {
+      return (
+        <PuzzlePlate
+          head={head}
+          cap={PUZZLE_COPY.emptyCap}
+          title={DAILY_GAMES_COPY.emptyTitle}
+          body={DAILY_GAMES_COPY.emptyBody}
+          tone="status"
+          slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: onBack }}
+          onBack={onBack}
+          backAria={DAILY_GAMES_COPY.backToGames}
+        />
+      )
+    }
     return (
-      <div className="daily-games-hub">
-        <div className="daily-games-skeleton" role="status" aria-label={DAILY_GAMES_COPY.loading}>
-          <span /><span /><span /><span />
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !data || data.pool.words.length === 0) {
-    return (
-      <div className="daily-games-hub">
-        <section className="daily-games-state" role={error ? 'alert' : undefined}>
-          <h2>{error ? DAILY_GAMES_COPY.unavailable : DAILY_GAMES_COPY.emptyTitle}</h2>
-          <p>{error ?? DAILY_GAMES_COPY.emptyBody}</p>
-          <button type="button" className="daily-games-retry" onClick={error ? retry : onBack}>
-            {error ? DAILY_GAMES_COPY.retry : DAILY_GAMES_COPY.backToGames}
-          </button>
-        </section>
-      </div>
-    )
-  }
-
-  return (
-    <div className="daily-games-hub">
       <DailyGameSession
         mode={mode}
         data={data}
@@ -72,6 +119,14 @@ export function DailyGameView({
         onStateUpdated={replaceData}
         onReviewMissedWords={onReviewMissedWords}
       />
+    )
+  }
+
+  /* ONE PAGE HEADING FOR EVERY STATE -- the plates and the board alike; the slab's title is not one */
+  return (
+    <div className="dp-puzzle" data-puzzle={gameType}>
+      <h1 className="sr-only">{DAILY_GAME_TILES.find((tile) => tile.type === gameType)?.title}</h1>
+      {body()}
     </div>
   )
 }

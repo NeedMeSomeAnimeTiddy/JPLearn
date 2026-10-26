@@ -153,10 +153,10 @@ afterEach(() => {
 type ViewName = 'home' | 'minigame' | 'jlpt_prep' | 'passage_hub' | 'daily_games'
 
 function currentView(): ViewName | 'unknown' {
-  /* DAILY GAMES FIRST, and the container rather than a tile: it wears the same tape-deck shell as
-     the minigame view, so a shell-shaped question answers wrong for it. `.daily-games-hub` is on
-     the screen whether or not its four tiles have arrived. */
-  if (document.querySelector('.daily-games-hub')) return 'daily_games'
+  /* DAILY GAMES FIRST, and the container rather than the sheet: a puzzle stands on the round's own
+     sheet, so `.rd-sheet` would call it a minigame. `.dp-puzzle` is the view's root in every state
+     -- loading the day, dealing the board, the board, the result. */
+  if (document.querySelector('.dp-puzzle')) return 'daily_games'
   /* THE ROUND BEFORE THE FRAME, and the order is the whole answer now. The round moved onto the
      menu's own stage, so it has a `.mn-frame` too -- asking the frame first would call every round
      'home'. `.rd-sheet` is the sheet it stands on and is there in all of its states. */
