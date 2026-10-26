@@ -3,6 +3,7 @@ const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { createBridgeWorker } = require('./bridge_worker.cjs')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime, isVoiceRuntimeInstalled } = require('./voice_runtime.cjs')
@@ -288,14 +289,6 @@ let preloadedAssistantChatHistory = {
 }
 const bridgeReadCache = new Map()
 const bridgeReadInFlight = new Map()
-const bridgeWorkerState = {
-  child: null,
-  nextRequestId: 1,
-  buffer: '',
-  pending: new Map(),
-  stderr: '',
-  consecutiveTimeouts: 0,
-}
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
 const STUDY_JOURNEY_SMOKE_FILENAME = 'study-journey-smoke.json'
@@ -325,6 +318,14 @@ const bridgeTelemetry = {
   lastWorkerError: null,
   lastFallbackAtUtc: null,
 }
+const bridgeWorker = createBridgeWorker({
+  resolveContext: () => resolvePythonBridgeContext(),
+  resolvePythonCommand: (projectRoot) => resolvePythonCommand(projectRoot),
+  telemetry: bridgeTelemetry,
+  requestTimeoutMs: BRIDGE_REQUEST_TIMEOUT_MS,
+  maxConsecutiveTimeouts: BRIDGE_MAX_CONSECUTIVE_TIMEOUTS,
+})
+const bridgeWorkerState = bridgeWorker.state
 const STARTUP_BUDGETS_MS = {
   startupReady: 5000,
   firstSummary: 2500,
@@ -1114,180 +1115,16 @@ function runPythonBridgeWithArgsOneShot(args) {
   })
 }
 
-function rejectPendingBridgeRequests(error) {
-  const pending = Array.from(bridgeWorkerState.pending.values())
-  bridgeWorkerState.pending.clear()
-  for (const request of pending) {
-    clearTimeout(request.timeoutId)
-    request.reject(error)
-  }
-}
-
 function stopPythonBridgeWorker() {
-  if (!bridgeWorkerState.child) {
-    return
-  }
-
-  const child = bridgeWorkerState.child
-  bridgeWorkerState.child = null
-  try {
-    child.kill()
-  } catch {
-    // Ignore termination errors during shutdown/restart.
-  }
+  bridgeWorker.stop()
 }
 
 function getOrStartPythonBridgeWorker() {
-  if (bridgeWorkerState.child && !bridgeWorkerState.child.killed) {
-    return bridgeWorkerState.child
-  }
-
-  const bridgeContext = resolvePythonBridgeContext()
-  const pythonCmd = resolvePythonCommand(bridgeContext.projectRoot)
-  const bridgeScript = bridgeContext.bridgeScript
-
-  bridgeWorkerState.consecutiveTimeouts = 0
-
-  const child = spawn(pythonCmd, [bridgeScript, '--server'], {
-    cwd: bridgeContext.projectRoot,
-    windowsHide: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  })
-
-  bridgeWorkerState.child = child
-  bridgeWorkerState.buffer = ''
-  bridgeWorkerState.stderr = ''
-  bridgeTelemetry.workerStarts += 1
-
-  child.stdout.setEncoding('utf8')
-  child.stdout.on('data', (chunk) => {
-    bridgeWorkerState.buffer += chunk
-    while (true) {
-      const newlineIndex = bridgeWorkerState.buffer.indexOf('\n')
-      if (newlineIndex < 0) {
-        break
-      }
-
-      const line = bridgeWorkerState.buffer.slice(0, newlineIndex).trim()
-      bridgeWorkerState.buffer = bridgeWorkerState.buffer.slice(newlineIndex + 1)
-      if (!line) {
-        continue
-      }
-
-      try {
-        const envelope = JSON.parse(line)
-        const requestId = envelope.id
-        const request = bridgeWorkerState.pending.get(requestId)
-        if (!request) {
-          continue
-        }
-
-        bridgeWorkerState.pending.delete(requestId)
-        clearTimeout(request.timeoutId)
-        // Any response -- success or command-level failure -- proves the
-        // worker is alive and responsive, not wedged.
-        bridgeWorkerState.consecutiveTimeouts = 0
-
-        if (envelope.code !== 0) {
-          bridgeTelemetry.workerFailureCount += 1
-          const payload = envelope.payload || {}
-          const errorMessage = typeof payload.error === 'string' ? payload.error : `Bridge request failed with code ${envelope.code}`
-          bridgeTelemetry.lastWorkerError = errorMessage
-          request.reject(new Error(errorMessage))
-          continue
-        }
-
-        bridgeTelemetry.workerSuccessCount += 1
-        request.resolve(envelope.payload)
-      } catch (error) {
-        console.warn('Ignoring malformed bridge worker output line', {
-          detail: error instanceof Error ? error.message : String(error),
-        })
-      }
-    }
-  })
-
-  child.stderr.setEncoding('utf8')
-  child.stderr.on('data', (chunk) => {
-    bridgeWorkerState.stderr += chunk
-    if (bridgeWorkerState.stderr.length > 20000) {
-      bridgeWorkerState.stderr = bridgeWorkerState.stderr.slice(-20000)
-    }
-  })
-
-  child.on('error', (error) => {
-    const wrapped = new Error(`Bridge worker failed to start: ${error.message}`)
-    bridgeTelemetry.lastWorkerError = wrapped.message
-    rejectPendingBridgeRequests(wrapped)
-    stopPythonBridgeWorker()
-  })
-
-  child.on('close', (code) => {
-    const detail = [
-      `Bridge worker exited with code ${code}`,
-      `Python command: ${pythonCmd}`,
-      `Bridge script: ${bridgeScript}`,
-      `Bridge cwd: ${bridgeContext.projectRoot}`,
-      `Bridge candidates: ${bridgeContext.candidates.join(' | ')}`,
-      `stderr: ${bridgeWorkerState.stderr.trim() || '(empty)'}`,
-    ].join('\n')
-    bridgeTelemetry.lastWorkerError = detail
-    rejectPendingBridgeRequests(new Error(detail))
-    stopPythonBridgeWorker()
-  })
-
-  return child
+  return bridgeWorker.start()
 }
 
 function runPythonBridgeWorkerRequest(args) {
-  return new Promise((resolve, reject) => {
-    bridgeTelemetry.workerRequestCount += 1
-
-    let child
-    try {
-      child = getOrStartPythonBridgeWorker()
-    } catch (error) {
-      reject(error)
-      return
-    }
-
-    const requestId = bridgeWorkerState.nextRequestId
-    bridgeWorkerState.nextRequestId += 1
-
-    const timeoutId = setTimeout(() => {
-      const pending = bridgeWorkerState.pending.get(requestId)
-      if (!pending) {
-        return
-      }
-      bridgeTelemetry.workerTimeoutCount += 1
-      bridgeTelemetry.workerFailureCount += 1
-      bridgeTelemetry.lastWorkerError = `Bridge worker request timed out after ${BRIDGE_REQUEST_TIMEOUT_MS}ms`
-      bridgeWorkerState.pending.delete(requestId)
-      bridgeWorkerState.consecutiveTimeouts += 1
-      pending.reject(new Error(`Bridge worker request timed out after ${BRIDGE_REQUEST_TIMEOUT_MS}ms`))
-
-      // Only tear down the shared worker -- which rejects every other
-      // unrelated in-flight request via the 'close' handler -- once it looks
-      // genuinely unresponsive rather than just slow on this one request.
-      if (bridgeWorkerState.consecutiveTimeouts >= BRIDGE_MAX_CONSECUTIVE_TIMEOUTS) {
-        stopPythonBridgeWorker()
-      }
-    }, BRIDGE_REQUEST_TIMEOUT_MS)
-
-    bridgeWorkerState.pending.set(requestId, {
-      resolve,
-      reject,
-      timeoutId,
-    })
-
-    try {
-      child.stdin.write(`${JSON.stringify({ id: requestId, args })}\n`)
-    } catch (error) {
-      bridgeWorkerState.pending.delete(requestId)
-      clearTimeout(timeoutId)
-      reject(error)
-    }
-  })
+  return bridgeWorker.request(args)
 }
 
 function runPythonBridge(command) {
