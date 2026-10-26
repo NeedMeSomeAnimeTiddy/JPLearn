@@ -7,6 +7,15 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
+      // A lazy import that something else also imports statically is not lazy: the module lands in
+      // the entry chunk and the import() produces nothing. That happened to the valley once (#83)
+      // and the only sign was a line in the build log, so it is an error now rather than a warning.
+      onwarn(warning, warn) {
+        if (warning.code === 'INEFFECTIVE_DYNAMIC_IMPORT') {
+          throw new Error(`A lazy import is not lazy any more: ${warning.message}`)
+        }
+        warn(warning)
+      },
       output: {
         manualChunks: (id: string) => {
           if (!id.includes('node_modules')) {

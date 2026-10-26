@@ -480,8 +480,37 @@ function normalizeStartupTelemetry(payload) {
 
   return {
     startupReadyMs: toFiniteNumber(payload.startupReadyMs),
-    firstSummaryMs: toFiniteNumber(payload.firstSummaryMs),
     deferredLoadsQueuedAtMs: toFiniteNumber(payload.deferredLoadsQueuedAtMs),
+  }
+}
+
+function warnIfFirstSummaryOverBudget(firstSummaryMs) {
+  if (typeof firstSummaryMs === 'number' && firstSummaryMs > STARTUP_BUDGETS_MS.firstSummary) {
+    console.warn(
+      `Startup budget exceeded: first summary in ${firstSummaryMs}ms (budget ${STARTUP_BUDGETS_MS.firstSummary}ms)`,
+    )
+  }
+}
+
+/* THE FIRST SUMMARY ARRIVES ON ITS OWN, BECAUSE IT CANNOT ARRIVE WITH STARTUP-READY (#82). The
+   renderer says it is ready as soon as its shell mounts, deliberately before the summary's bridge
+   round-trip, so a `firstSummaryMs` carried on that message was null on every run ever recorded and
+   the 2500 ms budget was never checked. The renderer now reports it when the summary lands. That can
+   be before the telemetry file is written, in which case the write picks it up, or after, in which
+   case the file is written again with it -- either way it is checked against the budget once. */
+function recordFirstSummary(webContentsId, payload) {
+  const context = startupTelemetryByContentsId.get(webContentsId)
+  const firstSummaryMs = typeof payload?.firstSummaryMs === 'number' && Number.isFinite(payload.firstSummaryMs)
+    ? Math.round(payload.firstSummaryMs)
+    : null
+  if (!context || firstSummaryMs === null || typeof context.firstSummaryMs === 'number') {
+    return
+  }
+  context.firstSummaryMs = firstSummaryMs
+  if (context.written) {
+    context.written.renderer = { ...(context.written.renderer || {}), firstSummaryMs }
+    writeStartupTelemetry(context.written)
+    warnIfFirstSummaryOverBudget(firstSummaryMs)
   }
 }
 
@@ -1451,6 +1480,7 @@ registerIpcHandlers({
   clearBridgeReadCaches,
   saveStartupTheme,
   normalizeStartupTelemetry,
+  recordFirstSummary,
   startupTelemetryByContentsId,
   startupReadyResolvers,
   isWindowExpanded,
@@ -2357,9 +2387,11 @@ async function createWindowWithSplash() {
   const startupSessionCompletedAt = Date.now()
   const startupSessionMs = startupSessionCompletedAt - startupSessionStartedAt
   const telemetryContext = startupTelemetryByContentsId.get(webContentsId) || {}
-  const rendererTelemetry = telemetryContext.renderer || null
+  const rendererTelemetry = (telemetryContext.renderer || typeof telemetryContext.firstSummaryMs === 'number')
+    ? { ...(telemetryContext.renderer || {}), firstSummaryMs: telemetryContext.firstSummaryMs ?? null }
+    : null
 
-  writeStartupTelemetry({
+  const startupTelemetry = {
     capturedAtUtc: new Date().toISOString(),
     budgetsMs: STARTUP_BUDGETS_MS,
     main: {
@@ -2377,18 +2409,17 @@ async function createWindowWithSplash() {
       maxWaitMs: STARTUP_PRELOAD_MAX_WAIT_MS,
       tasks: Array.isArray(preloadTelemetry?.taskTimings) ? preloadTelemetry.taskTimings : [],
     },
-  })
+  }
+  writeStartupTelemetry(startupTelemetry)
+  /* kept, so a first summary that lands after this point can be written into the same file */
+  telemetryContext.written = startupTelemetry
 
   if (rendererTelemetry && typeof rendererTelemetry.startupReadyMs === 'number' && rendererTelemetry.startupReadyMs > STARTUP_BUDGETS_MS.startupReady) {
     console.warn(
       `Startup budget exceeded: renderer startup-ready in ${rendererTelemetry.startupReadyMs}ms (budget ${STARTUP_BUDGETS_MS.startupReady}ms)`,
     )
   }
-  if (rendererTelemetry && typeof rendererTelemetry.firstSummaryMs === 'number' && rendererTelemetry.firstSummaryMs > STARTUP_BUDGETS_MS.firstSummary) {
-    console.warn(
-      `Startup budget exceeded: first summary in ${rendererTelemetry.firstSummaryMs}ms (budget ${STARTUP_BUDGETS_MS.firstSummary}ms)`,
-    )
-  }
+  warnIfFirstSummaryOverBudget(rendererTelemetry?.firstSummaryMs)
 
   updateSplashStatus(splash, 'Welcome', 'Ready to study.', 100)
 

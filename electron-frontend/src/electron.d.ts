@@ -555,9 +555,10 @@ interface DesktopApi {
   getOverviewCharacterMastery: () => Promise<OverviewCharacterMasteryPayload>
   notifyStartupReady: (payload?: {
     startupReadyMs?: number
-    firstSummaryMs?: number | null
     deferredLoadsQueuedAtMs?: number
   }) => Promise<{ ok: boolean }>
+  /** sent once, when the first study summary lands -- after startup-ready, which cannot carry it */
+  notifyFirstSummary?: (payload: { firstSummaryMs: number }) => Promise<{ ok: boolean }>
   openInspectElement?: () => Promise<{ ok: boolean }>
   setStartupTheme: (theme: string) => Promise<{ ok: boolean; theme: string }>
   getConfigValue?: {

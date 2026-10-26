@@ -139,9 +139,31 @@ function validateTelemetry(telemetryPath) {
   return {
     startupSessionMs,
     startupReadyMs,
-    firstSummaryMs: parsed?.renderer?.firstSummaryMs ?? null,
     telemetryPath,
   }
+}
+
+/* The first summary is reported on its own message, after startup-ready (#82), so it can land after
+   the telemetry file is first written. Waited for rather than read once: a null here used to pass,
+   which is how a budget that could never be checked went unnoticed. */
+async function waitForFirstSummary(child, telemetryPath) {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < maxWaitMs) {
+    if (child.exitCode !== null && child.exitCode !== 0) {
+      throw new Error(`Packaged app exited early with code ${child.exitCode}`)
+    }
+    let firstSummaryMs = null
+    try {
+      firstSummaryMs = JSON.parse(fs.readFileSync(telemetryPath, 'utf8'))?.renderer?.firstSummaryMs
+    } catch {
+      /* caught mid-rewrite: the late value is written into the same file, so read it again */
+    }
+    if (typeof firstSummaryMs === 'number') {
+      return firstSummaryMs
+    }
+    await sleep(pollIntervalMs)
+  }
+  throw new Error(`Timed out after ${maxWaitMs}ms waiting for renderer.firstSummaryMs in startup telemetry`)
 }
 
 function validateJourneyReport(reportPath) {
@@ -211,12 +233,15 @@ async function main() {
     const telemetryPath = await waitForTelemetry(child)
     const metrics = validateTelemetry(telemetryPath)
     appendLog(`Telemetry file: ${metrics.telemetryPath}`)
-    appendLog(`startupSessionMs=${metrics.startupSessionMs}, startupReadyMs=${metrics.startupReadyMs}, firstSummaryMs=${metrics.firstSummaryMs}`)
+    appendLog(`startupSessionMs=${metrics.startupSessionMs}, startupReadyMs=${metrics.startupReadyMs}`)
 
     const reportPath = await waitForJourneyReport(child)
     const journey = validateJourneyReport(reportPath)
     appendLog(`Study journey report: ${journey.reportPath}`)
     appendLog(`journeyDurationMs=${journey.durationMs}, slug=${journey.slug}, sessionId=${journey.sessionId}, steps=${journey.steps}`)
+
+    const firstSummaryMs = await waitForFirstSummary(child, metrics.telemetryPath)
+    appendLog(`firstSummaryMs=${firstSummaryMs}`)
   } finally {
     terminateProcessTree(child.pid)
     fs.writeFileSync(path.join(smokeDir, 'stdout.log'), stdoutLines.join(''), 'utf8')

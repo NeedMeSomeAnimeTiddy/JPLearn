@@ -88,6 +88,15 @@ function createRegisteredHandlers(overrides = {}) {
 }
 
 describe('ipc runtime contract', () => {
+  it('hands the first summary time to main on its own channel, for the sending window', () => {
+    const recordFirstSummary = vi.fn()
+    const { handlers } = createRegisteredHandlers({ recordFirstSummary })
+
+    expect(handlers.get('ui:first-summary')(createValidEvent(), { firstSummaryMs: 1234 })).toEqual({ ok: true })
+
+    expect(recordFirstSummary).toHaveBeenCalledWith(1, { firstSummaryMs: 1234 })
+  })
+
   it('rejects malformed record-game-result payloads before bridge dispatch', async () => {
     const { handlers, options } = createRegisteredHandlers()
     const handler = handlers.get('study:record-game-result')

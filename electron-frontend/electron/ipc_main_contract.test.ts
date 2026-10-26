@@ -71,6 +71,7 @@ describe('ipc main contract', () => {
       'window:quit-app',
       'ui:set-startup-theme',
       'ui:startup-ready',
+      'ui:first-summary',
       'ui:inspect-element',
       'learning-path:complete-onboarding',
     ]
@@ -140,6 +141,7 @@ describe('ipc main contract', () => {
       'window:quit-app',
       'ui:set-startup-theme',
       'ui:startup-ready',
+      'ui:first-summary',
       'ui:inspect-element',
       'learning-path:complete-onboarding',
     ]

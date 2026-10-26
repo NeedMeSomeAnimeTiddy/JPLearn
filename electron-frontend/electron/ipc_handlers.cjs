@@ -1146,6 +1146,12 @@ function registerIpcHandlers(options) {
     return { ok: true }
   })
 
+  options.ipcMain.handle('ui:first-summary', (event, telemetryPayload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    options.recordFirstSummary?.(event.sender.id, telemetryPayload)
+    return { ok: true }
+  })
+
   options.ipcMain.handle('ui:inspect-element', (event) => {
     const win = assertTrustedIpcSender(event, trustedSenderOptions())
     if (!win || win.isDestroyed()) {

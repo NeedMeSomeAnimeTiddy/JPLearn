@@ -1039,7 +1039,10 @@ function App() {
       setSummary(payload)
       saveSummarySnapshot(payload)
       if (startupFirstSummaryMsRef.current === null) {
-        startupFirstSummaryMsRef.current = Math.round(performance.now() - startupBootMarkRef.current)
+        const firstSummaryMs = Math.round(performance.now() - startupBootMarkRef.current)
+        startupFirstSummaryMsRef.current = firstSummaryMs
+        /* its own message: startup-ready is sent before the summary can exist (#82) */
+        void window.jplearnDesktop?.notifyFirstSummary?.({ firstSummaryMs })?.catch(() => undefined)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown desktop bridge error')
@@ -1088,7 +1091,6 @@ function App() {
     const startupReadyMs = Math.round(performance.now() - startupBootMarkRef.current)
     void window.jplearnDesktop?.notifyStartupReady({
       startupReadyMs,
-      firstSummaryMs: startupFirstSummaryMsRef.current,
       deferredLoadsQueuedAtMs,
     }).catch(() => undefined)
   }, [])
