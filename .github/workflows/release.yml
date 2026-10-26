@@ -181,6 +181,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/bundle_python.ps1 -Force
 
+      - name: Fetch the valley models
+        working-directory: electron-frontend
+        # world.glb and its lightmap are not in git; they come from the valley-models-1 release,
+        # checked against pinned SHA-256s. Without them the installer ships with no valley.
+        run: npm run fetch:models
+
       - name: Build Windows installer
         working-directory: electron-frontend
         # JPLEARN_DOCUMENTS_DIR is set to a temp path so the build step

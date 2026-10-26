@@ -293,6 +293,9 @@ nul
 # them is a page with two broken images in it.
 !mockups/menu-concepts/design-system/assets/*.png
 
+# fetch-models.cjs: half-finished downloads and local model files it moved aside with --force.
+.valley-cache/
+
 # Codebase Memory MCP — local knowledge-graph index + ADR cache.
 # Regenerated via `codebase-memory-mcp cli index_repository`, not version-controlled.
 .codebase-memory/

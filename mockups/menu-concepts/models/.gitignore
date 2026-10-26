@@ -7,8 +7,10 @@
 # environment.blend is NOT an artifact — it is the source of truth for the entire world, and
 # ignoring it means GIT IS NOT BACKING IT UP. That is a deliberate trade: an 18 MB binary cannot be
 # diffed or merged, so every save would be a full copy and a conflict would be unresolvable. It
-# needs backing up somewhere that is not this repository. Blender's own environment.blend1 is a
-# single-step undo, not a backup.
+# needs backing up somewhere that is not this repository. The release `valley-models-1` holds the
+# 26 Oct copy (`npm run fetch:models -- --all` restores it, and never over a newer local file) and
+# Z:/Projects/JPLearn another; a re-export wants a new release and a new Z: copy. Blender's own
+# environment.blend1 is a single-step undo, not a backup.
 
 world.glb
 *.blend

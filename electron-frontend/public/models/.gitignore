@@ -6,11 +6,10 @@
 # of a repository that is 50 MB packed in total, and it can be regenerated from a source that is
 # itself not in git.
 #
-# WHICH MEANS A FRESH CLONE CANNOT BUILD THE VALLEY, and that is an open question rather than a
-# settled one. Phase 0 measured the cost of the world; how it reaches a machine that has never had
-# it -- LFS, a release asset, a fetch script, or a first-run download -- is phase 1's to answer.
-# Until then the app is expected to boot without it: `mountValley` catches its own failure and the
-# app loses a backdrop, not a feature.
+# A FRESH CLONE GETS THEM FROM A GITHUB RELEASE: `npm run fetch:models` (in electron-frontend)
+# downloads both into this folder and checks their SHA-256, and `make:release` runs it first.
+# Without them the app still boots -- `mountValley` catches its own failure and the app loses a
+# backdrop, not a feature.
 
 world.glb
 night_lightmap.png
