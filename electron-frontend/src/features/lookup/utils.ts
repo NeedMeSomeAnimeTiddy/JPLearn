@@ -1,5 +1,36 @@
-import { LOOKUP_HISTORY_KEY, LOOKUP_HISTORY_LIMIT } from './constants'
+import { LOOKUP_GATE_COPY, LOOKUP_HISTORY_KEY, LOOKUP_HISTORY_LIMIT } from './constants'
 import type { LookupRouteKey } from './types'
+
+/** whether a model route can answer, and when it cannot, why and the one place to fix it */
+export interface ModelGate {
+  enabled: boolean
+  reason: string
+  help: string
+}
+
+/** the part of the setup report the gates read; null until the app has asked */
+export interface GateInstallInfo {
+  llamaCppInstalled: boolean
+  models: ReadonlyArray<{ installed: boolean }>
+  ocrInstalled?: boolean
+}
+
+/* A QUESTION ANSWERS WHEN IT CAN ACTUALLY BE ANSWERED: the build has the chat, Chat with Tutor is
+   on, and llama.cpp and a tutor model are installed. Until the setup report has come back nothing
+   is known to be installed, so the route waits dimmed rather than offering a field that fails. */
+export function chatGate(runtime: boolean, settingOn: boolean, install: GateInstallInfo | null): ModelGate {
+  if (!runtime) return { enabled: false, ...LOOKUP_GATE_COPY.chatNoRuntime }
+  if (!settingOn) return { enabled: false, ...LOOKUP_GATE_COPY.chatOff }
+  const installed = Boolean(install?.llamaCppInstalled && install.models.some((model) => model.installed))
+  if (!installed) return { enabled: false, ...LOOKUP_GATE_COPY.chatNoModel }
+  return { enabled: true, reason: '', help: '' }
+}
+
+export function ocrGate(runtime: boolean, install: GateInstallInfo | null): ModelGate {
+  if (!runtime) return { enabled: false, ...LOOKUP_GATE_COPY.ocrNoRuntime }
+  if (!install?.ocrInstalled) return { enabled: false, ...LOOKUP_GATE_COPY.ocrNotInstalled }
+  return { enabled: true, reason: '', help: '' }
+}
 
 /* CJK Unified Ideographs, plus Extension A. Deliberately not the full ideographic range: the
    point is to recognise a character someone would call a kanji, not to be exhaustive about

@@ -8,8 +8,10 @@ import type { LookupRoute, LookupRouteKey } from './types'
    through -- "a lookup, not a conversation". Robbie chose option A on the tools card
    (`design-system/components/tools.html`, plates 8a-8c): chat and image translation fold into this
    overlay and the tutor pop-up retires. `assistant-chat` answers while Chat with Tutor is on in
-   Settings, `assistant-chat-ocr` while image translation is installed; otherwise both stay drawn,
-   dimmed, and say what is missing -- a door that disappears reads as a feature the app lacks. */
+   Settings and a tutor model is installed (the runtime starts it on the first question),
+   `assistant-chat-ocr` while image translation is installed; otherwise both stay drawn, dimmed, and
+   say what is missing and the one place to fix it -- a door that disappears reads as a feature the
+   app lacks. */
 export const LOOKUP_ROUTES: readonly LookupRoute[] = [
   { key: 'kanji', en: 'ONE KANJI', jp: '漢字', command: 'kanji-detail' },
   { key: 'word', en: 'A WORD', jp: '辞書', command: 'dictionary-search' },
@@ -33,12 +35,38 @@ export const LOOKUP_OCR_EN_CHARS = 200
 /** OCR lines the answer area holds beside the image; the rest fold to a count */
 export const LOOKUP_OCR_LINES = 4
 
+/* WHY A MODEL ROUTE IS DIMMED, AND THE ONE PLACE TO FIX IT. Each state names one fix, at the
+   settings location that has it (Settings › Assistant holds Tutor Assistant, Tutor models and Image
+   Translation), so the sheet never gives two instructions that disagree. */
+const WITHOUT = 'The first three routes answer without it.'
+export const LOOKUP_GATE_COPY = {
+  chatNoRuntime: { reason: 'Chat with the tutor is not part of this build.', help: WITHOUT },
+  chatOff: {
+    reason: 'Chat with Tutor is turned off.',
+    help: `Turn it on in Settings › Assistant › Tutor Assistant. ${WITHOUT}`,
+  },
+  chatNoModel: {
+    reason: 'No tutor model is installed.',
+    help: `Download one in Settings › Assistant › Tutor models. ${WITHOUT}`,
+  },
+  ocrNoRuntime: { reason: 'Image Translation is not part of this build.', help: WITHOUT },
+  ocrNotInstalled: {
+    reason: 'Image Translation is not installed.',
+    help: `Install it in Settings › Assistant › Image Translation. ${WITHOUT}`,
+  },
+} as const
+
 export const LOOKUP_COPY = {
   chatNoModelTitle: 'This route needs the tutor model.',
-  chatNoModelHelp: 'Turn on Chat with Tutor in Settings › Assistant, or download a model in Tutor models. The first three routes answer without one.',
   ocrNoModelTitle: 'This route needs image translation.',
-  ocrNoModelHelp: 'Install Image Translation in Settings › Assistant. The first three routes answer without it.',
-  dimmed: 'A QUESTION AND A SCREENSHOT ARE DIMMED UNTIL A MODEL IS RUNNING',
+  /* what the gate checks, said as the gate checks it: installed and switched on, not "running" --
+     the runtime starts the model on the first question */
+  chatDimmed: 'A QUESTION IS DIMMED UNTIL A TUTOR MODEL IS INSTALLED AND CHAT WITH TUTOR IS ON',
+  ocrDimmed: 'A SCREENSHOT IS DIMMED UNTIL IMAGE TRANSLATION IS INSTALLED',
+  wordPlaceholder: 'a kanji, a word, a phrase',
+  chatPlaceholder: 'ask the tutor a question',
+  ocrPlaceholder: 'pick an image (Enter), paste one (Ctrl+V) or drop one here',
+  notAnImage: 'is not an image. Pick, paste or drop a PNG, JPEG or WEBP.',
   chatEmpty: 'Ask the tutor anything about Japanese or your study. Enter sends it; the model runs on this device.',
   ocrEmpty: 'Pick a file, paste a screenshot, or drop an image here. The Japanese is read off it and translated as a whole.',
 } as const

@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
 import { Volume2 } from 'lucide-react'
-import { LOOKUP_COPY, LOOKUP_OCR_LINES } from '../constants'
+import { LOOKUP_COPY, LOOKUP_GATE_COPY, LOOKUP_OCR_LINES } from '../constants'
 import type { LookupChat, LookupOcr } from '../types'
 
 /* ==================================================================================================
@@ -69,10 +69,10 @@ export function QuestionBody({ chat, pages, page, replyKey }: QuestionBodyProps)
       <>
         <NoModel
           title={LOOKUP_COPY.chatNoModelTitle}
-          reason={chat?.disabledReason ?? 'Chatbot is disabled in settings.'}
-          help={LOOKUP_COPY.chatNoModelHelp}
+          reason={chat?.disabledReason ?? LOOKUP_GATE_COPY.chatNoRuntime.reason}
+          help={chat?.disabledHelp ?? LOOKUP_GATE_COPY.chatNoRuntime.help}
         />
-        <div className="lk-note">{LOOKUP_COPY.dimmed}</div>
+        <div className="lk-note">{LOOKUP_COPY.chatDimmed}</div>
       </>
     )
   }
@@ -128,27 +128,33 @@ export interface ScreenshotBodyProps {
   /** the English, paged the same way a long reply is */
   enPages: string[]
   page: number
+  /** why a dropped file was turned away before it reached the reader, until the next image */
+  fileNote?: string | null
 }
 
 function percent(confidence: number): string {
   return Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : '—'
 }
 
-export function ScreenshotBody({ ocr, fileInputRef, enPages, page }: ScreenshotBodyProps) {
+export function ScreenshotBody({ ocr, fileInputRef, enPages, page, fileNote }: ScreenshotBodyProps) {
   if (!ocr || !ocr.enabled) {
     return (
       <>
         <NoModel
           title={LOOKUP_COPY.ocrNoModelTitle}
-          reason={ocr?.disabledReason ?? 'Image Translation is unavailable in this build.'}
-          help={LOOKUP_COPY.ocrNoModelHelp}
+          reason={ocr?.disabledReason ?? LOOKUP_GATE_COPY.ocrNoRuntime.reason}
+          help={ocr?.disabledHelp ?? LOOKUP_GATE_COPY.ocrNoRuntime.help}
         />
-        <div className="lk-note">{LOOKUP_COPY.dimmed}</div>
+        {fileNote
+          ? <div className="lk-note" role="alert">{fileNote}</div>
+          : <div className="lk-note">{LOOKUP_COPY.ocrDimmed}</div>}
       </>
     )
   }
 
-  const { result, busy, error } = ocr
+  const { result, busy } = ocr
+  /* a file that was turned away before it reached the reader says so in the reader's own place */
+  const error = fileNote ?? ocr.error
   return (
     <>
       <div className="lk-ans">
@@ -204,7 +210,7 @@ export function ScreenshotBody({ ocr, fileInputRef, enPages, page }: ScreenshotB
       </div>
       <div className="lk-note quiet lk-note-row">
         <span>PNG, JPEG OR WEBP · UP TO {ocr.maxMb} MB · NOTHING LEAVES THIS DEVICE</span>
-        {result || error ? (
+        {result || ocr.error ? (
           <span className="lk-chips-row">
             <button type="button" className="lk-chip" onClick={ocr.clear} disabled={busy} aria-label="Clear the image">CLEAR</button>
           </span>

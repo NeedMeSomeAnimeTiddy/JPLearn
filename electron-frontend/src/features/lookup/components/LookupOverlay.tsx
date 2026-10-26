@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { trapFocus } from '../../../lib/focusTrap'
 import { bindWanakanaIme } from '../../../lib/wanakanaBinding'
 import {
-  ANSWERABLE_ROUTES, LOOKUP_OCR_EN_CHARS, LOOKUP_REPLY_PAGE_CHARS, LOOKUP_ROUTES, LOOKUP_WORD_LIMIT,
+  ANSWERABLE_ROUTES, LOOKUP_COPY, LOOKUP_OCR_EN_CHARS, LOOKUP_REPLY_PAGE_CHARS, LOOKUP_ROUTES, LOOKUP_WORD_LIMIT,
 } from '../constants'
 import type { LookupAssistant, LookupController, LookupRouteKey, LookupStatus } from '../types'
 import { imageFileFrom, kanjiIn, pageReply } from '../utils'
@@ -53,6 +53,9 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
   const restoreFocusRef = useRef<HTMLElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [page, setPage] = useState(0)
+  /* a dropped file that was not an image, said on A SCREENSHOT until the next image or route */
+  const [fileNote, setFileNote] = useState<string | null>(null)
+  useEffect(() => { if (activeRoute !== 'ocr' || !isOpen) setFileNote(null) }, [activeRoute, isOpen])
 
   const chat = assistant?.chat
   const ocr = assistant?.ocr
@@ -148,6 +151,7 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
      SCREENSHOT whether or not that route can answer, so a paste with no model lands on the sentence
      that says what is missing rather than on nothing. */
   const takeImage = (file: File) => {
+    setFileNote(null)
     setActiveRoute('ocr')
     if (ocr?.enabled && !ocr.busy) ocr.submit(file)
   }
@@ -178,6 +182,9 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
   }
 
   const onKeyDown = (event: React.KeyboardEvent) => {
+    /* AN INPUT METHOD STILL COMPOSING OWNS EVERY KEY: its ENTER picks the kanji and its ESC drops the
+       candidate. Neither is a lookup, nor a close. 229 is what browsers report for its keys. */
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -211,11 +218,23 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
     takeImage(file)
   }
 
+  /* EVERY FILE DROP IS CANCELLED BEFORE IT IS LOOKED AT. Left to the browser, a dropped file is a
+     navigation -- a text or HTML file would replace the app with itself -- so the default goes
+     first, and only then is the file asked whether it is an image. Dragged text is not a file and
+     is left to the field. */
   const onDrop = (event: React.DragEvent) => {
-    const file = imageFileFrom(event.dataTransfer)
-    if (!file) return
+    const data = event.dataTransfer
+    const carriesFiles = (data?.files?.length ?? 0) > 0 || Boolean(data?.types?.includes('Files'))
+    if (!carriesFiles) return
     event.preventDefault()
-    takeImage(file)
+    const file = imageFileFrom(data)
+    if (file) {
+      takeImage(file)
+      return
+    }
+    const name = data?.files?.[0]?.name
+    setActiveRoute('ocr')
+    setFileNote(`${name ? `“${name}”` : 'That file'} ${LOOKUP_COPY.notAnImage}`)
   }
 
   const answerable = live.length
@@ -262,7 +281,8 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder={activeRoute === 'tutor' ? 'ask the tutor a question' : 'a kanji, a word, a phrase'}
+              placeholder={activeRoute === 'tutor' ? LOOKUP_COPY.chatPlaceholder
+                : activeRoute === 'ocr' ? LOOKUP_COPY.ocrPlaceholder : LOOKUP_COPY.wordPlaceholder}
               aria-label="What to look up"
               maxLength={activeRoute === 'tutor' && chat ? chat.charLimit : undefined}
               spellCheck={false}
@@ -278,7 +298,7 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
           {activeRoute === 'tutor' ? (
             <QuestionBody chat={chat} pages={replyPages} page={page} replyKey={lastReply?.key ?? null} />
           ) : activeRoute === 'ocr' ? (
-            <ScreenshotBody ocr={ocr} fileInputRef={fileInputRef} enPages={enPages} page={page} />
+            <ScreenshotBody ocr={ocr} fileInputRef={fileInputRef} enPages={enPages} page={page} fileNote={fileNote} />
           ) : (
             <LookupAnswerBody controller={controller} />
           )}
@@ -296,7 +316,9 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
                   className={classes.join(' ')}
                   disabled={!answerableNow}
                   aria-pressed={entry.key === activeRoute}
-                  title={entry.needsModel && !answerableNow ? `${entry.command} needs a running model` : entry.command}
+                  title={entry.needsModel && !answerableNow
+                    ? `${entry.command}: ${(entry.key === 'tutor' ? chat?.disabledReason : ocr?.disabledReason) ?? 'not in this build.'}`
+                    : entry.command}
                   onClick={() => answerableNow && setActiveRoute(entry.key)}
                 >
                   <u aria-hidden="true">{answerableNow ? markOf(entry.key) : ''}</u>
