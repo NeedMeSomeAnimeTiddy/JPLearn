@@ -2278,7 +2278,8 @@ def _build_category_metrics_for_node(node_id: str, *, n5_only: bool = False) -> 
             if state.repetitions >= 3 and state.interval >= 21:
                 mastered_count += 1
 
-        leech_count += len(load_active_leech_card_ids(deck.name))
+        # Only the cards the deck shows: a leech flag on a hidden repeat (#80) can never be lifted.
+        leech_count += len(load_active_leech_card_ids(deck.name) & set(card_ids))
 
     if total_items == 0:
         return _empty_metrics(node_id)

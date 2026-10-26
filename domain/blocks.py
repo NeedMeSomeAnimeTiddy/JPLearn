@@ -182,8 +182,9 @@ def _display_name(deck_name: str) -> str:
 def _component_ordered(card_ids: list[int], characters: dict[int, str]) -> list[int]:
     """Sort kanji card ids so a character follows the components it is built from.
 
-    Ordering runs over characters, not ids, because a level deck can carry the
-    same character twice; the ids are re-expanded afterwards so nothing is lost.
+    Ordering runs over characters, not ids, and the ids are re-expanded
+    afterwards. A level deck no longer shows the same character twice (#80), but
+    nothing here relies on that.
     """
     ids_by_char: dict[str, list[int]] = {}
     for card_id in card_ids:

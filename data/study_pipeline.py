@@ -12,6 +12,7 @@ from typing import cast
 from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantPopupCadence, AssistantState, compute_assistant_state, evaluate_assistant_events
 from domain.curriculum import next_stage
+from domain.decks import hidden_repeat_ids_by_deck_name
 from domain.history import ItemHistory, RawItemHistoryBucket, classify_review_trend
 from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow, SessionHistoryRow
 from domain.retrieval import embed_text, rank_by_similarity
@@ -267,7 +268,7 @@ def _load_assistant_chat_context_inputs(session_id: str | None = None) -> dict[s
     streak = database.load_streak_state()
     activity_week = database.load_activity_summary(7)
     mistakes = database.load_mistake_breakdown(limit=3)
-    leech_count = database.load_active_leech_count()
+    leech_count = database.load_active_leech_count(hidden_repeat_ids_by_deck_name())
     item_history = load_item_history(limit_items=4, events_per_item=3)
     session_summary = database.load_session_summary(session_id) if session_id else None
     return {
@@ -609,7 +610,7 @@ def load_assistant_snapshot(session_id: str | None = None) -> dict[str, object]:
     streak = database.load_streak_state()
     mistakes = database.load_mistake_breakdown(limit=6)
     item_history = load_item_history(limit_items=8, events_per_item=8)
-    leech_count = database.load_active_leech_count()
+    leech_count = database.load_active_leech_count(hidden_repeat_ids_by_deck_name())
     curriculum_summary = database.load_curriculum_stage_summary(mode="context_cloze")
     session_summary = database.load_session_summary(session_id) if session_id else None
     latest_state = database.load_latest_assistant_state()

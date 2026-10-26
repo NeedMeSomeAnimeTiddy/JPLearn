@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Collection, Generator, Mapping
 from typing import TypedDict, TypeAlias, cast
 
 from domain.activity import ActivitySummary, DailyCount
@@ -1923,17 +1923,26 @@ def load_active_leech_card_ids(deck_name: str) -> set[int]:
     return {int(row["card_id"]) for row in rows}
 
 
-def load_active_leech_count() -> int:
-    """Return total count of active leech cards across all decks."""
+def load_active_leech_count(hidden_ids_by_deck: Mapping[str, Collection[int]] | None = None) -> int:
+    """Return total count of active leech cards across all decks.
+
+    ``hidden_ids_by_deck`` names cards no deck shows any more (issue #80's hidden
+    repeats). Their leech rows stay in the table but are not counted: a flag on a
+    card that cannot be studied could never be lifted.
+    """
     with _connect() as conn:
-        row = conn.execute(
+        rows = conn.execute(
             """
-            SELECT COUNT(*) AS total
+            SELECT deck, card_id
             FROM leech_items
             WHERE is_active=1
             """
-        ).fetchone()
-    return int((row or {})["total"] or 0)
+        ).fetchall()
+    hidden = {
+        _normalize_deck_name(deck_name): set(card_ids)
+        for deck_name, card_ids in (hidden_ids_by_deck or {}).items()
+    }
+    return sum(1 for row in rows if int(row["card_id"]) not in hidden.get(row["deck"], ()))
 
 
 def save_assistant_profile(

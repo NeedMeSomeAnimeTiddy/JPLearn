@@ -878,26 +878,43 @@ def _repeat_key(family: str, card: Card) -> str | tuple[str, str]:
 
 
 @lru_cache(maxsize=None)
-def hidden_repeat_ids(family: str, level: str) -> frozenset[int]:
-    """Return the card ids a level deck hides because a lower level, or an
-    earlier row of the same deck, already teaches that word.
+def _hidden_repeat_ids_by_level(family: str) -> dict[str, frozenset[int]]:
+    """Walk one family's unfiltered decks once, N5 first, and collect the repeats.
 
-    Computed from the unfiltered decks in level order, N5 first, so the lowest
-    level always keeps the card. The corpora are static module data, so the
-    result is cached for the life of the process.
+    The lowest level always keeps the card. The corpora are static module data,
+    so the result is cached for the life of the process.
     """
     seen: set[str | tuple[str, str]] = set()
-    for current in _REPEAT_LEVELS:
+    by_level: dict[str, frozenset[int]] = {}
+    for level in _REPEAT_LEVELS:
         hidden: set[int] = set()
-        for card in _RAW_LEVEL_BUILDERS[(family, current)]().cards:
+        for card in _RAW_LEVEL_BUILDERS[(family, level)]().cards:
             key = _repeat_key(family, card)
             if key in seen:
                 hidden.add(card.id)
             else:
                 seen.add(key)
-        if current == level:
-            return frozenset(hidden)
-    raise ValueError(f"Unknown level {level!r}")
+        by_level[level] = frozenset(hidden)
+    return by_level
+
+
+def hidden_repeat_ids(family: str, level: str) -> frozenset[int]:
+    """Return the card ids a level deck hides because a lower level, or an
+    earlier row of the same deck, already teaches that word."""
+    return _hidden_repeat_ids_by_level(family)[level]
+
+
+def hidden_repeat_ids_by_deck_name() -> dict[str, frozenset[int]]:
+    """Return every level deck's hidden repeat ids, keyed by deck name.
+
+    For readers of stored per-card rows (leeches, review state) that are keyed by
+    deck name rather than built from a deck's cards.
+    """
+    return {
+        _RAW_LEVEL_BUILDERS[key]().name: hidden_repeat_ids(*key)
+        for key in _RAW_LEVEL_BUILDERS
+        if hidden_repeat_ids(*key)
+    }
 
 
 def _level_deck(family: str, level: str) -> Deck:

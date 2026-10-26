@@ -5,6 +5,7 @@ from pathlib import Path
 
 from data import database
 from data import study_pipeline
+from domain.decks import hidden_repeat_ids_by_deck_name
 from domain.scheduler import ReviewState
 from domain.streaks import StreakState
 
@@ -453,6 +454,20 @@ def test_leech_state_enters_and_exits_based_on_recent_attempts(tmp_path: Path, m
 
     active_ids_after = study_pipeline.load_active_leech_card_ids("Hiragana")
     assert 42 not in active_ids_after
+
+
+def test_active_leech_count_skips_hidden_repeats(tmp_path: Path, monkeypatch) -> None:
+    """A leech flag on a card no deck shows any more (#80) could never be lifted."""
+    _use_temp_db(tmp_path, monkeypatch)
+
+    # 時 under its Kanji N4 id, hidden because Kanji N5 teaches it, and a card N4 still shows.
+    for card_id in (1156, 1000):
+        state = ReviewState(card_id=card_id)
+        for quality in [0, 1, 2, 4, 4]:
+            study_pipeline.review_card("Kanji N4", state, quality=quality)
+
+    assert database.load_active_leech_count() == 2
+    assert database.load_active_leech_count(hidden_repeat_ids_by_deck_name()) == 1
 
 
 def test_review_minigame_result_persists_quality_and_tags(tmp_path: Path, monkeypatch) -> None:

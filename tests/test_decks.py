@@ -5,7 +5,6 @@ import pytest
 from domain.deck_supplements import VOCAB_SUPPLEMENT, with_supplement
 from domain.decks import (
     ALL_DECKS,
-    hidden_repeat_ids,
     CATEGORY_SOURCE_DECKS,
     _VOCAB_CATEGORY_ID_SPACING,
     _VOCAB_CATEGORY_LEVEL_BASE,
@@ -17,6 +16,7 @@ from domain.decks import (
     VOCAB_N4_EXTERNAL_DATA,
     VOCAB_N5_EXTERNAL_DATA,
     get_conjugation_training_deck,
+    hidden_repeat_ids,
     get_grammar_patterns_deck,
     get_hiragana_deck,
     get_kanji_n1_deck,
