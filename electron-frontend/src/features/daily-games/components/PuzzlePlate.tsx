@@ -15,8 +15,8 @@ interface PuzzlePlateProps {
   cap: string
   title: string
   body?: string | null
-  /** 'busy' announces politely; 'alert' is a failure the learner has to act on */
-  tone: 'busy' | 'alert' | 'plain'
+  /** 'status' is said politely -- loading, an empty pool; 'alert' is a failure to act on */
+  tone: 'status' | 'alert'
   slab: SlabSpec
   onBack: () => void
   backAria: string
@@ -43,8 +43,8 @@ export function PuzzlePlate({ head, cap, title, body, tone, slab, onBack, backAr
         <RoundWork kick={PUZZLE_COPY.plateKick} kickJp={PUZZLE_COPY.plateKickJp} slab={slab}>
           <div
             className="rd-plain"
-            role={tone === 'alert' ? 'alert' : tone === 'busy' ? 'status' : undefined}
-            aria-label={tone === 'busy' ? title : undefined}
+            role={tone === 'alert' ? 'alert' : 'status'}
+            aria-label={tone === 'status' ? title : undefined}
           >
             <h2>{title}</h2>
             {body ? <p className={tone === 'alert' ? 'rd-err' : undefined}>{body}</p> : null}

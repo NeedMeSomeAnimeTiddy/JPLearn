@@ -18,7 +18,7 @@ describe('PuzzleEnding', () => {
   it('is a labelled non-modal region with keyboard-operable actions', async () => {
     const onDone = vi.fn()
     const { container } = render(
-      <PuzzleEnding mode="daily" title="Match Pairs complete" message="Done." score={2} count={2} clipboard={{ writeText: async () => undefined }} onDone={onDone} />,
+      <PuzzleEnding mode="daily" puzzle="Match Pairs" title="Match Pairs complete" message="Done." score={2} count={2} clipboard={{ writeText: async () => undefined }} onDone={onDone} />,
     )
 
     const results = screen.getByRole('region', { name: 'Match Pairs complete' })
@@ -33,7 +33,7 @@ describe('PuzzleEnding', () => {
   it('leads with REVIEW MISSED · n in vermilion when a daily run missed words, with Share as the calm second slab', async () => {
     const onReviewMissedWords = vi.fn(async () => undefined)
     render(
-      <PuzzleEnding mode="daily" title="Typing Blitz complete" message="Done." score={0} count={2} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missed} onReviewMissedWords={onReviewMissedWords} />,
+      <PuzzleEnding mode="daily" puzzle="Typing Blitz" title="Typing Blitz complete" message="Done." score={0} count={2} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missed} onReviewMissedWords={onReviewMissedWords} />,
     )
 
     const review = screen.getByRole('button', { name: /review missed words · 2/i })
@@ -49,16 +49,25 @@ describe('PuzzleEnding', () => {
   it('shows the review failing and lets it be pressed again', async () => {
     const onReviewMissedWords = vi.fn(async () => { throw new Error('no') })
     render(
-      <PuzzleEnding mode="daily" title="Typing Blitz complete" message="Done." score={0} count={2} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missed} onReviewMissedWords={onReviewMissedWords} />,
+      <PuzzleEnding mode="daily" puzzle="Typing Blitz" title="Typing Blitz complete" message="Done." score={0} count={2} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missed} onReviewMissedWords={onReviewMissedWords} />,
     )
     fireEvent.click(screen.getByRole('button', { name: /review missed words/i }))
     expect((await screen.findByRole('alert')).textContent).toMatch(/could not open missed-word review/i)
     expect((screen.getByRole('button', { name: /review missed words/i }) as HTMLButtonElement).disabled).toBe(false)
   })
 
+  it('shares a result that names the puzzle it came from', async () => {
+    const clipboard = { writeText: vi.fn(async () => undefined) }
+    render(
+      <PuzzleEnding mode="practice" puzzle="Word Search" title="Word Search complete" message="Done." score={3} count={4} clipboard={clipboard} onDone={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /share result/i }))
+    await waitFor(() => expect(clipboard.writeText).toHaveBeenCalledWith('JPLearn Word Search: 3/4 (practice).'))
+  })
+
   it('offers practice runs no review slab, only the road back', () => {
     render(
-      <PuzzleEnding mode="practice" title="Typing Blitz complete" message="Done." score={0} count={2} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missed} onReviewMissedWords={vi.fn(async () => undefined)} />,
+      <PuzzleEnding mode="practice" puzzle="Typing Blitz" title="Typing Blitz complete" message="Done." score={0} count={2} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missed} onReviewMissedWords={vi.fn(async () => undefined)} />,
     )
     expect(screen.queryByRole('button', { name: /review missed/i })).toBeNull()
     expect(screen.getByRole('button', { name: /back to the road/i })).toBeTruthy()

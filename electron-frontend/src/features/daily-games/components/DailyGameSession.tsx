@@ -50,9 +50,11 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
   const startedAt = useRef<number | null>(null)
   const attemptedTargetCount = useRef(0)
   const text = PUZZLE_TEXT[gameType]
+  const unavailable = fillCopy(DAILY_GAMES_COPY.puzzleUnavailable, { title: text.title })
 
   useEffect(() => {
     let active = true
+    const missing = fillCopy(DAILY_GAMES_COPY.puzzleUnavailable, { title: PUZZLE_TEXT[gameType].title })
     async function prepare(): Promise<void> {
       setIsLoading(true)
       setError(null)
@@ -61,14 +63,14 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         const nextSeed = mode === 'daily'
           ? data.pool.game_seeds[gameType]
           : (await dependencies.createPracticeSeed({ day: data.pool.day, gameType })).seed
-        if (typeof nextSeed !== 'number') throw new Error(DAILY_GAMES_COPY.gameUnavailable)
+        if (typeof nextSeed !== 'number') throw new Error(missing)
         if (active) {
           startedAt.current = dependencies.now().getTime()
           setSpent(0)
           setSeed(nextSeed)
         }
       } catch (caught) {
-        if (active) setError(caught instanceof Error && caught.message ? caught.message : DAILY_GAMES_COPY.gameUnavailable)
+        if (active) setError(caught instanceof Error && caught.message ? caught.message : missing)
       } finally {
         if (active) setIsLoading(false)
       }
@@ -112,12 +114,16 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
       onStateUpdated?.(nextState)
       setResult({ score: nextAttempt.score, pairCount: targetCount, isFallback: false, missedWords: getAttemptMissedWords(data, nextAttempt) })
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : DAILY_GAMES_COPY.gameUnavailable)
+      setError(caught instanceof Error && caught.message ? caught.message : unavailable)
     }
   }
 
   function completeGame(next: { score: number; targetCount: number; outcomes: DailyGamesAttemptRequest['outcomes'] }): void {
     attemptedTargetCount.current = next.targetCount
+    const now = dependencies.now().getTime()
+    const durationSeconds = Math.floor((now - (startedAt.current ?? now)) / 1000)
+    /* the SPENT chip stops on the figure that is recorded, not on the last tick of its interval */
+    setSpent(durationSeconds)
     if (next.outcomes.length === 0) {
       setResult({ score: next.score, pairCount: next.targetCount, isFallback: true, missedWords: [] })
       return
@@ -128,7 +134,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
       mode,
       score: next.score,
       completed: true,
-      durationSeconds: Math.floor((dependencies.now().getTime() - (startedAt.current ?? dependencies.now().getTime())) / 1000),
+      durationSeconds,
       outcomes: next.outcomes,
     }, next.targetCount)
   }
@@ -140,7 +146,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
 
   const head = puzzleHead(gameType)
   const cap = mode === 'daily' ? fillCopy(PUZZLE_COPY.dailyCap, { count: data.pool.words.length }) : PUZZLE_COPY.practiceCap
-  const spentChip = { key: 'spent', value: formatClock(spent), label: PUZZLE_COPY.spent }
+  const spentChip = { key: 'spent', value: formatClock(spent), label: 'SPENT' }
 
   /* THE ENDING, IN ITS THREE STATES -- saving, the save that failed, and the result. All three are
      the work cell of the same sheet; the board you finished stays in the prompt cell beside them. */
@@ -148,10 +154,11 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
     if (result) {
       const shownMode = result.isFallback ? 'practice' : mode
       return {
-        run: [{ key: 'score', value: pad2(result.score), of: `/ ${result.pairCount}`, label: PUZZLE_COPY.score }, spentChip],
+        run: [{ key: 'score', value: pad2(result.score), of: `/ ${result.pairCount}`, label: 'SCORE' }, spentChip],
         work: (
           <PuzzleEnding
             mode={shownMode}
+            puzzle={text.title}
             title={text.resultsTitle}
             message={shownMode === 'daily' ? text.dailyResults : text.practiceResults}
             score={result.score}
@@ -174,7 +181,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
             slab={{ text: PUZZLE_COPY.retrySlab, jp: PUZZLE_COPY.retrySlabJp, onClick: () => void recordAttempt(failed), label: DAILY_GAMES_COPY.retryGame }}
           >
             <div className="rd-plain" role="alert">
-              <h2>{fillCopy(DAILY_GAMES_COPY.puzzleUnavailable, { title: text.title })}</h2>
+              <h2>{unavailable}</h2>
               <p className="rd-err">{error}</p>
             </div>
           </RoundWork>
@@ -214,7 +221,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
           head={head}
           cap={PUZZLE_COPY.preparingCap}
           title={fillCopy(DAILY_GAMES_COPY.loadingGame, { title: text.title })}
-          tone="busy"
+          tone="status"
           slab={{ text: PUZZLE_COPY.waitSlab, jp: PUZZLE_COPY.waitSlabJp, tone: 'calm' }}
           onBack={onBack}
           backAria={DAILY_GAMES_COPY.backToGames}
@@ -226,7 +233,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         <PuzzlePlate
           head={head}
           cap={cap}
-          title={fillCopy(DAILY_GAMES_COPY.puzzleUnavailable, { title: text.title })}
+          title={unavailable}
           body={error}
           tone="alert"
           slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: onBack }}
@@ -269,6 +276,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         onBack()
       }}
     >
+      <h1 className="sr-only">{text.title}</h1>
       {body()}
     </section>
   )

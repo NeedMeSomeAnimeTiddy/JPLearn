@@ -26,8 +26,9 @@ button.dp-cell { cursor: pointer; }
 /* the open squares of a crossword are inputs, and an input brings a width and a caret of its own */
 input.dp-cell { width: 100%; height: 100%; caret-color: var(--hi); }
 .dp-block { background: rgba(20, 17, 13, 0.1); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.1); }
-/* the entry you are on, the line you are drawing -- lit, edged in ink */
-.dp-cell.here { background: var(--gold-hi); box-shadow: inset 0 0 0 2px var(--ink); }
+/* the entry you are on, the line you are drawing -- an ink wash edged in ink. NOT GOLD: gold is
+   earned, and a line you are still drawing has not earned anything yet. */
+.dp-cell.here { background: rgba(20, 17, 13, 0.12); box-shadow: inset 0 0 0 2px var(--ink); }
 /* found is earned, so it is gold */
 .dp-cell.on { background: var(--gold); }
 
@@ -70,6 +71,8 @@ button.dp-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px
 /* the clue you are on */
 .dp-row.here { box-shadow: inset 3px 0 0 var(--hi), inset 0 -1px 0 rgba(20, 17, 13, 0.1); padding-left: 8px; }
 .dp-row.here u { background: var(--hi); color: #ffe9c9; }
+/* the clue you are on is read in full -- clues run to 120 characters and an ellipsis is not a clue */
+.dp-row.here b { white-space: normal; overflow: visible; text-overflow: clip; }
 .dp-fold, .dp-status {
   margin: 0; padding: 7px 0 0;
   font-family: var(--lat-ui); font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
@@ -101,7 +104,7 @@ button.dp-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px
 }
 .dp-tile {
   min-width: 0; min-height: 0; padding: 0 10px; border: 0; cursor: pointer;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: grid; place-items: center; overflow: hidden;
   background: var(--washi-dim); color: var(--ink);
   box-shadow: 3px 4px 0 rgba(20, 17, 13, 0.22), inset 0 0 0 1px rgba(20, 17, 13, 0.16);
   transition: background 0.14s ease, box-shadow 0.14s ease;
@@ -109,6 +112,12 @@ button.dp-row:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px
 .dp-tile.jp { font-family: var(--jp); font-weight: 400; font-size: 21px; }
 .dp-tile.lat {
   font-family: var(--lat); font-style: italic; font-weight: 900; font-size: 15px; letter-spacing: 0.01em;
+}
+/* TWO LINES, THEN IT STOPS. A meaning longer than one line is the common case, and two lines of
+   it at 1.1 still fit the 45px tile; the whole of it is the tile's title. */
+.dp-tile > span {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; white-space: normal; line-height: 1.1; overflow-wrap: anywhere;
 }
 .dp-tile:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
 .dp-tile:disabled { cursor: default; }

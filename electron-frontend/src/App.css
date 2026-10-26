@@ -6385,7 +6385,7 @@ kbd {
   overflow: hidden;
 }
 
-/* Subtle noise texture — same as hub-topbar */
+/* Subtle noise texture */
 .cassette-panel-header::before {
   content: '';
   position: absolute;
@@ -6429,7 +6429,7 @@ kbd {
     0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* Decorative accent stripe under title — same as hub-topbar-stripe */
+/* Decorative accent stripe under title */
 .cassette-panel-header-title::after {
   content: '';
   display: block;

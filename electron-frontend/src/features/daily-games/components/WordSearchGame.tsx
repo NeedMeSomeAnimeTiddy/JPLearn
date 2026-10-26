@@ -3,7 +3,7 @@ import { startTransition, useCallback, useEffect, useOptimistic, useRef, useStat
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { RoundWork } from '../../round'
 import type { DailyGamesWordPayload } from '../../../generated/types'
-import { CROSSWORD_COPY, WORD_SEARCH_COPY, WORD_SEARCH_MAX_TARGETS } from '../constants'
+import { WORD_SEARCH_COPY, WORD_SEARCH_MAX_TARGETS } from '../constants'
 import type { DailyGamesAttemptOutcomeInput, PuzzleShell, WordSearchBoard, WordSearchCoordinate, WordSearchTarget } from '../types'
 import { boardCell, pad2 } from '../utils'
 import { PuzzleRound, PuzzleRows } from './PuzzleRound'
@@ -243,7 +243,7 @@ export function WordSearchGame({ board, words, isSaving, onComplete, shell }: Wo
             render={(target, index) => {
               const isFound = optimisticFoundTargetIds.has(target.id)
               /* ENGLISH LEADS -- it is the half of the word you can read the list by */
-              const meaning = target.poolPosition === null ? CROSSWORD_COPY.fallbackClue : (words[target.poolPosition]?.meaning ?? target.value)
+              const meaning = target.poolPosition === null ? WORD_SEARCH_COPY.fallbackMeaning : (words[target.poolPosition]?.meaning ?? target.value)
               return (
                 <li key={target.id} className={isFound ? 'dp-row on' : 'dp-row'}>
                   <u aria-hidden="true">{pad2(index + 1)}</u>

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { screenHead } from '../../menu'
 import { puzzleHead } from '../../menu/daily'
 import { DAILY_GAMES_COPY, PUZZLE_COPY } from '../constants'
 import type { DailyGameType, DailyGamesMode, DailyGamesSessionDependencies } from '../types'
@@ -24,16 +25,40 @@ import '../daily-games.css'
    ================================================================================================== */
 
 export interface DailyGameViewProps {
-  gameType: DailyGameType
+  /** null when the route was reached with nothing chosen -- history forward, say */
+  gameType: DailyGameType | null
   mode: DailyGamesMode
   onBack: () => void
   dependencies?: DailyGamesSessionDependencies
   onReviewMissedWords?: (missedWords: DailyGamesMissedWordPayload[]) => Promise<void>
 }
 
-export function DailyGameView({
+export function DailyGameView({ gameType, ...rest }: DailyGameViewProps) {
+  /* NOTHING CHOSEN IS STILL A SHEET. The route can be reached without a puzzle -- the titlebar's
+     forward after Back cleared it -- and a blank window is the shape of a broken screen. It says
+     so and offers the road, without fetching a day it has no puzzle to deal from. */
+  if (!gameType) {
+    return (
+      <div className="dp-puzzle">
+        <PuzzlePlate
+          head={screenHead('DRILLS', 'daily')}
+          cap={PUZZLE_COPY.noPuzzleCap}
+          title={PUZZLE_COPY.noPuzzleTitle}
+          body={PUZZLE_COPY.noPuzzleBody}
+          tone="status"
+          slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: rest.onBack }}
+          onBack={rest.onBack}
+          backAria={DAILY_GAMES_COPY.backToGames}
+        />
+      </div>
+    )
+  }
+  return <ChosenPuzzle gameType={gameType} {...rest} />
+}
+
+function ChosenPuzzle({
   gameType, mode, onBack, dependencies, onReviewMissedWords,
-}: DailyGameViewProps) {
+}: DailyGameViewProps & { gameType: DailyGameType }) {
   const deps = useMemo(
     () => dependencies ?? getDefaultDailyGamesSessionDependencies(),
     [dependencies],
@@ -48,7 +73,7 @@ export function DailyGameView({
           head={head}
           cap={PUZZLE_COPY.loadingCap}
           title={DAILY_GAMES_COPY.loading}
-          tone="busy"
+          tone="status"
           slab={{ text: PUZZLE_COPY.waitSlab, jp: PUZZLE_COPY.waitSlabJp, tone: 'calm' }}
           onBack={onBack}
           backAria={DAILY_GAMES_COPY.backToGames}
@@ -76,7 +101,7 @@ export function DailyGameView({
           cap={PUZZLE_COPY.emptyCap}
           title={DAILY_GAMES_COPY.emptyTitle}
           body={DAILY_GAMES_COPY.emptyBody}
-          tone="plain"
+          tone="status"
           slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: onBack }}
           onBack={onBack}
           backAria={DAILY_GAMES_COPY.backToGames}

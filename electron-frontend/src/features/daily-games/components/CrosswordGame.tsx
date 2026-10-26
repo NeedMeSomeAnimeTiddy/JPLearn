@@ -1,6 +1,6 @@
 import { cva } from 'class-variance-authority'
 import { startTransition, useEffect, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent, KeyboardEvent } from 'react'
+import type { CSSProperties, KeyboardEvent } from 'react'
 import * as wanakana from 'wanakana'
 import { RoundVerdict, RoundWork } from '../../round'
 import { CROSSWORD_COPY, CROSSWORD_MAX_TARGETS } from '../constants'
@@ -54,6 +54,9 @@ export function CrosswordGame({ board, isSaving, onComplete, shell }: CrosswordG
   const [activeEntryId, setActiveEntryId] = useState(board.entries[0]?.id ?? '')
   const [focusCoordinate, setFocusCoordinate] = useState<CrosswordCoordinate | null>(null)
   const [status, setStatus] = useState('')
+  /* the render's answer to "is it over"; `completed` is the same fact for the handlers, which
+     must see it before the next render does */
+  const [solved, setSolved] = useState(false)
   const completed = useRef(false)
   const cellRefs = useRef<Array<Array<HTMLInputElement | null>>>([])
   const activeEntry = board.entries.find((entry) => entry.id === activeEntryId) ?? board.entries[0]
@@ -158,6 +161,7 @@ export function CrosswordGame({ board, isSaving, onComplete, shell }: CrosswordG
       return
     }
     completed.current = true
+    setSolved(true)
     const outcomes = board.entries
       .filter((entry) => entry.poolPosition !== null)
       .map((entry) => ({
@@ -168,19 +172,12 @@ export function CrosswordGame({ board, isSaving, onComplete, shell }: CrosswordG
     onComplete({ score: solvedEntries.length, targetCount: board.entries.length, outcomes })
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault()
-    if ((event.nativeEvent as unknown as { isComposing?: boolean }).isComposing) return
-    submit()
-  }
-
   const columns = board.grid[0]?.length ?? board.grid.length
   const cell = boardCell(columns)
   const isFilled = (entry: CrosswordEntry): boolean => entry.cells.every((item) => (values.get(coordinateKey(item)) ?? '').trim() !== '')
   const filledCount = board.entries.filter(isFilled).length
   /* NO LIVE CORRECTNESS. The trail stays empty until CHECK has said every answer is right, because
      a gold tick is earned and a filled square is not yet anything. */
-  const solved = status === CROSSWORD_COPY.complete
   return (
     <PuzzleRound
       shell={shell}
@@ -203,38 +200,36 @@ export function CrosswordGame({ board, isSaving, onComplete, shell }: CrosswordG
         <div className="rd-ask">
           <div className="rd-kick"><span>THE GRID</span><em>升目</em></div>
           <div className="dp-stage">
-            <form onSubmit={handleSubmit}>
-              <div role="region" aria-label={CROSSWORD_COPY.boardLabel} aria-describedby="crossword-instructions">
-                <div className="dp-board" style={{ '--dp-n': columns, '--dp-cell': `${cell}px` } as CSSProperties}>
-                  {board.grid.map((gridRow, row) => gridRow.map((character, column) => {
-                    const coordinate = { row, column }
-                    const entry = character === null ? undefined : getEntryAt(coordinate)
-                    return character === null ? <span key={coordinateKey(coordinate)} className="dp-cell dp-block" aria-hidden="true" /> : (
-                      <input
-                        key={coordinateKey(coordinate)}
-                        ref={(element) => { (cellRefs.current[row] ??= [])[column] = element }}
-                        className={crosswordCell({ active: entry?.id === activeEntry?.id })}
-                        lang="ja"
-                        aria-label={getCellLabel(row, column)}
-                        aria-describedby="crossword-current-clue"
-                        autoComplete="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                        value={values.get(coordinateKey(coordinate)) ?? ''}
-                        disabled={isSaving || completed.current}
-                        onClick={() => { if (entry) setActiveEntryId(entry.id) }}
-                        onFocus={(event) => { wanakana.bind(event.currentTarget, { IMEMode: 'toHiragana' }) }}
-                        onBlur={(event) => { wanakana.unbind(event.currentTarget); normalizeCell(coordinate) }}
-                        onChange={(event) => updateValue(coordinate, event.target.value)}
-                        onInput={(event) => updateValue(coordinate, event.currentTarget.value, (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing)}
-                        onCompositionEnd={(event) => updateValue(coordinate, event.currentTarget.value)}
-                        onKeyDown={(event) => handleKeyDown(event, coordinate)}
-                      />
-                    )
-                  }))}
-                </div>
+            <div role="region" aria-label={CROSSWORD_COPY.boardLabel} aria-describedby="crossword-instructions">
+              <div className="dp-board" style={{ '--dp-n': columns, '--dp-cell': `${cell}px` } as CSSProperties}>
+                {board.grid.map((gridRow, row) => gridRow.map((character, column) => {
+                  const coordinate = { row, column }
+                  const entry = character === null ? undefined : getEntryAt(coordinate)
+                  return character === null ? <span key={coordinateKey(coordinate)} className="dp-cell dp-block" aria-hidden="true" /> : (
+                    <input
+                      key={coordinateKey(coordinate)}
+                      ref={(element) => { (cellRefs.current[row] ??= [])[column] = element }}
+                      className={crosswordCell({ active: entry?.id === activeEntry?.id })}
+                      lang="ja"
+                      aria-label={getCellLabel(row, column)}
+                      aria-describedby="crossword-current-clue"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      value={values.get(coordinateKey(coordinate)) ?? ''}
+                      disabled={isSaving || solved}
+                      onClick={() => { if (entry) setActiveEntryId(entry.id) }}
+                      onFocus={(event) => { wanakana.bind(event.currentTarget, { IMEMode: 'toHiragana' }) }}
+                      onBlur={(event) => { wanakana.unbind(event.currentTarget); normalizeCell(coordinate) }}
+                      onChange={(event) => updateValue(coordinate, event.target.value)}
+                      onInput={(event) => updateValue(coordinate, event.currentTarget.value, (event.nativeEvent as unknown as { isComposing?: boolean }).isComposing)}
+                      onCompositionEnd={(event) => updateValue(coordinate, event.currentTarget.value)}
+                      onKeyDown={(event) => handleKeyDown(event, coordinate)}
+                    />
+                  )
+                }))}
               </div>
-            </form>
+            </div>
           </div>
           <p id="crossword-current-clue" className="sr-only" role="status">{CROSSWORD_COPY.currentClue}: {activeEntry?.clue}</p>
         </div>
@@ -243,7 +238,7 @@ export function CrosswordGame({ board, isSaving, onComplete, shell }: CrosswordG
         <RoundWork
           kick="CLUES"
           kickJp="手がかり"
-          slab={{ text: 'CHECK', jp: '確認', onClick: submit, disabled: isSaving || completed.current, label: CROSSWORD_COPY.submit }}
+          slab={{ text: 'CHECK', jp: '確認', onClick: submit, disabled: isSaving || solved, label: CROSSWORD_COPY.submit }}
           after={status ? <RoundVerdict message={status} tone={solved ? 'success' : 'error'} /> : null}
         >
           <p id="crossword-instructions" className="sr-only">{CROSSWORD_COPY.instructions}</p>
@@ -257,8 +252,9 @@ export function CrosswordGame({ board, isSaving, onComplete, shell }: CrosswordG
                 <button
                   type="button"
                   className={entry.id === activeEntry?.id ? 'dp-row here' : 'dp-row'}
-                  aria-label={getClueLabel(entry, index)}
+                  aria-label={isFilled(entry) ? `${getClueLabel(entry, index)} · FILLED` : getClueLabel(entry, index)}
                   aria-pressed={entry.id === activeEntry?.id}
+                  title={entry.clue}
                   onClick={() => selectEntry(entry)}
                 >
                   <u aria-hidden="true">{pad2(index + 1)}</u>

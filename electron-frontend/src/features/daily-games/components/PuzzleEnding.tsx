@@ -17,6 +17,8 @@ import { PuzzleRows } from './PuzzleRound'
 
 interface PuzzleEndingProps {
   mode: DailyGamesMode
+  /** the puzzle's own name, which the shared result names */
+  puzzle: string
   title: string
   message: string
   score: number
@@ -28,7 +30,7 @@ interface PuzzleEndingProps {
 }
 
 export function PuzzleEnding({
-  mode, title, message, score, count, clipboard, onDone, missedWords = [], onReviewMissedWords,
+  mode, puzzle, title, message, score, count, clipboard, onDone, missedWords = [], onReviewMissedWords,
 }: PuzzleEndingProps) {
   const [shareState, setShareState] = useState<'idle' | 'success' | 'error'>('idle')
   const [reviewState, setReviewState] = useState<'idle' | 'loading' | 'error'>('idle')
@@ -36,7 +38,7 @@ export function PuzzleEnding({
 
   async function shareResult(): Promise<void> {
     try {
-      await clipboard.writeText(buildShareResult(score, count, mode))
+      await clipboard.writeText(buildShareResult(score, count, mode, puzzle))
       setShareState('success')
     } catch {
       setShareState('error')

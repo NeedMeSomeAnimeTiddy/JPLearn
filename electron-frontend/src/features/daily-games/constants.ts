@@ -24,7 +24,7 @@ export const DAILY_GAMES_COPY = {
   /* `{title}` is the puzzle's own name -- this said "Match Pairs" over all four */
   loadingGame: 'Preparing {title}',
   puzzleUnavailable: '{title} is unavailable right now.',
-  gameUnavailable: 'Match Pairs is unavailable right now.',
+  gameUnavailable: 'This puzzle is unavailable right now.',
   backToGames: 'Back to the daily road',
   retryGame: 'Try again',
   matchPairsTitle: 'Match Pairs',
@@ -43,7 +43,8 @@ export const DAILY_GAMES_COPY = {
   share: 'Share result',
   shareSuccess: 'Result copied to your clipboard.',
   shareFailure: 'Could not copy the result. Try again.',
-  shareFormat: 'JPLearn Match Pairs: {score}/{pairCount} pairs matched ({mode}).',
+  /* `{title}` is the puzzle's own name -- this said "Match Pairs" for all four */
+  shareFormat: 'JPLearn {title}: {score}/{pairCount} ({mode}).',
   reviewMissedWords: 'Review missed words',
   reviewingMissedWords: 'Opening review',
   reviewMissedWordsFailure: 'Could not open missed-word review. Try again.',
@@ -97,6 +98,8 @@ export const WORD_SEARCH_FILLER_CHARACTERS = Array.from('あいうえおかき�
 export const WORD_SEARCH_COPY = {
   title: 'Word Search',
   hint: 'Find each Japanese word in the grid.',
+  /** what the list says for the fallback target, which has no pool word to take a meaning from */
+  fallbackMeaning: 'Practice word',
   instructions: 'Select a starting cell, then select the last cell in a horizontal, vertical, or diagonal line. You can drag across cells, or use arrow keys and Enter or Space.',
   progress: 'Words found',
   targetList: 'Words to find',
@@ -166,8 +169,10 @@ export const PUZZLE_COPY = {
   loadingCap: 'READING TODAY’S POOL',
   unavailableCap: 'TODAY’S POOL DID NOT LOAD',
   emptyCap: 'TODAY’S POOL · NO WORDS',
+  noPuzzleCap: 'NO PUZZLE CHOSEN',
+  noPuzzleTitle: 'No puzzle chosen',
+  noPuzzleBody: 'Pick one of today’s four on the daily road.',
   preparingCap: 'DEALING THE BOARD',
-  savingCap: 'SAVING YOUR RESULT',
   plateKick: 'THE BOARD',
   plateKickJp: '盤',
   waitSlab: 'ONE MOMENT',
@@ -190,6 +195,4 @@ export const PUZZLE_COPY = {
   noMisses: 'NOTHING MISSED',
   more: '{count} MORE',
   words: '{count} WORDS',
-  score: 'SCORE',
-  spent: 'SPENT',
 } as const

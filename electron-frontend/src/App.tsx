@@ -2908,13 +2908,14 @@ function App() {
       {/* A PUZZLE STANDS BARE, the way the exam run does: the sheet is the whole screen, so the old
           hub's CRT, glitch corners and nameplate went with it. Back is `navigate('home', 'back')`,
           which leaves `menuPath` where the road put it -- the DAILY road, level three, with the
-          tablet you pressed still on it. */}
-      {view === 'daily_games' && dailyPlay ? (
+          tablet you pressed still on it. With nothing chosen (history forward after Back cleared it)
+          the view draws its own plate offering the road rather than a blank window. */}
+      {view === 'daily_games' ? (
         <ErrorBoundary>
-          <Suspense fallback={<div role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
+          <Suspense fallback={<div className="dp-puzzle" role="status" aria-label={DAILY_GAMES_COPY.loading} />}>
             <DailyGameView
-              gameType={dailyPlay.type}
-              mode={dailyPlay.mode}
+              gameType={dailyPlay?.type ?? null}
+              mode={dailyPlay?.mode ?? 'daily'}
               onBack={() => { setDailyPlay(null); navigate('home', 'back') }}
               onReviewMissedWords={startMissedWordReview}
             />

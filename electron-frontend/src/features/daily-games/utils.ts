@@ -161,8 +161,9 @@ export function buildWordSearch(words: readonly DailyGamesWordPayload[], seed: n
     : buildPlacedBoard(candidates, random) ?? buildWordSearchFallback(seed, null)
 }
 
-export function buildShareResult(score: number, pairCount: number, mode: string): string {
+export function buildShareResult(score: number, pairCount: number, mode: string, title: string): string {
   return DAILY_GAMES_COPY.shareFormat
+    .replace('{title}', title)
     .replace('{score}', String(score))
     .replace('{pairCount}', String(pairCount))
     .replace('{mode}', mode)

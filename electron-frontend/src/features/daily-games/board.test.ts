@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { CROSSWORD_MAX_GRID_SIZE, CROSSWORD_MIN_GRID_SIZE, PUZZLE_ASK_W, PUZZLE_BOARD_GAP, WORD_SEARCH_MAX_GRID_SIZE } from './constants'
 import { boardCell } from './utils'
 
@@ -21,5 +23,34 @@ describe('boardCell', () => {
       expect(n * cell + (n - 1) * PUZZLE_BOARD_GAP).toBeLessThanOrEqual(PUZZLE_ASK_W)
       expect(n * (cell + 1) + (n - 1) * PUZZLE_BOARD_GAP).toBeGreaterThan(PUZZLE_ASK_W)
     }
+  })
+})
+
+/* THE SHEET'S COLOUR LAW, held in the stylesheet: gold is earned, so the entry you are on and the
+   line you are still drawing are ink; and a label that does not fit wraps rather than vanishing
+   behind an ellipsis. */
+describe('the puzzle stylesheet', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/features/daily-games/daily-games.css'), 'utf8')
+  const rule = (selector: string) => {
+    const at = css.indexOf(`${selector} {`)
+    expect(at, `${selector} is styled`).toBeGreaterThanOrEqual(0)
+    return css.slice(at, css.indexOf('}', at))
+  }
+
+  it('never marks selected or in-progress in gold', () => {
+    expect(rule('.dp-cell.here')).not.toMatch(/gold/)
+    expect(rule('.dp-cell.here')).toMatch(/var\(--ink\)/)
+  })
+
+  it('wraps the clue you are on and lets a tile take two lines', () => {
+    expect(rule('.dp-row.here b')).toMatch(/white-space: normal/)
+    const tile = rule('.dp-tile > span')
+    expect(tile).toMatch(/-webkit-line-clamp: 2/)
+    expect(tile).toMatch(/white-space: normal/)
+    expect(tile).toMatch(/line-height: 1\.1/)
+  })
+
+  it('never rounds a corner', () => {
+    expect(css.includes('border-radius')).toBe(false)
   })
 })

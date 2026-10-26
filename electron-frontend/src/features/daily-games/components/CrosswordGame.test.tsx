@@ -89,8 +89,11 @@ describe('CrosswordGame', () => {
     expect(firstInput.value).toBe('が')
 
     fireEvent.keyDown(firstInput, { key: 'Enter', isComposing: true })
-    fireEvent.submit(firstInput.closest('form')!)
+    fireEvent.keyDown(firstInput, { key: 'Enter' })
     expect(onComplete).not.toHaveBeenCalled()
+    /* Enter sets a square and never checked anything, so the form it was inside is gone too --
+       CHECK is the slab */
+    expect(firstInput.closest('form')).toBeNull()
 
     const secondInput = screen.getByRole('textbox', { name: cellName(secondCell.row, secondCell.column) }) as HTMLInputElement
     fireEvent.change(secondInput, { target: { value: 'っ' } })
@@ -136,6 +139,10 @@ describe('CrosswordGame', () => {
     })
     const first = screen.getByRole('button', { name: /clue 1:/i })
     expect(first.textContent).toContain('FILLED')
+    expect(first.getAttribute('aria-label')).toMatch(/· FILLED$/)
+    expect(first.getAttribute('title')).toBe(entry.clue)
+    const unfilled = board.entries.findIndex((other) => other.cells.some((cell) => !entry.cells.some((mine) => mine.row === cell.row && mine.column === cell.column)))
+    expect(screen.getByRole('button', { name: new RegExp(`clue ${unfilled + 1}:`, 'i') }).getAttribute('aria-label')).not.toMatch(/FILLED/)
     expect(first.className).not.toMatch(/\b(on|bad)\b/)
     expect(document.querySelectorAll('.rd-ticks i.on, .rd-ticks i.bad')).toHaveLength(0)
 

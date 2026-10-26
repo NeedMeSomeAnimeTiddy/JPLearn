@@ -97,10 +97,11 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
               className={classes.join(' ')}
               lang={side === 'character' ? 'ja' : undefined}
               aria-pressed={selected?.id === pair.id}
+              title={pair.value}
               disabled={isSaving || isResolving || matchedIds.has(pair.id)}
               onClick={() => selectPair(pair)}
             >
-              {pair.value}
+              <span>{pair.value}</span>
             </button>
           )
         })}
