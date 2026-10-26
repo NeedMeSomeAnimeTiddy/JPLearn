@@ -60,7 +60,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {this.props.onBack ? (
               <button
                 type="button"
-                className="error-boundary-retry btn-primary"
+                className="error-boundary-retry error-boundary-back btn-primary"
                 onClick={this.props.onBack}
               >
                 <ArrowLeft size={14} strokeWidth={2.2} aria-hidden="true" />

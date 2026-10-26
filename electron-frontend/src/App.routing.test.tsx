@@ -18,6 +18,8 @@
  * asserted here — it has to be checked by eye at each call site.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { openDeck, openGame } from './test-entry'
 import { SCREEN_NAMES } from './features/menu'
@@ -474,6 +476,41 @@ describe('titlebar-only tools in the command palette', () => {
 
 /* A CRASHED PUZZLE, EXAM OR PASSAGE HAS NO CHROME TO LEAVE BY, so its boundary's fallback carries Back.
    App.tsx hands each of the three routes the same `onBack` the screen itself uses. */
+/* JSDOM APPLIES NO CSS, so a role query finds the timer chip whether or not the bare titlebar hides it
+   (it did, for one review round). Visibility is held where it is decided: in menu.css. */
+describe('the bare titlebar keeps the focus timer visible', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/features/menu/menu.css'), 'utf8')
+  const rule = (selector: string) => {
+    const at = css.indexOf(`${selector} {`)
+    expect(at, `${selector} is styled`).toBeGreaterThanOrEqual(0)
+    return css.slice(at, css.indexOf('}', at))
+  }
+
+  it('hides the progress cluster except the timer chip, never the cluster itself', () => {
+    expect(css).not.toMatch(/\.window-titlebar\.is-bare \.titlebar-progress-cluster \{[^}]*display: none/)
+    expect(rule('.window-titlebar.is-bare .titlebar-progress-cluster > :not(.titlebar-pomodoro)')).toMatch(/display: none/)
+    expect(rule('.window-titlebar.is-bare .titlebar-pomodoro')).not.toMatch(/display: none/)
+  })
+
+  it('draws the chip square-cornered, in the menu chip, above the 30px line the run chips start at', () => {
+    const chip = rule('.window-titlebar.is-bare .titlebar-pomodoro')
+    expect(chip).toMatch(/border-radius: 0/)
+    expect(chip).toMatch(/background: var\(--washi\)/)
+    expect(chip).toMatch(/skewX\(-8deg\)/)
+    /* centred in the 40px bar and 20px tall (3px + a 14px line + 3px), so its bottom edge is at
+       20 + 10 + `top`, and has to be above 30 */
+    const lift = Number(/top: (-?\d+)px/.exec(chip)?.[1])
+    expect(20 + 10 + lift).toBeLessThan(30)
+  })
+
+  it('marks the titlebar chip with the class that the stylesheet spares', async () => {
+    window.localStorage.setItem('jplearn-desktop-settings-v1', JSON.stringify({ pomodoroEnabled: true }))
+    render(<App />)
+    await expectView('home')
+    expect(document.querySelector('.titlebar-progress-cluster > button.titlebar-pomodoro')).toBeTruthy()
+  })
+})
+
 describe('ErrorBoundary Back', () => {
   function Boom(): never {
     throw new Error('the screen broke')

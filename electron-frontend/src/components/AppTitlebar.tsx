@@ -442,7 +442,7 @@ export function AppTitlebar({
         {settings.pomodoroEnabled ? (
           <button
             type="button"
-            className={`titlebar-streak-chip ${pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? 'titlebar-pomodoro--break' : ''}`}
+            className={`titlebar-streak-chip titlebar-pomodoro ${pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? 'titlebar-pomodoro--break' : ''}`}
             onClick={pomodoro.toggle}
             aria-label={pomodoro.display ? `${pomodoro.display.isRunning ? 'Pause' : 'Resume'} timer (${pomodoro.display.formatted})` : 'Start timer'}
             title={pomodoro.display ? `${pomodoro.display.phase} — ${pomodoro.display.formatted}` : 'Start timer'}

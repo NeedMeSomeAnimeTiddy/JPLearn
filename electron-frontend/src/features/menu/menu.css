@@ -3621,13 +3621,35 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 /* AND THE PROGRESS CLUSTER IS A SIBLING OF THE DRAG STRIP, NOT A CHILD OF IT. Hiding the strip's
    children left the streak chip, the streak and the XP bar still drawn -- faintly, over the sky,
    saying 4 and 2 next to a menu chip already saying 4 DAY STREAK and Lv 2. Found by reading the
-   header's own children in the running app rather than by reading the component. */
-.window-titlebar.is-bare .titlebar-progress-cluster { display: none; }
+   header's own children in the running app rather than by reading the component.
+
+   EVERYTHING IN IT GOES BUT THE FOCUS TIMER. The bar is bare on every screen, so this chip is the
+   only thing that draws the countdown -- hide it and a timer started from the palette runs where
+   nobody can see it. It is drawn in the menu's chip (washi, ink, tracked caps, the -8deg slant,
+   square corners) at 20px and lifted to y 4-24, so it ends above the 30px line where the menu's
+   `.stats` and the round's `.rd-run` begin, and clear of them wherever they run to the left. */
+.window-titlebar.is-bare .titlebar-progress-cluster > :not(.titlebar-pomodoro) { display: none; }
+.window-titlebar.is-bare .titlebar-pomodoro {
+  position: relative; top: -6px; margin-right: 10px;
+  padding: 3px 10px; border-radius: 0;
+  background: var(--washi); color: var(--ink);
+  font-family: var(--lat-ui); font-weight: 600; font-size: 11px; letter-spacing: 0.14em;
+  transform: skewX(-8deg);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
+  transition: filter 0.16s ease;
+}
+.window-titlebar.is-bare .titlebar-pomodoro:hover { filter: brightness(1.08); }
+.window-titlebar.is-bare .titlebar-pomodoro.titlebar-pomodoro--break { background: var(--ink); color: var(--washi); }
+.window-titlebar.is-bare .titlebar-pomodoro .titlebar-streak-icon { color: inherit; }
 /* AND THE CONTROLS GO QUIET RATHER THAN AWAY. Cream-on-cream chrome over a night valley reads as a
    scrap of the old interface left behind; at 0.55 they are still plainly there and still hit their
    full contrast the moment the pointer finds them. */
 .window-titlebar.is-bare .window-control-button { opacity: 0.55; color: var(--washi, #f2ead8); }
 .window-titlebar.is-bare .window-control-button:hover { opacity: 1; }
+
+/* THE CRASH FALLBACK'S BACK IS THE QUIET ONE: an outline in the card's own text colour, so it reads
+   as the way out beside Try again's filled button rather than as a second copy of it. */
+.btn-primary.error-boundary-back { background: transparent; color: inherit; }
 
 /* ---- THE BACK CONTROL, LIFTED ---------------------------------------------------------------
    Every screen below the front door needs one, and the port's `.pj-back` was a bare gold line at
