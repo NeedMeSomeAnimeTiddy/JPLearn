@@ -1632,8 +1632,6 @@ kbd {
   color: var(--text-main);
 }
 
-/* Locked menu card state */
-
 .glyph-svg {
   width: 20px;
   height: 20px;
@@ -1644,8 +1642,6 @@ kbd {
   height: 16px;
   flex-shrink: 0;
 }
-
-
 
 .spin-icon {
   animation: iconSpin 0.9s linear infinite;
@@ -1781,8 +1777,6 @@ kbd {
 
 /* .learning-path-shell/.learning-path-toggle/.learning-path-compact/.learning-path-body
    removed — replaced by .hub-rail/.hub-block-list in hub-studio layout */
-
-
 
 /* ==================================================================================================
    THE CHARACTER MASTERY GRID IS THE `mastery` FEATURE NOW, and the little card its chips opened is
@@ -2009,38 +2003,6 @@ kbd {
   font-size: 0.69rem;
   color: var(--text-soft);
 }
-
-/* ── Home recommendations section ─────────────────────────────── */
-/* ═══════════════════════════════════════════════════════════════
-   Your course — tape counter + track index (issue #78 phase 4)
-
-   The course is a sequence, so it is drawn as one: a row of index marks
-   in order, with the stage you are on read out above it. Replaced a
-   wrapped grid of sixteen equal chips, which buried the current stage
-   and repeated "progress not tracked yet" ten times.
-   ═══════════════════════════════════════════════════════════════ */
-
-.course {
-  position: relative;
-  margin-top: 10px;
-  padding: 9px 11px 8px;
-  border: 1px solid var(--panel-border);
-  border-radius: 0;
-  background: color-mix(in oklab, var(--panel-bg) 60%, transparent);
-}
-
-/* Only the reasons that mean "something is wrong" get their own colour; the
-   rest stay neutral so the accent keeps meaning "start here". */
-
-
-
-
-
-
-
-
-
-
 
 .cassette-brand {
   font-size: 0.56rem;
@@ -2460,9 +2422,6 @@ kbd {
 
   
 }
-
-
-
 
 /* THE SCRIM HAS TO HIDE A VALLEY NOW, NOT A DARK PAGE.
    0.62 over panels whose own --panel-bg is 0.84 alpha leaves about six per cent of whatever is
@@ -3199,7 +3158,6 @@ kbd {
   0% { transform: scaleY(0.4); }
   100% { transform: scaleY(1); }
 }
-
 
 .settings-theme-entry.is-active {
   border-color: color-mix(in oklab, var(--theme-color, var(--accent)) 74%, var(--panel-border));
@@ -3996,7 +3954,6 @@ html[data-reduced-motion='true'] *::after {
   transform: translateY(2px);
   box-shadow: none;
 }
-
 
 /* ── Shared primary button ──────────────────────────────────────── */
 .btn-primary {
