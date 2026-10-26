@@ -210,7 +210,7 @@ export function KanjiDetailPanel({ character, onClose, backTo = null }: KanjiDet
     >
       <button type="button" className="lk-scrim" aria-label={closeLabel} tabIndex={-1} onClick={onClose} />
       <div className="lk-frame" ref={frameRef}>
-        <div className="mx-sheet kx-sheet" ref={sheetRef} tabIndex={-1}>
+        <div className="kx-sheet" ref={sheetRef} tabIndex={-1}>
           <div className="lk-cap">
             <b lang="ja">字</b><i>CHARACTER</i>
             <s>
