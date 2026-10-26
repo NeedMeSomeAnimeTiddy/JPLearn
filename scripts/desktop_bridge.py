@@ -4014,6 +4014,26 @@ def _cmd_fsrs_get_weights(argv: list[str]) -> tuple[int, dict[str, object]]:
         return 2, {"error": str(exc)}
 
 
+def _cmd_fsrs_reload_weights(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """Re-read the saved FSRS weights into this worker's scheduler.
+
+    ``fsrs-optimize`` runs in a one-shot process, so the long-lived worker would
+    otherwise keep scheduling with the weights it read at startup. Unlike
+    ``_apply_persisted_fsrs_weights`` this reports failures instead of swallowing them.
+    """
+    try:
+        from domain.scheduler import reset_weights as reset_scheduler_weights
+
+        saved = load_fsrs_weights()
+        if saved is not None:
+            set_scheduler_weights(saved)
+        else:
+            reset_scheduler_weights()
+        return 0, {"ok": True, "is_custom": saved is not None}
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
 def _cmd_fsrs_optimize(argv: list[str]) -> tuple[int, dict[str, object]]:
     try:
         result = run_fsrs_optimization()
@@ -4110,6 +4130,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "snapshot": _cmd_snapshot,
     "run-check": _cmd_run_check,
     "fsrs-get-weights": _cmd_fsrs_get_weights,
+    "fsrs-reload-weights": _cmd_fsrs_reload_weights,
     "fsrs-optimize": _cmd_fsrs_optimize,
     "fsrs-reset-weights": _cmd_fsrs_reset_weights,
 }
