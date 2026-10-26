@@ -87,6 +87,8 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
   useEffect(() => {
     if (!sheetKey) return
     const key = (e: KeyboardEvent) => {
+      /* an input method's ESC (Look it up can be open over the sheet) drops its candidate, nothing more */
+      if (e.isComposing || e.keyCode === 229) return
       if (e.key === 'Escape') { setSheetKey(null); e.stopPropagation() }
     }
     window.addEventListener('keydown', key, true)

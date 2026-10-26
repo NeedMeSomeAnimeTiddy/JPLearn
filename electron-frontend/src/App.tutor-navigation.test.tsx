@@ -157,6 +157,25 @@ describe('The tutor, now inside Look it up', () => {
     expect(screen.queryByText('THE TUTOR')).toBeNull()
   })
 
+  it('keeps Look it up open on an ESC an input method is still composing with', async () => {
+    mount()
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    fireEvent.click(screen.getByRole('button', { name: 'Open the tutor (Look it up)' }))
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    const field = screen.getByRole('textbox', { name: 'What to look up' })
+
+    /* in the full app the key also reaches App's own ESC, which closes the sheet -- unless guarded */
+    fireEvent.keyDown(field, { key: 'Escape', isComposing: true })
+    fireEvent.keyDown(field, { key: 'Escape', keyCode: 229 })
+    /* and the app's guard holds by itself, for a composing key that never passed through the field */
+    fireEvent.keyDown(document.body, { key: 'Escape', isComposing: true })
+    expect(screen.getByRole('dialog', { name: 'Look it up' })).toBeTruthy()
+
+    /* a committed ESC still closes it */
+    fireEvent.keyDown(field, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Look it up' })).toBeNull())
+  })
+
   it('all four command palette entries open the right place', async () => {
     mount()
     await screen.findByRole('button', { name: /open shortcuts/i })

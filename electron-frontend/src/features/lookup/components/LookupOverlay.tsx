@@ -183,8 +183,13 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
 
   const onKeyDown = (event: React.KeyboardEvent) => {
     /* AN INPUT METHOD STILL COMPOSING OWNS EVERY KEY: its ENTER picks the kanji and its ESC drops the
-       candidate. Neither is a lookup, nor a close. 229 is what browsers report for its keys. */
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return
+       candidate. Neither is a lookup, nor a close. 229 is what browsers report for its keys. The
+       key goes no further either -- the app's own ESC would close the sheet -- but its default is
+       left alone, because that default is the input method's. */
+    if (event.nativeEvent.isComposing || event.keyCode === 229) {
+      event.stopPropagation()
+      return
+    }
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()

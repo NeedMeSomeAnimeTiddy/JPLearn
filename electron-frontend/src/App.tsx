@@ -1625,6 +1625,10 @@ function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
+      /* A KEY AN INPUT METHOD IS STILL COMPOSING WITH IS NEVER A SHORTCUT. Its ESC drops the
+         candidate and its ENTER picks the kanji -- closing Look it up, the kanji sheet or a screen
+         on that ESC would throw the half-typed word away. 229 is what browsers report for them. */
+      if (event.isComposing || event.keyCode === 229) return
       const target = event.target as HTMLElement
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
 
