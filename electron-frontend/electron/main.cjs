@@ -2484,6 +2484,20 @@ async function createWindowWithSplash() {
   return win
 }
 
+/* THE PYTHON BRIDGE STARTS NOW, NOT WHEN THE FIRST SCREEN ASKS FOR IT. Its first answer costs a
+   Python start and about a second of imports before any command runs, and the first command is the
+   study summary every screen waits on. Spawned from the preload it began 1-3 s into the launch,
+   after Electron's own start, so the two costs queued; started here they overlap. The worker only
+   reads stdin, so it sits idle until asked, and JPLEARN_DOCUMENTS_DIR is already set above. Not on
+   a Squirrel install/update/uninstall run, which exits without a window. */
+if (!_squirrelArg) {
+  try {
+    getOrStartPythonBridgeWorker()
+  } catch {
+    // The first request starts it instead, as before.
+  }
+}
+
 app.whenReady().then(async () => {
   // Ensure Documents\JPLearn\ subdirectories exist on every launch
   try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }

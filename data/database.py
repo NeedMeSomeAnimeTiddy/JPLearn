@@ -5,6 +5,7 @@ import os
 import shutil
 import sqlite3
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from collections.abc import Callable, Generator
@@ -108,15 +109,55 @@ class AssistantProfile(TypedDict):
     updated_at_utc: str
 
 
-@contextmanager
-def _connect() -> Generator[sqlite3.Connection, None, None]:
+_shared_conn: ContextVar[sqlite3.Connection | None] = ContextVar("_shared_conn", default=None)
+
+
+def _open() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    return conn
+
+
+@contextmanager
+def _connect() -> Generator[sqlite3.Connection, None, None]:
+    shared = _shared_conn.get()
+    if shared is not None:
+        # Commits or rolls back when this block ends, like an own connection -- see shared_connection.
+        with shared:
+            yield shared
+        return
+    conn = _open()
     try:
         with conn:
             yield conn
     finally:
+        conn.close()
+
+
+@contextmanager
+def shared_connection() -> Generator[None, None, None]:
+    """Let every read in a burst reuse one connection instead of opening its own.
+
+    The study summary makes about seventy small reads, and opening the database for each was a third
+    of its time. Inside this block `_connect` hands out the one connection, and each `_connect` block
+    still commits or rolls back when it ends.
+
+    FOR READS. Blocks that nest -- one `_connect` caller calling another inside its own block -- now
+    share a transaction: the inner block's end commits the outer one's pending writes, an inner
+    failure rolls them back, and readers see writes not yet committed. Separate connections kept
+    those apart. So wrap only read-only bursts that do not nest; nested uses of this function
+    themselves are fine and share the outer connection.
+    """
+    if _shared_conn.get() is not None:
+        yield
+        return
+    conn = _open()
+    token = _shared_conn.set(conn)
+    try:
+        yield
+    finally:
+        _shared_conn.reset(token)
         conn.close()
 
 

@@ -163,6 +163,7 @@ from data.database import (  # noqa: E402
     save_feature_unlock,
     save_tutor_seen_key,
     save_user_xp,
+    shared_connection,
     upsert_progression_node,
 )
 from data.jlpt_repository import (  # noqa: E402
@@ -1334,6 +1335,11 @@ def _mastered_count(states: Mapping[int, object]) -> int:
 
 def build_summary() -> dict[str, object]:
     init_study_db()
+    with shared_connection():
+        return _build_summary()
+
+
+def _build_summary() -> dict[str, object]:
     decks: list[DeckSummary] = []
     prompt_lookup: dict[tuple[str, int], str] = {}
     prompt_lookup_by_id: dict[int, str] = {}
@@ -1371,10 +1377,12 @@ def build_summary() -> dict[str, object]:
         deck = factory()
         card_ids = [card.id for card in deck.cards]
         mastered_count, due_today, completed_today = load_deck_summary_counts(deck.name, card_ids)
+        deck_key = _normalize_deck_key(deck.name)
+        slug_key = _normalize_deck_key(slug)
         for card in deck.cards:
             prompt_text = card.character
-            prompt_lookup[(_normalize_deck_key(deck.name), card.id)] = prompt_text
-            prompt_lookup[(_normalize_deck_key(slug), card.id)] = prompt_text
+            prompt_lookup[(deck_key, card.id)] = prompt_text
+            prompt_lookup[(slug_key, card.id)] = prompt_text
             prompt_lookup_by_id[card.id] = prompt_text
         decks.append(
             DeckSummary(
