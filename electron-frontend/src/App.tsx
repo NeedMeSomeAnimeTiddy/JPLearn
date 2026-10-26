@@ -2925,17 +2925,21 @@ function App() {
     </>
   )
 
-  /* THE ROUND STANDS ON THE VALLEY TOO, so the shell has to stop painting a ground over it.
-     `mn-showing` is the one line that makes the app's own panel transparent -- see `menu.css` -- and
-     the round is now a menu screen that happens to be a session. */
+  /* EVERY SCREEN THAT STANDS ON THE ROUND'S SHEET STANDS ON THE VALLEY TOO, so the shell has to stop
+     painting a ground over it. `mn-showing` is the one line that makes the app's own panel
+     transparent -- see `menu.css` -- and the round, the daily puzzles, the exam and the passage are
+     all menu screens that happen to be sessions. */
+  const onTheSheet = view === 'home' || view === 'minigame' || view === 'daily_games'
+    || view === 'jlpt_prep' || view === 'passage_hub'
   return (
-    <main className={view === 'home' || view === 'minigame' ? 'app-shell mn-showing' : 'app-shell'}>
+    <main className={onTheSheet ? 'app-shell mn-showing' : 'app-shell'}>
       <AppTitlebar
-        /* BARE OVER A MENU SCREEN, AND THE ROUND IS ONE NOW. The full titlebar is 40px of dark
-           chrome at the top of the window, and the heading slab is authored at y 20 of a board that
-           starts at the window's own top edge -- so a round with the ordinary titlebar had the bar
-           drawn straight through its heading. Every other screen on this stage is already bare. */
-        bare={view === 'home' || view === 'minigame'}
+        /* BARE OVER A MENU SCREEN, AND EVERY SCREEN ON THE ROUND'S SHEET IS ONE NOW. The full
+           titlebar is 40px of dark chrome at the top of the window, and the heading slab is authored
+           at y 20 of a board that starts at the window's own top edge -- so a round, a puzzle, an
+           exam or a passage with the ordinary titlebar had the bar drawn straight through its
+           heading. Every other screen on this stage is already bare. */
+        bare={onTheSheet}
         windowDrag={windowDrag}
         shortcutMenuRef={shortcutMenuRef}
         shortcutMenuOpen={shortcutMenuOpen}

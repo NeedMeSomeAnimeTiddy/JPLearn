@@ -42,6 +42,12 @@ describe('the puzzle stylesheet', () => {
     expect(rule('.dp-cell.here')).toMatch(/var\(--ink\)/)
   })
 
+  it('draws a blocked crossword square as solid ink, not as an answer square', () => {
+    const block = rule('.dp-cell.dp-block')
+    expect(block).toMatch(/background: var\(--ink\)/)
+    expect(block).not.toMatch(/rgba/)
+  })
+
   it('wraps the clue you are on and lets a tile take two lines', () => {
     expect(rule('.dp-row.here b')).toMatch(/white-space: normal/)
     const tile = rule('.dp-tile > span')

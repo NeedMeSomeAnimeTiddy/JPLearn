@@ -25,7 +25,8 @@ button.dp-cell { cursor: pointer; }
 .dp-cell:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
 /* the open squares of a crossword are inputs, and an input brings a width and a caret of its own */
 input.dp-cell { width: 100%; height: 100%; caret-color: var(--hi); }
-.dp-block { background: rgba(20, 17, 13, 0.1); box-shadow: inset 0 0 0 1px rgba(20, 17, 13, 0.1); }
+/* a blocked square is solid ink -- it has to read as NOT a square you can answer */
+.dp-cell.dp-block { background: var(--ink); box-shadow: none; }
 /* the entry you are on, the line you are drawing -- an ink wash edged in ink. NOT GOLD: gold is
    earned, and a line you are still drawing has not earned anything yet. */
 .dp-cell.here { background: rgba(20, 17, 13, 0.12); box-shadow: inset 0 0 0 2px var(--ink); }

@@ -243,6 +243,17 @@ describe('view -> parent (Escape back-navigation)', () => {
     expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
   })
 
+  it('draws the bare titlebar over a daily puzzle, as over every screen on the round sheet', async () => {
+    render(<App />)
+    await expectView('home')
+    expect(document.querySelector('.window-titlebar.is-bare')).toBeTruthy()
+
+    await openDailyPuzzle()
+    await expectView('daily_games')
+    expect(document.querySelector('.window-titlebar.is-bare')).toBeTruthy()
+    expect(document.querySelector('.app-shell.mn-showing')).toBeTruthy()
+  })
+
   it('still parents the two views the shortcut menu no longer opens directly', () => {
     /* `jlpt_prep` and `passage_hub` used to be two clicks from the titlebar, which is what these
        tests walked. They are not any more: the menu's ASCENT and LIBRARY are the browsing screens
