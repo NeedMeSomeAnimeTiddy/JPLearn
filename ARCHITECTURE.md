@@ -79,10 +79,11 @@ full interpreter + import cost.
    bridge at all — it calls `llm_runtime.cjs::translateText` directly; the bridge's own
    translation path was dead code and has been deleted (#70 step 2).
 
-2. **Timeout kills shared state.** On `BRIDGE_REQUEST_TIMEOUT_MS` the handler calls
-   `stopPythonBridgeWorker()`, and the resulting `close` event runs
-   `rejectPendingBridgeRequests()` — so *one* slow request rejects every unrelated
-   in-flight request and forces a cold restart.
+2. **Timeouts and restarts.** A request that runs past `BRIDGE_REQUEST_TIMEOUT_MS` is
+   rejected on its own. Only after `BRIDGE_MAX_CONSECUTIVE_TIMEOUTS` (3) timeouts in a row is
+   the worker stopped, and its `close` settles only that child's requests
+   (`electron/bridge_worker.cjs`). A wedged worker still rejects everything queued on it
+   when it is restarted (§8 B2).
 
 3. **Positional string args only.** Commands take `argv: list[str]`; structured payloads
    are JSON strings passed as a single positional arg. There is no schema at the Python

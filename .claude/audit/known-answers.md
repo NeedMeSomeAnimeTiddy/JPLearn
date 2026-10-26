@@ -26,7 +26,7 @@ the drift is a STALE RECORD worth reporting.
 | `curriculum_stages` | `(deck, card_id, mode)` | as above |
 | `daily_game_miss_signals` | `(deck_name, card_id)` | as above |
 | `card_mastery_scores` (`data/mastery_repository.py`) | `(deck, card_id)` where deck is the **slug** | A slug change forks mastery; a name change does not |
-| `card_notes` (`data/card_notes_repository.py`) | an opaque `note_key` hashed from character and reading, independent of deck | Survives deck and id changes; a change to text normalisation moves it |
+| `card_notes` (`data/card_notes_repository.py`) | an opaque `note_key`, independent of deck: built-in cards hash character and reading; dictionary entries use their JMdict source id, and hash character and reading only when that id is missing | Survives deck and id changes; a change to text normalisation moves the hashed keys (and a change to source-id canonicalisation moves dictionary keys) |
 | `daily_word_pools` / `_words` | `pool_day`, `pool_position`; rows carry `deck_slug`, `deck_name`, `card_id` | Results go by pool position |
 | Single-row and keyed-by-name tables (`streak_state`, `user_xp`, `user_settings`, `assistant_*`, `user_progression`, ...) | their own ids | Not tied to cards |
 

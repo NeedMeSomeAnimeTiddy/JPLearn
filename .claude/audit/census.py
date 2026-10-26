@@ -114,7 +114,12 @@ def walk(root: Path, exts: tuple[str, ...]) -> list[Path]:
     if not root.is_dir():
         return []
     out: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
+    def unreadable(exc: OSError) -> None:
+        # A subtree os.walk cannot list would otherwise vanish from every count.
+        where = Path(exc.filename) if exc.filename else root
+        _READ_ERRORS[posix(where)] = f"{type(exc).__name__}: {exc}"
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=unreadable):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         out.extend(Path(dirpath, f) for f in filenames if f.endswith(exts))
     return sorted(out)
@@ -374,7 +379,7 @@ def section(text: str, heading: str) -> str:
 
 
 def open_findings(text: str) -> list[tuple[str, str]]:
-    """(id, first 80 chars) per §8 table row whose id cell is not struck with ~~."""
+    """(id, first 80 chars of its unstruck text) per §8 table row whose id cell is not struck."""
     out = []
     for ln in section(text, FINDINGS_HEADING).splitlines():
         cells = [c.strip() for c in ln.strip().strip("|").split("|")]
@@ -383,7 +388,9 @@ def open_findings(text: str) -> list[tuple[str, str]]:
         rid = cells[0]
         if rid.startswith("~~") or not re.search(r"\w", rid) or set(rid) <= set("-: "):
             continue
-        out.append((rid, plain(cells[1])[:80]))
+        # A row corrected in place keeps its withdrawn claim struck; show only the current text.
+        current = plain(re.sub(r"~~.*?~~", "", cells[1]))
+        out.append((rid, current[:80] or "(only struck text)"))
     return out
 
 

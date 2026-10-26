@@ -80,7 +80,7 @@ deck_name|\.name\b.*deck                                  scripts/desktop_bridge
 ```
 
 Learner stores have different keys (known-answers Part 1 has the table): most are deck name plus
-card id, mastery scores use the deck slug, notes a deck-independent hash. When a reader is not
+card id, mastery scores use the deck slug, notes a deck-independent key (a JMdict source id, or a hash of character and reading). When a reader is not
 limited to a deck's own card ids (compare `load_deck_summary_counts`, which is, with a bare
 `SELECT ... FROM leech_items`), it can see rows for cards no deck shows (#80's hidden repeats).
 

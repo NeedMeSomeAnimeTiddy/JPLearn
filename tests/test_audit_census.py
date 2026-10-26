@@ -275,3 +275,31 @@ def test_default_does_not_read_records_and_text_stays_neutral(monkeypatch: pytes
 def test_records_text_is_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(REPO)
     assert "9. RECORDS" in census.report(census.collect(include_records=True), 2)
+
+
+def test_open_findings_shows_only_the_unstruck_correction() -> None:
+    row = (
+        "## 8. Findings\n\n| # | Finding | Issue |\n|---|---|---|\n"
+        "| B2 | ~~One timeout rejects everything.~~ Partly fixed: three in a row restart it. | none |\n"
+        "| B9 | ~~Withdrawn entirely.~~ | none |\n"
+    )
+    rows = dict(census.open_findings(row))
+    assert rows["B2"] == "Partly fixed: three in a row restart it."
+    assert rows["B9"] == "(only struck text)"
+
+
+def test_unlistable_subtree_is_a_read_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
+    blocked = tmp_path / "blocked"
+
+    def fake_walk(root: Path, onerror=None):
+        yield str(root), ["blocked"], ["ok.py"]
+        onerror(PermissionError(13, "Access is denied", str(blocked)))
+
+    monkeypatch.setattr(census.os, "walk", fake_walk)
+    census._READ_ERRORS.clear()
+    try:
+        assert census.walk(tmp_path, (".py",)) == [tmp_path / "ok.py"]
+        assert any("blocked" in path for path in census._READ_ERRORS)
+    finally:
+        census._READ_ERRORS.clear()
