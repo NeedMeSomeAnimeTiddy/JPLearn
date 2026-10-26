@@ -6,7 +6,7 @@ import type { DailyGamesSessionDependencies } from './types'
 import { buildMatchPairs, buildTypingBlitz, buildWordSearch } from './utils'
 import { buildCrossword } from './crossword'
 import { DailyGameSession } from './components/DailyGameSession'
-import { GameResultsOverlay } from './components/GameResultsOverlay'
+import { PuzzleEnding } from './components/PuzzleEnding'
 
 const state: DailyGamesStatePayload = {
   pool: {
@@ -299,7 +299,7 @@ describe('Daily Game lifecycle', () => {
 
   it('announces clipboard failures through the injected clipboard dependency', async () => {
     const clipboard = { writeText: vi.fn(async () => { throw new Error('Denied') }) }
-    render(<GameResultsOverlay mode="practice" score={1} pairCount={1} clipboard={clipboard} onDone={vi.fn()} />)
+    render(<PuzzleEnding mode="practice" title="Match Pairs complete" message="Done." score={1} count={1} clipboard={clipboard} onDone={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: /share result/i }))
     expect((await screen.findByRole('status')).textContent).toMatch(/could not copy/i)
@@ -309,10 +309,12 @@ describe('Daily Game lifecycle', () => {
     const missedWords = [{ word: { ...state.pool.words[0], deck_slug: 'vocab_food', card_id: 7 }, miss_count: 2 }]
     const onReviewMissedWords = vi.fn(async () => undefined)
     const { rerender } = render(
-      <GameResultsOverlay
+      <PuzzleEnding
         mode="daily"
+        title="Match Pairs complete"
+        message="Done."
         score={0}
-        pairCount={1}
+        count={1}
         clipboard={{ writeText: async () => undefined }}
         onDone={vi.fn()}
         missedWords={missedWords}
@@ -323,7 +325,7 @@ describe('Daily Game lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: /review missed words/i }))
     await waitFor(() => expect(onReviewMissedWords).toHaveBeenCalledWith(missedWords))
 
-    rerender(<GameResultsOverlay mode="practice" score={0} pairCount={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missedWords} onReviewMissedWords={onReviewMissedWords} />)
+    rerender(<PuzzleEnding mode="practice" title="Match Pairs complete" message="Done." score={0} count={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} missedWords={missedWords} onReviewMissedWords={onReviewMissedWords} />)
     expect(screen.queryByRole('button', { name: /review missed words/i })).toBeNull()
   })
 
@@ -365,7 +367,7 @@ describe('Daily Game lifecycle', () => {
     await screen.findByRole('button', { name: '猫' })
     expect((await runAxe(container)).violations).toEqual([])
 
-    rerender(<GameResultsOverlay mode="daily" score={1} pairCount={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} />)
+    rerender(<PuzzleEnding mode="daily" title="Match Pairs complete" message="Done." score={1} count={1} clipboard={{ writeText: async () => undefined }} onDone={vi.fn()} />)
     expect((await runAxe(container)).violations).toEqual([])
   })
 })

@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import * as axeCore from 'axe-core'
 import type { DailyGamesWordPayload } from '../../../generated/types'
 import { buildCrossword } from '../crossword'
+import type { PuzzleShell } from '../types'
+import { boardCell } from '../utils'
 import { CrosswordGame } from './CrosswordGame'
 
 const words: DailyGamesWordPayload[] = [
@@ -12,6 +14,10 @@ const words: DailyGamesWordPayload[] = [
 ]
 
 const board = buildCrossword(words, 117)
+const shell: PuzzleShell = {
+  head: null, cap: '', hints: [], onBack: () => undefined, backAria: 'Back to the daily road',
+  spent: { key: 'spent', value: '00:00', label: 'SPENT' }, ending: null,
+}
 const runAxe = (axeCore as unknown as { default?: typeof axeCore; run?: typeof axeCore.run }).default?.run ?? axeCore.run
 
 function cellName(row: number, column: number): RegExp {
@@ -19,7 +25,7 @@ function cellName(row: number, column: number): RegExp {
 }
 
 function renderGame(onComplete = vi.fn()): ReturnType<typeof render> {
-  return render(<CrosswordGame board={board} isSaving={false} onComplete={onComplete} />)
+  return render(<CrosswordGame board={board} isSaving={false} onComplete={onComplete} shell={shell} />)
 }
 
 function fillBoard(): void {
@@ -94,7 +100,7 @@ describe('CrosswordGame', () => {
   it('completes the fallback without fabricating a vocabulary outcome', () => {
     const onComplete = vi.fn()
     const fallback = buildCrossword([], 5)
-    render(<CrosswordGame board={fallback} isSaving={false} onComplete={onComplete} />)
+    render(<CrosswordGame board={fallback} isSaving={false} onComplete={onComplete} shell={shell} />)
     const entry = fallback.entries[0]
     entry.cells.forEach((cell, index) => {
       fireEvent.change(screen.getByRole('textbox', { name: cellName(cell.row, cell.column) }), { target: { value: Array.from(entry.answer)[index] } })
@@ -110,10 +116,42 @@ describe('CrosswordGame', () => {
     expect((await runAxe(container)).violations).toEqual([])
   })
 
-  it('contains its board in a labelled, keyboard-focusable scroll region', () => {
+  it('stands its board in the prompt cell at the solved cell size, with nothing to scroll', () => {
     renderGame()
     const boardRegion = screen.getByRole('region', { name: 'Crossword board' })
-    expect(boardRegion.getAttribute('tabindex')).toBe('0')
-    expect(boardRegion.classList.contains('daily-game-board-scroll')).toBe(true)
+    expect(boardRegion.closest('.rd-ask')).toBeTruthy()
+    const grid = boardRegion.querySelector('.dp-board') as HTMLElement
+    expect(grid.style.getPropertyValue('--dp-cell')).toBe(`${boardCell(board.grid[0].length)}px`)
+  })
+
+  it('lists every clue, marks a filled one FILLED in ink without saying if it is right, and completes from the CHECK slab', () => {
+    const onComplete = vi.fn()
+    renderGame(onComplete)
+    const clues = screen.getByRole('list', { name: 'Clues' })
+    expect(clues.querySelectorAll('li')).toHaveLength(board.entries.length)
+
+    const entry = board.entries[0]
+    entry.cells.forEach((cell) => {
+      fireEvent.change(screen.getByRole('textbox', { name: cellName(cell.row, cell.column) }), { target: { value: 'ア' } })
+    })
+    const first = screen.getByRole('button', { name: /clue 1:/i })
+    expect(first.textContent).toContain('FILLED')
+    expect(first.className).not.toMatch(/\b(on|bad)\b/)
+    expect(document.querySelectorAll('.rd-ticks i.on, .rd-ticks i.bad')).toHaveLength(0)
+
+    fillBoard()
+    const slab = screen.getByRole('button', { name: /check crossword/i })
+    expect(slab.classList.contains('rd-slab')).toBe(true)
+    fireEvent.click(slab)
+    expect(onComplete).toHaveBeenCalledOnce()
+    expect(document.querySelectorAll('.rd-ticks i.on')).toHaveLength(board.entries.length)
+  })
+
+  it('shows an incomplete check as the round verdict', () => {
+    renderGame()
+    fireEvent.click(screen.getByRole('button', { name: /check crossword/i }))
+    const verdict = document.querySelector('.rd-verdict') as HTMLElement
+    expect(verdict.classList.contains('is-error')).toBe(true)
+    expect(verdict.textContent).toMatch(/check the clues and try again/i)
   })
 })

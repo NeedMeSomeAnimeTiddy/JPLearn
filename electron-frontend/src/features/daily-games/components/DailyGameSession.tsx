@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { RoundWork } from '../../round'
 import { puzzleHead } from '../../menu/daily'
 import type { DailyGamesMissedWordPayload, DailyGamesStatePayload } from '../../../generated/types'
@@ -9,7 +8,6 @@ import { buildMatchPairs, buildTypingBlitz, buildWordSearch, fillCopy, formatClo
 import { buildCrossword } from '../crossword'
 import { enrichCrosswordClues } from '../crosswordClues'
 import { CrosswordGame } from './CrosswordGame'
-import { GameResultsOverlay } from './GameResultsOverlay'
 import { MatchPairsGame } from './MatchPairsGame'
 import { PuzzleEnding } from './PuzzleEnding'
 import { PuzzlePlate } from './PuzzlePlate'
@@ -33,10 +31,6 @@ const PUZZLE_TEXT: Record<DailyGameType, { title: string; resultsTitle: string; 
   match_pairs: { title: DAILY_GAMES_COPY.matchPairsTitle, resultsTitle: DAILY_GAMES_COPY.resultsTitle, dailyResults: DAILY_GAMES_COPY.dailyResults, practiceResults: DAILY_GAMES_COPY.practiceResults, saving: DAILY_GAMES_COPY.recordingResult },
   typing_blitz: { title: TYPING_BLITZ_COPY.title, resultsTitle: TYPING_BLITZ_COPY.resultsTitle, dailyResults: TYPING_BLITZ_COPY.dailyResults, practiceResults: TYPING_BLITZ_COPY.practiceResults, saving: TYPING_BLITZ_COPY.saving },
 }
-
-/* shortcut: the puzzles not yet moved onto the sheet keep their old board and result overlay until
-   their own step of the build order lands; this set empties as they move */
-const ON_THE_SHEET: ReadonlySet<DailyGameType> = new Set(['typing_blitz', 'match_pairs', 'word_search'])
 
 function getAttemptMissedWords(data: DailyGamesStatePayload, attempt: DailyGamesAttemptRequest): DailyGamesMissedWordPayload[] {
   return attempt.outcomes.flatMap((outcome) => {
@@ -241,6 +235,9 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         />
       )
     }
+    if (gameType === 'crossword' && crosswordBoard) {
+      return <CrosswordGame board={crosswordBoard} isSaving={isSaving} onComplete={completeGame} shell={shell} />
+    }
     if (gameType === 'word_search' && wordSearchBoard) {
       return <WordSearchGame board={wordSearchBoard} words={data.pool.words} isSaving={isSaving} onComplete={completeGame} shell={shell} />
     }
@@ -253,34 +250,13 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
     return null
   }
 
-  if (ON_THE_SHEET.has(gameType)) {
-    return (
-      /* THE ESCAPE GUARD. Escape leaves -- unless an IME is composing, where it cancels the
-         composition, or a puzzle has already used it for something of its own (word search
-         cancelling a half-made selection), which it says by preventing the default. Either way it
-         stops here so the app's own Escape does not walk a level up behind the puzzle's back. */
-      <section
-        className="dp-session"
-        aria-label={text.title}
-        onKeyDown={(event) => {
-          if (event.key !== 'Escape') return
-          if (event.defaultPrevented || event.nativeEvent.isComposing) {
-            event.stopPropagation()
-            return
-          }
-          event.preventDefault()
-          event.stopPropagation()
-          onBack()
-        }}
-      >
-        {body()}
-      </section>
-    )
-  }
-
   return (
-    <main
-      className="daily-game-session"
+    /* THE ESCAPE GUARD. Escape leaves -- unless an IME is composing, where it cancels the
+       composition, or a puzzle has already used it for something of its own (word search
+       cancelling a half-made selection), which it says by preventing the default. Either way it
+       stops here so the app's own Escape does not walk a level up behind the puzzle's back. */
+    <section
+      className="dp-session"
       aria-label={text.title}
       onKeyDown={(event) => {
         if (event.key !== 'Escape') return
@@ -293,12 +269,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
         onBack()
       }}
     >
-      <button type="button" className="daily-games-back" onClick={onBack}><ArrowLeft aria-hidden="true" size={18} />{DAILY_GAMES_COPY.backToGames}</button>
-      {isLoading ? <div className="daily-games-skeleton" role="status" aria-label={fillCopy(DAILY_GAMES_COPY.loadingGame, { title: text.title })}><span /><span /></div> : null}
-      {!isLoading && error && !attempt ? <section className="daily-games-state" role="alert"><h2>{DAILY_GAMES_COPY.gameUnavailable}</h2><p>{error}</p><button type="button" className="daily-games-retry" onClick={onBack}>{DAILY_GAMES_COPY.retryGame}</button></section> : null}
-      {!isLoading && crosswordBoard && !result && gameType === 'crossword' ? <CrosswordGame board={crosswordBoard} isSaving={isSaving} onComplete={completeGame} /> : null}
-      {attempt && error ? <section className="daily-games-state" role="alert"><h2>{DAILY_GAMES_COPY.gameUnavailable}</h2><p>{error}</p><button type="button" className="daily-games-retry" onClick={() => void recordAttempt(attempt)}>{DAILY_GAMES_COPY.retryGame}</button></section> : null}
-      {result ? <GameResultsOverlay mode={result.isFallback ? 'practice' : mode} score={result.score} pairCount={result.pairCount} clipboard={dependencies.clipboard} onDone={onBack} missedWords={result.missedWords} onReviewMissedWords={onReviewMissedWords} {...(gameType === 'crossword' ? { title: CROSSWORD_COPY.resultsTitle, dailyResults: CROSSWORD_COPY.dailyResults, practiceResults: CROSSWORD_COPY.practiceResults, countLabel: CROSSWORD_COPY.words } : gameType === 'word_search' ? { title: WORD_SEARCH_COPY.resultsTitle, dailyResults: WORD_SEARCH_COPY.dailyResults, practiceResults: WORD_SEARCH_COPY.practiceResults, countLabel: WORD_SEARCH_COPY.words } : {})} /> : null}
-    </main>
+      {body()}
+    </section>
   )
 }
