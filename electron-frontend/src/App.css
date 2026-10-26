@@ -9084,6 +9084,13 @@ button.lpp-node:hover .lpp-node-ring {
   margin-top: 8px;
 }
 
+/* Back is the quiet one: an outline in the card's own text colour, so it reads as the way out beside
+   Try again's filled button rather than as a second copy of it. */
+.btn-primary.error-boundary-back {
+  background: transparent;
+  color: inherit;
+}
+
 /* ── Onboarding Buttons ──────────────────────────────────────────── */
 
 .obn-btn {

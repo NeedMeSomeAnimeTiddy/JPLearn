@@ -495,7 +495,12 @@ describe('the bare titlebar keeps the focus timer visible', () => {
   it('draws the chip square-cornered, in the menu chip, above the 30px line the run chips start at', () => {
     const chip = rule('.window-titlebar.is-bare .titlebar-pomodoro')
     expect(chip).toMatch(/border-radius: 0/)
-    expect(chip).toMatch(/background: var\(--washi\)/)
+    /* every token it reads carries a fallback: the titlebar is outside `.mn-open`, where they live */
+    expect(chip).toMatch(/background: var\(--washi, #f2ead8\)/)
+    expect(chip).toMatch(/color: var\(--ink, #14110d\)/)
+    expect(chip).toMatch(/font-family: var\(--lat-ui, "Bahnschrift/)
+    expect(rule('.window-titlebar.is-bare .titlebar-pomodoro.titlebar-pomodoro--break')).toMatch(/background: var\(--ink, #14110d\); color: var\(--washi, #f2ead8\)/)
+    expect(chip.match(/var\(--[\w-]+\)/g)).toBeNull()
     expect(chip).toMatch(/skewX\(-8deg\)/)
     /* centred in the 40px bar and 20px tall (3px + a 14px line + 3px), so its bottom edge is at
        20 + 10 + `top`, and has to be above 30 */

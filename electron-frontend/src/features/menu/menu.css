@@ -3632,24 +3632,23 @@ body.at-path .walk-hud, body.at-path .walk-hud button { pointer-events: none; }
 .window-titlebar.is-bare .titlebar-pomodoro {
   position: relative; top: -6px; margin-right: 10px;
   padding: 3px 10px; border-radius: 0;
-  background: var(--washi); color: var(--ink);
-  font-family: var(--lat-ui); font-weight: 600; font-size: 11px; letter-spacing: 0.14em;
+  /* FALLBACKS, because the titlebar stands outside `.mn-open` and `.lk-open`, where these three are
+     defined (stage.css) -- the same reason `.window-control-button` below names its colour */
+  background: var(--washi, #f2ead8); color: var(--ink, #14110d);
+  font-family: var(--lat-ui, "Bahnschrift SemiCondensed", "Bahnschrift", "Segoe UI", "Arial", sans-serif);
+  font-weight: 600; font-size: 11px; letter-spacing: 0.14em;
   transform: skewX(-8deg);
   box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.45);
   transition: filter 0.16s ease;
 }
 .window-titlebar.is-bare .titlebar-pomodoro:hover { filter: brightness(1.08); }
-.window-titlebar.is-bare .titlebar-pomodoro.titlebar-pomodoro--break { background: var(--ink); color: var(--washi); }
+.window-titlebar.is-bare .titlebar-pomodoro.titlebar-pomodoro--break { background: var(--ink, #14110d); color: var(--washi, #f2ead8); }
 .window-titlebar.is-bare .titlebar-pomodoro .titlebar-streak-icon { color: inherit; }
 /* AND THE CONTROLS GO QUIET RATHER THAN AWAY. Cream-on-cream chrome over a night valley reads as a
    scrap of the old interface left behind; at 0.55 they are still plainly there and still hit their
    full contrast the moment the pointer finds them. */
 .window-titlebar.is-bare .window-control-button { opacity: 0.55; color: var(--washi, #f2ead8); }
 .window-titlebar.is-bare .window-control-button:hover { opacity: 1; }
-
-/* THE CRASH FALLBACK'S BACK IS THE QUIET ONE: an outline in the card's own text colour, so it reads
-   as the way out beside Try again's filled button rather than as a second copy of it. */
-.btn-primary.error-boundary-back { background: transparent; color: inherit; }
 
 /* ---- THE BACK CONTROL, LIFTED ---------------------------------------------------------------
    Every screen below the front door needs one, and the port's `.pj-back` was a bare gold line at
