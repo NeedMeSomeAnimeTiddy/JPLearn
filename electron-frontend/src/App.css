@@ -1086,20 +1086,6 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   user-select: none;
 }
 
-.window-titlebar-wordmark {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--text-main);
-  pointer-events: none;
-  user-select: none;
-  white-space: nowrap;
-}
-
 .window-titlebar-nav {
   display: inline-flex;
   align-items: center;
@@ -1296,8 +1282,7 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   animation-delay: 114ms;
 }
 
-.titlebar-shortcut-leaf .titlebar-shortcut-icon,
-.titlebar-shortcut-leaf .game-icon-svg {
+.titlebar-shortcut-leaf .titlebar-shortcut-icon {
   width: 14px;
   height: 14px;
 }
@@ -1410,14 +1395,6 @@ html[data-theme='lofi_dusk_light'] .app-shell::after {
   gap: 16px;
 }
 
-.view-forward {
-  animation: viewSlideForward var(--motion-view-duration, 280ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
-}
-
-.view-back {
-  animation: viewSlideBack var(--motion-view-duration, 280ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
-}
-
 button {
   font-family: var(--button-font);
   font-size: 0.95rem;
@@ -1495,223 +1472,6 @@ button:active:not(:disabled) {
   will-change: transform, opacity;
 }
 
-/* Decorative lofi window scene (shared pieces) */
-.home-hero-window {
-  position: absolute;
-  top: 4px;
-  right: 8px;
-  width: 116px;
-  height: 116px;
-  border-radius: 16px 16px 12px 12px;
-  border: 3px solid color-mix(in oklab, var(--accent) 40%, var(--panel-border));
-  background: linear-gradient(180deg,
-    color-mix(in oklab, var(--tone-ocean) 30%, var(--bg-subtle)),
-    color-mix(in oklab, var(--accent) 22%, var(--bg-main)));
-  overflow: hidden;
-}
-
-.home-hero-window::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  margin-left: -1.5px;
-  background: color-mix(in oklab, var(--accent) 40%, var(--panel-border));
-}
-
-.home-hero-moon {
-  position: absolute;
-  top: 16px;
-  right: 18px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, var(--accent-soft), var(--accent));
-  box-shadow: 0 0 18px color-mix(in oklab, var(--accent-soft) 70%, transparent);
-}
-
-.home-hero-star {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--text-main);
-  opacity: 0.7;
-}
-
-.home-hero-star-1 { top: 22px; left: 18px; }
-.home-hero-star-2 { top: 42px; left: 34px; }
-.home-hero-star-3 { top: 30px; left: 52px; }
-
-.home-hero-hill {
-  position: absolute;
-  left: -10%;
-  bottom: -32px;
-  width: 140%;
-  height: 60px;
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--tone-teal) 40%, var(--bg-main));
-  opacity: 0.85;
-}
-
-.home-hero-plant {
-  position: absolute;
-  bottom: 0;
-  left: 4px;
-  width: 26px;
-  height: 38px;
-  border-radius: 0 0 6px 6px;
-  background: color-mix(in oklab, var(--accent) 60%, #5a4a40);
-}
-
-.home-hero-plant::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 24px;
-  width: 30px;
-  height: 34px;
-  margin-left: -15px;
-  border-radius: 50% 50% 40% 40%;
-  background: color-mix(in oklab, var(--tone-teal) 70%, var(--bg-main));
-}
-
-.home-hero-mug {
-  position: absolute;
-  bottom: 2px;
-  left: 40px;
-  width: 22px;
-  height: 18px;
-  border-radius: 4px 4px 7px 7px;
-  background: color-mix(in oklab, var(--accent) 70%, var(--card-bg-top));
-}
-
-.home-hero-steam {
-  position: absolute;
-  left: 50%;
-  top: -12px;
-  width: 4px;
-  height: 12px;
-  margin-left: -2px;
-  border-radius: 4px;
-  background: linear-gradient(180deg, color-mix(in oklab, var(--text-main) 40%, transparent), transparent);
-  animation: homeHeroSteam 3.2s ease-in-out infinite;
-}
-
-@keyframes homeHeroSteam {
-  0%, 100% { opacity: 0.2; transform: translateY(0) scaleY(0.9); }
-  50% { opacity: 0.6; transform: translateY(-4px) scaleY(1.1); }
-}
-
-html[data-reduced-motion='true'] .home-hero-steam {
-  animation: none;
-}
-
-/* ── Home deck info panel (below cassette carousel) ──────────── */
-.home-deck-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 6px 24px;
-  border: 1px solid var(--panel-border);
-  border-left: 0;
-  border-right: 0;
-  background: var(--bg-main);
-  position: relative;
-  z-index: 1;
-  margin-left: -14px;
-  margin-right: -14px;
-}
-
-.home-deck-info-head {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  margin-right: auto;
-}
-
-/* The three destinations, huddled at the right edge as one group. */
-.home-deck-info-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.home-deck-info-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.home-deck-info-title-row .home-deck-info-glyph {
-  font-family: var(--sans);
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: color-mix(in oklab, var(--accent) 62%, var(--text-main));
-  flex-shrink: 0;
-}
-
-.home-deck-info-title-row strong {
-  font-size: 0.88rem;
-  font-weight: 700;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-deck-info-title-row .menu-card-readiness-badge {
-  flex-shrink: 0;
-}
-
-.home-deck-info-meta {
-  font-family: var(--mono);
-  font-size: 0.54rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--accent-soft) 45%, var(--text-soft));
-  font-weight: 700;
-}
-
-.home-jlpt-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  flex-shrink: 0;
-  padding: 6px 14px;
-  border-radius: 0;
-  border: 1px solid var(--panel-border);
-  background: var(--button-bg-top);
-  color: var(--text-main);
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-family: var(--mono);
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  box-shadow: 0 2px 0 var(--accent-ink);
-  transition: transform 80ms ease, box-shadow 80ms ease, border-color 140ms ease;
-}
-
-.home-jlpt-button:hover {
-  background: color-mix(in oklab, var(--button-bg-top) 80%, var(--accent));
-  color: var(--text-main);
-  border-color: var(--accent);
-}
-
-.home-jlpt-button:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.home-jlpt-pct {
-  font-size: 0.62rem;
-  opacity: 0.7;
-}
-
 /* ═══════════════════════════════════════════════════════════════
    Script Hub: ZZZ / CRT Cassette Console
    ═══════════════════════════════════════════════════════════════ */
@@ -1750,101 +1510,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
 .hub-glitch-corner--br::before { bottom: 0; right: 0; width: 20px; height: 1.5px; }
 .hub-glitch-corner--br::after { bottom: 0; right: 0; width: 1.5px; height: 20px; }
 
-.hub-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 0;
-  font-size: 0.68rem;
-  font-weight: 700;
-  font-family: var(--mono);
-  background: var(--button-bg-top);
-  border: 1px solid var(--accent-ink);
-  color: var(--text-main);
-  box-shadow: 0 1px 0 var(--accent-ink);
-}
-
-.hub-stat--warn {
-  color: color-mix(in oklab, var(--tone-rose) 80%, var(--text-soft));
-}
-
-/* ── Tape Deck Player Area ────────────────────────────────────── */
-.hub-player {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 14px 10px;
-  min-height: 0;
-  overflow: hidden;
-  scrollbar-width: none;
-  position: relative;
-  background:
-    radial-gradient(ellipse 500px 240px at 50% 10%,
-      color-mix(in oklab, var(--accent) 5%, transparent) 0%,
-      transparent 55%);
-}
-
-.hub-player::-webkit-scrollbar { display: none; }
-
-/* Ghost reel — large transparent spinning ring */
-.hub-player::after {
-  content: '';
-  position: absolute;
-  right: 50px;
-  top: 50px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  border: 14px solid color-mix(in oklab, var(--accent) 5%, transparent);
-  border-top-color: color-mix(in oklab, var(--accent-soft) 7%, transparent);
-  opacity: 0.22;
-  animation: cassetteSpin 14s linear infinite;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.hub-player-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 0;
-  margin: 0;
-  height: 0;
-  overflow: visible;
-  position: relative;
-  z-index: 1;
-}
-
-.hub-player-header .hero-kicker {
-  font-family: var(--mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--accent-soft) 45%, var(--text-soft));
-  font-weight: 700;
-}
-
 /* REC indicator */
-.hub-rec-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #e04444;
-  box-shadow:
-    0 0 6px #e04444,
-    0 0 16px rgba(224,68,68,0.45);
-  vertical-align: middle;
-  margin-right: 3px;
-  animation: recPulse 1.2s ease-in-out infinite;
-}
-
-@keyframes recPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
 
 .hub-deck-badge {
   display: flex;
@@ -1864,53 +1530,7 @@ html[data-reduced-motion='true'] .home-hero-steam {
   pointer-events: none;
 }
 
-.hub-deck-badge--right {
-  justify-content: flex-end;
-  left: auto;
-  right: 14px;
-}
-
-.hub-deck-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: color-mix(in oklab, var(--tone-teal) 75%, var(--accent-soft));
-  box-shadow:
-    0 0 5px color-mix(in oklab, var(--tone-teal) 45%, transparent),
-    0 0 10px color-mix(in oklab, var(--tone-teal) 20%, transparent);
-  animation: ledPulse 2s ease-in-out infinite;
-}
-
-@keyframes ledPulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
 /* ── Transport controls (cel-shaded flat) ───────────────────── */
-.hub-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.hub-control-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 3px;
-}
-
-.hub-control-divider {
-  width: 2px;
-  height: 16px;
-  background: var(--panel-border);
-  flex-shrink: 0;
-}
 
 .hub-chip-button {
   display: inline-flex;
@@ -1954,87 +1574,9 @@ html[data-reduced-motion='true'] .home-hero-steam {
   cursor: not-allowed;
 }
 
-.hub-level-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 0;
-  border: 1px solid transparent;
-  background: transparent;
-  color: color-mix(in oklab, var(--accent-soft) 50%, var(--text-soft));
-  font-size: 0.56rem;
-  font-weight: 700;
-  font-family: var(--mono);
-  letter-spacing: 0.14em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-}
-
-.hub-level-chip:hover {
-  color: var(--text-main);
-  border-color: var(--panel-border);
-}
-
-.hub-level-chip.is-active {
-  border-color: var(--accent);
-  color: var(--text-main);
-  background: color-mix(in oklab, var(--accent) 10%, transparent);
-}
-
 /* ═══════════════════════════════════════════════════════════════
    Animated Deck Elements
    ═══════════════════════════════════════════════════════════════ */
-
-/* ── Sweeping scanner line ────────────────────────────────────── */
-.hub-sweep {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    var(--accent-soft) 20%,
-    var(--accent) 50%,
-    var(--accent-soft) 80%,
-    transparent 100%);
-  opacity: 0.25;
-  animation: sweepDown 12s linear infinite;
-}
-
-@keyframes sweepDown {
-  0% { top: 0%; opacity: 0; }
-  10% { opacity: 0.3; }
-  20% { opacity: 0; }
-  100% { top: 100%; opacity: 0; }
-}
-
-/* ── Floating audio particles ─────────────────────────────────── */
-.hub-particle {
-  position: absolute;
-  pointer-events: none;
-  z-index: 1;
-  width: 6px;
-  height: 6px;
-  border-radius: 0;
-  background: var(--accent-soft);
-  opacity: 0;
-  animation: particleDrift 8s ease-in-out infinite;
-}
-.hub-particle--1 { top: 20%; left: 15%; animation-delay: 0s; width: 8px; height: 8px; }
-.hub-particle--2 { top: 55%; left: 75%; animation-delay: -3s; }
-.hub-particle--3 { top: 70%; left: 30%; animation-delay: -5s; width: 4px; height: 4px; }
-.hub-particle--4 { top: 35%; left: 60%; animation-delay: -1.5s; width: 5px; height: 5px; }
-
-@keyframes particleDrift {
-  0% { transform: translate(0, 0) scale(1); opacity: 0; }
-  20% { opacity: 0.5; }
-  50% { transform: translate(40px, -30px) scale(1.5); opacity: 0.3; }
-  80% { opacity: 0.5; }
-  100% { transform: translate(-20px, -60px) scale(0.5); opacity: 0; }
-}
 
 /* ── 3D Transport buttons ────────────────────────────────────── */
 .hub-chip-button {
@@ -2066,92 +1608,6 @@ html[data-reduced-motion='true'] .home-hero-steam {
   box-shadow: inset 0 3px 6px rgba(0,0,0,0.3), 0 1px 0 var(--accent-ink);
   transform: translateY(2px);
 }
-
-/* ── Responsive ───────────────────────────────────────────────── */
-@media (max-width: 860px) {
-  .hub-player {
-    overflow-y: auto;
-    padding: 8px 10px 10px;
-  }
-}
-
-.home-menu {
-  padding: 27px;
-  display: grid;
-  gap: 12px;
-  animation: enterUp 420ms ease both;
-  border-radius: 28px;
-}
-
-.logo-crest {
-  width: 74px;
-  height: 74px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  position: relative;
-  background: radial-gradient(circle at 32% 30%, #ffe9d1, #e8b46f 70%);
-  border: 2px solid rgba(255, 248, 235, 0.55);
-}
-
-.crest-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #743728;
-  opacity: 0.8;
-}
-
-.crest-line {
-  position: absolute;
-  width: 42px;
-  height: 2px;
-  background: rgba(88, 42, 30, 0.72);
-  transform: rotate(26deg);
-}
-
-.home-kicker {
-  margin: 0;
-  color: var(--accent);
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.home-logo {
-  margin: 0;
-  font-size: clamp(56px, 11vw, 104px);
-  line-height: 0.92;
-  letter-spacing: -0.03em;
-  font-family: var(--display-font);
-  text-shadow: 0 12px 30px rgba(24, 18, 14, 0.24);
-}
-
-.home-header-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.home-jlpt-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 20px;
-  border: 1px solid var(--button-border);
-  background: linear-gradient(to bottom, var(--button-bg-top), var(--button-bg-bottom));
-  color: var(--text-main);
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.15s, opacity 0.15s;
-}
-.home-jlpt-btn:hover:not(.is-locked) { border-color: var(--accent); color: var(--accent); }
-.home-jlpt-btn.is-locked { opacity: 0.45; cursor: default; }
 
 /* ==================================================================================================
    ALL THAT IS LEFT OF THE OLD READING SCREENS, which is one element rule that was filed here by
@@ -3609,76 +3065,6 @@ kbd {
   to   { opacity: 1 }
 }
 
-/* ── Phase 8: Script Hub side sheet ──────────────────────────────────────── */
-
-.side-sheet-backdrop {
-  position: fixed;
-  inset: 40px 0 0 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 150;
-  display: flex;
-  justify-content: flex-end;
-  animation: fadeIn 180ms ease both;
-}
-
-.side-sheet-right {
-  width: min(540px, 100%);
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-  background: linear-gradient(180deg, var(--bg-subtle), var(--bg-main));
-  border-left: 1px solid var(--panel-border);
-  animation: slideInRight 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.side-sheet-right::-webkit-scrollbar { width: 0; }
-
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
-}
-
-/* ── Phase 9: Home stats strip ───────────────────────────────────────────── */
-
-.home-stats-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.home-stats-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 70%, transparent);
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--panel-bg) 60%, transparent);
-  color: var(--text-soft);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
-}
-
-.home-stats-chip:hover {
-  background: color-mix(in oklab, var(--panel-bg) 90%, transparent);
-  border-color: var(--panel-border);
-  color: var(--text-main);
-}
-
-.home-stats-chip-streak { color: var(--tone-streak, var(--text-soft)); }
-.home-stats-chip-mastery { color: var(--tone-skill, var(--text-soft)); }
-.home-stats-chip-due { color: var(--tone-warning, var(--text-soft)); }
-
-/* XP bar widget in stats strip */
-.home-stats-xp {
-  display: flex;
-  align-items: center;
-}
-
 /* ── Titlebar compact XP indicator ───────────────────────────────── */
 .titlebar-xp {
   position: relative;
@@ -3890,21 +3276,6 @@ kbd {
   margin: 2px 0;
   font-size: 0.69rem;
   color: var(--text-soft);
-}
-
-/* ── Tutor banner notification ──────────────────────────────────── */
-.tutor-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  margin: 0 0 10px;
-  border: 1px solid color-mix(in oklab, var(--panel-border) 70%, transparent);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--panel-bg) 82%, transparent);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 12px -8px rgba(0, 0, 0, 0.4);
-  animation: enterUp 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ── Home recommendations section ─────────────────────────────── */
