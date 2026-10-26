@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import replace
+from functools import lru_cache
 from types import ModuleType
 from typing import cast
 
@@ -622,27 +623,27 @@ _KANJI_N1_DATA: list[tuple[str, str, str]] = [
 ]
 
 
-def get_kanji_n5_deck() -> Deck:
+def _raw_kanji_n5_deck() -> Deck:
     rows = KANJI_N5_EXTERNAL_DATA if KANJI_N5_EXTERNAL_DATA else _KANJI_N5_DATA
     return _build_kanji_deck("Kanji N5", _supplemented_kanji(rows, "n5"), "n5", id_offset=0)
 
 
-def get_kanji_n4_deck() -> Deck:
+def _raw_kanji_n4_deck() -> Deck:
     rows = KANJI_N4_EXTERNAL_DATA if KANJI_N4_EXTERNAL_DATA else _KANJI_N4_DATA
     return _build_kanji_deck("Kanji N4", _supplemented_kanji(rows, "n4"), "n4", id_offset=1000)
 
 
-def get_kanji_n3_deck() -> Deck:
+def _raw_kanji_n3_deck() -> Deck:
     rows = KANJI_N3_EXTERNAL_DATA if KANJI_N3_EXTERNAL_DATA else _KANJI_N3_DATA
     return _build_kanji_deck("Kanji N3", _supplemented_kanji(rows, "n3"), "n3", id_offset=2000)
 
 
-def get_kanji_n2_deck() -> Deck:
+def _raw_kanji_n2_deck() -> Deck:
     rows = KANJI_N2_EXTERNAL_DATA if KANJI_N2_EXTERNAL_DATA else _KANJI_N2_DATA
     return _build_kanji_deck("Kanji N2", _supplemented_kanji(rows, "n2"), "n2", id_offset=3000)
 
 
-def get_kanji_n1_deck() -> Deck:
+def _raw_kanji_n1_deck() -> Deck:
     rows = KANJI_N1_EXTERNAL_DATA if KANJI_N1_EXTERNAL_DATA else _KANJI_N1_DATA
     return _build_kanji_deck("Kanji N1", _supplemented_kanji(rows, "n1"), "n1", id_offset=4000)
 
@@ -796,7 +797,7 @@ _VOCAB_N5_DATA: list[tuple[str, str, str]] = [
 ]
 
 
-def get_vocab_n5_deck() -> Deck:
+def _raw_vocab_n5_deck() -> Deck:
     data = VOCAB_N5_EXTERNAL_DATA if VOCAB_N5_EXTERNAL_DATA else _VOCAB_N5_DATA
     return _build_vocab_deck(
         "Vocabulary N5", _supplemented_vocab(data, "n5"), "n5",
@@ -804,32 +805,146 @@ def get_vocab_n5_deck() -> Deck:
     )
 
 
-def get_vocab_n4_deck() -> Deck:
+def _raw_vocab_n4_deck() -> Deck:
     rows = VOCAB_N4_EXTERNAL_DATA
     return _build_vocab_deck(
         "Vocabulary N4", rows, "n4", id_offset=10000, id_capacity=_VOCAB_ID_CAPACITY["n4"]
     )
 
 
-def get_vocab_n3_deck() -> Deck:
+def _raw_vocab_n3_deck() -> Deck:
     rows = VOCAB_N3_EXTERNAL_DATA
     return _build_vocab_deck(
         "Vocabulary N3", rows, "n3", id_offset=20000, id_capacity=_VOCAB_ID_CAPACITY["n3"]
     )
 
 
-def get_vocab_n2_deck() -> Deck:
+def _raw_vocab_n2_deck() -> Deck:
     rows = VOCAB_N2_EXTERNAL_DATA
     return _build_vocab_deck(
         "Vocabulary N2", rows, "n2", id_offset=30000, id_capacity=_VOCAB_ID_CAPACITY["n2"]
     )
 
 
-def get_vocab_n1_deck() -> Deck:
+def _raw_vocab_n1_deck() -> Deck:
     rows = VOCAB_N1_EXTERNAL_DATA
     return _build_vocab_deck(
         "Vocabulary N1", rows, "n1", id_offset=40000, id_capacity=_VOCAB_ID_CAPACITY["n1"]
     )
+
+
+# ---------------------------------------------------------------------------
+# One card per word across the JLPT levels (issue #80)
+# ---------------------------------------------------------------------------
+#
+# The level corpora were imported separately and overlap: 時 is on the N5 and N4
+# kanji lists, 開く (aku) on N5 and N4 vocabulary, and a few words repeat within
+# one list. Each repeat had its own card id, so the same word was learned twice.
+#
+# A word now appears only in the lowest level that teaches it, and only once
+# there; later repeats are hidden. They cannot simply be dropped from the corpus,
+# because ids are positional (`id_offset + index`) and every card after a dropped
+# row would move onto another word's SRS history. So ids are assigned over the
+# full rows exactly as before and the repeats are filtered out afterwards. Their
+# old `review_states` rows stay in the database, unshown.
+#
+# A kanji is matched on its character alone: the levels write the same reading
+# list in different forms ("toki/ji", "ji/toki"), and a single character is one
+# thing to learn. A word is matched on spelling *and* reading, because the
+# corpora carry genuine homographs - 開く as aku and hiraku, 辛い as karai and
+# tsurai - which are different words and keep their own cards.
+
+_REPEAT_LEVELS: tuple[str, ...] = ("n5", "n4", "n3", "n2", "n1")
+
+_RAW_LEVEL_BUILDERS: dict[tuple[str, str], Callable[[], Deck]] = {
+    ("kanji", "n5"): _raw_kanji_n5_deck,
+    ("kanji", "n4"): _raw_kanji_n4_deck,
+    ("kanji", "n3"): _raw_kanji_n3_deck,
+    ("kanji", "n2"): _raw_kanji_n2_deck,
+    ("kanji", "n1"): _raw_kanji_n1_deck,
+    ("vocab", "n5"): _raw_vocab_n5_deck,
+    ("vocab", "n4"): _raw_vocab_n4_deck,
+    ("vocab", "n3"): _raw_vocab_n3_deck,
+    ("vocab", "n2"): _raw_vocab_n2_deck,
+    ("vocab", "n1"): _raw_vocab_n1_deck,
+}
+
+
+def _repeat_key(family: str, card: Card) -> str | tuple[str, str]:
+    """Return what makes two cards in one family the same thing to learn."""
+    if family == "kanji":
+        return card.character
+    return (card.character, (card.romaji or "").strip().lower())
+
+
+@lru_cache(maxsize=None)
+def hidden_repeat_ids(family: str, level: str) -> frozenset[int]:
+    """Return the card ids a level deck hides because a lower level, or an
+    earlier row of the same deck, already teaches that word.
+
+    Computed from the unfiltered decks in level order, N5 first, so the lowest
+    level always keeps the card. The corpora are static module data, so the
+    result is cached for the life of the process.
+    """
+    seen: set[str | tuple[str, str]] = set()
+    for current in _REPEAT_LEVELS:
+        hidden: set[int] = set()
+        for card in _RAW_LEVEL_BUILDERS[(family, current)]().cards:
+            key = _repeat_key(family, card)
+            if key in seen:
+                hidden.add(card.id)
+            else:
+                seen.add(key)
+        if current == level:
+            return frozenset(hidden)
+    raise ValueError(f"Unknown level {level!r}")
+
+
+def _level_deck(family: str, level: str) -> Deck:
+    """Build a level deck with its repeats of lower-level words hidden."""
+    deck = _RAW_LEVEL_BUILDERS[(family, level)]()
+    hidden = hidden_repeat_ids(family, level)
+    return Deck(name=deck.name, cards=[card for card in deck.cards if card.id not in hidden])
+
+
+def get_kanji_n5_deck() -> Deck:
+    return _level_deck("kanji", "n5")
+
+
+def get_kanji_n4_deck() -> Deck:
+    return _level_deck("kanji", "n4")
+
+
+def get_kanji_n3_deck() -> Deck:
+    return _level_deck("kanji", "n3")
+
+
+def get_kanji_n2_deck() -> Deck:
+    return _level_deck("kanji", "n2")
+
+
+def get_kanji_n1_deck() -> Deck:
+    return _level_deck("kanji", "n1")
+
+
+def get_vocab_n5_deck() -> Deck:
+    return _level_deck("vocab", "n5")
+
+
+def get_vocab_n4_deck() -> Deck:
+    return _level_deck("vocab", "n4")
+
+
+def get_vocab_n3_deck() -> Deck:
+    return _level_deck("vocab", "n3")
+
+
+def get_vocab_n2_deck() -> Deck:
+    return _level_deck("vocab", "n2")
+
+
+def get_vocab_n1_deck() -> Deck:
+    return _level_deck("vocab", "n1")
 
 
 # ---------------------------------------------------------------------------

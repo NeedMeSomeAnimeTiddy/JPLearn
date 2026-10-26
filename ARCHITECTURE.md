@@ -380,6 +380,16 @@ Vocabulary level decks expose the **whole** imported corpus (8,031 words). The f
 import fails at deck-build time instead of silently colliding card ids (§5, A1). N5 is
 the tight one — 718 of 1,000 — and `tests/test_deck_id_uniqueness.py` guards the boundary.
 
+The table counts rows, which is what ids are allocated over. A level deck *shows* fewer
+(#80): a word the corpora repeat appears only in the lowest level that teaches it, and
+once there. `domain/decks.py::hidden_repeat_ids` works out the repeats from the
+unfiltered decks, N5 first, and the level builders filter them out **after** ids are
+assigned, so no id moves; the repeats' old `review_states` rows stay in the database,
+unshown. A kanji is a repeat on its character alone (the levels write the same readings
+in different forms); a word only on spelling and reading together, so homographs such as
+開く aku/hiraku stay two cards. Today that hides 81 kanji and 6 words (greetings the N5
+supplement added that N2/N3 also carry).
+
 Pacing is **not** a deck-sizing concern: a study session draws only 8–20 items
 (`SESSION_LENGTH_PRESETS`) from an SRS-ordered queue, so corpus size affects
 denominators and deck-total labels, not how much a learner faces per session.

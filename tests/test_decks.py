@@ -5,6 +5,7 @@ import pytest
 from domain.deck_supplements import VOCAB_SUPPLEMENT, with_supplement
 from domain.decks import (
     ALL_DECKS,
+    hidden_repeat_ids,
     CATEGORY_SOURCE_DECKS,
     _VOCAB_CATEGORY_ID_SPACING,
     _VOCAB_CATEGORY_LEVEL_BASE,
@@ -192,7 +193,7 @@ class TestKanjiDecks:
         chars = {c.character for c in get_kanji_n2_deck().cards}
         assert kanji in chars, f"Expected N2 kanji '{kanji}' not found in deck"
 
-    @pytest.mark.parametrize("kanji", ["統", "率", "審", "憲"])
+    @pytest.mark.parametrize("kanji", ["勲", "綱", "審", "憲"])
     def test_spot_check_n1_kanji_present(self, kanji: str) -> None:
         chars = {c.character for c in get_kanji_n1_deck().cards}
         assert kanji in chars, f"Expected N1 kanji '{kanji}' not found in deck"
@@ -223,7 +224,9 @@ class TestVocabDecks:
         collapsing the category decks into blocks loses no content.
         """
         deck = loader()
-        assert len(deck) == len(with_supplement(list(corpus), VOCAB_SUPPLEMENT.get(level, ())))
+        # Less the words a lower level already teaches, which the deck hides (issue #80).
+        rows = with_supplement(list(corpus), VOCAB_SUPPLEMENT.get(level, ()))
+        assert len(deck) == len(rows) - len(hidden_repeat_ids("vocab", level))
         assert len(deck) >= min_cards
         assert deck.name == name
         for card in deck.cards:

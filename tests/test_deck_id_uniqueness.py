@@ -24,7 +24,9 @@ from domain.decks import (
     _VOCAB_ID_CAPACITY,
     ALL_DECKS,
     CATEGORY_SOURCE_DECKS,
+    _RAW_LEVEL_BUILDERS,
     _build_vocab_deck,
+    hidden_repeat_ids,
 )
 
 
@@ -246,3 +248,47 @@ def test_all_decks_still_build_after_id_reallocation() -> None:
         ids = [c.id for c in deck.cards]
         assert len(ids) > 0, f"Deck '{slug}' is empty"
         assert len(ids) == len(set(ids)), f"Deck '{slug}' has duplicate ids within itself"
+
+
+def test_a_word_is_taught_in_one_level_only() -> None:
+    """Issue #80: the level corpora overlap, and a repeat was a second card.
+
+    A kanji counts as a repeat on its character alone, because each level writes
+    the same readings in its own form ("toki/ji", "ji/toki"). A word counts only
+    on spelling and reading together, so homographs such as 開く (aku, N5) and
+    開く (hiraku, N4) remain two cards.
+    """
+    for family in ("kanji", "vocab"):
+        seen: dict[object, str] = {}
+        for level in _LEVELS:
+            slug = f"{family}_{level}"
+            for card in ALL_DECKS[slug]().cards:
+                key = card.character if family == "kanji" else (card.character, card.romaji)
+                assert key not in seen, f"{key!r} is in both '{seen[key]}' and '{slug}'"
+                seen[key] = slug
+
+
+@pytest.mark.parametrize("family", ["kanji", "vocab"])
+@pytest.mark.parametrize("level", _LEVELS)
+def test_hiding_repeats_moves_no_card_id(family: str, level: str) -> None:
+    """Hidden repeats are filtered out after ids are assigned, so no id moves."""
+    raw = {card.id: card for card in _RAW_LEVEL_BUILDERS[(family, level)]().cards}
+    shown = ALL_DECKS[f"{family}_{level}"]().cards
+    for card in shown:
+        assert raw[card.id] == card
+    assert {card.id for card in shown} == set(raw) - hidden_repeat_ids(family, level)
+
+
+@pytest.mark.parametrize(
+    ("slug", "card_id", "shown"),
+    [
+        ("kanji_n5", 9, True),  # 時 stays in N5 ...
+        ("kanji_n4", 1156, False),  # ... and its N4 repeat is hidden
+        ("vocab_n5", 8, True),  # 開く aku
+        ("vocab_n4", 10131, True),  # 開く hiraku: same spelling, a different word
+        ("vocab_n2", 30303, False),  # おはよう, already an N5 word
+    ],
+)
+def test_pinned_repeat_decisions(slug: str, card_id: int, shown: bool) -> None:
+    ids = {card.id for card in ALL_DECKS[slug]().cards}
+    assert (card_id in ids) is shown
