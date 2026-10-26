@@ -335,7 +335,6 @@ const STARTUP_PRELOAD_PROGRESS_END_PCT = 90
 const STARTUP_PRELOAD_DECK_SLUGS = [
   'hiragana',
   'katakana',
-  'kanji_numbers_time',
   'vocab_greetings',
 ]
 const STARTUP_PRELOAD_BLOCK_ONLY_SLUGS = []
@@ -2195,18 +2194,27 @@ async function runStudyJourneySmokeIfEnabled() {
 async function preloadStartupBridgeData(splash) {
   updateSplashStatus(splash, 'Loading study data...', 'Preparing your decks and stats...', STARTUP_PRELOAD_PROGRESS_START_PCT)
 
+  const startedAt = Date.now()
+
+  /* THE VOICE WARMUP RUNS BESIDE THE BRIDGE TASKS, NOT IN FRONT OF THEM. It starts VOICEVOX, its own
+     process that never touches the Python bridge, and it takes 3-8 s. As the first task of a serial
+     list it held every bridge read behind it -- the renderer's first summary waited for it too, and
+     that summary's time tracked the warmup's run for run (#82's first readings: 4.0 s behind a 3.2 s
+     warmup, 7.4 s behind 8.0 s). The splash still waits for it, inside the same time budget. */
+  const voiceWarmup = (async () => {
+    // Voice warmup is best-effort; listening modes stay locked when unavailable.
+    let ready = false
+    let error = null
+    try {
+      ready = (await localVoiceRuntime.preload())?.ready === true
+      if (!ready) error = localVoiceRuntime.getStatus?.()?.lastError || 'VOICEVOX did not start'
+    } catch (voiceError) {
+      error = voiceError instanceof Error ? voiceError.message : String(voiceError)
+    }
+    return { key: 'voice-runtime-preload', label: 'Voice runtime warmup', durationMs: Date.now() - startedAt, ok: ready, error }
+  })()
+
   const preloadTasks = [
-    {
-      key: 'voice-runtime-preload',
-      label: 'Voice runtime warmup',
-      run: async () => {
-        try {
-          await localVoiceRuntime.preload()
-        } catch {
-          // Voice warmup is best-effort; listening modes stay locked when unavailable.
-        }
-      },
-    },
     {
       key: 'summary',
       label: 'Study summary',
@@ -2266,7 +2274,6 @@ async function preloadStartupBridgeData(splash) {
   }
 
   const taskTimings = []
-  const startedAt = Date.now()
   const totalTasks = preloadTasks.length
 
   for (let index = 0; index < totalTasks; index += 1) {
@@ -2321,6 +2328,22 @@ async function preloadStartupBridgeData(splash) {
       break
     }
   }
+
+  updateSplashStatus(splash, 'Loading study data...', 'Warming up the voice engine...', STARTUP_PRELOAD_PROGRESS_END_PCT)
+  const voiceBudgetMs = Math.max(0, STARTUP_PRELOAD_MAX_WAIT_MS - (Date.now() - startedAt))
+  let voiceBudgetTimer = null
+  const voiceTiming = await Promise.race([
+    voiceWarmup,
+    new Promise((resolve) => { voiceBudgetTimer = setTimeout(() => resolve({
+      key: 'voice-runtime-preload',
+      label: 'Voice runtime warmup',
+      durationMs: Date.now() - startedAt,
+      ok: false,
+      error: `Still warming up after the ${STARTUP_PRELOAD_MAX_WAIT_MS}ms preload budget; left running`,
+    }), voiceBudgetMs) }),
+  ])
+  clearTimeout(voiceBudgetTimer)
+  taskTimings.unshift(voiceTiming)
 
   return {
     totalDurationMs: Date.now() - startedAt,
