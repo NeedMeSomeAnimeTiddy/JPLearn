@@ -1407,7 +1407,9 @@ def save_session_goal(
 def _session_items_goal_met(reviewed: int, target_items: int) -> bool:
     """The one rule for a session's item goal: answers given, repeats included, reach the target.
 
-    Both session readers use this, so the tutor's summary and the Ledger's history agree.
+    The session readers (summary, history, diagnostics) use this, so they agree on the item goal.
+    Only load_session_summary also applies a session's accuracy target, which the app never sets
+    today, so a session with one set can read as met in the history and not in the summary.
     """
     return reviewed >= target_items if target_items > 0 else reviewed > 0
 

@@ -70,7 +70,7 @@ export function statPanelsFrom(crown: MenuCrown): Partial<Record<StatKey, StatPa
       jp: '今週', en: 'THIS WEEK',
       rows: [
         { label: 'REVIEWED', value: nf(w.reviewed), lead: true },
-        { label: 'CORRECT', value: `${nf(w.correct)} · ${Math.round(w.accuracy * 100)}%` },
+        { label: 'CORRECT', value: `${nf(w.correct)} · ${w.accuracy}%` },
         { label: 'ACTIVE DAYS', value: `${w.activeDays} OF 7` },
         { label: 'POINTS', value: nf(w.points) },
       ],
