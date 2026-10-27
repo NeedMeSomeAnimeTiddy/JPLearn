@@ -73,7 +73,6 @@ import {
   CARD_SCORES_STORAGE_KEY,
   SUMMARY_SNAPSHOT_STORAGE_KEY,
   SESSION_STORAGE_KEY,
-  EXPERTISE_LEVEL_TO_SCRIPT_KEYS,
   deriveExpertiseLevelFromChecked,
   EMPTY_SCRIPT_STATS,
   defaultMinigameStatsByScript,
@@ -2274,29 +2273,10 @@ function App() {
     const level = deriveExpertiseLevelFromChecked(checkedItems)
     try {
       await window.jplearnDesktop?.applyExpertiseLevel(level)
-      if (level === 'total_beginner') {
-        setCardScores({ hiragana: {}, katakana: {}, kanji_n5: {}, vocab_n5: {}, grammar_patterns: {}, sentence_examples: {} })
-      } else {
-        const targetScripts = EXPERTISE_LEVEL_TO_SCRIPT_KEYS[level]
-        const payloads = await Promise.all(targetScripts.map((slug) => getDeckCardsDeduped(slug)))
-        setCardScores((previous) => {
-          const next: CardScores = {
-            hiragana: { ...previous.hiragana },
-            katakana: { ...previous.katakana },
-            kanji_n5: { ...previous.kanji_n5 },
-            vocab_n5: { ...previous.vocab_n5 },
-            grammar_patterns: { ...previous.grammar_patterns },
-            sentence_examples: { ...previous.sentence_examples },
-          }
-          targetScripts.forEach((scriptKey, index) => {
-            const deck = payloads[index]
-            const seeded = { ...next[scriptKey] }
-            deck.cards.forEach((card) => { seeded[card.id] = CARD_MASTERY_MAX })
-            next[scriptKey] = seeded
-          })
-          return next
-        })
-      }
+      // The bridge writes the seeded cards' mastery counters with their schedules (audit 3, F1), so
+      // show what it stored rather than computing a copy here that the next launch would discard.
+      const payload = await window.jplearnDesktop?.getCardScores?.()
+      if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
       refreshDeckProgressAfterSeedChange()
     } catch {
       // Expertise seeding is best-effort; proceed to mark onboarding complete.
@@ -2306,7 +2286,7 @@ function App() {
     // path — it just records that it finished.
     const result = await window.jplearnDesktop?.completeOnboarding?.(answers).catch(() => undefined)
     if (result) setLearningPathStatus(result as LearningPathStatus)
-  }, [getDeckCardsDeduped, refreshDeckProgressAfterSeedChange])
+  }, [refreshDeckProgressAfterSeedChange])
 
 
 

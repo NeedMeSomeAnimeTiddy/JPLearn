@@ -16,6 +16,7 @@ followed by generated blocks covering whatever the categories do not reach.
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -348,7 +349,9 @@ def compute_block_mastery(block: Block, repetitions_map: dict[int, int]) -> floa
 
     Args:
         block: The block to evaluate.
-        repetitions_map: Mapping of card_id → repetitions count from SRS state.
+        repetitions_map: card_id → a count that is 1 or more for a card that counts as passed. The
+            bridge sets it for any card ever answered correctly, or still in a run of correct
+            answers, so a later miss does not take a card back out (audit 3, F3).
     """
     if not block.card_ids:
         return 0.0
@@ -356,7 +359,12 @@ def compute_block_mastery(block: Block, repetitions_map: dict[int, int]) -> floa
     return passed / len(block.card_ids)
 
 
-def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int], threshold: float = UNLOCK_THRESHOLD) -> int:
+def compute_unlocked_count(
+    blocks: list[Block],
+    repetitions_map: dict[int, int],
+    threshold: float = UNLOCK_THRESHOLD,
+    studied: Collection[int] | None = None,
+) -> int:
     """Return how many blocks are currently accessible (always at least 1).
 
     Blocks unlock sequentially: block *i* is unlocked once block *i − 1*
@@ -368,6 +376,10 @@ def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int],
     change shape underneath existing review history: vocabulary and kanji had no
     blocks at all before issue #78, so their whole deck was one pool, and without
     this a learner would come back to find studied cards locked away.
+
+    *studied* names the cards the learner has reviewed at all, right or wrong. The floor uses it
+    when given, so a block whose studied cards were all missed stays open too (audit 3, F3); without
+    it, the floor falls back to *repetitions_map*.
     """
     unlocked = 1
     for i in range(1, len(blocks)):
@@ -377,7 +389,10 @@ def compute_unlocked_count(blocks: list[Block], repetitions_map: dict[int, int],
         else:
             break
 
+    def was_studied(cid: int) -> bool:
+        return cid in studied if studied is not None else repetitions_map.get(cid, 0) >= 1
+
     for block in reversed(blocks):
-        if any(repetitions_map.get(cid, 0) >= 1 for cid in block.card_ids):
+        if any(was_studied(cid) for cid in block.card_ids):
             return max(unlocked, block.index + 1)
     return unlocked

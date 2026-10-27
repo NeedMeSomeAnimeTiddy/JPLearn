@@ -57,7 +57,7 @@ from data.study_pipeline import (  # noqa: E402
     load_session_summary,
     track_assistant_event_interaction,
 )
-from data.database import save_state  # noqa: E402
+from data.database import load_correct_card_ids, save_state  # noqa: E402
 from domain.vocab_order import (  # noqa: E402
     clamp_budget,
     next_words,
@@ -1618,11 +1618,17 @@ def build_block_progress(slug: str) -> dict[str, object]:
     deck = factory()
     card_ids = [card.id for card in deck.cards]
     states = load_review_states(deck.name, card_ids)
+    # A card counts toward its block once it has been answered correctly, even if missed since
+    # (audit 3, F3, Robbie's "Correct once counts"). The current run still counts too, for rows
+    # with no log behind them: pre-FSRS history and onboarding's seeded schedules.
+    ever_correct = load_correct_card_ids(deck.name)
     repetitions_map: dict[int, int] = {
-        cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
+        cid: max(getattr(states.get(cid), "repetitions", 0), 1 if cid in ever_correct else 0)
+        for cid in card_ids
     }
+    studied = {cid for cid in card_ids if cid in states and has_been_reviewed(states[cid])}
 
-    unlocked_count = compute_unlocked_count(blocks, repetitions_map, threshold)
+    unlocked_count = compute_unlocked_count(blocks, repetitions_map, threshold, studied)
     char_map: dict[int, str] = {card.id: card.character for card in deck.cards}
     meaning_map: dict[int, str] = {card.id: card.meaning for card in deck.cards}
     romaji_map: dict[int, str] = {card.id: card.romaji for card in deck.cards}
@@ -2553,6 +2559,10 @@ def apply_expertise_level(level: str) -> dict[str, object]:
     the FSRS columns can carry real progress with no last-review date, so absence of a row and of
     events is the only safe test. Robbie decided (2026-10-26) that claiming a level writes schedules,
     not only mastery.
+
+    Each card it seeds also gets the full mastery counter, in the same transaction and under the
+    level deck's slug (audit 3, F1). The counters used to be set only in the renderer's snapshot,
+    which the first restart after any answer threw away.
     """
     init_study_db()
     normalized_level = level.strip().lower()
@@ -2561,19 +2571,23 @@ def apply_expertise_level(level: str) -> dict[str, object]:
         raise ValueError(f"Unknown expertise level: {level}")
 
     onboarding_day = date.today()
-    seeds: list[tuple[str, list[ReviewState]]] = []
+    seeds: list[tuple[str, str, list[ReviewState]]] = []
     for slug in target_slugs:
         factory = ALL_DECKS.get(slug)
         if factory is None:
             continue
         deck = factory()
-        seeds.append((deck.name, [_mastered_seed_state(card.id, onboarding_day) for card in deck.cards]))
+        store_slug = parent_slug_for_category(slug) or slug
+        seeds.append((store_slug, deck.name, [_mastered_seed_state(card.id, onboarding_day) for card in deck.cards]))
 
+    mastery_repository = _card_mastery_repository()
     seeded_cards = 0
     touched_decks: list[str] = []
     with write_transaction():
-        for deck_name, states in seeds:
-            seeded_cards += seed_review_states_if_unstudied(deck_name, states)
+        for store_slug, deck_name, states in seeds:
+            seeded_ids = seed_review_states_if_unstudied(deck_name, states)
+            mastery_repository.seed_full_scores(store_slug, seeded_ids)
+            seeded_cards += len(seeded_ids)
             touched_decks.append(deck_name)
 
     return {
@@ -3336,6 +3350,7 @@ def build_jlpt_exam_queue_payload(
     cards_by_deck: dict[str, list] = {}
     states_by_deck: dict[str, dict[int, object]] = {}
     leech_ids_by_deck: dict[str, set[int]] = {}
+    slug_by_deck_name: dict[str, str] = {}
 
     for lv in target_levels:
         spec = JLPT_LEVEL_SPECS[lv]
@@ -3349,6 +3364,7 @@ def build_jlpt_exam_queue_payload(
             deck = factory()
             card_ids = [card.id for card in deck.cards]
             cards_by_deck[deck_name] = deck.cards
+            slug_by_deck_name[deck.name] = deck_name
             states_by_deck[deck_name] = load_review_states(deck.name, card_ids)
             if mode in ("weak_area_drill",):
                 leech_ids_by_deck[deck_name] = load_active_leech_card_ids(deck.name)
@@ -3356,8 +3372,13 @@ def build_jlpt_exam_queue_payload(
     # Load accuracy map for modes that need it
     accuracy_map: dict[tuple[str, int], float] = {}
     if mode in ("mock_exam", "weak_area_drill"):
-        all_deck_names = list(cards_by_deck.keys())
-        accuracy_map = load_card_accuracy_map(all_deck_names)
+        # The review log is keyed by deck display name, and the queues by slug: querying it by slug
+        # matched nothing, so every card read as 50% (audit 3, F6).
+        accuracy_map = {
+            (slug_by_deck_name[name], card_id): ratio
+            for (name, card_id), ratio in load_card_accuracy_map(list(slug_by_deck_name)).items()
+            if name in slug_by_deck_name
+        }
 
     # Build queue
     if mode == "mock_exam":
