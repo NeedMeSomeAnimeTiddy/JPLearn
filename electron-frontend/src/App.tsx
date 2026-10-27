@@ -2429,8 +2429,13 @@ function App() {
         // A format-2 backup replaces the mastery counters (audit 2, F5). Show the stored ones now,
         // even when empty, and so overwrite the localStorage copy that would otherwise be adopted
         // back into the table at the next launch.
-        const payload = await window.jplearnDesktop.getCardScores?.()
-        if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
+        // The import has landed by now, so a failed re-read must not report it as failed.
+        try {
+          const payload = await window.jplearnDesktop.getCardScores?.()
+          if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
+        } catch {
+          // The next launch reads them.
+        }
       } else {
         setBackupMessage('Import failed.')
       }

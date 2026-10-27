@@ -51,6 +51,19 @@ needs a throwaway worktree with the venv. No helpers.
   in `main.cjs`, fixed by 6ea0f82 before this commit; the telemetry predated the fix. The one-shot
   retry is ARCH §8 B3.
 
+### Outcome (branch `audit2-mastery-backup`)
+- Fixed: F1, F5 (backup format 2; the screen re-reads the counters after an import), F7, F8, F10,
+  and the pins for F3 and F11. S2-S5 corrected.
+- Robbie's calls: F2 Up next measures the five level decks; the vocabulary recall floor drops to 0.07
+  of `vocab_n5` (about 52 words) to keep the old pace ("Keep the old pace"). F3 pin test only, no
+  reserved range. F6 grammar in his 13-block table, sentences in 60 numbered sets of 20. F11
+  Conjugation Training stays hidden.
+- F6 side effect: a saved block choice (`blockSelectionV2` in browser storage, by block index) for
+  grammar or sentences now points at the new block with that number, or falls back to the default
+  if that block is locked. A viewing preference only; no progress moves.
+- Left as is: `studyPlan.ts` still gates grammar on topic words (nothing calls it); the renderer's
+  pending-answer key uses the submitted slug, matching the main process.
+
 ### Triggers checked
 - DEBT #1: not fired (empty-database summary 0.52 s warm; no review timing).
 - DEBT #2 and #3: out of scope.

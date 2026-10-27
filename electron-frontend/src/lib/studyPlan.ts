@@ -3,9 +3,9 @@ import type {
 } from '../types'
 import { SCRIPT_LABELS } from '../constants'
 
-// What this module still does: measure how much of each section the learner has
-// mastered, for the cassette carousel's coverage bars and the JLPT Prep
-// percentage.
+// What this module does: measure how much of each section the learner has
+// mastered. Nothing in the app calls `buildStudyPlan` any more; only its tests
+// do (audit 2 noted it for a dead-code audit).
 //
 // What it no longer does: decide what to study next. That lived here as
 // `focusRows`/`shortcutRows`/`learnerStage` alongside a second, independent
@@ -30,9 +30,8 @@ import { SCRIPT_LABELS } from '../constants'
 // five level decks per track, so this file and the bridge no longer scope
 // vocabulary the same way.
 //
-// This file deliberately still gates grammar on the N5 topic words
-// (`VOCAB_N5_STUDY_DECK` below). Robbie's decision of 2026-10-27 kept the
-// behaviour of that gate unchanged; changing it would move when grammar unlocks.
+// This file still gates grammar on the N5 topic words (`VOCAB_N5_STUDY_DECK`
+// below). Audit 2 left it as it was, since the gate does nothing at runtime.
 //
 // The negative lookahead excludes only an exact level slug. `vocab_numbers` and
 // `vocab_nouns` begin `vocab_n` but are N5 categories, so matching on a bare
