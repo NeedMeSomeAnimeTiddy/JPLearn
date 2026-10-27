@@ -1360,15 +1360,6 @@ def _build_legacy_prompt_lookup() -> dict[tuple[str, int], str]:
     return lookup
 
 
-def _mastered_count(states: Mapping[int, object]) -> int:
-    # Shared repository rule: mastered means repetitions >= 3 and interval >= 21.
-    return sum(
-        1
-        for state in states.values()
-        if getattr(state, "repetitions", 0) >= 3 and getattr(state, "interval", 0) >= 21
-    )
-
-
 def build_summary() -> dict[str, object]:
     init_study_db()
     with shared_connection():
