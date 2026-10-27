@@ -290,7 +290,7 @@ interchangeable — each answers its own question:
 |---|---|---|
 | Counter | `card_mastery_scores.score >= 4` (`domain/mastery.py`) | progress bars; the Kanji and Vocabulary level bars (`level-progress` command, `features/level-progress`); round furigana and the "mastered" round flag |
 | FSRS mastered | `repetitions >= 3 AND interval >= 21` | deck stats, `summary` |
-| Block passed | answered correctly at least once, or still in a run of correct answers (`_block_pass_inputs`, `domain/blocks.py`) | block unlock gating |
+| Block passed | answered correctly at least once, or still in a run of correct answers (`_block_pass_inputs`, `domain/blocks.py`) | block unlock gating; path-step counts; known kanji |
 
 The counter does not gate anything: `buildCategoryProgress` only picks a fallback topic.
 The level bars show each level deck's summed counters over four times its size; the bridge
@@ -502,7 +502,8 @@ The same pass rule decides which kanji count as known (`_known_kanji`).
 and the five deck-backed ones. The rest (`UNMEASURED_NODE_IDS`) can never be mastered, so
 `gate_status` asks only that they be reached before whatever waits on them opens. Kanji N5,
 the reading step and the JLPT steps therefore open, and the menu's STUDY row and the path's
-focus skip unmeasured steps.
+focus skip unmeasured steps. The menu's JLPT row counts the JLPT steps the path has opened,
+since none of them can be mastered. Path-step counts use the block pass rule above.
 
 Mastery for every one of these decks lands in the `cardScores.vocab_n5` /
 `cardScores.kanji_n5` bucket. That used to be correct only because the id ranges were
