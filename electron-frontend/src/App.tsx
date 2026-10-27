@@ -422,6 +422,12 @@ function App() {
   // span five JLPT level decks, and since #78 they load the level deck directly.
   const scriptDeckCacheRef = useRef<Partial<Record<string, ScriptDeck['cards']>>>({})
   const scriptBlockCacheRef = useRef<Partial<Record<string, BlockInfo[]>>>({})
+  /** decks whose two caches above predate a saved answer; see `invalidateStudyQueue` */
+  const staleDeckSlugsRef = useRef<Set<string>>(new Set())
+  const deckRefreshInFlightRef = useRef(false)
+  /** answers marked so far, so a read can tell whether one arrived while it was out */
+  const deckSavesRef = useRef(0)
+  const [deckSaveRevision, setDeckSaveRevision] = useState(0)
   const deckCardsInFlightRef = useRef<Map<string, Promise<ScriptDeck>>>(new Map())
   const blockProgressInFlightRef = useRef<Map<string, Promise<BlockProgressPayload>>>(new Map())
   const studyQueueInFlightRef = useRef<Map<string, Promise<StudyQueueResponse>>>(new Map())
@@ -556,6 +562,11 @@ function App() {
    */
   const invalidateStudyQueue = useCallback((slug: DeckSlugInput) => {
     studyQueueCacheRef.current.delete(slug)
+    // The same answer moves the deck's unlocks, problem-card flags and grammar stages, so its
+    // cached cards and blocks are stale too; they are re-read once no session is live (audit 4 F1/F2).
+    staleDeckSlugsRef.current.add(slug)
+    deckSavesRef.current += 1
+    setDeckSaveRevision((revision) => revision + 1)
   }, [])
 
   const buildRound = useCallback(
@@ -1235,6 +1246,11 @@ function App() {
       // were never read: a category carries no blocks of its own, it *is* one.
       // They now load the JLPT level deck, whose blocks are the categories
       // followed by generated sets covering the rest of the corpus.
+      // A deck answered since it was cached is read again (audit 4 F1/F2).
+      if (staleDeckSlugsRef.current.delete(deckSlug)) {
+        delete scriptDeckCacheRef.current[deckSlug]
+        delete scriptBlockCacheRef.current[deckSlug]
+      }
       const cachedDeck = scriptDeckCacheRef.current[deckSlug]
       const cachedBlocks = scriptBlockCacheRef.current[deckSlug]
 
@@ -1318,6 +1334,54 @@ function App() {
   useEffect(() => {
     void loadScriptCards(activeScript, activeDeckSlug)
   }, [activeScript, activeDeckSlug, loadScriptCards])
+
+  /* THE DECK UNDER STUDY IS READ AGAIN ONCE ITS SESSION IS OVER (audit 4 F1/F2). Its cards and
+     blocks are cached for the run, and every saved answer can open a block, flag or clear a problem
+     card, or move a grammar stage. Not while a session is live or starting: swapping the pool under
+     a running cycle changes which cards its indices name. A save that lands after the read began
+     makes that read stale, so it is dropped and the deck read once more. */
+  const sessionBusyRef = useRef(false)
+  sessionBusyRef.current = sessionActive || session.slice.sessionStartPending
+  useEffect(() => {
+    if (sessionActive || session.slice.sessionStartPending || gameLoading) return
+    if (deckRefreshInFlightRef.current) return
+    const slug = activeDeckSlug
+    const script = activeScript
+    if (!staleDeckSlugsRef.current.has(slug)) return
+    const requestId = scriptLoadRequestIdRef.current
+    const savesAtStart = deckSavesRef.current
+    deckRefreshInFlightRef.current = true
+    void (async () => {
+      try {
+        const [deckPayload, blockPayload] = await Promise.all([
+          getDeckCardsDeduped(slug),
+          getBlockProgressDeduped(slug),
+        ])
+        // a save since the read began: the deck stays marked and is read once more
+        if (deckSavesRef.current !== savesAtStart) return
+        const cards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
+        const blocks = normalizeBlockList(blockPayload.blocks)
+        scriptDeckCacheRef.current[slug] = cards
+        scriptBlockCacheRef.current[slug] = blocks
+        // a session that started meanwhile keeps its pool; the deck is read again after it
+        if (sessionBusyRef.current) return
+        staleDeckSlugsRef.current.delete(slug)
+        // a deck load since then owns the screen's state
+        if (scriptLoadRequestIdRef.current !== requestId) return
+        setDeckCards(cards)
+        setBlockProgress(blocks)
+      } catch {
+        // not retried here: the next load of this deck reads it from the bridge
+        staleDeckSlugsRef.current.delete(slug)
+        delete scriptDeckCacheRef.current[slug]
+        delete scriptBlockCacheRef.current[slug]
+      } finally {
+        deckRefreshInFlightRef.current = false
+        if (staleDeckSlugsRef.current.size > 0) setDeckSaveRevision((revision) => revision + 1)
+      }
+    })()
+  }, [activeDeckSlug, activeScript, deckSaveRevision, gameLoading, getBlockProgressDeduped,
+    getDeckCardsDeduped, session.slice.sessionStartPending, sessionActive])
 
   // The selected blocks' leeches, which is the pool a leech-focus session draws from (audit 3, F8).
   const leechCards = useMemo(
@@ -2017,7 +2081,19 @@ function App() {
   const startBlockDrill = useCallback((index: number) => {
     /* -1 is the deck the bridge could not cut into blocks: no filter, study it whole */
     if (index < 0) blockSelection.clear()
-    else blockSelection.select(index)
+    else {
+      /* THE DECK SCREEN READ ITS BLOCKS JUST NOW; App's copy can predate the unlock that put this
+         block on offer (audit 4 F1). Its answer is the one the selection is checked against, and
+         it replaces App's copy so the session draws from the block that was pressed. */
+      const shown = menuDeck.loading || menuDeck.error ? [] : normalizeBlockList(menuDeck.blocks)
+      if (shown.length > 0) {
+        scriptBlockCacheRef.current[activeDeckSlug] = shown
+        setBlockProgress(shown)
+        blockSelection.select(index, shown)
+      } else {
+        blockSelection.select(index)
+      }
+    }
     const minigame = resolveScriptMinigame(activeScript, activeGame)
     closeKanjiDetail()
     setActiveGame(minigame)
@@ -2025,7 +2101,7 @@ function App() {
     resetSessionWithLives()
     session.requestResumeSession({ script: activeScript, minigame })
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
-  }, [activeGame, activeScript, blockSelection, closeKanjiDetail, navigate,
+  }, [activeDeckSlug, activeGame, activeScript, blockSelection, closeKanjiDetail, menuDeck, navigate,
     resetSessionWithLives, resolveScriptMinigame])
 
   /** the drill the two study screens promise on their slab, named rather than implied */
