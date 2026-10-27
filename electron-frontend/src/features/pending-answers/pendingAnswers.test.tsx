@@ -1,9 +1,11 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AnswerRejectedEvent, AnswerSavedEvent, PendingAnswersSnapshot } from '../../electron'
 import { PendingAnswersBar } from './components/PendingAnswersBar'
 import { answerCardKey, newAnswerIdentity } from './answerIdentity'
 import { hasNewerPendingAnswer, useAnswerOutcomes } from './useAnswerOutcomes'
+import { reportSkippedAnswer } from './skippedAnswers'
+import { emptyCardScores, mergeStoredScores } from '../../lib/cardScores'
 
 function fakeDesktop(initial: PendingAnswersSnapshot) {
   const saved = new Set<(event: AnswerSavedEvent) => void>()
@@ -29,6 +31,7 @@ const empty: PendingAnswersSnapshot = { count: 0, headError: null, headAttempts:
 const result = { ok: true, card_id: 1, repetitions: 1, interval: 1, next_review: '2026-01-02', ease_factor: 2.5 }
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
 })
 
@@ -90,10 +93,10 @@ describe('PendingAnswersBar', () => {
     const desktop = fakeDesktop(empty)
     render(<PendingAnswersBar />)
     await act(async () => {})
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe('')
 
     act(() => desktop.status({ count: 1, headError: null, headAttempts: 1, seq: 1, pending: [] }))
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe('')
   })
 
   it('says how many answers are waiting and retries on request', async () => {
@@ -110,7 +113,7 @@ describe('PendingAnswersBar', () => {
     expect(desktop.retryPendingAnswers).toHaveBeenCalledOnce()
 
     act(() => desktop.status({ ...empty, seq: 2 }))
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe('')
   })
 
   it('reports a skipped answer once, then clears', async () => {
@@ -124,6 +127,40 @@ describe('PendingAnswersBar', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
 
     act(() => vi.advanceTimersByTime(8000))
-    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe('')
+  })
+
+  it('keeps one live region mounted, so the first notice is announced', async () => {
+    const desktop = fakeDesktop(empty)
+    render(<PendingAnswersBar />)
+    await act(async () => {})
+    const region = screen.getByRole('status')
+
+    act(() => desktop.status({ count: 1, headError: 'database is locked', headAttempts: 1, seq: 1, pending: [] }))
+    expect(screen.getByRole('status')).toBe(region)
+    expect(region.textContent).toContain("Couldn't confirm this answer was saved.")
+  })
+
+  it('reports an answer the main process never admitted as skipped', async () => {
+    fakeDesktop(empty)
+    render(<PendingAnswersBar />)
+    await act(async () => {})
+
+    act(() => reportSkippedAnswer())
+    expect(screen.getByRole('status').textContent).toContain("One answer couldn't be saved and was skipped.")
+  })
+})
+
+describe('mergeStoredScores', () => {
+  it('takes the database, keeps the named cards, and drops a score the database never took', () => {
+    const current = { ...emptyCardScores(), hiragana: { 1: 2, 2: 1, 3: 4 } }
+    const stored = { ...emptyCardScores(), hiragana: { 1: 1, 4: 3 } }
+    const merged = mergeStoredScores(current, stored, (script, cardId) => script === 'hiragana' && cardId === 3)
+    expect(merged.hiragana).toEqual({ 1: 1, 3: 4, 4: 3 })
+  })
+
+  it('accepts an empty database', () => {
+    const current = { ...emptyCardScores(), hiragana: { 1: 1 } }
+    expect(mergeStoredScores(current, emptyCardScores(), () => false).hiragana).toEqual({})
   })
 })

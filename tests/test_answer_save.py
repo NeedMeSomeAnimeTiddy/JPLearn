@@ -8,6 +8,7 @@ F7: seeding dates the last simulated review the onboarding day, and never touche
 from __future__ import annotations
 
 import sqlite3
+import threading
 import uuid
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
@@ -125,7 +126,7 @@ def test_write_transaction_refuses_to_nest_and_restores_its_context() -> None:
     assert database._in_write_txn.get() is False
 
 
-def test_write_transaction_rolls_back_a_caught_inner_failure_only_if_it_escapes() -> None:
+def test_write_transaction_rolls_back_writes_made_before_an_exception_escapes() -> None:
     database.init_db()
     state = ReviewState(card_id=1)
     with pytest.raises(RuntimeError):
@@ -232,6 +233,48 @@ def test_receipts_table_arrives_by_migration_on_an_existing_database() -> None:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(review_answer_receipts)")}
     assert version == database.LATEST_SCHEMA_VERSION == 21
     assert columns == {"answer_id", "request_fingerprint", "payload_json", "recorded_at_utc"}
+
+
+def test_migration_21_keeps_an_existing_learners_progress_and_survives_two_launches_at_once() -> None:
+    card_id = _first_card()
+    desktop_bridge.record_game_result("hiragana", card_id, True, minigame="meaning_match", answer=_answer())
+    with closing(sqlite3.connect(database.DB_PATH)) as conn:
+        conn.execute("DROP TABLE review_answer_receipts")
+        conn.execute("UPDATE schema_version SET version = 20 WHERE id = 1")
+        conn.commit()
+    before = _snapshot_without_receipts()
+
+    errors: list[BaseException] = []
+
+    def launch() -> None:
+        try:
+            database.init_db()
+        except BaseException as error:  # noqa: BLE001 - reported below
+            errors.append(error)
+
+    threads = [threading.Thread(target=launch) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    with closing(sqlite3.connect(database.DB_PATH)) as conn:
+        version = conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
+        receipts = conn.execute("SELECT COUNT(*) FROM review_answer_receipts").fetchone()[0]
+    assert version == 21
+    assert receipts == 0
+    assert _snapshot_without_receipts() == before
+    assert len(before["review_events"]) == 1
+
+
+def _snapshot_without_receipts() -> dict[str, list[tuple[Any, ...]]]:
+    with closing(sqlite3.connect(database.DB_PATH)) as conn:
+        return {
+            table: sorted(conn.execute(f"SELECT * FROM {table}").fetchall(), key=repr)
+            for table in _LEARNER_TABLES
+            if table != "review_answer_receipts"
+        }
 
 
 # --- F7: onboarding seeds --------------------------------------------------------------------

@@ -57,10 +57,11 @@ import {
   normalizeCurriculumStage,
 } from '../../lib/roundContent'
 import { CARD_MASTERY_MAX } from '../../constants'
-import { hasAnyCardScore, toSectionScores } from '../../lib/cardScores'
+import { mergeStoredScores, toSectionScores } from '../../lib/cardScores'
 import type { AnswerSavedEvent, PendingAnswersSnapshot } from '../../electron'
 import { answerCardKey, newAnswerIdentity } from '../pending-answers/answerIdentity'
 import { hasNewerPendingAnswer, useAnswerOutcomes } from '../pending-answers/useAnswerOutcomes'
+import { reportSkippedAnswer } from '../pending-answers/skippedAnswers'
 import type { AnswerContext } from './types'
 import {
   DEFAULT_INTERLEAVE_WEIGHTS,
@@ -188,6 +189,10 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   /** the session whose end-of-session summary is on screen, so a late save can refresh it */
   const summarySessionIdRef = useRef<string | null>(null)
   const needsStoredScoresRefreshRef = useRef(false)
+  /** the queue as last reported; null until the main process has said */
+  const pendingSnapshotRef = useRef<PendingAnswersSnapshot | null>(null)
+  /** bumped whenever a save sets a card's counter, so a database read begun earlier leaves it alone */
+  const scoreVersionsRef = useRef(new Map<string, number>())
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const queueBucketCountsRef = useRef<{ due: number; leech: number; new: number; review: number } | null>(null)
@@ -385,12 +390,14 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     setSessionStartPending(false)
     setSessionSummaryLoading(false)
     setLastSessionSummary(null)
+    summarySessionIdRef.current = null
     setSessionRunReport(null)
     setActiveSessionId(null)
   }, [resetSessionFull])
 
   const clearLastRunReport = useCallback((): void => {
     setLastSessionSummary(null)
+    summarySessionIdRef.current = null
     setSessionRunReport(null)
   }, [])
 
@@ -610,6 +617,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       retryTargetItemsRef.current = items.length
       setRetryTargetItems(items.length)
       setLastSessionSummary(null)
+      summarySessionIdRef.current = null
       setSessionRunReport(null)
       setActiveSessionId(null)
       seenCardIdsRef.current = []
@@ -664,6 +672,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     resetRoundCycle()
     setSessionGoalError(null)
     setLastSessionSummary(null)
+    summarySessionIdRef.current = null
     setSessionRunReport(null)
     setActiveSessionId(null)
     seenCardIdsRef.current = []
@@ -1237,6 +1246,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       const identity = newAnswerIdentity()
       answerContextsRef.current.set(identity.answerId, {
         cardKey: answerCardKey(resultSlug, roundState.cardId),
+        slug: resultSlug,
+        admitted: false,
         script: activeScript,
         cardId: roundState.cardId,
         mode: roundState.mode,
@@ -1262,8 +1273,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
             ...identity,
           })
           if (!admitted) throw new Error('Review persistence unavailable')
+          const context = answerContextsRef.current.get(identity.answerId)
+          if (context) context.admitted = true
         } catch {
-          // Never admitted, so no outcome will follow: treat it as refused.
+          // Never admitted, so no outcome will follow and the queue never heard of it: say it was
+          // skipped, and undo its optimistic step from the database.
+          reportSkippedAnswer()
           applyRejectedAnswerRef.current(identity.answerId)
         }
       })()
@@ -1336,15 +1351,35 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
   currentRoundRef.current = roundState
 
+  // Re-read the stored counters. The read can take a while, so when it lands the cards with an answer
+  // still on its way -- or set by a save since the read began -- keep what they have.
   const refreshStoredScores = useCallback(async () => {
     const desktop = window.jplearnDesktop
     if (!desktop?.getCardScores) return
+    const versionsAtStart = new Map(scoreVersionsRef.current)
     try {
       const payload = await desktop.getCardScores()
       const stored = toSectionScores(payload?.scores ?? {})
-      if (hasAnyCardScore(stored)) setCardScores(stored)
+      const inFlight = new Set(
+        Array.from(answerContextsRef.current.values(), (context) => `${context.script}:${context.cardId}`),
+      )
+      setCardScores((prev) => mergeStoredScores(prev, stored, (script, cardId) => {
+        const key = `${script}:${cardId}`
+        return inFlight.has(key) || scoreVersionsRef.current.get(key) !== versionsAtStart.get(key)
+      }))
     } catch { /* best effort: the next answer's result corrects it */ }
   }, [setCardScores])
+
+  /** Re-read the stored counters now if nothing is on its way, or once the queue empties. */
+  const requestStoredScoresRefresh = () => {
+    const queueEmpty = (pendingSnapshotRef.current?.count ?? 0) === 0
+    if (queueEmpty && answerContextsRef.current.size === 0) {
+      needsStoredScoresRefreshRef.current = false
+      void refreshStoredScores()
+    } else {
+      needsStoredScoresRefreshRef.current = true
+    }
+  }
 
   const applySavedAnswer = (event: AnswerSavedEvent, snapshot: PendingAnswersSnapshot | null) => {
     const context = answerContextsRef.current.get(event.answerId)
@@ -1352,10 +1387,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     const result = event.result
     if (!context) {
       // Admitted by an earlier load of this window (or another window): nothing local to reconcile
-      // against, so take the database's view once nothing is waiting.
-      if (!snapshot || snapshot.count <= 1) void refreshStoredScores()
+      // against, so take the database's view once nothing is waiting (the status after this save).
+      needsStoredScoresRefreshRef.current = true
       return
     }
+    // The study queue was read before this answer saved.
+    invalidateStudyQueue(context.slug)
 
     if (context.isExplicitReview && explicitReviewPersistenceRequestRef.current === context.persistenceRequestId
       && explicitReviewItemsRef.current) {
@@ -1374,6 +1411,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     }
     if (!newerWaiting && typeof result.mastery_score === 'number') {
       const storedScore = result.mastery_score
+      const versionKey = `${context.script}:${context.cardId}`
+      scoreVersionsRef.current.set(versionKey, (scoreVersionsRef.current.get(versionKey) ?? 0) + 1)
       setCardScores((prev) => (
         prev[context.script][context.cardId] === storedScore
           ? prev
@@ -1444,8 +1483,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       feedbackAdvanceRef.current = null
     }
     // The optimistic step for this answer stands in memory; the database never took it. Re-read the
-    // stored counters once nothing else is waiting (onQueueChanged), rather than undo a clamped step.
-    needsStoredScoresRefreshRef.current = true
+    // stored counters once nothing else is waiting, rather than undo a clamped step.
+    requestStoredScoresRefresh()
   }
   applyRejectedAnswerRef.current = applyRejectedAnswer
 
@@ -1453,10 +1492,14 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     onSaved: applySavedAnswer,
     onRejected: (event) => applyRejectedAnswer(event.answerId),
     onQueueChanged: (snapshot) => {
-      if (snapshot.count === 0 && needsStoredScoresRefreshRef.current) {
-        needsStoredScoresRefreshRef.current = false
-        void refreshStoredScores()
+      pendingSnapshotRef.current = snapshot
+      // An admitted answer gone from the queue with no outcome (an event this window missed) is lost
+      // as far as this window can tell: reconcile it as refused, from the database.
+      const stillWaiting = new Set(snapshot.pending.map((entry) => entry.answerId))
+      for (const [answerId, context] of answerContextsRef.current) {
+        if (context.admitted && !stillWaiting.has(answerId)) applyRejectedAnswer(answerId)
       }
+      if (needsStoredScoresRefreshRef.current) requestStoredScoresRefresh()
     },
   })
 

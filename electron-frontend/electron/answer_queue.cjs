@@ -4,7 +4,8 @@
 
    THE STUDY ROUND KEEPS GOING WHEN A SAVE FAILS -- Robbie's call, 2026-10-26. So a failed answer is
    not dropped and not retried out of order: it stays at the head, nothing behind it is sent, and the
-   queue retries it on a backoff (and whenever the learner presses Retry or answers again). An answer
+   queue retries it on a backoff (30, 60, then every 120 s) or when the learner presses Retry. Answering
+   again does not cut the backoff short: the new answer just waits behind the failed one. An answer
    is never evicted. A save is safe to repeat because each answer carries an id the bridge keeps a
    receipt for: a repeat of an answer that already committed returns the stored result.
 
@@ -44,7 +45,15 @@ function createAnswerQueue(options) {
   let seq = 0
   let drainPromise = null
   let retryTimer = null
-  let exclusiveDepth = 0
+  // Exclusive operations (reset, import, expertise seeding) run one after another on a chain; while any
+  // is queued or running the queue sends nothing -- except the drain an import does before it starts.
+  let exclusiveWaiting = 0
+  let exclusiveTail = Promise.resolve()
+  let drainingForExclusive = false
+
+  function paused() {
+    return exclusiveWaiting > 0 && !drainingForExclusive
+  }
 
   function snapshot() {
     const head = entries[0]
@@ -80,7 +89,7 @@ function createAnswerQueue(options) {
   }
 
   async function drainLoop() {
-    while (entries.length > 0 && exclusiveDepth === 0) {
+    while (entries.length > 0 && !paused()) {
       const head = entries[0]
       head.attempts += 1
       try {
@@ -115,12 +124,23 @@ function createAnswerQueue(options) {
     }
   }
 
-  /** start draining unless a drain or an exclusive operation is already under way */
-  function kick() {
-    if (drainPromise !== null || exclusiveDepth > 0 || entries.length === 0) {
-      return drainPromise ?? Promise.resolve()
+  /**
+   * Start draining unless a drain or an exclusive operation is already under way. A failed head waits
+   * out its backoff unless `force` (the Retry button, or an import that must drain first).
+   */
+  function kick(force = false) {
+    if (drainPromise !== null) {
+      return drainPromise
     }
-    cancelRetry()
+    if (paused() || entries.length === 0) {
+      return Promise.resolve()
+    }
+    if (retryTimer !== null) {
+      if (!force) {
+        return Promise.resolve()
+      }
+      cancelRetry()
+    }
     drainPromise = drainLoop().finally(() => {
       drainPromise = null
     })
@@ -149,12 +169,12 @@ function createAnswerQueue(options) {
 
   /** the Retry button: try the head now */
   function retryNow() {
-    return kick()
+    return kick(true)
   }
 
   /**
-   * Run `operation` with no answer in flight and none sent until it finishes. Answers admitted
-   * meanwhile are counted and wait their turn.
+   * Run `operation` with no answer in flight and none sent until it finishes, after any exclusive
+   * operation already queued. Answers admitted meanwhile are counted and wait their turn.
    *
    * `dropPending: true` is for a progress reset: the learner asked to delete progress, so answers still
    * waiting are dropped (each reported as rejected with reason 'reset'). Otherwise the queue is drained
@@ -162,13 +182,17 @@ function createAnswerQueue(options) {
    * land between an answer and the ones after it.
    */
   async function runExclusive(operation, { dropPending = false } = {}) {
-    exclusiveDepth += 1
+    exclusiveWaiting += 1
+    const previous = exclusiveTail
+    let release
+    exclusiveTail = new Promise((resolve) => { release = resolve })
     try {
-      cancelRetry()
+      await previous
       if (drainPromise) {
         await drainPromise.catch(() => undefined)
       }
       if (dropPending) {
+        cancelRetry()
         const dropped = entries.splice(0, entries.length)
         for (const entry of dropped) {
           seq += 1
@@ -181,11 +205,11 @@ function createAnswerQueue(options) {
           emitStatus()
         }
       } else if (entries.length > 0) {
-        exclusiveDepth -= 1
+        drainingForExclusive = true
         try {
-          await kick()
+          await kick(true)
         } finally {
-          exclusiveDepth += 1
+          drainingForExclusive = false
         }
         if (entries.length > 0) {
           throw new Error(WAITING_FOR_SAVES_MESSAGE)
@@ -193,9 +217,10 @@ function createAnswerQueue(options) {
       }
       return await operation()
     } finally {
-      exclusiveDepth -= 1
-      // Not when a retry is already scheduled: the head just failed, and the backoff stands.
-      if (exclusiveDepth === 0 && retryTimer === null) {
+      exclusiveWaiting -= 1
+      release()
+      // A failed head keeps its backoff; kick() leaves it alone while the retry timer runs.
+      if (exclusiveWaiting === 0) {
         void kick()
       }
     }
@@ -204,4 +229,52 @@ function createAnswerQueue(options) {
   return { enqueue, retryNow, runExclusive, snapshot, kick }
 }
 
-module.exports = { createAnswerQueue, INVALID_ANSWER_CODE, WAITING_FOR_SAVES_MESSAGE }
+/**
+ * The before-quit guard: answers waiting to save live only in memory, so quitting with any asks first.
+ * Returns true when the quit may go ahead. "Wait and retry" cancels the quit entirely -- including the
+ * tray's `isQuitting` flag, or closing the window afterwards would destroy it instead of hiding it.
+ *
+ * @param {object} options
+ * @param {{ snapshot: () => { count: number }, retryNow: () => Promise<unknown> }} options.queue
+ * @param {(options: object) => Promise<{ response: number }>} options.showMessageBox
+ * @param {() => void} options.quit  app.quit()
+ * @param {() => void} options.cancelQuit  clears the app's isQuitting flag
+ */
+function createUnsavedAnswersQuitGuard({ queue, showMessageBox, quit, cancelQuit }) {
+  let confirmed = false
+  let dialogOpen = false
+  return function mayQuit() {
+    const waiting = queue.snapshot().count
+    if (waiting === 0 || confirmed) {
+      return true
+    }
+    cancelQuit()
+    if (dialogOpen) {
+      return false
+    }
+    dialogOpen = true
+    const message = waiting === 1
+      ? "1 answer isn't saved yet. Quit anyway?"
+      : `${waiting} answers aren't saved yet. Quit anyway?`
+    void showMessageBox({
+      type: 'warning',
+      buttons: ['Wait and retry', 'Quit anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      message,
+    }).then(({ response }) => {
+      dialogOpen = false
+      if (response === 1) {
+        confirmed = true
+        quit()
+      } else {
+        void queue.retryNow()
+      }
+    }).catch(() => {
+      dialogOpen = false
+    })
+    return false
+  }
+}
+
+module.exports = { createAnswerQueue, createUnsavedAnswersQuitGuard, INVALID_ANSWER_CODE, WAITING_FOR_SAVES_MESSAGE }

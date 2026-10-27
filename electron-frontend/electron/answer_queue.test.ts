@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { createAnswerQueue, INVALID_ANSWER_CODE, WAITING_FOR_SAVES_MESSAGE } = require('./answer_queue.cjs')
+const { createAnswerQueue, createUnsavedAnswersQuitGuard, INVALID_ANSWER_CODE, WAITING_FOR_SAVES_MESSAGE } = require('./answer_queue.cjs')
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -105,6 +105,23 @@ describe('answer queue', () => {
     expect(send).toHaveBeenCalledTimes(4)
     await vi.advanceTimersByTimeAsync(120_000)
     expect(send).toHaveBeenCalledTimes(5)
+  })
+
+  it('lets a failed head wait out its backoff while the learner keeps answering', async () => {
+    vi.useFakeTimers()
+    const send = vi.fn(async (_a: string[]) => { throw bridgeError('database is locked') })
+    const { queue } = setup(send)
+
+    queue.enqueue('a', args('a'), 'k')
+    await vi.advanceTimersByTimeAsync(0)
+    queue.enqueue('b', args('b'), 'k')
+    queue.enqueue('c', args('c'), 'k')
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(send).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send.mock.calls[1][0][8]).toBe('a')
   })
 
   it('retries at once when asked, and resends the answer unchanged', async () => {
@@ -218,6 +235,44 @@ describe('answer queue', () => {
     expect(order).toEqual(['send a', 'import', 'send b'])
   })
 
+  it('runs two exclusive operations one after the other, never together', async () => {
+    const order: string[] = []
+    const importDone = deferred<unknown>()
+    const { queue } = setup(async () => ({ ok: true }))
+
+    const importing = queue.runExclusive(async () => {
+      order.push('import start')
+      await importDone.promise
+      order.push('import end')
+    })
+    const reset = queue.runExclusive(async () => { order.push('reset') }, { dropPending: true })
+    await flush()
+    expect(order).toEqual(['import start'])
+
+    importDone.resolve(undefined)
+    await Promise.all([importing, reset])
+    expect(order).toEqual(['import start', 'import end', 'reset'])
+  })
+
+  it('sends nothing while an exclusive operation waits its turn behind another', async () => {
+    const sent: string[] = []
+    const first = deferred<unknown>()
+    const { queue } = setup(async (a) => { sent.push(a[8]); return { ok: true } })
+
+    const running = queue.runExclusive(() => first.promise)
+    const waitingReset = queue.runExclusive(async () => ({ ok: true }), { dropPending: true })
+    await flush()
+    queue.enqueue('a', args('a'), 'k')
+    await flush()
+    expect(sent).toEqual([])
+
+    first.resolve({ ok: true })
+    await Promise.all([running, waitingReset])
+    await flush()
+    expect(sent).toEqual([])
+    expect(queue.snapshot().count).toBe(0)
+  })
+
   it('keeps working after an exclusive operation fails', async () => {
     const { queue, saved } = setup(async () => ({ ok: true }))
     await expect(queue.runExclusive(async () => { throw new Error('reset failed') }, { dropPending: true }))
@@ -226,5 +281,45 @@ describe('answer queue', () => {
     queue.enqueue('a', args('a'), 'k')
     await flush()
     expect(saved()).toEqual(['a'])
+  })
+})
+
+describe('quitting with answers waiting', () => {
+  function guardWith(count: number, response: number) {
+    const showMessageBox = vi.fn(async (_options: { message: string }) => ({ response }))
+    const quit = vi.fn()
+    const cancelQuit = vi.fn()
+    const retryNow = vi.fn(async () => undefined)
+    const mayQuit = createUnsavedAnswersQuitGuard({
+      queue: { snapshot: () => ({ count }), retryNow }, showMessageBox, quit, cancelQuit,
+    })
+    return { mayQuit, showMessageBox, quit, cancelQuit, retryNow }
+  }
+
+  it('lets the app quit when nothing is waiting', () => {
+    const { mayQuit, showMessageBox } = guardWith(0, 0)
+    expect(mayQuit()).toBe(true)
+    expect(showMessageBox).not.toHaveBeenCalled()
+  })
+
+  it('asks first, and "Wait and retry" cancels the quit so closing the window hides it again', async () => {
+    const { mayQuit, showMessageBox, quit, cancelQuit, retryNow } = guardWith(2, 0)
+    expect(mayQuit()).toBe(false)
+    expect(mayQuit()).toBe(false)
+    await flush()
+
+    expect(showMessageBox).toHaveBeenCalledOnce()
+    expect(showMessageBox.mock.calls[0][0].message).toBe("2 answers aren't saved yet. Quit anyway?")
+    expect(cancelQuit).toHaveBeenCalled()
+    expect(retryNow).toHaveBeenCalledOnce()
+    expect(quit).not.toHaveBeenCalled()
+  })
+
+  it('quits on "Quit anyway" and does not ask twice', async () => {
+    const { mayQuit, quit } = guardWith(1, 1)
+    expect(mayQuit()).toBe(false)
+    await flush()
+    expect(quit).toHaveBeenCalledOnce()
+    expect(mayQuit()).toBe(true)
   })
 })

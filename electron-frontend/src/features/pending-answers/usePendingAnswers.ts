@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PendingAnswersSnapshot } from '../../electron'
+import { onSkippedAnswer } from './skippedAnswers'
 
 export interface PendingAnswersState {
   /** answers waiting to save; shown only once the oldest has failed at least once */
@@ -26,6 +27,7 @@ export function usePendingAnswers(): PendingAnswersState {
     const offRejected = desktop.onAnswerRejected?.((event) => {
       if (event.reason === 'invalid') setSkipped(true)
     })
+    const offSkipped = onSkippedAnswer(() => setSkipped(true))
     void desktop.getPendingAnswers?.().then((next) => {
       if (!disposed && next) take(next)
     }).catch(() => undefined)
@@ -33,6 +35,7 @@ export function usePendingAnswers(): PendingAnswersState {
       disposed = true
       offStatus()
       offRejected?.()
+      offSkipped()
     }
   }, [])
 

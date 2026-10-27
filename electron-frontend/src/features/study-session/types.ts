@@ -166,6 +166,10 @@ export interface StudySessionApi {
 export interface AnswerContext {
   /** `${slug}:${cardId}`, matching the main process's queue */
   cardKey: string
+  /** the deck the answer was saved against, whose study queue a late save makes stale */
+  slug: DeckSlugInput
+  /** set once the main process has admitted it; an admitted answer that leaves the queue unseen is lost */
+  admitted: boolean
   script: ScriptKey
   cardId: number
   mode: RoundState['mode']

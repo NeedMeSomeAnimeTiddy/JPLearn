@@ -139,7 +139,12 @@ function registerIpcHandlers(options) {
       throw new Error('Legacy card scores must be an object keyed by section')
     }
     try {
-      return await runPythonBridgeWithArgsRead(['import-card-scores', JSON.stringify(legacyScores)])
+      // A write: in turn with answers, reset and import, on the worker alone.
+      const response = await options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['import-card-scores', JSON.stringify(legacyScores)]),
+      )
+      clearBridgeReadCaches()
+      return response
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to import card mastery scores: ${detail}`)
@@ -641,7 +646,10 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedLevel = validateExpertiseLevelInput(level)
     try {
-      const response = await options.runPythonBridgeWithArgs(['apply-expertise-level', validatedLevel])
+      // Seeds review schedules: in turn with answers, reset and import, on the worker alone.
+      const response = await options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['apply-expertise-level', validatedLevel]),
+      )
       clearBridgeReadCaches()
       return response
     } catch (error) {
@@ -1416,9 +1424,10 @@ function registerIpcHandlers(options) {
       if (canceled || !filePaths || filePaths.length === 0) {
         return { ok: false, cancelled: true }
       }
-      // Not while answers are waiting to save: the import would land between them.
+      // Not while answers are waiting to save: the import would land between them. Worker only: a
+      // one-shot fallback could still be writing after a reset that ran next on the worker.
       const response = await options.answerQueue.runExclusive(
-        () => runPythonBridgeWithArgsRead(['analytics-import-json', filePaths[0], 'merge']),
+        () => options.runPythonBridgeWorkerOnly(['analytics-import-json', filePaths[0], 'merge']),
       )
       if (!response || typeof response !== 'object') {
         throw new Error('Invalid import response from bridge')
