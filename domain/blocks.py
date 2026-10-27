@@ -122,18 +122,24 @@ _KATAKANA_BLOCKS: list[Block] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Sentence Examples blocks  (card IDs match _GRAMMAR_PATTERNS_DATA indices in
-# domain/decks.py)
+# Sentence Examples blocks  (card IDs are positions in the served sentence list:
+# the first 1,200 rows of data/external_sources/sentence_examples.csv, which is
+# what scripts/desktop_bridge.py's SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT keeps).
+# The sentences have no topic order, so the blocks are plain numbered sets.
+# ``sample_chars`` is empty on purpose: domain/ cannot read the CSV, and the
+# block-selection preview renders nothing for an empty list.
 # ---------------------------------------------------------------------------
+SENTENCE_EXAMPLES_BLOCK_SIZE = 20
+SENTENCE_EXAMPLES_BLOCK_COUNT = 60  # x BLOCK_SIZE = the bridge's 1,200-card cap
 _SENTENCE_EXAMPLES_BLOCKS: list[Block] = [
-    Block(0, "Copula / Existence", list(range(0, 6)), ["〜は〜です", "〜があります", "〜がいます"]),
-    Block(1, "Core Particles", list(range(6, 19)), ["〜は", "〜が", "〜を"]),
-    Block(2, "Verb Forms", list(range(19, 31)), ["〜ます", "〜ません", "〜てください"]),
-    Block(3, "i-Adjectives", list(range(31, 35)), ["〜い (present)", "〜くない", "〜かった"]),
-    Block(4, "na-Adjectives", list(range(35, 38)), ["〜な (before noun)", "〜です (na-adj)", "〜ではありません (na-adj)"]),
-    Block(5, "Question Words", list(range(38, 49)), ["なに/なん", "どこ", "だれ"]),
-    Block(6, "Connectives", list(range(49, 54)), ["〜から (reason)", "〜が (contrast)", "〜けど/けれど"]),
-    Block(7, "Common Patterns", list(range(54, 64)), ["〜をください", "〜がほしい", "〜たい"]),
+    Block(
+        index,
+        f"Sentences {index * SENTENCE_EXAMPLES_BLOCK_SIZE + 1}–"
+        f"{(index + 1) * SENTENCE_EXAMPLES_BLOCK_SIZE}",
+        list(range(index * SENTENCE_EXAMPLES_BLOCK_SIZE, (index + 1) * SENTENCE_EXAMPLES_BLOCK_SIZE)),
+        [],
+    )
+    for index in range(SENTENCE_EXAMPLES_BLOCK_COUNT)
 ]
 
 # ---------------------------------------------------------------------------
@@ -147,17 +153,26 @@ _CONJUGATION_TRAINING_BLOCKS: list[Block] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Grammar Patterns blocks  (card IDs match _GRAMMAR_PATTERNS_DATA indices in
-# domain/decks.py).  Uses CATEGORY_UNLOCK_THRESHOLD (0.70) instead of the
-# standard 0.80 so learners advance after completing most of each group.
+# Grammar Patterns blocks  (card IDs match the served imported list,
+# GRAMMAR_PATTERNS_EXTERNAL_DATA, ids 0-87 of the deck in domain/decks.py).
+# Every id is in exactly one block.  Uses CATEGORY_UNLOCK_THRESHOLD (0.70)
+# instead of the standard 0.80 so learners advance after completing most of
+# each group.
 # ---------------------------------------------------------------------------
 _GRAMMAR_PATTERNS_BLOCKS: list[Block] = [
-    Block(0, "Copula & Existence",      list(range(0,  6)),  ["〜は〜です", "〜があります", "〜がいます"]),
-    Block(1, "Core Particles",          list(range(6,  19)), ["〜は", "〜が", "〜を"]),
-    Block(2, "Verb Forms",              list(range(19, 31)), ["〜ます", "〜ません", "〜ました"]),
-    Block(3, "Descriptions & Questions",list(range(31, 49)), ["〜い", "〜な", "なに/なん"]),
-    Block(4, "Connectives",             list(range(49, 54)), ["〜から", "〜が (contrast)", "〜けど"]),
-    Block(5, "Key Expressions",         list(range(54, 64)), ["〜をください", "〜がほしい", "どうぞよろしく"]),
+    Block(0,  "Copula & Existence",     list(range(0,  6)),  ["〜は〜です", "〜は〜ではありません", "〜は〜ですか"]),
+    Block(1,  "Core Particles",         list(range(6,  19)), ["〜は", "〜が", "〜を"]),
+    Block(2,  "Polite Verbs",           list(range(19, 31)), ["〜ます", "〜ません", "〜ました"]),
+    Block(3,  "Adjectives",             list(range(31, 38)), ["〜い (present)", "〜くない", "〜かった"]),
+    Block(4,  "Question Words",        list(range(38, 44)), ["なに/なん", "だれ", "どの〜"]),
+    Block(5,  "Connectives",            list(range(44, 49)), ["〜から (reason)", "〜が (contrast)", "〜けど/けれど"]),
+    Block(6,  "Wants & Requests",       list(range(49, 52)), ["〜をください", "〜がほしい", "〜たい"]),
+    Block(7,  "Everyday Phrases",       list(range(52, 59)), ["〜に行きます", "〜で行きます", "どうぞよろしく"]),
+    Block(8,  "Casual & Past Forms",    list(range(59, 64)), ["〜ましたか", "〜じゃない", "〜だった"]),
+    Block(9,  "Endings & Feelings",     list(range(64, 72)), ["〜から〜まで", "〜ね", "〜よ"]),
+    Block(10, "Linking Actions",        list(range(72, 78)), ["〜てから", "〜ながら", "〜ことができます"]),
+    Block(11, "Opinions & Obligations", list(range(78, 84)), ["〜と思います", "〜かもしれません", "〜なければなりません"]),
+    Block(12, "Conditionals & Favors",  list(range(84, 88)), ["〜たら", "〜てあげます", "〜てくれます"]),
 ]
 
 
