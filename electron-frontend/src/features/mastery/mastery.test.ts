@@ -82,6 +82,34 @@ describe('masteryGroups', () => {
     expect(groups.map((g) => g.pct)).toEqual([100, 100])
   })
 
+  it('draws vocabulary as five levels, N5 to N1, like kanji', () => {
+    /* audit 3, Q3: it used to be the twelve N5 topic groups and nothing else */
+    const groups = masteryGroups(input({
+      blocks: {},
+      categoryBlocks: {
+        vocab_n1: [raw(0, 'Law & Justice', [500])],
+        vocab_n5: [raw(0, 'Greetings', [1, 2]), raw(1, 'Numbers', [3])],
+        vocab_n4: [raw(0, 'School & Work', [100])],
+        vocab_n3: [raw(0, 'Feelings', [200])],
+        vocab_n2: [raw(0, 'Money & Finance', [300])],
+      },
+    }))
+    expect(groups.map((g) => g.en)).toEqual([
+      'VOCABULARY N5', 'VOCABULARY N4', 'VOCABULARY N3', 'VOCABULARY N2', 'VOCABULARY N1',
+    ])
+    expect(groups[0].blocks.map((b) => [b.name, b.chars.length]))
+      .toEqual([['Greetings', 2], ['Numbers', 1]])
+  })
+
+  it('reads every vocabulary level out of the one score map they share', () => {
+    const groups = masteryGroups(input({
+      blocks: {},
+      categoryBlocks: { vocab_n5: [raw(0, 'A', [1])], vocab_n1: [raw(0, 'B', [500])] },
+      scores: scores({ vocab_n5: { 1: 4, 500: 4 } }),
+    }))
+    expect(groups.map((g) => [g.en, g.pct])).toEqual([['VOCABULARY N5', 100], ['VOCABULARY N1', 100]])
+  })
+
   it('caps a score that has run past full marks', () => {
     const groups = masteryGroups(input({ scores: scores({ hiragana: { 1: 9, 2: 9 } }) }))
     expect(groups[0].pct).toBe(100)

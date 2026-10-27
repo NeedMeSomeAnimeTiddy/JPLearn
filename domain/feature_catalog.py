@@ -6,6 +6,7 @@ All logic lives in :mod:`domain.feature_service`.
 Features unlock in three tiers:
 1. Always available  — no prerequisites (themes, achievements)
 2. Progression gates — require specific progression nodes to be mastered
+   (or reached, for a node nothing measures; see ``gate_status``)
 3. Feature chains    — require another feature to be unlocked first
 """
 from __future__ import annotations
@@ -18,6 +19,7 @@ from domain.features import (
     FeatureUnlock,
     ProgressionCondition,
 )
+from domain.progression_curriculum import gate_status
 
 
 # ---------------------------------------------------------------------------
@@ -34,9 +36,10 @@ def _badge(descriptor: str) -> FeatureReward:
 
 
 def _requires_mastered(*node_ids: str) -> FeatureRequirement:
+    """Mastered, or merely reached for a node nothing measures (``gate_status``)."""
     return FeatureRequirement(
         progression_conditions=tuple(
-            ProgressionCondition(node_id=nid, required_status="mastered")
+            ProgressionCondition(node_id=nid, required_status=gate_status(nid))
             for nid in node_ids
         )
     )

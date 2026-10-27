@@ -290,3 +290,47 @@ def record_mastery(
                 tmp = ProgressionState(node_states=working)
 
     return ProgressionState(node_states=working), tuple(events)
+
+
+def unlock_ready_nodes(
+    graph: ProgressionGraph,
+    state: ProgressionState,
+    today: date,
+) -> tuple[ProgressionState, tuple[ProgressionEvent, ...]]:
+    """Unlock every locked node whose unlock conditions are now met.
+
+    :func:`record_mastery` only re-evaluates a node's dependants when that node
+    is mastered. A condition that asks for a prerequisite to be merely
+    ``"unlocked"`` (how the curriculum gates on a node nothing can measure) is
+    met without any mastery event, so this pass is what notices it. It only
+    ever moves ``"locked"`` to ``"unlocked"``, so no status moves backwards,
+    and it repeats until nothing changes because one unlock can satisfy the
+    next node in a chain.
+    """
+    working = dict(state.node_states)
+    events: list[ProgressionEvent] = []
+    changed = True
+    while changed:
+        changed = False
+        for node_id in graph.nodes:
+            ns = working.get(node_id)
+            if ns is None or ns.status != "locked":
+                continue
+            if not is_unlocked(graph, ProgressionState(node_states=working), node_id):
+                continue
+            working[node_id] = NodeProgressionState(
+                node_id=node_id,
+                status="unlocked",
+                mastered_item_count=ns.mastered_item_count,
+                total_item_count=ns.total_item_count,
+                first_activated_date=ns.first_activated_date,
+                mastered_date=ns.mastered_date,
+            )
+            is_branch = any(
+                node_id in graph.nodes[p].branches
+                for p in graph.parent_index.get(node_id, ())
+            )
+            event_type: ProgressionEventType = "branch_unlocked" if is_branch else "node_unlocked"
+            events.append(ProgressionEvent(event_type=event_type, node_id=node_id, date=today))
+            changed = True
+    return ProgressionState(node_states=working), tuple(events)
