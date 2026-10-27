@@ -25,21 +25,35 @@ the launch gate) was not run.
 
 ### Where each finding went
 - F1 App keeps each deck's block list for the whole run; starting a block unlocked during the run
-  saves an empty selection, so sessions study the whole deck, across restarts (P1): repair in
-  progress.
-- F2 problem-card flags and grammar stages frozen at deck load for the run (P2): repair in
-  progress, with F1.
-- F3 Ledger Sessions and 30-day accuracy multiplied by 100 (P2; since 1e1c4d25): repair in progress.
-- F4 Up Next preview indexes the block, not the session's pool (P2): repair in progress.
+  saves an empty selection, so sessions study the whole deck, across restarts (P1): fixed. The deck
+  is marked stale on each answer and its blocks re-read once the session ends; START THIS BLOCK
+  checks against the deck screen's fresh blocks; `select` never saves for a block that does not
+  survive the check. The review measured the first design's cost: re-reading `deck-cards` takes
+  3.3-4.7 s warm for vocab_n5 (kanji 0.15-0.5 s), enough to push the next queue past 1.2 s. So
+  only `block-progress` (6-15 ms) is re-read, and it now carries the deck's problem-card ids and
+  grammar stages above 1, patched onto the cached cards (`withCardState`).
+- F2 problem-card flags and grammar stages frozen at deck load for the run (P2): fixed with F1,
+  from the same block-progress read; a pytest checks it agrees with `deck-cards`.
+- F3 Ledger Sessions and 30-day accuracy multiplied by 100 (P2; since 1e1c4d25): fixed, and the
+  review found the same bug in the menu's THIS WEEK panel (`statPanels.ts`), also fixed. Their test
+  fixtures used fractions and now use whole numbers.
+- F4 Up Next preview indexes the block, not the session's pool (P2): fixed (the hook remembers the
+  pool its cycle was built from). The preview cannot be opened today: `queueOpen` in
+  `MinigameView.tsx` is never set true. Whether it gets a button or goes is Robbie's call; left.
 - F5 two "session goal met" rules; the tutor's cannot be met on kana blocks (P3; no real sessions
-  to size it): Robbie chose "Answers given"; repair in progress.
+  to size it): Robbie chose "Answers given". One helper, `session_items_goal_met`, now decides it
+  for the summary, the history and the devtools diagnostics; the tutor's context strings show
+  answers given. Only the summary also applies an accuracy target, which the app never sets.
 - F6 study queue over 1.2 s gives a silent random order (P2, plausible; Check 3 not run): measure
   first; filed as DEBT #8 with a timing trigger.
-- F7 goal row written before a round is built; failed starts appear in history (P3): repair in
-  progress.
+- F7 goal row written before a round is built; failed starts appear in history (P3): fixed; the
+  goal is sent after the first round builds and awaited before it can be answered, so the first
+  answer carries its session id (review). The wait has no timer of its own (the bridge's 30 s);
+  normally milliseconds, left.
 - F8 no session id means no end screen and an uncleared save (P3): drafted as debt; fixed with the
-  session repairs instead.
-- Nits: unread save fields, unread `queueBucketCounts`, unreachable "+N more": repair in progress.
+  session repairs instead. A session ended with no answers builds no report of zeros (review).
+- Nits: unread save fields, unread `queueBucketCounts`, unreachable "+N more" and its style:
+  removed. Old saves carrying the fields still resume (tests seed them).
 
 ### Triggers checked
 - DEBT #4: not checked (needs startup telemetry).

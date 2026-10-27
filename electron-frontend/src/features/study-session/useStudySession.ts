@@ -188,7 +188,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   const roundPresentedAtRef = useRef<number>(0)
   const localToastIdRef = useRef(-1)
   const previousSessionActiveRef = useRef(false)
-  const seenCardIdsRef = useRef<number[]>([])
   const wrongCardIdsRef = useRef<number[]>([])
   const nearMissCardIdsRef = useRef<number[]>([])
   const retryCardsRef = useRef<GameCard[] | null>(null)
@@ -209,8 +208,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   /** bumped whenever a save sets a card's counter, so a database read begun earlier leaves it alone */
   const scoreVersionsRef = useRef(new Map<string, number>())
   const roundCycleRef = useRef<number[]>([])
+  /** the cards `roundCycleRef`'s indices point into: the leech, retry or mode pool, not always the block */
+  const roundCyclePoolRef = useRef<ScriptDeck['cards']>([])
   const roundCursorRef = useRef<number>(0)
-  const queueBucketCountsRef = useRef<{ due: number; leech: number; new: number; review: number } | null>(null)
+  /** set by a missed-word review, whose end has no run report and no save to clear */
+  const explicitReviewRunRef = useRef(false)
   const interleaveCursorRef = useRef<number>(0)
   /** Monotonic per-round seed; see nextRoundMode. */
   const promptSeedRef = useRef<number>(0)
@@ -241,6 +243,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
   const resetRoundCycle = useCallback(() => {
     roundCycleRef.current = []
+    roundCyclePoolRef.current = []
     roundCursorRef.current = 0
     interleaveCursorRef.current = 0
     promptSeedRef.current = 0
@@ -313,16 +316,10 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       roundCycleRef.current = queue
         ? buildQueueCycle(queue, sourceCards)
         : shuffleArray([...Array(sourceCards.length).keys()])
-      queueBucketCountsRef.current = queue?.queue ? {
-        due: queue.queue.buckets_due,
-        leech: queue.queue.buckets_leech,
-        new: queue.queue.buckets_new,
-        review: queue.queue.buckets_review,
-      } : null
     } catch {
       roundCycleRef.current = shuffleArray([...Array(sourceCards.length).keys()])
-      queueBucketCountsRef.current = null
     }
+    roundCyclePoolRef.current = sourceCards
     roundCursorRef.current = 0
     setQueueRevision((prev) => prev + 1)
   }, [activeDeckSlug, buildQueueCycle, getStudyQueue, resetRoundCycle])
@@ -480,7 +477,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   // ── Session persistence + end-of-session report ────────────────────────────
 
   const clearPersistedSession = useCallback(() => {
-    seenCardIdsRef.current = []
     wrongCardIdsRef.current = []
     nearMissCardIdsRef.current = []
     try { localStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* ignore */ }
@@ -490,13 +486,19 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     const previouslyActive = previousSessionActiveRef.current
     previousSessionActiveRef.current = sessionActive
 
-    if (!previouslyActive || sessionActive || !activeSessionId) return
+    // A session whose goal never started still ends here: its save is cleared and its run report
+    // built, and only the backend summary needs the session id (audit 4 F8). A missed-word review
+    // has neither, and nor does a session cut short by a start in the same update
+    // (`continueLastSession`); one reset first and started later, as a block start is, ends here.
+    if (!previouslyActive || sessionActive || sessionStartPending || explicitReviewRunRef.current) return
 
     const capturedWrongCardIds = [...wrongCardIdsRef.current]
     const capturedNearMissCardIds = [...nearMissCardIdsRef.current]
     clearPersistedSession()
 
     const completedRounds = sessionRounds
+    // Nothing was answered (a database reset mid-session, a deck reload): no report of zeros.
+    if (completedRounds === 0) return
     const completedCorrect = sessionScore
     const completedWrong = Math.max(0, completedRounds - completedCorrect)
     const accuracy = completedRounds > 0 ? Math.round((completedCorrect / completedRounds) * 100) : 0
@@ -535,26 +537,28 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       nearMissCardIds: capturedNearMissCardIds,
     })
 
-    setSessionSummaryLoading(true)
-    setSessionGoalError(null)
-    summarySessionIdRef.current = activeSessionId
-    const fetchSummary = async () => {
-      try {
-        const response = await window.jplearnDesktop?.getSessionSummary(activeSessionId)
-        if (!response.ok || !response.summary) {
-          setSessionGoalError(response.error ?? 'Unable to load session summary.')
+    if (activeSessionId) {
+      setSessionSummaryLoading(true)
+      setSessionGoalError(null)
+      summarySessionIdRef.current = activeSessionId
+      const fetchSummary = async () => {
+        try {
+          const response = await window.jplearnDesktop?.getSessionSummary(activeSessionId)
+          if (!response.ok || !response.summary) {
+            setSessionGoalError(response.error ?? 'Unable to load session summary.')
+            setLastSessionSummary(null)
+            return
+          }
+          setLastSessionSummary(response.summary)
+        } catch (error: unknown) {
+          setSessionGoalError(error instanceof Error ? error.message : 'Unable to load session summary.')
           setLastSessionSummary(null)
-          return
+        } finally {
+          setSessionSummaryLoading(false)
         }
-        setLastSessionSummary(response.summary)
-      } catch (error: unknown) {
-        setSessionGoalError(error instanceof Error ? error.message : 'Unable to load session summary.')
-        setLastSessionSummary(null)
-      } finally {
-        setSessionSummaryLoading(false)
       }
+      void fetchSummary()
     }
-    void fetchSummary()
 
     // Refresh XP after each session so the titlebar badge stays current (Q1-A: pull after session end).
     const getXpProgress = window.jplearnDesktop?.getXpProgress
@@ -581,6 +585,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     sessionPoints,
     sessionRounds,
     sessionScore,
+    sessionStartPending,
     sessionTargetItems,
     retryTargetItems,
     clearPersistedSession,
@@ -595,19 +600,22 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     if (explicitItems) {
       return explicitItems.slice(explicitReviewCursorRef.current, explicitReviewCursorRef.current + 5).map((item) => item.card)
     }
+    // The cycle's indices name cards in the pool it was built from -- the leech pool, a retry list,
+    // a mode's filter -- which is the block only when none of those applied (audit 4 F4).
     const cursor = roundCursorRef.current
     const cycle = roundCycleRef.current
+    const pool = roundCyclePoolRef.current
     const result: GameCard[] = []
     for (let index = cursor; index < cycle.length && result.length < 5; index += 1) {
       const cardIndex = cycle[index]
-      if (cardIndex < activeBlockCards.length) {
-        result.push(activeBlockCards[cardIndex])
+      if (cardIndex < pool.length) {
+        result.push(pool[cardIndex])
       }
     }
     return result
     // queueRevision is a state counter bumped when the queue or cursor changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionActive, activeBlockCards, explicitReviewItems, queueRevision])
+  }, [sessionActive, explicitReviewItems, queueRevision])
 
   const activeSessionLengthPreset = useMemo(
     () => SESSION_LENGTH_PRESETS.find((preset) => preset.items === sessionTargetItems) ?? null,
@@ -655,7 +663,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       summarySessionIdRef.current = null
       setSessionRunReport(null)
       setActiveSessionId(null)
-      seenCardIdsRef.current = []
+      explicitReviewRunRef.current = true
       wrongCardIdsRef.current = []
       nearMissCardIdsRef.current = []
 
@@ -714,7 +722,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     summarySessionIdRef.current = null
     setSessionRunReport(null)
     setActiveSessionId(null)
-    seenCardIdsRef.current = []
+    explicitReviewRunRef.current = false
     wrongCardIdsRef.current = []
     nearMissCardIdsRef.current = []
     if (!customCards) {
@@ -756,10 +764,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       }
       const goalTargetItems = Math.max(1, Math.floor(customTargetItems ?? sessionTargetItems))
 
-      const goalRequest = window.jplearnDesktop?.startSessionGoal({
-          targetItems: goalTargetItems,
-        })
-
       await hydrateRoundCycle(modeCards)
       const index = nextCardIndex(modeCards.length)
       const nextRound = index === null
@@ -776,6 +780,23 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         return
       }
 
+      // Only a start that has a round to play is recorded as a session: a goal sent before the
+      // round was built left a zero-answer row in the session history when it failed (audit 4 F7).
+      // The goal is awaited before the round can be answered, so the first answer is saved with
+      // its session id.
+      try {
+        const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop?.startSessionGoal({
+          targetItems: goalTargetItems,
+        })
+        if (!goalResponse.ok) {
+          setSessionGoalError('Unable to start session goal.')
+        } else {
+          setActiveSessionId(goalResponse.goal.session_id)
+        }
+      } catch (error: unknown) {
+        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
+      }
+
       setSessionActive(true)
       collaboratorsRef.current.onSessionStart()
       saveSessionPrefs()
@@ -790,16 +811,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       setIsRoundResolving(false)
       setGameError(null)
       setRoundConfidenceScore(3)
-      try {
-        const goalResponse: SessionGoalStartResponse = await goalRequest
-        if (!goalResponse.ok) {
-          setSessionGoalError('Unable to start session goal.')
-        } else {
-          setActiveSessionId(goalResponse.goal.session_id)
-        }
-      } catch (error: unknown) {
-        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
-      }
     } catch (error: unknown) {
       resetSessionCore()
       setGameError(error instanceof Error ? error.message : 'Could not start the session. Try again or restart the app.')
@@ -1202,11 +1213,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         }
       }
 
-      const answeredCardId = roundState.cardId
-      if (!seenCardIdsRef.current.includes(answeredCardId)) {
-        seenCardIdsRef.current.push(answeredCardId)
-      }
-
       const confidenceForAnswer = confidenceCaptureEnabled ? roundConfidenceScore : undefined
 
       if (!explicitReviewItemsRef.current) {
@@ -1219,8 +1225,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
             leechFocusEnabled,
             confidenceCaptureEnabled,
             sessionTargetItems,
-            seenCardIds: [...seenCardIdsRef.current],
-            sessionStartedAt: new Date().toISOString(),
             restore: {
               sessionScore: isCorrect ? sessionScore + 1 : sessionScore,
               sessionRounds: sessionRounds + 1,
@@ -1593,7 +1597,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     roundConfidenceScore,
     activeSessionLengthPreset,
     upcomingCards,
-    queueBucketCounts: queueBucketCountsRef.current,
     answerInputRef,
     startSession: (game) => { void startSession(game) },
     submitAnswer,

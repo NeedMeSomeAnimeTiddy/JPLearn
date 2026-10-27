@@ -368,6 +368,11 @@ interface BlockProgressPayload {
   /** Mastery a block needs before it opens the next one. Absent on builds older than
    *  the field — read it with a fallback rather than assuming a number. */
   unlock_threshold?: number
+  /** The deck's active problem cards and grammar stages above 1 (card id → stage; a card left out
+   *  is at stage 1): the per-card fields of `deck-cards` that a saved answer can change, so a
+   *  session end refreshes them from this cheap read (audit 4 F1/F2). */
+  leech_card_ids?: number[]
+  curriculum_stages?: Record<string, number>
 }
 
 interface OverviewCharacterMasteryPayload {

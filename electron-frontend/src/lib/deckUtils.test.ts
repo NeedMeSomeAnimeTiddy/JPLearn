@@ -3,6 +3,7 @@ import {
   SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT,
   buildInterleaveSequence,
   clampWeight,
+  withCardState,
   chooseUniqueIndices,
   limitRuntimeDeckCards,
   normalizeBlockList,
@@ -93,5 +94,26 @@ describe('buildInterleaveSequence', () => {
 
   it('falls back to the allowed modes when no modes are weighted in', () => {
     expect(buildInterleaveSequence(weights, [])).toEqual([])
+  })
+})
+
+describe('withCardState (audit 4 F1/F2)', () => {
+  const cards = [
+    { id: 1, is_leech: true, curriculum_stage: 3 },
+    { id: 2, is_leech: false, curriculum_stage: 1 },
+    { id: 3, is_leech: false, curriculum_stage: 2 },
+  ] as unknown as Parameters<typeof withCardState>[0]
+
+  it('takes problem cards and stages from the read, and puts a card left out at stage 1', () => {
+    const next = withCardState(cards, { leech_card_ids: [2], curriculum_stages: { '3': 3 } })
+    expect(next.map((card) => [card.id, card.is_leech, card.curriculum_stage])).toEqual([
+      [1, false, 1],
+      [2, true, 1],
+      [3, false, 3],
+    ])
+  })
+
+  it('leaves the cards as they were when the read does not carry the fields', () => {
+    expect(withCardState(cards, {})).toBe(cards)
   })
 })
