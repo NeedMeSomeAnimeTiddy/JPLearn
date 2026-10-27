@@ -1646,19 +1646,32 @@ def build_block_progress(slug: str) -> dict[str, object]:
     The renderer had to guess it — one of the two values is already copied into
     ``constants.tsx`` as ``CATEGORY_UNLOCK_THRESHOLD`` and the kana one was nowhere —
     and a gate the learner is shown has to come from the same call that applied it.
+
+    ``leech_card_ids`` and ``curriculum_stages`` are the per-card fields of ``deck-cards`` that a
+    saved answer can change. The renderer re-reads this after each session to refresh them
+    (audit 4 F1/F2) instead of ``deck-cards``, which ranks distractors and looks up the dictionary
+    for every card: 3-5 s warm for vocab_n5, against a few milliseconds here. Stages are the
+    stored ones only; a card with none is at stage 1, as in ``deck-cards``.
     """
     init_study_db()
     threshold = unlock_threshold_for_slug(slug)
-    blocks = blocks_for_slug(slug)
-    if not blocks:
-        return {"slug": slug, "blocks": [], "unlock_threshold": threshold}
-
     factory = ALL_DECKS.get(slug)
     if factory is None:
         raise ValueError(f"Unknown deck slug: {slug}")
 
     deck = factory()
     card_ids = [card.id for card in deck.cards]
+    card_state = {
+        "leech_card_ids": sorted(load_active_leech_card_ids(deck.name) & set(card_ids)),
+        "curriculum_stages": {
+            str(card_id): stage
+            for card_id, stage in load_curriculum_stages(deck.name, "context_cloze", card_ids).items()
+        },
+    }
+    blocks = blocks_for_slug(slug)
+    if not blocks:
+        return {"slug": slug, "blocks": [], "unlock_threshold": threshold, **card_state}
+
     repetitions_map, studied = _block_pass_inputs(deck.name, card_ids)
 
     unlocked_count = compute_unlocked_count(blocks, repetitions_map, threshold, studied)
@@ -1683,7 +1696,7 @@ def build_block_progress(slug: str) -> dict[str, object]:
             }
         )
 
-    return {"slug": slug, "blocks": result, "unlock_threshold": threshold}
+    return {"slug": slug, "blocks": result, "unlock_threshold": threshold, **card_state}
 
 
 def _block_pass_inputs(deck_name: str, card_ids: list[int]) -> tuple[dict[int, int], set[int]]:

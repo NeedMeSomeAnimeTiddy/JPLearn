@@ -290,31 +290,34 @@ describe('blocks and cards that change during the run (audit 4)', () => {
   it('reads problem-card flags again once a session on the deck has ended (F2)', async () => {
     /* Problem-card focus is on. The deck loads with no problem cards, so the first session falls
        back to every card. Cards 4 and 5 become problem cards while it plays; the next session must
-       draw only them, which needs the deck read again rather than served from the first load. */
+       draw only them, which needs the flags read again rather than served from the first load.
+       They come with the block list, so the whole deck is not read again. */
     window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({
       script: 'hiragana', game: 'meaning_match', leechFocusEnabled: true, sessionTargetItems: 8,
     }))
     const flags = { leeches: [] as number[] }
-    const getDeckCards = vi.fn(async () => ({
-      cards: cards.map((card) => ({ ...card, is_leech: flags.leeches.includes(card.id) })),
-    }))
+    const getDeckCards = vi.fn(async () => ({ cards }))
+    const getBlockProgress = vi.fn(async () => ({ blocks: [], leech_card_ids: flags.leeches }))
     window.jplearnDesktop = {
-      ...makeApi(), getDeckCards, getBlockProgress: async () => ({ blocks: [] }),
+      ...makeApi(), getDeckCards, getBlockProgress,
     } as unknown as typeof window.jplearnDesktop
 
     render(<App />)
     await openGame('Hiragana', 'Meaning Match')
     await answerRounds(1, ALL_PROMPTS)
     flags.leeches = [4, 5]
-    const readsBefore = getDeckCards.mock.calls.length
+    const blockReads = getBlockProgress.mock.calls.length
     await answerRounds(7, ALL_PROMPTS)
     await screen.findByText(/RUN IT AGAIN/, {}, { timeout: 4000 })
 
-    /* one read of the deck once the session is over */
-    await waitFor(() => expect(getDeckCards.mock.calls.length).toBeGreaterThan(readsBefore))
+    /* one read of the block list once the session is over; the whole deck is not read again,
+       then or when the next session opens it */
+    await waitFor(() => expect(getBlockProgress.mock.calls.length).toBeGreaterThan(blockReads))
+    const deckReads = getDeckCards.mock.calls.length
 
     await openGame('Hiragana', 'Meaning Match')
     await answerRounds(3, ['char4', 'char5'])
+    expect(getDeckCards.mock.calls.length).toBe(deckReads)
   })
 })
 

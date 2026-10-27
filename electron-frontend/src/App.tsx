@@ -88,6 +88,8 @@ import {
   normalizeDeckCards,
   limitRuntimeDeckCards,
   normalizeBlockList,
+  withCardState,
+  type DeckCardState,
 } from './lib/deckUtils'
 import {
   buildCategoryProgress,
@@ -1246,11 +1248,10 @@ function App() {
       // were never read: a category carries no blocks of its own, it *is* one.
       // They now load the JLPT level deck, whose blocks are the categories
       // followed by generated sets covering the rest of the corpus.
-      // A deck answered since it was cached is read again (audit 4 F1/F2).
-      if (staleDeckSlugsRef.current.delete(deckSlug)) {
-        delete scriptDeckCacheRef.current[deckSlug]
-        delete scriptBlockCacheRef.current[deckSlug]
-      }
+      // A deck answered since it was cached has its blocks read again, and its cards take the
+      // problem cards and stages that read carries (audit 4 F1/F2).
+      const stale = staleDeckSlugsRef.current.delete(deckSlug)
+      if (stale) delete scriptBlockCacheRef.current[deckSlug]
       const cachedDeck = scriptDeckCacheRef.current[deckSlug]
       const cachedBlocks = scriptBlockCacheRef.current[deckSlug]
 
@@ -1268,6 +1269,9 @@ function App() {
 
         if (!resolvedCards) {
           resolvedCards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
+          scriptDeckCacheRef.current[deckSlug] = resolvedCards
+        } else if (stale) {
+          resolvedCards = withCardState(resolvedCards, blockPayload as DeckCardState)
           scriptDeckCacheRef.current[deckSlug] = resolvedCards
         }
         if (!resolvedBlocks) {
@@ -1337,29 +1341,31 @@ function App() {
 
   /* THE DECK UNDER STUDY IS READ AGAIN ONCE ITS SESSION IS OVER (audit 4 F1/F2). Its cards and
      blocks are cached for the run, and every saved answer can open a block, flag or clear a problem
-     card, or move a grammar stage. Not while a session is live or starting: swapping the pool under
-     a running cycle changes which cards its indices name. A save that lands after the read began
-     makes that read stale, so it is dropped and the deck read once more. */
+     card, or move a grammar stage. Only the block list is read: it also carries the problem cards
+     and stages, which are patched onto the cached cards. `deck-cards` itself takes seconds for the
+     larger vocabulary decks on the serial bridge, and would hold up the next session's queue.
+     Not while a session is live or starting: swapping the pool under a running cycle changes which
+     cards its indices name. A save that lands after the read began makes that read stale, so it is
+     dropped and the deck read once more. */
   const sessionBusyRef = useRef(false)
   sessionBusyRef.current = sessionActive || session.slice.sessionStartPending
   useEffect(() => {
     if (sessionActive || session.slice.sessionStartPending || gameLoading) return
     if (deckRefreshInFlightRef.current) return
     const slug = activeDeckSlug
-    const script = activeScript
     if (!staleDeckSlugsRef.current.has(slug)) return
     const requestId = scriptLoadRequestIdRef.current
     const savesAtStart = deckSavesRef.current
     deckRefreshInFlightRef.current = true
     void (async () => {
       try {
-        const [deckPayload, blockPayload] = await Promise.all([
-          getDeckCardsDeduped(slug),
-          getBlockProgressDeduped(slug),
-        ])
+        const blockPayload = await getBlockProgressDeduped(slug)
         // a save since the read began: the deck stays marked and is read once more
         if (deckSavesRef.current !== savesAtStart) return
-        const cards = limitRuntimeDeckCards(script, normalizeDeckCards(deckPayload.cards))
+        const cached = scriptDeckCacheRef.current[slug]
+        // no cached cards to patch: the next load of this deck reads them whole
+        if (!cached) throw new Error('deck not cached')
+        const cards = withCardState(cached, blockPayload)
         const blocks = normalizeBlockList(blockPayload.blocks)
         scriptDeckCacheRef.current[slug] = cards
         scriptBlockCacheRef.current[slug] = blocks
@@ -1380,8 +1386,8 @@ function App() {
         if (staleDeckSlugsRef.current.size > 0) setDeckSaveRevision((revision) => revision + 1)
       }
     })()
-  }, [activeDeckSlug, activeScript, deckSaveRevision, gameLoading, getBlockProgressDeduped,
-    getDeckCardsDeduped, session.slice.sessionStartPending, sessionActive])
+  }, [activeDeckSlug, deckSaveRevision, gameLoading, getBlockProgressDeduped,
+    session.slice.sessionStartPending, sessionActive])
 
   // The selected blocks' leeches, which is the pool a leech-focus session draws from (audit 3, F8).
   const leechCards = useMemo(

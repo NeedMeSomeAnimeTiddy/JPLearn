@@ -487,8 +487,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     previousSessionActiveRef.current = sessionActive
 
     // A session whose goal never started still ends here: its save is cleared and its run report
-    // built, and only the backend summary needs the session id (audit 4 F8). Two endings have
-    // neither, as before: a session cut short by the next start, and a missed-word review.
+    // built, and only the backend summary needs the session id (audit 4 F8). A missed-word review
+    // has neither, and nor does a session cut short by a start in the same update
+    // (`continueLastSession`); one reset first and started later, as a block start is, ends here.
     if (!previouslyActive || sessionActive || sessionStartPending || explicitReviewRunRef.current) return
 
     const capturedWrongCardIds = [...wrongCardIdsRef.current]
@@ -496,6 +497,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     clearPersistedSession()
 
     const completedRounds = sessionRounds
+    // Nothing was answered (a database reset mid-session, a deck reload): no report of zeros.
+    if (completedRounds === 0) return
     const completedCorrect = sessionScore
     const completedWrong = Math.max(0, completedRounds - completedCorrect)
     const accuracy = completedRounds > 0 ? Math.round((completedCorrect / completedRounds) * 100) : 0
@@ -779,9 +782,20 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
       // Only a start that has a round to play is recorded as a session: a goal sent before the
       // round was built left a zero-answer row in the session history when it failed (audit 4 F7).
-      const goalRequest = window.jplearnDesktop?.startSessionGoal({
-        targetItems: goalTargetItems,
-      })
+      // The goal is awaited before the round can be answered, so the first answer is saved with
+      // its session id.
+      try {
+        const goalResponse: SessionGoalStartResponse = await window.jplearnDesktop?.startSessionGoal({
+          targetItems: goalTargetItems,
+        })
+        if (!goalResponse.ok) {
+          setSessionGoalError('Unable to start session goal.')
+        } else {
+          setActiveSessionId(goalResponse.goal.session_id)
+        }
+      } catch (error: unknown) {
+        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
+      }
 
       setSessionActive(true)
       collaboratorsRef.current.onSessionStart()
@@ -797,16 +811,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       setIsRoundResolving(false)
       setGameError(null)
       setRoundConfidenceScore(3)
-      try {
-        const goalResponse: SessionGoalStartResponse = await goalRequest
-        if (!goalResponse.ok) {
-          setSessionGoalError('Unable to start session goal.')
-        } else {
-          setActiveSessionId(goalResponse.goal.session_id)
-        }
-      } catch (error: unknown) {
-        setSessionGoalError(error instanceof Error ? error.message : 'Unable to start session goal.')
-      }
     } catch (error: unknown) {
       resetSessionCore()
       setGameError(error instanceof Error ? error.message : 'Could not start the session. Try again or restart the app.')

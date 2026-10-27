@@ -20,6 +20,26 @@ export function normalizeBlockList(blocks: unknown): BlockInfo[] {
   return Array.isArray(blocks) ? blocks as BlockInfo[] : []
 }
 
+/** The per-card fields a saved answer can change, as the block-progress read carries them. */
+export interface DeckCardState {
+  leech_card_ids?: number[]
+  curriculum_stages?: Record<string, number>
+}
+
+/** Cards with the problem-card flags and grammar stages of a fresh block-progress read (audit 4
+ *  F1/F2). A read without them (an older bridge) leaves the cards as they were; a card with no
+ *  stored stage is at stage 1, as `deck-cards` sends it. */
+export function withCardState(cards: ScriptDeck['cards'], state: DeckCardState): ScriptDeck['cards'] {
+  if (state.leech_card_ids === undefined) return cards
+  const leeches = new Set(state.leech_card_ids)
+  const stages = state.curriculum_stages ?? {}
+  return cards.map((card) => ({
+    ...card,
+    is_leech: leeches.has(card.id),
+    curriculum_stage: stages[String(card.id)] ?? 1,
+  }))
+}
+
 export function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
