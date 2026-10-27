@@ -2034,8 +2034,8 @@ def _tutorial_is_complete() -> bool:
         return True
     # Counted, not merely fetched: `load_review_states` fabricates a default
     # state for cards that have never been seen, so a non-empty result proves
-    # nothing. `repetitions > 0` is the same "has actually been studied" test
-    # node mastery uses.
+    # nothing. A step's count is cards that pass the block rule (answered
+    # correctly at least once), so one such card means the learner has studied.
     return any(
         _compute_node_mastery_counts(node_id)[0] > 0
         for node_id in _PROGRESSION_SYNC_DECK_SLUGS
