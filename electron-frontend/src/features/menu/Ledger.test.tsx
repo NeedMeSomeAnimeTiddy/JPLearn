@@ -139,10 +139,10 @@ describe('what the ledger is made of', () => {
         { minigame: 'meaning_match', attempts: 100, correct: 90, accuracy: 90 },
       ],
       session_history: [
-        { session_id: 's1', started_at_utc: '2026-09-01T10:00:00Z', target_items: 20, reviewed: 24, correct: 21, accuracy: 0.875, goal_met: true },
-        { session_id: 's2', started_at_utc: '2026-08-30T10:00:00Z', target_items: 20, reviewed: 8, correct: 4, accuracy: 0.5, goal_met: false },
+        { session_id: 's1', started_at_utc: '2026-09-01T10:00:00Z', target_items: 20, reviewed: 24, correct: 21, accuracy: 88, goal_met: true },
+        { session_id: 's2', started_at_utc: '2026-08-30T10:00:00Z', target_items: 20, reviewed: 8, correct: 4, accuracy: 50, goal_met: false },
       ],
-      activity: { month: { reviewed: 310, accuracy: 0.74 } },
+      activity: { month: { reviewed: 310, accuracy: 74 } },
       ...over,
     } as unknown as StudySummaryPayload)
 
@@ -176,6 +176,7 @@ describe('what the ledger is made of', () => {
       expect(lines[0].off).toBeFalsy()
       expect(lines[1].off).toBe(true)
       expect(lines[0].v).toBe('88%')
+      expect(lines[1].v).toBe('50%')
     })
 
     it('sums the decks rather than listing twenty of them', () => {
@@ -188,6 +189,8 @@ describe('what the ledger is made of', () => {
       expect(lines[1].v).toBe('2 DECKS')
       expect(lines[2].v).toBe('5')
       expect(lines[3].v).toBe('2')
+      /* the backend sends accuracy as a whole-number percentage, so it is shown as it comes */
+      expect(lines[4].v).toBe('310 REVIEWS · 74%')
     })
 
     it("reads the bridge's totals, so a topic view is not counted again over its level deck", () => {

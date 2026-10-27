@@ -62,7 +62,7 @@ def _format_goals(session_summary: SessionSummary | None) -> str:
         return "No active session goal context in memory."
     status = "met" if session_summary.goal_met else "in-progress"
     return (
-        f"Session {session_summary.session_id} {status}: completed={session_summary.completed_items}/"
+        f"Session {session_summary.session_id} {status}: answered={session_summary.reviewed}/"
         f"{session_summary.target_items}, accuracy={session_summary.accuracy}%"
     )
 
@@ -345,7 +345,7 @@ def _format_unified_memory_graph(
     goal_node = (
         "none"
         if session_summary is None
-        else f"{session_summary.completed_items}/{session_summary.target_items}@{session_summary.accuracy}%"
+        else f"{session_summary.reviewed}/{session_summary.target_items}@{session_summary.accuracy}%"
     )
     summary_node = " | ".join(summary_fragments) if summary_fragments else "none"
     memory_node = " | ".join(memory_hits) if memory_hits else "none"

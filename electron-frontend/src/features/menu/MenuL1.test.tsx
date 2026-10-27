@@ -185,7 +185,7 @@ describe('what the crown and the hero are derived from', () => {
     const full = crownFrom(4, { level: 2, total_xp: 300, xp_to_next_level: 50, xp_for_current_level: 150 }, {
       streakBest: 11,
       freezes: 2,
-      week: { reviewed: 120, correct: 96, accuracy: 0.8, activeDays: 5, points: 340 },
+      week: { reviewed: 120, correct: 96, accuracy: 80, activeDays: 5, points: 340 },
     })
     expect(full.streakBest).toBe(11)
     expect(full.totalXp).toBe(300)

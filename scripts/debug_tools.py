@@ -246,7 +246,7 @@ def _load_session_goal_diagnostics(conn: sqlite3.Connection) -> list[dict[str, o
                 "completed_items": completed_items,
                 "reviewed": reviewed,
                 "accuracy": accuracy,
-                "goal_met": completed_items >= target_items,
+                "goal_met": database._session_items_goal_met(reviewed, target_items),
             }
         )
     return diagnostics
@@ -309,8 +309,8 @@ def print_diagnostics(args: argparse.Namespace) -> int:
         print("  (no saved session goals)")
     for session in sessions:
         print(
-            f"  {session['session_id']}: completed={session['completed_items']}/{session['target_items']} "
-            f"reviewed={session['reviewed']} accuracy={session['accuracy']}% goal_met={session['goal_met']}"
+            f"  {session['session_id']}: answered={session['reviewed']}/{session['target_items']} "
+            f"distinct_cards={session['completed_items']} accuracy={session['accuracy']}% goal_met={session['goal_met']}"
         )
 
     typed = cast(dict[str, int], report["typed_outcomes"])

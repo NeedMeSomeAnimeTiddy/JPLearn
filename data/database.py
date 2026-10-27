@@ -1404,6 +1404,16 @@ def save_session_goal(
     )
 
 
+def _session_items_goal_met(reviewed: int, target_items: int) -> bool:
+    """The one rule for a session's item goal: answers given, repeats included, reach the target.
+
+    The session readers (summary, history, diagnostics) use this, so they agree on the item goal.
+    Only load_session_summary also applies a session's accuracy target, which the app never sets
+    today, so a session with one set can read as met in the history and not in the summary.
+    """
+    return reviewed >= target_items if target_items > 0 else reviewed > 0
+
+
 def load_session_summary(session_id: str) -> SessionSummary | None:
     """Return computed completion metrics for one session id."""
     normalized_session_id = normalize_storage_text(session_id)
@@ -1442,7 +1452,7 @@ def load_session_summary(session_id: str) -> SessionSummary | None:
     target_accuracy_value = (
         None if goal_row["target_accuracy"] is None else int(goal_row["target_accuracy"])
     )
-    goal_met = completed_items >= target_items
+    goal_met = _session_items_goal_met(reviewed, target_items)
     if target_accuracy_value is not None:
         goal_met = goal_met and accuracy >= target_accuracy_value
 
@@ -1927,7 +1937,7 @@ def load_session_history(limit: int = 8) -> list[SessionHistoryRow]:
         correct = int(row["correct"] or 0)
         accuracy = round((correct / reviewed) * 100) if reviewed > 0 else 0
         target = int(row["target_items"] or 0)
-        goal_met = reviewed >= target if target > 0 else reviewed > 0
+        goal_met = _session_items_goal_met(reviewed, target)
         history.append(
             SessionHistoryRow(
                 session_id=str(row["session_id"]),

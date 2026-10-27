@@ -52,7 +52,7 @@ describe('the streak', () => {
 describe('the week', () => {
   it('reads the seven days that used to be a card in the Study Overview', () => {
     const p = statPanelsFrom({
-      ...bare, week: { reviewed: 1240, correct: 992, accuracy: 0.8, activeDays: 5, points: 3400 },
+      ...bare, week: { reviewed: 1240, correct: 992, accuracy: 80, activeDays: 5, points: 3400 },
     }).week!
     expect(p.rows.map((r) => r.value)).toEqual(['1,240', '992 · 80%', '5 OF 7', '3,400'])
   })
