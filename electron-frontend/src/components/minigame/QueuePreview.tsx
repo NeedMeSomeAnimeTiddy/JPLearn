@@ -143,12 +143,6 @@ export function QueuePreview({
               No remaining cards in queue.
             </p>
           )}
-
-          {upcomingCards.length > PREVIEW_COUNT ? (
-            <p className="queue-preview-more">
-              +{upcomingCards.length - PREVIEW_COUNT} more in queue
-            </p>
-          ) : null}
         </motion.div>
       ) : null}
     </AnimatePresence>

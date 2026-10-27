@@ -7,8 +7,11 @@ import type { DeckSlugInput, JlptLevel, PersistedSession, ScriptKey } from '../.
  * `activeScript` names a *section*, and for kanji and vocabulary every level shares one section
  * key (`kanji_n5`, `vocab_n5`). Resuming from it alone always reopened N5, so the deck the session
  * actually studied is saved beside it.
+ *
+ * `seenCardIds` and `sessionStartedAt` are no longer written: nothing read them (audit 4 nit 1).
+ * Saves that still carry them load as before; the parser ignores fields it does not use.
  */
-export interface PersistedStudySession extends PersistedSession {
+export interface PersistedStudySession extends Omit<PersistedSession, 'seenCardIds' | 'sessionStartedAt'> {
   deckSlug: DeckSlugInput
 }
 

@@ -15,7 +15,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { openDeck } from './test-entry'
+import { openDeck, openGame } from './test-entry'
 import App from './App'
 import { PREFS_STORAGE_KEY } from './lib/appStorage'
 import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
@@ -256,3 +256,88 @@ describe('the block a session draws from', () => {
     await waitFor(() => expect(getDeckCards).toHaveBeenCalledWith('vocab_n5'))
   })
 })
+
+describe('blocks and cards that change during the run (audit 4)', () => {
+  it('starts a block unlocked since the deck loaded, rather than saving the whole deck (F1)', async () => {
+    /* App reads hiragana's blocks once, with S-row locked. The deck screen reads them again each
+       time it opens, and by then S-row is open. Pressing START on it used to check the block
+       against App's old copy, drop it, and save [] -- "the whole deck" -- for good. */
+    const progress = { sRowOpen: false }
+    window.jplearnDesktop = {
+      ...makeApi(),
+      getBlockProgress: async (slug: string) => ({
+        blocks: blocks.map((block) => (
+          block.index === 2 && slug === 'hiragana' ? { ...block, unlocked: progress.sRowOpen } : block
+        )),
+      }),
+    } as unknown as typeof window.jplearnDesktop
+
+    await openHiraganaDeck()
+    expect(openBlock()).toBe('K-row')
+
+    progress.sRowOpen = true
+    /* leave and come back: App serves hiragana from its cache, the deck screen asks the bridge */
+    openDeck('Katakana')
+    openDeck('Hiragana')
+    await waitFor(() => expect(openBlock()).toBe('S-row'))
+
+    start()
+    await waitFor(() => expect(storedSelection()).toEqual({ hiragana: [2] }))
+    await waitFor(() => expect(document.querySelector('.rd-focus')).not.toBeNull())
+    expect(['char4', 'char5']).toContain(document.querySelector('.rd-focus')?.textContent?.trim())
+  })
+
+  it('reads problem-card flags again once a session on the deck has ended (F2)', async () => {
+    /* Problem-card focus is on. The deck loads with no problem cards, so the first session falls
+       back to every card. Cards 4 and 5 become problem cards while it plays; the next session must
+       draw only them, which needs the deck read again rather than served from the first load. */
+    window.localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({
+      script: 'hiragana', game: 'meaning_match', leechFocusEnabled: true, sessionTargetItems: 8,
+    }))
+    const flags = { leeches: [] as number[] }
+    const getDeckCards = vi.fn(async () => ({
+      cards: cards.map((card) => ({ ...card, is_leech: flags.leeches.includes(card.id) })),
+    }))
+    window.jplearnDesktop = {
+      ...makeApi(), getDeckCards, getBlockProgress: async () => ({ blocks: [] }),
+    } as unknown as typeof window.jplearnDesktop
+
+    render(<App />)
+    await openGame('Hiragana', 'Meaning Match')
+    await answerRounds(1, ALL_PROMPTS)
+    flags.leeches = [4, 5]
+    const readsBefore = getDeckCards.mock.calls.length
+    await answerRounds(7, ALL_PROMPTS)
+    await screen.findByText(/RUN IT AGAIN/, {}, { timeout: 4000 })
+
+    /* one read of the deck once the session is over */
+    await waitFor(() => expect(getDeckCards.mock.calls.length).toBeGreaterThan(readsBefore))
+
+    await openGame('Hiragana', 'Meaning Match')
+    await answerRounds(3, ['char4', 'char5'])
+  })
+})
+
+const ALL_PROMPTS = cards.map((card) => card.character)
+
+const continueButton = () =>
+  screen.queryByRole('button', { name: /continue immediately/i }) as HTMLButtonElement | null
+
+/** Answer `rounds` Meaning Match rounds correctly, checking each prompt is one of `prompts`. */
+async function answerRounds(rounds: number, prompts: string[]): Promise<void> {
+  for (let round = 0; round < rounds; round++) {
+    await waitFor(() => {
+      expect(continueButton()).toBeNull()
+      expect(prompts).toContain(document.querySelector('.rd-focus')?.textContent?.trim())
+      expect(document.querySelectorAll('.rd-slip').length).toBeGreaterThan(0)
+    }, { timeout: 4000 })
+    const prompt = document.querySelector('.rd-focus')?.textContent?.trim() ?? ''
+    const answer = cards.find((card) => card.character === prompt)?.meaning
+    const correct = Array.from(document.querySelectorAll('.rd-slip'))
+      .find((slip) => slip.querySelector('b')?.textContent?.trim() === answer)
+    fireEvent.click(correct as Element)
+    /* the feedback card holds until its answer has saved */
+    await waitFor(() => expect(continueButton()?.disabled).toBe(false), { timeout: 4000 })
+    fireEvent.click(continueButton() as HTMLButtonElement)
+  }
+}

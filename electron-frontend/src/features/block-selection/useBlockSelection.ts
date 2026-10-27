@@ -18,8 +18,11 @@ export interface BlockSelection {
    * screen hands ONE block over and needs that to be the one. `clear()` then `toggle()` is not
    * the same thing — both read `selected`, which is memoised from state, so the second call in a
    * tick sees the pre-clear selection.
+   *
+   * `against` is the block list to check the index with, for a caller holding a fresher one than
+   * the hook was given (the deck screen reads its own). A locked or unknown block changes nothing.
    */
-  select: (index: number) => void
+  select: (index: number, against?: BlockInfo[]) => void
   /** Clear the selection, which studies the whole deck. */
   clear: () => void
 }
@@ -85,7 +88,12 @@ export function useBlockSelection(
   )
 
   const select = useCallback(
-    (index: number) => commit(normalizeSelection([index], blocks)),
+    (index: number, against: BlockInfo[] = blocks) => {
+      // A saved [] means the learner chose the whole deck, so a block that does not survive
+      // normalising leaves the previous selection alone rather than writing one (audit 4 F1).
+      const next = normalizeSelection([index], against)
+      if (next.length > 0) commit(next)
+    },
     [commit, blocks],
   )
 
