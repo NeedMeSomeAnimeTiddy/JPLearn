@@ -18,6 +18,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { openDeck } from './test-entry'
 import App from './App'
 import { PREFS_STORAGE_KEY } from './lib/appStorage'
+import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
 vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => (
@@ -100,9 +101,7 @@ function makeApi() {
       category_blocks: { vocab_n5: [], grammar_patterns: [] },
       kanji_cards: [],
     }),
-    recordGameResult: async () => ({
-      ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5,
-    }),
+    ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 1, repetitions: 0 })),
     notifyStartupReady: async () => ({ ok: true }),
     setStartupTheme: async () => ({ ok: true, theme: 'lofi_dusk' }),
     getCardNote: async () => ({ note: null }),

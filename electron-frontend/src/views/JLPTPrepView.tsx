@@ -3,6 +3,7 @@ import { EXAM_MODES, screenHead, unscored } from '../features/menu'
 import { Round, RoundAsk, RoundSlips, RoundWork, promptSize } from '../features/round'
 import type { RunChip } from '../features/round'
 import { JLPT_LEVEL_LABELS } from '../constants'
+import { newAnswerIdentity } from '../features/pending-answers/answerIdentity'
 import type { JlptExamMode, JlptLevel, RoundOption } from '../types'
 
 /* ==================================================================================================
@@ -142,13 +143,14 @@ function ExamRunner({ level, mode, questions, onComplete, onAbort }: ExamRunnerP
     setChose(label)
     setTrail(next)
 
-    /* exam scoring is its own thing, but an answer is still a review — fire and forget, the way
-       it always has been */
+    /* exam scoring is its own thing, but an answer is still a review — handed to the save queue
+       and not waited for. A save that fails waits in the queue and the app-wide bar offers Retry. */
     void window.jplearnDesktop.recordGameResult?.({
       slug: question.deck as Parameters<typeof window.jplearnDesktop.recordGameResult>[0]['slug'],
       cardId: question.card_id,
       isCorrect: right,
       minigame: 'meaning_match',
+      ...newAnswerIdentity(),
     }).catch(() => undefined)
 
     dealt.current = setTimeout(() => {

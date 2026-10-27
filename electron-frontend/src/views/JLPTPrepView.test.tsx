@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { JLPTPrepView } from './JLPTPrepView'
+import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from '../test-fixtures/answerQueue'
 
 afterEach(() => {
   cleanup()
@@ -69,7 +70,7 @@ function installDesktopApi(overrides: Record<string, unknown> = {}) {
     getJLPTExamHistory: async () => ({ results: [] }),
     buildJLPTExamQueue: async () => ({ level: 'n5' as const, mode: 'diagnostic' as const, questions: [question()] }),
     saveJLPTExamResult: async () => ({ ok: true, id: 1 }),
-    recordGameResult: async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
+    ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 1, repetitions: 0 })),
     ...overrides,
   }
   // @ts-expect-error partial desktop API is sufficient for this view's calls

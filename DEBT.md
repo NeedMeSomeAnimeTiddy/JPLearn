@@ -44,3 +44,15 @@ fixed now: Optimize is a rare manual action, and the reset database cannot meet 
 
 **Trigger:** Optimize can run (5+ cards with 2+ reviews) and, over at least 500 logged answers, more
 than 10% carry a `confidence_score`; or Optimize is run automatically or offered as a prompt.
+
+## 3. Long writes on the bridge worker report failure at 30 s
+
+**Recorded 2026-10-27.** Reset, JSON import, onboarding seeding and the legacy score import now run on
+the worker alone, in turn with answers (audit 1 review, b91cc8a), so no one-shot copy can still be
+writing after a reset. The worker's 30 s timeout (`BRIDGE_REQUEST_TIMEOUT_MS`) counts from when the
+request is written, queue time included; a write that outlasts it is reported as failed while Python
+finishes it, and a merge import retried by the learner runs twice. Not fixed now: no measured import
+or seed comes near 30 s.
+
+**Trigger:** any of those four commands takes over 10 s on a warm worker, or a learner reports an
+import that "failed" but changed their progress.

@@ -84,7 +84,7 @@ def test_lapsed_word_does_not_use_new_word_budget(
 
 
 def test_seeded_and_rebuilt_states_count_as_reviewed() -> None:
-    assert has_been_reviewed(desktop_bridge._mastered_seed_state(1))
+    assert has_been_reviewed(desktop_bridge._mastered_seed_state(1, date.today()))
     rebuilt = rebuild_review_state(
         2,
         [

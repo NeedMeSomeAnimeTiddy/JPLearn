@@ -1,0 +1,45 @@
+/* Square on purpose: the UI is square-cornered (electron-frontend/CLAUDE.md). */
+.pending-answers-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  border-top: 1px solid color-mix(in oklab, var(--tone-amber) 45%, var(--panel-border));
+  background: color-mix(in oklab, var(--tone-amber) 10%, var(--bg-main));
+  color: var(--text-main);
+}
+
+.pending-answers-text {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.pending-answers-count {
+  color: var(--text-soft);
+}
+
+.pending-answers-retry {
+  flex: none;
+  padding: 6px 16px;
+  border: 1px solid var(--tone-amber);
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pending-answers-retry:hover {
+  background: color-mix(in oklab, var(--tone-amber) 18%, transparent);
+}
+
+.pending-answers-retry:focus-visible {
+  outline: 2px solid var(--tone-ocean);
+  outline-offset: 2px;
+}

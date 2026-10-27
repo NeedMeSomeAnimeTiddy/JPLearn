@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { openDailyGames } from './test-entry'
 import App from './App'
+import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
 vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => <span>{sequence[0]}</span>,
@@ -31,7 +32,7 @@ const desktopApi = {
   getDeckCards: async () => ({ slug: 'hiragana', name: 'Hiragana', cards: [] }),
   getStudyQueue: async () => ({ ok: true, queue: { slug: 'hiragana', card_ids: [], indices: [], buckets_due: 0, buckets_leech: 0, buckets_new: 0, buckets_review: 0 } }),
   getOverviewCharacterMastery: async () => ({ blocks: { hiragana: [], katakana: [] }, category_blocks: { vocab_n5: [], grammar_patterns: [] }, kanji_cards: [] }),
-  recordGameResult: async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
+  ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 1, repetitions: 0 })),
   startSessionGoal: async () => ({ ok: true, goal: { session_id: 'test', target_items: 10, target_minutes: null, target_accuracy: null, started_at_utc: '2026-01-01T00:00:00+00:00' } }),
   getSessionSummary: async () => ({ ok: true }),
   applyExpertiseLevel: async (level: string) => ({ ok: true, level, seeded_cards: 0, decks: [] }),
@@ -82,7 +83,8 @@ function buildReviewDesktopApi(recordGameResult = vi.fn(async () => ({ ok: true,
       recordDailyGamesAttempt: async () => completedReviewDailyState,
       getDeckCards,
       getStudyQueue,
-      recordGameResult,
+      // the mock stands for the bridge's answer; the fake queue delivers it as the main process does
+      ...fakeAnswerQueue(recordGameResult as never),
     },
     getDeckCards,
     getStudyQueue,

@@ -67,6 +67,23 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getKanjiDetail: (character) => ipcRenderer.invoke('study:get-kanji-detail', character),
   getOverviewCharacterMastery: () => ipcRenderer.invoke('study:get-overview-character-mastery'),
   recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload),
+  getPendingAnswers: () => ipcRenderer.invoke('study:get-pending-answers'),
+  retryPendingAnswers: () => ipcRenderer.invoke('study:retry-pending-answers'),
+  onAnswerSaved: (listener) => {
+    const handler = (_event, data) => listener(data)
+    ipcRenderer.on('study:answer-saved', handler)
+    return () => ipcRenderer.removeListener('study:answer-saved', handler)
+  },
+  onAnswerRejected: (listener) => {
+    const handler = (_event, data) => listener(data)
+    ipcRenderer.on('study:answer-rejected', handler)
+    return () => ipcRenderer.removeListener('study:answer-rejected', handler)
+  },
+  onPendingAnswersChanged: (listener) => {
+    const handler = (_event, data) => listener(data)
+    ipcRenderer.on('study:pending-answers', handler)
+    return () => ipcRenderer.removeListener('study:pending-answers', handler)
+  },
   lookupSentence: (payload) => ipcRenderer.invoke('study:lookup-sentence', payload),
   startSessionGoal: (payload) => ipcRenderer.invoke('study:start-session-goal', payload),
   getSessionSummary: (sessionId) => ipcRenderer.invoke('study:get-session-summary', sessionId),

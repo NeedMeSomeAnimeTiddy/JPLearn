@@ -70,9 +70,10 @@ MIGRATION_V17 = 17
 MIGRATION_V18 = 18
 MIGRATION_V19 = 19
 MIGRATION_V20 = 20
+MIGRATION_V21 = 21
 
 
-LATEST_SCHEMA_VERSION = 20
+LATEST_SCHEMA_VERSION = 21
 _SQLITE_IN_CHUNK_SIZE = 900
 
 StageDistribution: TypeAlias = dict[int, int]
@@ -110,6 +111,7 @@ class AssistantProfile(TypedDict):
 
 
 _shared_conn: ContextVar[sqlite3.Connection | None] = ContextVar("_shared_conn", default=None)
+_in_write_txn: ContextVar[bool] = ContextVar("_in_write_txn", default=False)
 
 
 def _open() -> sqlite3.Connection:
@@ -122,6 +124,10 @@ def _open() -> sqlite3.Connection:
 @contextmanager
 def _connect() -> Generator[sqlite3.Connection, None, None]:
     shared = _shared_conn.get()
+    if shared is not None and _in_write_txn.get():
+        # Inside write_transaction: the one transaction commits or rolls back when that block ends.
+        yield shared
+        return
     if shared is not None:
         # Commits or rolls back when this block ends, like an own connection -- see shared_connection.
         with shared:
@@ -158,6 +164,40 @@ def shared_connection() -> Generator[None, None, None]:
         yield
     finally:
         _shared_conn.reset(token)
+        conn.close()
+
+
+@contextmanager
+def write_transaction() -> Generator[None, None, None]:
+    """Run every write inside the block as one transaction: all of it commits, or none of it.
+
+    One answer touches about eight tables (schedule, review log, leech, streak, curriculum stage,
+    XP, mastery, badges). Each `_connect` block used to commit on its own, so a failure partway left
+    a half-saved answer (audit 1, F3). Inside this block `_connect` hands out one connection that
+    holds `BEGIN IMMEDIATE` -- the write lock, so a second process saving the same answer waits and
+    then sees it -- and no inner block commits. The block's end commits once; any exception rolls
+    everything back and is re-raised.
+
+    Not re-entrant, and not usable inside `shared_connection`: joining an outer transaction would
+    let a caught inner failure commit the outer one's partial work. Run `init_db()` before entering;
+    inside, it is a no-op.
+    """
+    if _shared_conn.get() is not None:
+        raise RuntimeError("write_transaction cannot nest or run inside shared_connection")
+    conn = _open()
+    conn_token = _shared_conn.set(conn)
+    txn_token = _in_write_txn.set(True)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except BaseException:
+            conn.rollback()
+            raise
+        conn.commit()
+    finally:
+        _in_write_txn.reset(txn_token)
+        _shared_conn.reset(conn_token)
         conn.close()
 
 
@@ -805,10 +845,11 @@ def _migration_0020(conn: sqlite3.Connection) -> None:
     old ``cardScores.kanji_n5`` bucket that held every N5–N1 kanji score and was
     correct only because ``domain/decks.py`` hand-allocates disjoint id ranges.
 
-    Deliberately its own table rather than a column on ``review_states``:
-    onboarding seeds a full score for every card in a deck without any review
-    having happened, and writing that into ``review_states`` would fabricate FSRS
-    rows for thousands of unreviewed cards.
+    Deliberately its own table rather than a column on ``review_states``: the
+    counter moves on its own rule, not with the FSRS schedule. (Onboarding's
+    "I already know this level" does write ``review_states`` rows, on purpose --
+    Robbie, 2026-10-26 -- but only for cards with no history; see
+    ``seed_review_states_if_unstudied``.)
 
     The counter is not derivable from FSRS state — see ``domain/mastery.py`` for
     why — so existing renderer values must be imported rather than recomputed.
@@ -820,6 +861,30 @@ def _migration_0020(conn: sqlite3.Connection) -> None:
             card_id INTEGER NOT NULL,
             score   INTEGER NOT NULL DEFAULT 0 CHECK (score BETWEEN 0 AND 4),
             PRIMARY KEY (deck, card_id)
+        )
+        """
+    )
+
+
+def _migration_0021(conn: sqlite3.Connection) -> None:
+    """One receipt per saved answer, so saving the same answer twice records it once (audit 1, F1).
+
+    The renderer gives each answer an id. The first save writes the review and, in the same
+    transaction, this row; a repeat with the same id returns the stored payload instead of reviewing
+    again. `request_fingerprint` hashes what was answered, so an id reused for a different answer is
+    refused rather than handed someone else's result.
+
+    Never pruned and not cleared by a progress reset: a pruned or cleared receipt would let a late
+    retry of an already-saved answer run again. A row is a few hundred bytes per answer, the same
+    order as `review_events`. An older build ignores the table and saves without ids, as before.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS review_answer_receipts (
+            answer_id           TEXT PRIMARY KEY CHECK (length(answer_id) = 36),
+            request_fingerprint TEXT NOT NULL,
+            payload_json        TEXT NOT NULL,
+            recorded_at_utc     TEXT NOT NULL
         )
         """
     )
@@ -846,6 +911,7 @@ MIGRATIONS: dict[int, Callable[[sqlite3.Connection], None]] = {
     MIGRATION_V18: _migration_0018,
     MIGRATION_V19: _migration_0019,
     MIGRATION_V20: _migration_0020,
+    MIGRATION_V21: _migration_0021,
 }
 
 
@@ -871,7 +937,13 @@ def _apply_migrations(conn: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    """Create required tables when they do not already exist."""
+    """Create required tables when they do not already exist.
+
+    A no-op inside `write_transaction`, whose callers run it just before entering: migrations must
+    not run inside the one transaction an answer is saved in.
+    """
+    if _in_write_txn.get():
+        return
     with _connect() as conn:
         _apply_migrations(conn)
 
@@ -915,6 +987,7 @@ def reset_db() -> None:
         conn.execute("DELETE FROM daily_games_streak_state")
         conn.execute("DELETE FROM scenario_srs_cards")
         conn.execute("DELETE FROM scenario_sessions")
+        # review_answer_receipts is kept on purpose: see _migration_0021.
 
 
 # ---------------------------------------------------------------------------
@@ -1141,6 +1214,73 @@ def save_state(deck_name: str, state: ReviewState) -> None:
                 state.difficulty,
                 state.last_review.isoformat() if state.last_review else None,
             ),
+        )
+
+
+def seed_review_states_if_unstudied(deck_name: str, states: Collection[ReviewState]) -> int:
+    """Insert each state only for a card with no review_states row and no logged review.
+
+    Returns how many rows were inserted. Existing rows are never touched -- including rows from
+    before the FSRS columns, whose real progress may carry no last-review date -- so `load_states`,
+    which fabricates defaults for absent rows, cannot be used to decide what is unstudied.
+    """
+    normalized_deck_name = _normalize_deck_name(deck_name)
+    inserted = 0
+    with _connect() as conn:
+        for state in states:
+            cursor = conn.execute(
+                """
+                INSERT INTO review_states (
+                    deck, card_id, ease_factor, interval, repetitions, next_review,
+                    stability, difficulty, last_review
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM review_events WHERE deck = ? AND card_id = ?
+                )
+                ON CONFLICT(deck, card_id) DO NOTHING
+                """,
+                (
+                    normalized_deck_name,
+                    state.card_id,
+                    state.ease_factor,
+                    state.interval,
+                    state.repetitions,
+                    state.next_review.isoformat(),
+                    state.stability,
+                    state.difficulty,
+                    state.last_review.isoformat() if state.last_review else None,
+                    normalized_deck_name,
+                    state.card_id,
+                ),
+            )
+            inserted += cursor.rowcount
+    return inserted
+
+
+def load_answer_receipt(answer_id: str) -> tuple[str, dict[str, object]] | None:
+    """Return (request_fingerprint, payload) stored for an answer id, or None."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT request_fingerprint, payload_json FROM review_answer_receipts WHERE answer_id = ?",
+            (answer_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return str(row["request_fingerprint"]), json.loads(row["payload_json"])
+
+
+def save_answer_receipt(
+    answer_id: str, request_fingerprint: str, payload: Mapping[str, object], recorded_at_utc: str
+) -> None:
+    """Store the result of a saved answer; call inside the write_transaction that saved it."""
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO review_answer_receipts (answer_id, request_fingerprint, payload_json, recorded_at_utc)
+            VALUES (?, ?, ?, ?)
+            """,
+            (answer_id, request_fingerprint, json.dumps(payload, ensure_ascii=False), recorded_at_utc),
         )
 
 

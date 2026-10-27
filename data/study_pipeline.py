@@ -388,6 +388,7 @@ def review_card(
     confidence_score: int | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
+    reviewed_at_utc: datetime | None = None,
 ) -> ReviewState:
     """Apply one review outcome, persist state/event, and return updated state.
 
@@ -398,14 +399,25 @@ def review_card(
     With no explicit date the day is resolved once here instead of separately
     inside ``update()``, so a review spanning midnight cannot log against one
     day and schedule from the next.
+
+    ``reviewed_at_utc`` is the exact moment the learner answered (timezone-aware). A save retried
+    later -- after a failed first attempt, perhaps past midnight -- passes it with the learner's
+    local day, so the review is logged, scheduled and counted for the streak when it was given.
     """
+    if reviewed_at_utc is not None:
+        if reviewed_at_utc.tzinfo is None:
+            raise ValueError("reviewed_at_utc must be timezone-aware")
+        reviewed_at_utc = reviewed_at_utc.astimezone(timezone.utc)
     review_day_local = reviewed_on_local or date.today()
-    review_day_utc = reviewed_on_utc or datetime.now(timezone.utc).date()
-    review_timestamp_utc = (
-        f"{review_day_utc.isoformat()}T00:00:00+00:00"
-        if reviewed_on_utc is not None
-        else datetime.now(timezone.utc).isoformat(timespec="seconds")
+    review_day_utc = reviewed_on_utc or (
+        reviewed_at_utc.date() if reviewed_at_utc is not None else datetime.now(timezone.utc).date()
     )
+    if reviewed_at_utc is not None:
+        review_timestamp_utc = reviewed_at_utc.isoformat(timespec="seconds")
+    elif reviewed_on_utc is not None:
+        review_timestamp_utc = f"{review_day_utc.isoformat()}T00:00:00+00:00"
+    else:
+        review_timestamp_utc = datetime.now(timezone.utc).isoformat(timespec="seconds")
     normalized_script_tag = normalize_storage_text(script_tag).lower()
     if not normalized_script_tag:
         normalized_script_tag = normalize_storage_text(deck_name).lower().replace(" ", "_")
@@ -449,6 +461,7 @@ def review_minigame_result(
     confidence_score: int | None = None,
     reviewed_on_local: date | None = None,
     reviewed_on_utc: date | None = None,
+    reviewed_at_utc: datetime | None = None,
 ) -> ReviewState:
     """Persist one minigame outcome by mapping correctness to review quality."""
     state = load_review_states(deck_name, [card_id]).get(card_id, ReviewState(card_id=card_id))
@@ -465,6 +478,7 @@ def review_minigame_result(
         confidence_score=confidence_score,
         reviewed_on_local=reviewed_on_local,
         reviewed_on_utc=reviewed_on_utc,
+        reviewed_at_utc=reviewed_at_utc,
     )
     normalized_minigame = minigame.strip().lower()
     stage_mode = (

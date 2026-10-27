@@ -139,7 +139,12 @@ function registerIpcHandlers(options) {
       throw new Error('Legacy card scores must be an object keyed by section')
     }
     try {
-      return await runPythonBridgeWithArgsRead(['import-card-scores', JSON.stringify(legacyScores)])
+      // A write: in turn with answers, reset and import, on the worker alone.
+      const response = await options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['import-card-scores', JSON.stringify(legacyScores)]),
+      )
+      clearBridgeReadCaches()
+      return response
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to import card mastery scores: ${detail}`)
@@ -548,7 +553,12 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('study:reset-db', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      const response = await options.runPythonBridge('reset-db')
+      // Answers still waiting are dropped: the learner asked to delete progress. Worker-only, so a
+      // save that timed out here but is still running in Python finishes before the reset does.
+      const response = await options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['reset-db']),
+        { dropPending: true },
+      )
       clearBridgeReadCaches()
       return response
     } catch (error) {
@@ -557,46 +567,41 @@ function registerIpcHandlers(options) {
     }
   })
 
+  /* Every answer is admitted to the answer queue (answer_queue.cjs) and this call returns at once;
+     the saved result reaches the renderer as study:answer-saved, a refused one as
+     study:answer-rejected (audit 1, F1/F3). */
   options.ipcMain.handle('study:record-game-result', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateRecordGameResultPayload(payload)
-    try {
-      const args = [
-        'record-result',
-        validatedPayload.slug,
-        String(validatedPayload.cardId),
-        validatedPayload.isCorrect ? '1' : '0',
-        validatedPayload.minigame,
-      ]
-      const curriculumStageArg =
-        typeof validatedPayload.curriculumStage === 'number'
-          ? String(validatedPayload.curriculumStage)
-          : ''
-      const sessionIdArg =
-        typeof validatedPayload.sessionId === 'string' && validatedPayload.sessionId.trim().length > 0
-          ? validatedPayload.sessionId
-          : ''
-      const confidenceArg =
-        typeof validatedPayload.confidenceScore === 'number'
-          ? String(validatedPayload.confidenceScore)
-          : ''
+    const args = [
+      'record-result',
+      validatedPayload.slug,
+      String(validatedPayload.cardId),
+      validatedPayload.isCorrect ? '1' : '0',
+      validatedPayload.minigame,
+      typeof validatedPayload.curriculumStage === 'number' ? String(validatedPayload.curriculumStage) : '',
+      typeof validatedPayload.sessionId === 'string' ? validatedPayload.sessionId : '',
+      typeof validatedPayload.confidenceScore === 'number' ? String(validatedPayload.confidenceScore) : '',
+      validatedPayload.answerId,
+      validatedPayload.answeredAtUtc,
+      validatedPayload.answeredLocalDate,
+    ]
+    return options.answerQueue.enqueue(
+      validatedPayload.answerId,
+      args,
+      `${validatedPayload.slug}:${validatedPayload.cardId}`,
+    )
+  })
 
-      if (curriculumStageArg || sessionIdArg || confidenceArg) {
-        args.push(curriculumStageArg)
-      }
-      if (sessionIdArg || confidenceArg) {
-        args.push(sessionIdArg)
-      }
-      if (confidenceArg) {
-        args.push(confidenceArg)
-      }
-      const response = await options.runPythonBridgeWithArgs(args)
-      clearBridgeReadCaches()
-      return response
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to record game result: ${detail}`)
-    }
+  options.ipcMain.handle('study:get-pending-answers', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return options.answerQueue.snapshot()
+  })
+
+  options.ipcMain.handle('study:retry-pending-answers', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    void options.answerQueue.retryNow()
+    return options.answerQueue.snapshot()
   })
 
   options.ipcMain.handle('study:start-session-goal', async (event, payload) => {
@@ -641,7 +646,10 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedLevel = validateExpertiseLevelInput(level)
     try {
-      const response = await options.runPythonBridgeWithArgs(['apply-expertise-level', validatedLevel])
+      // Seeds review schedules: in turn with answers, reset and import, on the worker alone.
+      const response = await options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['apply-expertise-level', validatedLevel]),
+      )
       clearBridgeReadCaches()
       return response
     } catch (error) {
@@ -1416,7 +1424,11 @@ function registerIpcHandlers(options) {
       if (canceled || !filePaths || filePaths.length === 0) {
         return { ok: false, cancelled: true }
       }
-      const response = await runPythonBridgeWithArgsRead(['analytics-import-json', filePaths[0], 'merge'])
+      // Not while answers are waiting to save: the import would land between them. Worker only: a
+      // one-shot fallback could still be writing after a reset that ran next on the worker.
+      const response = await options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['analytics-import-json', filePaths[0], 'merge']),
+      )
       if (!response || typeof response !== 'object') {
         throw new Error('Invalid import response from bridge')
       }

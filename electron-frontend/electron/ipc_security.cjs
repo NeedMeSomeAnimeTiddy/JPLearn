@@ -145,6 +145,8 @@ function validateRecordGameResultPayload(payload) {
     sessionId = validateSessionId(payload.sessionId)
   }
 
+  const answer = validateAnswerIdentity(payload, Date.now())
+
   return {
     slug,
     cardId: payload.cardId,
@@ -153,7 +155,40 @@ function validateRecordGameResultPayload(payload) {
     curriculumStage: payload.curriculumStage,
     sessionId,
     confidenceScore,
+    ...answer,
   }
+}
+
+const ANSWER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+const ISO_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/
+const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The id and moment the renderer gave one answer (audit 1, F1). Checked once, when the answer is
+ * admitted: the queue may retry it days later, and a retry must not be refused for its age.
+ */
+function validateAnswerIdentity(payload, nowMs) {
+  const { answerId, answeredAtUtc, answeredLocalDate } = payload
+  if (typeof answerId !== 'string' || !ANSWER_ID_PATTERN.test(answerId)) {
+    throw new Error(`Invalid answerId: ${String(answerId)}`)
+  }
+  if (typeof answeredAtUtc !== 'string' || !ISO_INSTANT_PATTERN.test(answeredAtUtc)) {
+    throw new Error(`Invalid answeredAtUtc: ${String(answeredAtUtc)}`)
+  }
+  const answeredMs = Date.parse(answeredAtUtc)
+  if (!Number.isFinite(answeredMs) || Math.abs(answeredMs - nowMs) > 2 * DAY_MS) {
+    throw new Error(`answeredAtUtc is not a plausible time for a new answer: ${answeredAtUtc}`)
+  }
+  if (typeof answeredLocalDate !== 'string' || !LOCAL_DATE_PATTERN.test(answeredLocalDate)) {
+    throw new Error(`Invalid answeredLocalDate: ${String(answeredLocalDate)}`)
+  }
+  const localMs = Date.parse(`${answeredLocalDate}T00:00:00Z`)
+  const utcDayMs = Date.parse(`${answeredAtUtc.slice(0, 10)}T00:00:00Z`)
+  if (!Number.isFinite(localMs) || Math.abs(localMs - utcDayMs) > DAY_MS) {
+    throw new Error(`answeredLocalDate ${answeredLocalDate} does not match answeredAtUtc ${answeredAtUtc}`)
+  }
+  return { answerId, answeredAtUtc, answeredLocalDate }
 }
 
 function validateSessionId(value) {

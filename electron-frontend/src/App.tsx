@@ -46,6 +46,7 @@ import { DAILY_GAMES_COPY } from './features/daily-games/constants'
 import type { DailyGameType, DailyGamesMode } from './features/daily-games'
 import { dedupeDictionaryCards } from './features/card-notes'
 import { KanjiDetailPanel } from './features/kanji-detail'
+import { PendingAnswersBar } from './features/pending-answers'
 import { BADGE_METADATA } from './features/achievements'
 import { OnboardingWizard } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
@@ -2854,6 +2855,9 @@ function App() {
         onExecute={(cmd) => { commandPalette.close(); cmd.action() }}
         onClose={commandPalette.close}
       />
+
+      {/* Answers waiting to be saved (audit 1, F3) */}
+      <PendingAnswersBar />
 
       {/* XP gain toasts — centered, stacks vertically */}
       {xpToasts.length > 0 ? (

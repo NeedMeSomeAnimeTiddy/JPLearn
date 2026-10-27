@@ -64,3 +64,29 @@ export function toSectionScores(stored: Record<string, Record<number, number>>):
 export function hasAnyCardScore(scores: CardScores): boolean {
   return Object.values(scores).some((section) => Object.keys(section).length > 0)
 }
+
+/**
+ * Take the database's counters in place of `current`, except for the cards `keep` names -- those
+ * still have an answer on its way, or were set by a save that landed after the read began, so their
+ * value is newer than the database's. A card the database has no row for loses its score: an
+ * answer that never saved leaves nothing behind.
+ */
+export function mergeStoredScores(
+  current: CardScores,
+  stored: CardScores,
+  keep: (script: ScriptKey, cardId: number) => boolean,
+): CardScores {
+  const merged = emptyCardScores()
+  for (const script of Object.keys(merged) as ScriptKey[]) {
+    const section: Record<number, number> = { ...(stored[script] ?? {}) }
+    const ids = new Set([...Object.keys(current[script] ?? {}), ...Object.keys(section)].map(Number))
+    for (const cardId of ids) {
+      if (!keep(script, cardId)) continue
+      const value = current[script]?.[cardId]
+      if (value === undefined) delete section[cardId]
+      else section[cardId] = value
+    }
+    merged[script] = section
+  }
+  return merged
+}

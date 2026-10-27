@@ -378,7 +378,7 @@ def test_jplearn_db_v20_creates_card_mastery_scores(tmp_path: Path, monkeypatch)
         ).fetchone()
 
     assert version_row is not None
-    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION == 20
+    assert int(version_row[0]) == database.LATEST_SCHEMA_VERSION >= 20
 
 
 def test_jplearn_db_upgrade_from_v19_preserves_rows_and_adds_mastery_table(
@@ -408,7 +408,7 @@ def test_jplearn_db_upgrade_from_v19_preserves_rows_and_adds_mastery_table(
         ).fetchone()[0] == 1
         assert int(
             conn.execute("SELECT version FROM schema_version WHERE id = 1").fetchone()[0]
-        ) == 20
+        ) == database.LATEST_SCHEMA_VERSION
 
 
 def test_card_mastery_score_range_is_enforced_by_the_schema(tmp_path: Path, monkeypatch) -> None:

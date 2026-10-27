@@ -29,6 +29,18 @@ const {
   validateScenarioEvaluationRequest,
 } = require('./ipc_security.cjs')
 
+const ANSWER_ID = '0b6f1c1e-3f7a-4c1e-9d55-1a2b3c4d5e6f'
+
+function answer() {
+  const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return {
+    answerId: ANSWER_ID,
+    answeredAtUtc: now.toISOString(),
+    answeredLocalDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+  }
+}
+
 describe('ipc_security', () => {
   it('accepts allowed renderer URLs in dev and prod', () => {
     expect(isAllowedRendererUrl('http://localhost:5173', true)).toBe(true)
@@ -263,6 +275,7 @@ describe('ipc_security', () => {
       curriculumStage: 2,
       sessionId: 'session-1',
       confidenceScore: 4,
+      ...answer(),
     })
 
     expect(valid.slug).toBe('hiragana')
@@ -305,6 +318,26 @@ describe('ipc_security', () => {
         confidenceScore: 0,
       }),
     ).toThrow(/invalid confidencescore/i)
+  })
+
+  it('requires each answer to carry a well-formed, plausible identity', () => {
+    const base = { slug: 'hiragana', cardId: 12, isCorrect: true }
+    const ok = validateRecordGameResultPayload({ ...base, ...answer() })
+    expect(ok.answerId).toBe(ANSWER_ID)
+    expect(ok.answeredLocalDate).toBe(answer().answeredLocalDate)
+
+    expect(() => validateRecordGameResultPayload(base)).toThrow(/invalid answerid/i)
+    expect(() => validateRecordGameResultPayload({ ...base, ...answer(), answerId: 'not-a-uuid' }))
+      .toThrow(/invalid answerid/i)
+    expect(() => validateRecordGameResultPayload({ ...base, ...answer(), answeredAtUtc: '2026-10-27 09:00' }))
+      .toThrow(/invalid answeredatutc/i)
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+    expect(() => validateRecordGameResultPayload({ ...base, ...answer(), answeredAtUtc: threeDaysAgo }))
+      .toThrow(/not a plausible time/i)
+    const now = new Date().toISOString()
+    expect(() => validateRecordGameResultPayload({
+      ...base, answerId: ANSWER_ID, answeredAtUtc: now, answeredLocalDate: '2001-01-01',
+    })).toThrow(/does not match/i)
   })
 
   it('validates grammar minigame request payload and rejects malformed values', () => {

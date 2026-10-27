@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { openGame } from './test-entry'
 import { PREFS_STORAGE_KEY } from './lib/appStorage'
 import App from './App'
+import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
 // Mock TypeAnimation to render text immediately instead of character-by-character.
 // This avoids timing issues in jsdom where incremental typing never completes quickly enough.
@@ -278,7 +279,7 @@ const baseDesktopApi = {
   deleteCardNote: async (noteKey: string) => ({ note_key: noteKey, deleted: true }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
-  recordGameResult: async () => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }),
+  ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 0, repetitions: 0 })),
   startSessionGoal: async () => ({
     ok: true,
     goal: {
@@ -561,7 +562,7 @@ describe('what each deck offers', () => {
     const recordGameResult = vi.fn(async (_payload: { minigame: string; confidenceScore?: number }) => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
     window.jplearnDesktop = {
       ...baseDesktopApi,
-      recordGameResult,
+      ...fakeAnswerQueue(recordGameResult),
     }
 
     /* CONFIDENCE CAPTURE IS A PERSISTED PREFERENCE, and its switch moved with the other three from
@@ -832,7 +833,7 @@ describe('what each deck offers', () => {
     const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 10, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
     window.jplearnDesktop = {
       ...baseDesktopApi,
-      recordGameResult,
+      ...fakeAnswerQueue(recordGameResult),
       getDeckCards: async (slug: string) => (
         slug.includes('kanji')
           ? { slug, name: 'Kanji Deck', cards: kanjiStrokeCards }
@@ -889,7 +890,7 @@ describe('what each deck offers', () => {
 
   it('records an unassisted handwriting completion as correct and keeps the feedback aligned', async () => {
     const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 0, repetitions: 1, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
-    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+    window.jplearnDesktop = { ...baseDesktopApi, ...fakeAnswerQueue(recordGameResult) }
 
     await openHandwritingRound()
 
@@ -909,7 +910,7 @@ describe('what each deck offers', () => {
 
   it('records a completed handwriting round with retries and assistance as correct', async () => {
     const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 0, repetitions: 1, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
-    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+    window.jplearnDesktop = { ...baseDesktopApi, ...fakeAnswerQueue(recordGameResult) }
 
     await openHandwritingRound()
     fireEvent.click(await screen.findByRole('button', { name: /complete handwriting after retries/i }))
@@ -925,7 +926,7 @@ describe('what each deck offers', () => {
 
   it('records a given-up handwriting round as incomplete and incorrect', async () => {
     const recordGameResult = vi.fn(async () => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
-    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+    window.jplearnDesktop = { ...baseDesktopApi, ...fakeAnswerQueue(recordGameResult) }
 
     await openHandwritingRound()
     fireEvent.click(await screen.findByRole('button', { name: /give up handwriting/i }))
@@ -1032,7 +1033,7 @@ describe('what each deck offers', () => {
 
     window.jplearnDesktop = {
       ...baseDesktopApi,
-      recordGameResult,
+      ...fakeAnswerQueue(recordGameResult),
       getGrammarMinigameData,
       getDeckCards: async (slug: string) => (
         slug === 'grammar_patterns'
@@ -1114,7 +1115,7 @@ describe('what each deck offers', () => {
       next_review: '2026-01-01',
       ease_factor: 2.5,
     }))
-    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+    window.jplearnDesktop = { ...baseDesktopApi, ...fakeAnswerQueue(recordGameResult) }
 
     render(<App />)
     await openGame('Vocabulary', 'Recognition')
@@ -1155,7 +1156,7 @@ describe('what each deck offers', () => {
       next_review: '2026-01-01',
       ease_factor: 2.5,
     }))
-    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult }
+    window.jplearnDesktop = { ...baseDesktopApi, ...fakeAnswerQueue(recordGameResult) }
 
     render(<App />)
     await openGame('Hiragana', 'Dictation')
