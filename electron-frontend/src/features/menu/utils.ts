@@ -140,9 +140,12 @@ export interface MenuRowSources {
 
 export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<MenuSectionKey, MenuRow> {
   /* THE PATH'S PLACE IS THE FIRST STEP NOT YET MASTERED, which is what "where you are" means on a
-     road you walk in order. A finished curriculum has no such node, and then you are at the end. */
+     road you walk in order. A finished curriculum has no such node, and then you are at the end.
+     A step the app cannot measure is walked past: it can never be mastered, so stopping at it left
+     the row on Sentence Examples for good, showing a figure that was not that step's (audit 3, F7).
+     The curriculum stopped waiting on those steps for the same reason. */
   const of = nodes.length
-  const at = nodes.findIndex((node) => node.status !== 'mastered')
+  const at = nodes.findIndex((node) => node.is_tracked && node.status !== 'mastered')
   const step = at < 0 ? of : at + 1
   const here = at < 0 ? null : nodes[at]
   const no = String(step).padStart(2, '0')

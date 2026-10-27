@@ -8,11 +8,15 @@ Main path (each node requires the previous to be mastered):
   tutorial → hiragana → katakana → vocabulary_n5 → grammar_n5
   → scripted_conv → listening → kanji_n5 → free_conv → reading
   → jlpt_n5 → jlpt_n4 → jlpt_n3 → jlpt_n2 → jlpt_n1
+
+A prerequisite in ``UNMEASURED_NODE_IDS`` only has to be reached instead,
+because nothing can ever mark it mastered (``gate_status``).
 """
 from __future__ import annotations
 
 from domain.progression import (
     MasteryRequirement,
+    NodeStatus,
     ProgressionGraph,
     ProgressionNode,
     ProgressionReward,
@@ -22,15 +26,35 @@ from domain.progression import (
 from domain.progression_service import build_graph
 
 
+#: The nodes the app can measure: the tutorial, and the five nodes backed by a
+#: deck (``scripts/desktop_bridge.py`` maps each to its deck and syncs them).
+#: This is the one list; the bridge, this graph and the feature catalog all
+#: derive from it.
+MEASURED_NODE_IDS: frozenset[str] = frozenset(
+    {"tutorial", "hiragana", "katakana", "vocabulary_n5", "grammar_n5", "kanji_n5"}
+)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
+def gate_status(node_id: str) -> NodeStatus:
+    """The status a node must reach before whatever waits on it can open.
+
+    A measured node must be mastered. An unmeasured one can never report
+    progress, so it can never be mastered; it would hold everything behind it
+    shut for good. It only has to be reached instead (audit 3, F7). The node
+    itself still reports no progress and never reads as mastered.
+    """
+    return "mastered" if node_id in MEASURED_NODE_IDS else "unlocked"
+
+
 def _requires_mastered(node_id: str) -> UnlockRequirement:
-    """Shorthand: unlock when a single node is mastered."""
+    """Shorthand: unlock when a single node is mastered, or reached if unmeasured."""
     return UnlockRequirement(
-        conditions=(UnlockCondition(node_id=node_id, required_status="mastered"),)
+        conditions=(UnlockCondition(node_id=node_id, required_status=gate_status(node_id)),)
     )
 
 
@@ -216,3 +240,8 @@ _NODES: list[ProgressionNode] = [
 # ---------------------------------------------------------------------------
 
 JPLEARN_GRAPH: ProgressionGraph = build_graph(_NODES, root_id="tutorial")
+
+#: The rest of the graph. Issue #78 left these without a measure on purpose:
+#: they always report no progress and never read as mastered, and what waits
+#: on them opens once they are reached (see ``gate_status``).
+UNMEASURED_NODE_IDS: frozenset[str] = frozenset(JPLEARN_GRAPH.nodes) - MEASURED_NODE_IDS

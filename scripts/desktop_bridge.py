@@ -103,11 +103,16 @@ from domain.decks import (  # noqa: E402
     VOCAB_N5_EXTERNAL_DATA,
 )
 from domain.progression import NodeProgressionState, ProgressionEvent, ProgressionState  # noqa: E402
-from domain.progression_curriculum import JPLEARN_GRAPH  # noqa: E402
+from domain.progression_curriculum import (  # noqa: E402
+    JPLEARN_GRAPH,
+    MEASURED_NODE_IDS,
+    UNMEASURED_NODE_IDS,
+)
 from domain.progression_service import (  # noqa: E402
     build_initial_state,
     reachable_nodes,
     record_mastery,
+    unlock_ready_nodes,
 )
 from domain.feature_catalog import JPLEARN_FEATURES  # noqa: E402
 from domain.feature_service import evaluate_features  # noqa: E402
@@ -1647,6 +1652,41 @@ def build_block_progress(slug: str) -> dict[str, object]:
     return {"slug": slug, "blocks": result, "unlock_threshold": threshold}
 
 
+def _overview_vocab_level_blocks(slug: str) -> list[dict[str, object]]:
+    """Return one vocabulary level's themes as overview rows.
+
+    The rows have ``build_block_progress``'s shape, and its pass and unlock
+    test (``compute_block_mastery``, ``compute_unlocked_count``), so the
+    overview counts a word the same way the block screens do.
+    """
+    themes = themes_for_slug(slug)
+    deck = ALL_DECKS[slug]()
+    by_id = {card.id: card for card in deck.cards}
+    card_ids = list(by_id)
+    states = load_review_states(deck.name, card_ids)
+    repetitions_map: dict[int, int] = {
+        cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
+    }
+    unlocked_count = compute_unlocked_count(themes, repetitions_map, unlock_threshold_for_slug(slug))
+    rows: list[dict[str, object]] = []
+    for theme in themes:
+        cards = [by_id[cid] for cid in theme.card_ids if cid in by_id]
+        rows.append(
+            {
+                "index": theme.index,
+                "name": theme.name,
+                "card_ids": [card.id for card in cards],
+                "sample_chars": theme.sample_chars,
+                "characters": [card.character for card in cards],
+                "meanings": [card.meaning for card in cards],
+                "romajis": [card.romaji for card in cards],
+                "mastery": round(compute_block_mastery(theme, repetitions_map), 3),
+                "unlocked": theme.index < unlocked_count,
+            }
+        )
+    return rows
+
+
 def build_overview_character_mastery() -> dict[str, object]:
     """Return the overview's character mastery data in one payload.
 
@@ -1687,43 +1727,17 @@ def build_overview_character_mastery() -> dict[str, object]:
             for card in deck.cards
         )
 
-    words_category_blocks: list[dict[str, object]] = []
-    can_unlock_next = True
-    for index, (label, slug) in enumerate(OVERVIEW_WORDS_CATEGORY_SPECS):
-        factory = ALL_DECKS.get(slug)
-        if factory is None:
-            continue
-        deck = factory()
-        card_ids = [card.id for card in deck.cards]
-        states = load_review_states(deck.name, card_ids)
-        repetitions_map: dict[int, int] = {
-            cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
-        }
-        total = len(card_ids)
-        passed = sum(1 for cid in card_ids if repetitions_map.get(cid, 0) >= 1)
-        mastery = (passed / total) if total > 0 else 0.0
-        unlocked = can_unlock_next
-        if total > 0 and mastery < 0.7:
-            can_unlock_next = False
-
-        words_category_blocks.append(
-            {
-                "index": index,
-                "name": label,
-                "card_ids": card_ids,
-                "sample_chars": [card.character for card in deck.cards[:3]],
-                "characters": [card.character for card in deck.cards],
-                "meanings": [card.meaning for card in deck.cards],
-                "romajis": [card.romaji for card in deck.cards],
-                "mastery": round(mastery, 3),
-                "unlocked": unlocked,
-            }
-        )
-
-    category_blocks = {
-        "vocab_n5": words_category_blocks,
-        "grammar_patterns": build_block_progress("grammar_patterns").get("blocks", []),
+    # Vocabulary covers all five levels, like kanji, rather than the 12 N5 topic
+    # groups it used to (audit 3, Q3). Each level is listed by the themes the
+    # deck screen names its words with: vocabulary levels are not chunked into
+    # study blocks (`blocks_for_slug` is empty for them), but `themes_for_slug`
+    # still covers every card exactly once. Only the light fields go across,
+    # never whole cards.
+    category_blocks: dict[str, object] = {
+        slug: _overview_vocab_level_blocks(slug)
+        for slug in ("vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1")
     }
+    category_blocks["grammar_patterns"] = build_block_progress("grammar_patterns").get("blocks", [])
 
     return {
         "blocks": overview_blocks,
@@ -1920,13 +1934,22 @@ def build_learning_path_status_payload() -> dict[str, object]:
 # N of how many?", and inventing one renders a progress bar derived from
 # nothing, which is worse than showing no progress: a wrong number cannot be
 # recognised as wrong. They report `is_tracked=False` and no ratio instead.
+#
+# Being unmeasured does not make them a wall. The curriculum gates on them as
+# "reached" rather than "mastered" (`gate_status` in
+# domain/progression_curriculum.py), so kanji_n5, reading and the JLPT nodes
+# open once the unmeasured node before them is reachable (audit 3, F7).
+#
+# Which nodes are measured is decided once, in `MEASURED_NODE_IDS`; this table
+# only says which deck measures each, and a test holds the two in step.
 _PROGRESSION_SYNC_DECK_SLUGS: dict[str, str] = {
     "hiragana": "hiragana",
     "katakana": "katakana",
     "vocabulary_n5": "vocab_n5",
     "grammar_n5": "grammar_patterns",
-    # An omission rather than a decision — kanji_n5 has had a deck all along,
-    # and its 0.8-of-99 requirement is a gate a learner actually reaches.
+    # kanji_n5 sits behind listening, which nothing measures; it opens once
+    # listening is reached, and its 0.8-of-99 requirement is then a gate a
+    # learner actually reaches.
     "kanji_n5": "kanji_n5",
 }
 
@@ -1937,12 +1960,13 @@ _PROGRESSION_SYNC_DECK_SLUGS: dict[str, str] = {
 # mastery, which against 60,000 sentences is not a threshold anyone crosses.
 # A denominator that large is the same failure as no denominator at all.
 
-_PROGRESSION_SYNC_ORDER: tuple[str, ...] = ("tutorial", *_PROGRESSION_SYNC_DECK_SLUGS)
+# Graph order, so a node is measured after the nodes it waits on.
+_PROGRESSION_SYNC_ORDER: tuple[str, ...] = tuple(
+    node_id for node_id in JPLEARN_GRAPH.nodes if node_id in MEASURED_NODE_IDS
+)
 
 #: Nodes the graph defines but nothing can measure yet.
-UNTRACKED_PROGRESSION_NODES: frozenset[str] = frozenset(
-    node_id for node_id in JPLEARN_GRAPH.nodes if node_id not in _PROGRESSION_SYNC_ORDER
-)
+UNTRACKED_PROGRESSION_NODES: frozenset[str] = UNMEASURED_NODE_IDS
 
 
 def _tutorial_is_complete() -> bool:
@@ -1998,12 +2022,33 @@ def sync_progression_state() -> tuple[ProgressionState, tuple[ProgressionEvent, 
     state = _load_progression_state()
     today = date.today()
     all_events: list[ProgressionEvent] = []
-    for node_id in _PROGRESSION_SYNC_ORDER:
-        mastered_count, total_count = _compute_node_mastery_counts(node_id)
-        state, events = record_mastery(JPLEARN_GRAPH, state, node_id, mastered_count, total_count, today)
-        all_events.extend(events)
+    counts = {node_id: _compute_node_mastery_counts(node_id) for node_id in _PROGRESSION_SYNC_ORDER}
+    # Repeated until a pass changes nothing: an unmeasured node that becomes
+    # reachable can open a measured one behind it (listening -> kanji_n5) that
+    # the same counts may already master. Every transition only moves a node
+    # forward, so this ends.
+    while True:
+        pass_events: list[ProgressionEvent] = []
+        for node_id in _PROGRESSION_SYNC_ORDER:
+            mastered_count, total_count = counts[node_id]
+            state, events = record_mastery(JPLEARN_GRAPH, state, node_id, mastered_count, total_count, today)
+            pass_events.extend(events)
+        state, events = unlock_ready_nodes(JPLEARN_GRAPH, state, today)
+        pass_events.extend(events)
+        all_events.extend(pass_events)
+        if not pass_events:
+            break
 
-    for node_id in _PROGRESSION_SYNC_ORDER:
+    # Unmeasured nodes are stored only once reached, so the feature gates,
+    # which read the stored state, see them open. Their counts stay zero.
+    persisted = (
+        *_PROGRESSION_SYNC_ORDER,
+        *(
+            node_id for node_id in JPLEARN_GRAPH.nodes
+            if node_id in UNMEASURED_NODE_IDS and state.node_states[node_id].status != "locked"
+        ),
+    )
+    for node_id in persisted:
         ns = state.node_states[node_id]
         upsert_progression_node(
             node_id=ns.node_id,

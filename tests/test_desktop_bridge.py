@@ -835,6 +835,37 @@ def test_overview_cards_expose_python_generated_note_keys(tmp_path: Path, monkey
     assert all(str(card["note_key"]).startswith("note:v1:builtin:") for card in cards)
 
 
+def test_overview_vocabulary_covers_all_five_levels_by_theme(tmp_path: Path, monkeypatch) -> None:
+    """Audit 3, Q3: the Mastery screen's vocabulary is every level, like its kanji.
+
+    It used to be the 12 N5 topic groups (about 145 words). Each level now
+    arrives as its themes, together covering every word in the level once, in
+    the light block shape rather than as whole cards.
+    """
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.init_study_db()
+    vocab_n4 = ALL_DECKS["vocab_n4"]()
+    database.save_state(vocab_n4.name, ReviewState(card_id=vocab_n4.cards[0].id, repetitions=1))
+
+    payload = desktop_bridge.build_overview_character_mastery()
+    category_blocks = cast(dict[str, list[dict[str, Any]]], payload["category_blocks"])
+
+    levels = ["vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1"]
+    assert [key for key in category_blocks if key.startswith("vocab_")] == levels
+    for slug in levels:
+        rows = category_blocks[slug]
+        deck_ids = [card.id for card in ALL_DECKS[slug]().cards]
+        row_ids = [cid for row in rows for cid in row["card_ids"]]
+        assert sorted(row_ids) == sorted(deck_ids), slug
+        for row in rows:
+            assert len(row["characters"]) == len(row["meanings"]) == len(row["romajis"]) == len(row["card_ids"])
+            assert "example_sentence" not in row
+    # Scored like the block screens: a studied word counts as passed.
+    first_n4 = next(r for r in category_blocks["vocab_n4"] if vocab_n4.cards[0].id in r["card_ids"])
+    assert first_n4["mastery"] > 0
+    assert category_blocks["grammar_patterns"]
+
+
 def test_build_deck_cards_includes_dictionary_summary_when_available(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

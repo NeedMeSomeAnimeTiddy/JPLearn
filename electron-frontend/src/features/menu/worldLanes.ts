@@ -14,12 +14,14 @@ import type { GateWords } from './unlock'
    section you visit because you want to. `duty` is never set here, so the whole screen comes out
    in ink and gold, and the only red it is allowed is a lane the curriculum has not opened yet.
 
-   TALK OPENS SIX STEPS BEFORE READ, and that came out the opposite way round from what the
-   navigation plan assumed. `domain/feature_catalog.py` gates `conversation_mode` on `grammar_n5`
-   (step five of sixteen) and `reading_mode` on `reading` (step eleven), so the section's own gate
-   is GRAMMAR — a section opens when its FIRST lane does — and there is a six-step window in which
-   THE WORLD is open and half of it is not. That window is where most early accounts will sit, so
-   the READ lane draws it rather than pretending the section arrives whole.
+   TALK OPENS BEFORE READ, and that came out the opposite way round from what the navigation plan
+   assumed. `domain/feature_catalog.py` gates `conversation_mode` on `grammar_n5` being mastered
+   (step five of sixteen) and `reading_mode` on `reading` (step eleven) being REACHED: nothing
+   measures reading, so the catalog cannot wait for it to be mastered (audit 3, F7). Between them
+   sits Kanji N5, the one measured step after grammar, so READ opens once Kanji N5 is mastered.
+   The section's own gate is GRAMMAR — a section opens when its FIRST lane does — and until Kanji
+   N5 is done THE WORLD is open and half of it is not. The READ lane draws that window rather than
+   pretending the section arrives whole.
    ================================================================================================== */
 
 export interface WorldInputs {
@@ -134,9 +136,10 @@ export function worldLanes({ passages, sessions, unlocked, gateOf }: WorldInputs
    which left a lane reading "OPENED BY READING" in red on a door that has never opened. The colour
    is the state and so is the tense. */
 /* THE CHIP, AND THE SLAB THAT REPLACES THE INVITATION WHEN THE LANE IS SHUT. Both say the same
-   milestone and both now say which trigger it is: `reading_mode` wants `reading` MASTERED, and
-   "reach READING on the path" was quietly wrong about that. Nothing is drawn at all until the
-   catalog has answered — a chip reading "OPENS AT" with no step is worse than no chip. */
+   milestone and both say which trigger it is, read off the requirement: `conversation_mode` wants
+   `grammar_n5` MASTERED, and `reading_mode` wants `reading` only REACHED, because nothing measures
+   reading. Nothing is drawn at all until the catalog has answered — a chip reading "OPENS AT" with
+   no step is worse than no chip. */
 function gateLine(shut: boolean, step: GateWords | null): string {
   if (!step) return ''
   return shut ? `OPENS AT ${step.en}` : `OPENED BY ${step.en}`

@@ -375,7 +375,12 @@ interface OverviewCharacterMasteryPayload {
     katakana: BlockInfo[]
   }
   category_blocks: {
+    /** each vocabulary level's themes, N5 to N1 */
     vocab_n5: BlockInfo[]
+    vocab_n4?: BlockInfo[]
+    vocab_n3?: BlockInfo[]
+    vocab_n2?: BlockInfo[]
+    vocab_n1?: BlockInfo[]
     grammar_patterns: BlockInfo[]
   }
   kanji_cards: OverviewCharacterCard[]
