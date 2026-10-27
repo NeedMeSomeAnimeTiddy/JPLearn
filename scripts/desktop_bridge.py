@@ -443,6 +443,29 @@ class DeckSummary:
 
 
 @dataclass(frozen=True)
+class SummaryTotals:
+    """Card counts across every deck the app serves, each card counted once.
+
+    Topic views share their level deck's cards, so they are left out; so are
+    decks the app cannot open. ``due_today`` is today's whole workload (still
+    due plus done today); ``remaining_due`` is only what is still due now.
+    """
+
+    total: int
+    mastered: int
+    due_today: int
+    completed_today: int
+    remaining_due: int
+    deck_count: int
+
+
+# Decks on the Python side that the app deliberately does not offer (Robbie,
+# 2026-10-27: keep Conjugation Training hidden); tests/test_deck_slug_lists.py
+# holds the same set against the IPC allowlist.
+_SUMMARY_UNSERVED_SLUGS = frozenset({"conjugation_training"})
+
+
+@dataclass(frozen=True)
 class StudyStreak:
     current_days: int
     best_days: int
@@ -1385,10 +1408,24 @@ def _build_summary() -> dict[str, object]:
         for script_tag, summary in narrative_story_by_script.items()
     }
 
+    total = mastered = due = completed = remaining = deck_count = 0
     for slug, factory in ALL_DECKS.items():
         deck = factory()
-        card_ids = [card.id for card in deck.cards]
+        # Count only the cards the app serves: `deck-cards` ships the first
+        # SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT sentences, not the whole corpus.
+        served_cards = (
+            deck.cards[:SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT] if slug == "sentence_examples" else deck.cards
+        )
+        card_ids = [card.id for card in served_cards]
         mastered_count, due_today, completed_today = load_deck_summary_counts(deck.name, card_ids)
+        if parent_slug_for_category(slug) is None and slug not in _SUMMARY_UNSERVED_SLUGS:
+            total += len(served_cards)
+            mastered += mastered_count
+            due += due_today
+            completed += completed_today
+            # due_today already includes completed_today, so this is what is still due.
+            remaining += max(0, due_today - completed_today)
+            deck_count += 1
         deck_key = _normalize_deck_key(deck.name)
         slug_key = _normalize_deck_key(slug)
         for card in deck.cards:
@@ -1399,7 +1436,7 @@ def _build_summary() -> dict[str, object]:
             DeckSummary(
                 slug=slug,
                 name=deck.name,
-                total=len(deck.cards),
+                total=len(served_cards),
                 mastered=mastered_count,
                 due_today=due_today,
                 completed_today=completed_today,
@@ -1408,6 +1445,16 @@ def _build_summary() -> dict[str, object]:
 
     return {
         "decks": [asdict(deck) for deck in decks],
+        "totals": asdict(
+            SummaryTotals(
+                total=total,
+                mastered=mastered,
+                due_today=due,
+                completed_today=completed,
+                remaining_due=remaining,
+                deck_count=deck_count,
+            )
+        ),
         "streak": asdict(
             StudyStreak(
                 current_days=streak.current_streak_days,

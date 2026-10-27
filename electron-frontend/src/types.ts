@@ -1,6 +1,7 @@
 // Shared primitive types extracted from App.tsx for use across components and views.
 
 import type { ThemeMode, ThemeKey, ThemeScope, CustomTheme } from './features/theme/types'
+import type { SummaryTotals } from './generated/types'
 
 export type MinigameKey =
   | 'romaji_sprint'
@@ -292,7 +293,11 @@ export interface SessionPrefOverrides {
 // Derived from the desktop API surface (src/electron.d.ts) rather than
 // hand-written, so they track scripts/generate_ts_types.py output automatically.
 
-export type StudySummaryPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getStudySummary>>
+export type StudySummaryPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getStudySummary>> & {
+  /** Counts over the decks the app serves, each card once (audit 3, F2). Optional because a
+      summary snapshot saved before the bridge sent it can be shown at launch. */
+  totals?: SummaryTotals
+}
 export type DeckSlugInput = Parameters<typeof window.jplearnDesktop.getDeckCards>[0]
 export type ScriptDeck = Awaited<ReturnType<typeof window.jplearnDesktop.getDeckCards>>
 export type BlockProgressPayload = Awaited<ReturnType<typeof window.jplearnDesktop.getBlockProgress>>
