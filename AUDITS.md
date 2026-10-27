@@ -23,28 +23,30 @@ throwaway temp databases; Check 8 read-only on the live database; `gh issue list
 ### Where each finding went
 - F1 onboarding seeds schedules but never the counters, which live only in the renderer and are
   lost at the first restart after an answer (P1; 1,051 seeded, 0 counters; nobody affected yet):
-  to fix, the bridge writes the counters in the seeding transaction (#66's stated intent).
+  fixed: the bridge writes the counters in the seeding transaction (#66's stated intent); rollback tested.
 - F2 the Ledger and the REVIEW lane add up 43 summary entries: 545 topic cards counted twice,
   60,000 sentences counted where 1,200 are served, and the hidden Conjugation deck (P1;
-  "1,196 OF 71,053" should be 1,051 of about 11,684): Robbie, "Fix the totals"; to fix.
+  "1,196 OF 71,053" should be 1,051 of about 11,684): Robbie, "Fix the totals"; fixed with a `totals` object in the summary, which the Ledger, REVIEW lane and tray read.
 - F3 block unlocking drops a card on any miss, so a studied block can re-lock (P2; reproduced):
   Robbie (Q1), "Correct once counts": a card counts toward its block once ever answered correctly;
-  to fix.
-- F4 the REVIEW lane's due count includes cards done today (P2): to fix with F2.
+  fixed (`_block_pass_inputs`), and applied to the overview, known kanji and path-step counts.
+- F4 the REVIEW lane's due count includes cards done today (P2): fixed with F2 (`remaining_due`).
 - F5 the Kanji and Vocabulary level bars always read 0% of 0; the setter has been gone since
-  28c37ec (P2): Robbie, "Score counters"; to fix.
-- F6 JLPT accuracy is queried by slug against name-keyed history and is never used (P2): to fix.
+  28c37ec (P2): Robbie, "Score counters"; fixed (`level-progress` command).
+- F6 JLPT accuracy is queried by slug against name-keyed history and is never used (P2): fixed.
 - F7 untracked path steps block Kanji N5, Reading Mode, Advanced Analytics and the JLPT steps for
-  good (P2; #78 made untracked deliberate, not the blocking): Robbie, "Don't block on them"; to fix.
-- F8 the leech-focus card count covers the whole deck (P3): to fix.
+  good (P2; #78 made untracked deliberate, not the blocking): Robbie, "Don't block on them"; fixed (`MEASURED_NODE_IDS`, `gate_status`). Review follow-up: the JLPT row counts open steps (Robbie, "Count open steps"); it goes 0 to 5 in one step, as the five JLPT steps open together.
+- F8 the leech-focus card count covers the whole deck (P3): fixed.
 - Q2 leech focus stays on after an Up next "Problem items" run: Robbie, "Only for that session";
-  to fix. Q3 the Mastery screen's vocabulary is the 12 N5 topics only: Robbie, "All five levels";
-  to fix.
+  fixed. Q3 the Mastery screen's vocabulary is the 12 N5 topics only: Robbie, "All five levels";
+  fixed.
 - Stale records: S1 ARCH §4 table and §5 unlock paragraph; S2 ARCH §9 item 3; S3 comments in
-  mastery_repository.py, desktop_bridge.py:1928-1929 and worldLanes.ts:17-22: to fix.
-- Nits: `_mastered_count` unused (to remove); "MASTERED" names two figures (left; the Ledger's note
+  mastery_repository.py, desktop_bridge.py:1928-1929 and worldLanes.ts:17-22: fixed.
+- Nits: `_mastered_count` unused (removed); "MASTERED" names two figures (left; the Ledger's note
   says so).
 - The FSRS "mastered" rule copied in seven places: DEBT #7.
+- Left after review: no review_events index (DEBT #1); a failed Up next start keeps its focus until
+  the next start, on purpose.
 - Passed to the JLPT audit: the diagnostic and adaptive queues test for states that
   load_review_states always fabricates.
 
