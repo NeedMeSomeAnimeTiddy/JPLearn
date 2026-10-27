@@ -157,8 +157,13 @@ npm run make:win
 ### Regenerate external content module from CSV
 
 ```bash
-python scripts/import_external_lists.py
+./.venv/Scripts/python.exe -m scripts.import_external_lists --conflict-policy keep-first
 ```
+
+The default policy (`error`) stops on about 180 cross-level conflicts and writes nothing, so
+`--conflict-policy keep-first` is required. If you pass `--output`, the path must be inside the repo
+root. `keep-first` drops later-level rows that repeat an earlier list's spelling and reading, so
+editing an earlier list can move later card ids. See `DEBT.md` #5.
 
 ### Export / import progress snapshots
 
