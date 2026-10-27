@@ -157,3 +157,21 @@ export interface StudySessionApi {
    */
   setLeechFocus: (value: boolean) => void
 }
+
+/**
+ * What the session keeps about one answer until its save outcome arrives (audit 1, F1/F3): which
+ * card and section it belongs to, which round it was given in, and how an explicit review's
+ * advance resumes once it saves.
+ */
+export interface AnswerContext {
+  /** `${slug}:${cardId}`, matching the main process's queue */
+  cardKey: string
+  script: ScriptKey
+  cardId: number
+  mode: RoundState['mode']
+  round: RoundState
+  isExplicitReview: boolean
+  persistenceRequestId: number
+  advanceFeedback: () => void
+  sessionId: string | null
+}

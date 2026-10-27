@@ -123,7 +123,11 @@ function createBridgeWorker(options) {
             const payload = envelope.payload || {}
             const errorMessage = typeof payload.error === 'string' ? payload.error : `Bridge request failed with code ${envelope.code}`
             telemetry.lastWorkerError = errorMessage
-            request.reject(new Error(errorMessage))
+            const failure = new Error(errorMessage)
+            // The exit code says what kind of failure it was: 3 is an answer that can never save as
+            // sent (answer_queue.cjs drops it), anything else may succeed on a retry.
+            failure.bridgeCode = envelope.code
+            request.reject(failure)
             continue
           }
 

@@ -16,6 +16,7 @@ import { openGame } from './test-entry'
 import { PREFS_STORAGE_KEY } from './lib/appStorage'
 import App from './App'
 import { POINT_COMBO_THRESHOLDS } from './constants'
+import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
 vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => (
@@ -95,9 +96,7 @@ function makeApi() {
       category_blocks: { vocab_n5: [], grammar_patterns: [] },
       kanji_cards: [],
     }),
-    recordGameResult: async () => ({
-      ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5,
-    }),
+    ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 1, repetitions: 0 })),
     startSessionGoal: async () => ({
       ok: true,
       goal: {

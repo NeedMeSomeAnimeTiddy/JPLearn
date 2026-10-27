@@ -574,6 +574,8 @@ interface DesktopApi {
     (key: string, value: unknown): Promise<{ ok: boolean; key: string; value: unknown }>
   }
     reloadLocalFonts?: () => Promise<{ ok: boolean }>
+  /** Admits one answer to the main process's save queue and returns at once; the outcome arrives
+      through onAnswerSaved or onAnswerRejected (audit 1, F1/F3). */
   recordGameResult: (payload: {
     slug: DeckSlug
     cardId: number
@@ -582,23 +584,15 @@ interface DesktopApi {
     curriculumStage?: number
     sessionId?: string
     confidenceScore?: number
-  }) => Promise<{
-    ok: boolean
-    card_id: number
-    repetitions: number
-    interval: number
-    next_review: string
-    ease_factor: number
-    // Stored per-card mastery counter after this answer (issue #66). Optional so
-    // a renderer running against an older bridge keeps its local step.
-    mastery_score?: number
-    confidence_score?: number | null
-    curriculum_stage?: number | null
-    xp_gained?: number
-    level_before?: number
-    level_after?: number
-    milestones_reached?: string[]
-  }>
+    answerId: string
+    answeredAtUtc: string
+    answeredLocalDate: string
+  }) => Promise<{ status: 'accepted'; answerId: string }>
+  getPendingAnswers?: () => Promise<PendingAnswersSnapshot>
+  retryPendingAnswers?: () => Promise<PendingAnswersSnapshot>
+  onAnswerSaved?: (listener: (event: AnswerSavedEvent) => void) => () => void
+  onAnswerRejected?: (listener: (event: AnswerRejectedEvent) => void) => () => void
+  onPendingAnswersChanged?: (listener: (snapshot: PendingAnswersSnapshot) => void) => () => void
   lookupSentence?: (payload: { query: string }) => Promise<{
     jp: string | null
     en: string | null
@@ -1178,3 +1172,47 @@ declare global {
   }
 }
 
+/** What the bridge stored for one saved answer. */
+export interface RecordGameResult {
+  ok: boolean
+  card_id: number
+  repetitions: number
+  interval: number
+  next_review: string
+  ease_factor: number
+  // Stored per-card mastery counter after this answer (issue #66).
+  mastery_score?: number
+  confidence_score?: number | null
+  curriculum_stage?: number | null
+  xp_gained?: number
+  level_before?: number
+  level_after?: number
+  milestones_reached?: string[]
+  /** true when this answer had already been saved and the stored result is being returned again */
+  replayed?: boolean
+}
+
+export interface AnswerSavedEvent {
+  answerId: string
+  /** `${slug}:${cardId}` */
+  cardKey: string
+  result: RecordGameResult
+  seq: number
+}
+
+export interface AnswerRejectedEvent {
+  answerId: string
+  cardKey: string
+  /** 'invalid': can never be saved as sent; 'reset': dropped by a progress reset */
+  reason: 'invalid' | 'reset'
+  error: string | null
+  seq: number
+}
+
+export interface PendingAnswersSnapshot {
+  count: number
+  headError: string | null
+  headAttempts: number
+  seq: number
+  pending: { answerId: string; cardKey: string }[]
+}

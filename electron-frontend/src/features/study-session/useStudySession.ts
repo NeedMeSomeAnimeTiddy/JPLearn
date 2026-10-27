@@ -57,6 +57,11 @@ import {
   normalizeCurriculumStage,
 } from '../../lib/roundContent'
 import { CARD_MASTERY_MAX } from '../../constants'
+import { hasAnyCardScore, toSectionScores } from '../../lib/cardScores'
+import type { AnswerSavedEvent, PendingAnswersSnapshot } from '../../electron'
+import { answerCardKey, newAnswerIdentity } from '../pending-answers/answerIdentity'
+import { hasNewerPendingAnswer, useAnswerOutcomes } from '../pending-answers/useAnswerOutcomes'
+import type { AnswerContext } from './types'
 import {
   DEFAULT_INTERLEAVE_WEIGHTS,
   DEFAULT_LIVES,
@@ -176,6 +181,13 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   const explicitReviewCursorRef = useRef(0)
   const explicitReviewPersistenceRequestRef = useRef(0)
   const feedbackAdvanceRef = useRef<(() => void) | null>(null)
+  /** What each answer still waiting for its outcome needs to reconcile it, by answer id. */
+  const answerContextsRef = useRef(new Map<string, AnswerContext>())
+  const applyRejectedAnswerRef = useRef<(answerId: string) => void>(() => undefined)
+  const currentRoundRef = useRef<RoundState | null>(null)
+  /** the session whose end-of-session summary is on screen, so a late save can refresh it */
+  const summarySessionIdRef = useRef<string | null>(null)
+  const needsStoredScoresRefreshRef = useRef(false)
   const roundCycleRef = useRef<number[]>([])
   const roundCursorRef = useRef<number>(0)
   const queueBucketCountsRef = useRef<{ due: number; leech: number; new: number; review: number } | null>(null)
@@ -483,6 +495,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
     setSessionSummaryLoading(true)
     setSessionGoalError(null)
+    summarySessionIdRef.current = activeSessionId
     const fetchSummary = async () => {
       try {
         const response = await window.jplearnDesktop?.getSessionSummary(activeSessionId)
@@ -1218,10 +1231,24 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         feedbackAdvanceRef.current = advanceFeedback
       }
 
+      // The answer goes to the main process's save queue and this call returns at once; the outcome
+      // is reconciled in applySavedAnswer / applyRejectedAnswer below, whichever way it arrives
+      // (audit 1, F1/F3). The round never waits for it, except an explicit review's advance.
+      const identity = newAnswerIdentity()
+      answerContextsRef.current.set(identity.answerId, {
+        cardKey: answerCardKey(resultSlug, roundState.cardId),
+        script: activeScript,
+        cardId: roundState.cardId,
+        mode: roundState.mode,
+        round: roundState,
+        isExplicitReview,
+        persistenceRequestId,
+        advanceFeedback,
+        sessionId: activeSessionId,
+      })
       void (async () => {
-        let persistenceSucceeded = false
         try {
-          const result = await window.jplearnDesktop?.recordGameResult({
+          const admitted = await window.jplearnDesktop?.recordGameResult({
             slug: resultSlug,
             cardId: roundState.cardId,
             isCorrect,
@@ -1232,94 +1259,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
                 : undefined,
             sessionId: activeSessionId ?? undefined,
             confidenceScore: confidenceForAnswer,
+            ...identity,
           })
-          if (!result) throw new Error('Review persistence unavailable')
-          persistenceSucceeded = true
-          if (
-            isExplicitReview
-            && explicitReviewPersistenceRequestRef.current === persistenceRequestId
-            && explicitReviewItemsRef.current
-          ) {
-            setRoundAdvancePending(false)
-            feedbackAdvanceRef.current = advanceFeedback
-          }
-          if (
-            isGrammarCurriculumMode(roundState.mode) &&
-            typeof result.curriculum_stage === 'number'
-          ) {
-            const resolvedStage = normalizeCurriculumStage(result.curriculum_stage)
-            setDeckCards((previousCards) =>
-              previousCards.map((entry) =>
-                entry.id === roundState.cardId
-                  ? { ...entry, curriculum_stage: resolvedStage }
-                  : entry,
-              ),
-            )
-          }
-          if (result.repetitions != null) {
-            setRoundSrsResult({
-              repetitions: result.repetitions,
-              interval: result.interval,
-              next_review: result.next_review,
-              ease_factor: result.ease_factor,
-            })
-          }
-          // Reconcile the optimistic ±1 step above against the stored counter
-          // (issue #66). The two agree in the normal case; they diverge when a
-          // write was lost or replayed, and SQLite is the source of truth now.
-          if (typeof result.mastery_score === 'number') {
-            const storedScore = result.mastery_score
-            setCardScores((prev) => (
-              prev[activeScript][roundState.cardId] === storedScore
-                ? prev
-                : {
-                    ...prev,
-                    [activeScript]: { ...prev[activeScript], [roundState.cardId]: storedScore },
-                  }
-            ))
-          }
-          if (typeof result.xp_gained === 'number' && result.xp_gained > 0) {
-            const leveledUp = typeof result.level_after === 'number'
-              && typeof result.level_before === 'number'
-              && result.level_after > result.level_before
-            const id = Date.now()
-            setXpToasts((prev) => [...prev, {
-              id,
-              xp: result.xp_gained!,
-              levelBefore: leveledUp ? result.level_before : undefined,
-              levelAfter: leveledUp ? result.level_after : undefined,
-            }])
-            setTimeout(() => setXpToasts((prev) => prev.filter((t) => t.id !== id)), 2500)
-          }
-          if (result.milestones_reached && result.milestones_reached.length > 0) {
-            const newToasts = result.milestones_reached.map((descriptor, index) => ({
-              id: Date.now() + index,
-              descriptor,
-            }))
-            setMilestoneToasts((prev) => [...prev, ...newToasts])
-            for (const toast of newToasts) {
-              setTimeout(() => setMilestoneToasts((prev) => prev.filter((t) => t.id !== toast.id)), 3500)
-            }
-          }
-          if (result.xp_gained !== undefined) {
-            void (async () => {
-              try {
-                const xp = await window.jplearnDesktop?.getXpProgress?.()
-                if (xp) setXpProgress(xp)
-              } catch { /* ignore */ }
-            })()
-          }
+          if (!admitted) throw new Error('Review persistence unavailable')
         } catch {
-          if (
-            isExplicitReview
-            && !persistenceSucceeded
-            && explicitReviewPersistenceRequestRef.current === persistenceRequestId
-            && explicitReviewItemsRef.current
-          ) {
-            setRoundAdvancePending(false)
-            setRoundAdvanceError(true)
-            feedbackAdvanceRef.current = null
-          }
+          // Never admitted, so no outcome will follow: treat it as refused.
+          applyRejectedAnswerRef.current(identity.answerId)
         }
       })()
 
@@ -1377,14 +1322,143 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       sessionScore,
       sessionTargetItems,
       setCardScores,
-      setDeckCards,
-      setMilestoneToasts,
       setMinigameStats,
       setScriptStats,
-      setXpProgress,
-      setXpToasts,
     ],
   )
+
+  // ── Answer outcomes ────────────────────────────────────────────────────────
+  //
+  // Every answer's outcome lands here, however late (audit 1, F1/F3). Global progress -- the
+  // stored mastery counter and curriculum stage -- follows the database, but not while a newer
+  // answer for the same card is still waiting: its own result will set the value. Round feedback
+  // applies only if the learner is still on that round.
+
+  currentRoundRef.current = roundState
+
+  const refreshStoredScores = useCallback(async () => {
+    const desktop = window.jplearnDesktop
+    if (!desktop?.getCardScores) return
+    try {
+      const payload = await desktop.getCardScores()
+      const stored = toSectionScores(payload?.scores ?? {})
+      if (hasAnyCardScore(stored)) setCardScores(stored)
+    } catch { /* best effort: the next answer's result corrects it */ }
+  }, [setCardScores])
+
+  const applySavedAnswer = (event: AnswerSavedEvent, snapshot: PendingAnswersSnapshot | null) => {
+    const context = answerContextsRef.current.get(event.answerId)
+    answerContextsRef.current.delete(event.answerId)
+    const result = event.result
+    if (!context) {
+      // Admitted by an earlier load of this window (or another window): nothing local to reconcile
+      // against, so take the database's view once nothing is waiting.
+      if (!snapshot || snapshot.count <= 1) void refreshStoredScores()
+      return
+    }
+
+    if (context.isExplicitReview && explicitReviewPersistenceRequestRef.current === context.persistenceRequestId
+      && explicitReviewItemsRef.current) {
+      setRoundAdvancePending(false)
+      feedbackAdvanceRef.current = context.advanceFeedback
+    }
+
+    const newerWaiting = hasNewerPendingAnswer(snapshot, context.cardKey, event.answerId)
+    if (!newerWaiting && isGrammarCurriculumMode(context.mode) && typeof result.curriculum_stage === 'number') {
+      const resolvedStage = normalizeCurriculumStage(result.curriculum_stage)
+      setDeckCards((previousCards) =>
+        previousCards.map((entry) =>
+          entry.id === context.cardId ? { ...entry, curriculum_stage: resolvedStage } : entry,
+        ),
+      )
+    }
+    if (!newerWaiting && typeof result.mastery_score === 'number') {
+      const storedScore = result.mastery_score
+      setCardScores((prev) => (
+        prev[context.script][context.cardId] === storedScore
+          ? prev
+          : { ...prev, [context.script]: { ...prev[context.script], [context.cardId]: storedScore } }
+      ))
+    }
+    if (currentRoundRef.current === context.round && result.repetitions != null) {
+      setRoundSrsResult({
+        repetitions: result.repetitions,
+        interval: result.interval,
+        next_review: result.next_review,
+        ease_factor: result.ease_factor,
+      })
+    }
+
+    if (typeof result.xp_gained === 'number' && result.xp_gained > 0) {
+      const leveledUp = typeof result.level_after === 'number'
+        && typeof result.level_before === 'number'
+        && result.level_after > result.level_before
+      const id = Date.now()
+      setXpToasts((prev) => [...prev, {
+        id,
+        xp: result.xp_gained!,
+        levelBefore: leveledUp ? result.level_before : undefined,
+        levelAfter: leveledUp ? result.level_after : undefined,
+      }])
+      setTimeout(() => setXpToasts((prev) => prev.filter((toast) => toast.id !== id)), 2500)
+    }
+    if (result.milestones_reached && result.milestones_reached.length > 0) {
+      const newToasts = result.milestones_reached.map((descriptor, index) => ({
+        id: Date.now() + index,
+        descriptor,
+      }))
+      setMilestoneToasts((prev) => [...prev, ...newToasts])
+      for (const toast of newToasts) {
+        setTimeout(() => setMilestoneToasts((prev) => prev.filter((entry) => entry.id !== toast.id)), 3500)
+      }
+    }
+    if (result.xp_gained !== undefined) {
+      void (async () => {
+        try {
+          const xp = await window.jplearnDesktop?.getXpProgress?.()
+          if (xp) setXpProgress(xp)
+        } catch { /* ignore */ }
+      })()
+    }
+
+    // A session summary already on screen was read before this answer saved.
+    if (context.sessionId && summarySessionIdRef.current === context.sessionId) {
+      void (async () => {
+        try {
+          const response = await window.jplearnDesktop?.getSessionSummary(context.sessionId!)
+          if (response?.ok && response.summary && summarySessionIdRef.current === context.sessionId) {
+            setLastSessionSummary(response.summary)
+          }
+        } catch { /* the summary stays as it was */ }
+      })()
+    }
+  }
+
+  const applyRejectedAnswer = (answerId: string) => {
+    const context = answerContextsRef.current.get(answerId)
+    answerContextsRef.current.delete(answerId)
+    if (context?.isExplicitReview && explicitReviewPersistenceRequestRef.current === context.persistenceRequestId
+      && explicitReviewItemsRef.current) {
+      setRoundAdvancePending(false)
+      setRoundAdvanceError(true)
+      feedbackAdvanceRef.current = null
+    }
+    // The optimistic step for this answer stands in memory; the database never took it. Re-read the
+    // stored counters once nothing else is waiting (onQueueChanged), rather than undo a clamped step.
+    needsStoredScoresRefreshRef.current = true
+  }
+  applyRejectedAnswerRef.current = applyRejectedAnswer
+
+  useAnswerOutcomes({
+    onSaved: applySavedAnswer,
+    onRejected: (event) => applyRejectedAnswer(event.answerId),
+    onQueueChanged: (snapshot) => {
+      if (snapshot.count === 0 && needsStoredScoresRefreshRef.current) {
+        needsStoredScoresRefreshRef.current = false
+        void refreshStoredScores()
+      }
+    },
+  })
 
   const submitHandwritingOutcome = useCallback((outcome: HandwritingOutcome) => {
     if (!roundState || roundState.mode !== 'handwriting') return

@@ -1,6 +1,7 @@
 // Shared desktop-API test fixture, extracted from App.accessibility.test.tsx so that
 // tests which render <App /> do not each carry their own copy of the bridge stub.
 
+import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './answerQueue'
 
 export const emptyCurriculumStub = {
   particle_cloze: {
@@ -64,9 +65,7 @@ export const baseDesktopApi = {
   deleteCardNote: async (noteKey: string) => ({ note_key: noteKey, deleted: true }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),
-  recordGameResult: async () => ({
-    ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5,
-  }),
+  ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 1, repetitions: 0 })),
   startSessionGoal: async () => ({
     ok: true,
     goal: {

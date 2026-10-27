@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen, Notification, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, Notification, Tray, Menu, nativeImage, dialog } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { createBridgeWorker } = require('./bridge_worker.cjs')
+const { createAnswerQueue } = require('./answer_queue.cjs')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
 const { createVoiceRuntime, isVoiceRuntimeInstalled } = require('./voice_runtime.cjs')
@@ -466,6 +467,9 @@ function getBridgeTelemetrySnapshot() {
     capturedAtUtc: new Date().toISOString(),
     pendingRequests: bridgeWorkerState.pending.size,
     readCacheEntries: bridgeReadCache.size,
+    answersWaiting: answerQueue.snapshot().count,
+    answerQueueHeadAttempts: answerQueue.snapshot().headAttempts,
+    answerQueueHeadError: answerQueue.snapshot().headError,
     stderrTail: bridgeWorkerState.stderr.slice(-4000) || null,
   }
 }
@@ -1127,6 +1131,24 @@ function runPythonBridgeWorkerRequest(args) {
   return bridgeWorker.request(args)
 }
 
+// Answers are saved through the worker alone: the one-shot fallback below has no timeout and, before
+// answers carried ids, re-ran saves that had already committed (audit 1, F1). The answer queue retries.
+function runPythonBridgeWorkerOnly(args) {
+  return runPythonBridgeWorkerRequest(args)
+}
+
+const answerQueue = createAnswerQueue({
+  send: runPythonBridgeWorkerOnly,
+  broadcast: (channel, payload) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(channel, payload)
+      }
+    }
+  },
+  onSaved: () => clearBridgeReadCaches(),
+})
+
 function runPythonBridge(command) {
   return runPythonBridgeWorkerRequest([command]).catch((error) => {
     bridgeTelemetry.fallbackCount += 1
@@ -1305,6 +1327,8 @@ function toggleWindowFullscreen(win) {
 
 registerIpcHandlers({
   ipcMain,
+  answerQueue,
+  runPythonBridgeWorkerOnly,
   screen,
   isDev: process.env.ELECTRON_DEV === '1',
   getWindowFromSender: BrowserWindow.fromWebContents,
@@ -2412,7 +2436,41 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', () => {
+let quitWithUnsavedAnswersConfirmed = false
+let unsavedAnswersDialogOpen = false
+
+app.on('before-quit', (event) => {
+  // Answers waiting to save live only in memory (answer_queue.cjs). Ask before losing them; nothing
+  // below runs -- the bridge stays up -- until the learner chooses to quit anyway.
+  const waiting = answerQueue.snapshot().count
+  if (waiting > 0 && !quitWithUnsavedAnswersConfirmed) {
+    event.preventDefault()
+    if (unsavedAnswersDialogOpen) {
+      return
+    }
+    unsavedAnswersDialogOpen = true
+    const message = waiting === 1
+      ? "1 answer isn't saved yet. Quit anyway?"
+      : `${waiting} answers aren't saved yet. Quit anyway?`
+    void dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Wait and retry', 'Quit anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      message,
+    }).then(({ response }) => {
+      unsavedAnswersDialogOpen = false
+      if (response === 1) {
+        quitWithUnsavedAnswersConfirmed = true
+        app.quit()
+      } else {
+        void answerQueue.retryNow()
+      }
+    }).catch(() => {
+      unsavedAnswersDialogOpen = false
+    })
+    return
+  }
   isQuitting = true
   void localTutorRuntime.unload('before-quit').catch(() => undefined)
   void localVoiceRuntime.unload().catch(() => undefined)
