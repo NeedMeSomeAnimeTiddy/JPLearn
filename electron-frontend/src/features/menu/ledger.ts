@@ -414,7 +414,7 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
       lines: rows.length
         ? rows.slice(0, 6).map((r) => ({
           k: `${sessionDay(r.started_at_utc)} · ${n(r.reviewed)} REVIEWS`,
-          v: `${Math.round(r.accuracy * 100)}%`,
+          v: `${r.accuracy}%`,
           off: !r.goal_met,
         }))
         : [{ k: 'NONE FINISHED YET', v: '—', off: true }],
@@ -432,7 +432,7 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
         { k: 'ACROSS', v: `${n(d.count)} DECK${d.count === 1 ? '' : 'S'}`, off: d.count === 0 },
         { k: 'DUE TODAY', v: n(d.due), off: d.due === 0 },
         { k: 'DONE TODAY', v: n(d.done), off: d.done === 0 },
-        { k: 'LAST 30 DAYS', v: m ? `${n(m.reviewed)} REVIEWS · ${Math.round(m.accuracy * 100)}%` : '—',
+        { k: 'LAST 30 DAYS', v: m ? `${n(m.reviewed)} REVIEWS · ${m.accuracy}%` : '—',
           off: !m || m.reviewed === 0 },
       ],
       note: 'MASTERED IS WHAT THE SCHEDULER CALLS MASTERED — THREE CORRECT REVIEWS AND A TWENTY-ONE DAY '
