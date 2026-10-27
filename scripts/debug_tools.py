@@ -246,7 +246,7 @@ def _load_session_goal_diagnostics(conn: sqlite3.Connection) -> list[dict[str, o
                 "completed_items": completed_items,
                 "reviewed": reviewed,
                 "accuracy": accuracy,
-                "goal_met": database._session_items_goal_met(reviewed, target_items),
+                "goal_met": database.session_items_goal_met(reviewed, target_items),
             }
         )
     return diagnostics

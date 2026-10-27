@@ -74,8 +74,8 @@ export function DiagnosticsTab({ diagnostics, loading, error, onRefresh }: Diagn
           <thead>
             <tr>
               <th>Session</th>
-              <th>Completed</th>
-              <th>Reviewed</th>
+              <th>Answered</th>
+              <th>Cards</th>
               <th>Accuracy</th>
               <th>Goal Met</th>
             </tr>
@@ -84,8 +84,8 @@ export function DiagnosticsTab({ diagnostics, loading, error, onRefresh }: Diagn
             {session_completion.map((s) => (
               <tr key={s.session_id}>
                 <td className="devtools-mono">{s.session_id.slice(0, 8)}...</td>
-                <td className="devtools-num">{s.completed_items}/{s.target_items}</td>
-                <td className="devtools-num">{s.reviewed}</td>
+                <td className="devtools-num">{s.reviewed}/{s.target_items}</td>
+                <td className="devtools-num">{s.completed_items}</td>
                 <td className="devtools-num">{s.accuracy}%</td>
                 <td className="devtools-num">
                   <span className={s.goal_met ? 'devtools-text-ok' : 'devtools-text-err'}>
