@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   getVocabFeed: (slug, count) => ipcRenderer.invoke('study:get-vocab-feed', slug, count),
   setVocabFeedBudget: (count, slug) => ipcRenderer.invoke('study:set-vocab-feed-budget', count, slug),
   getCardScores: () => ipcRenderer.invoke('study:get-card-scores'),
+  getLevelProgress: () => ipcRenderer.invoke('study:get-level-progress'),
   importCardScores: (legacyScores) => ipcRenderer.invoke('study:import-card-scores', legacyScores),
   getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug),
   getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug),

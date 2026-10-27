@@ -138,6 +138,8 @@ export interface StudySessionApi {
     customCards?: GameCard[],
     customTargetItems?: number,
     restore?: import('../../types').PersistedSessionRestore,
+    /** Session-only leech focus; absent means the learner's own saved setting (audit 3, Q2). */
+    leechFocus?: boolean,
   ) => Promise<void>
   startMissedWordReview: (missedWords: DailyGamesMissedWordPayload[]) => Promise<void>
   returnToDailyGames: () => void
@@ -153,14 +155,13 @@ export interface StudySessionApi {
   resetSessionForDbReset: () => void
   /** Clears the last run's report + summary, without touching the live round. */
   clearLastRunReport: () => void
-  /** Queues a session start that waits for `activeScript` to catch up. */
-  requestResumeSession: (request: { script: ScriptKey; minigame: MinigameKey }) => void
   /**
-   * Sets leech focus outright, for callers that know the value they want — an
-   * "Up next" row raised by `leeches_detected` turns it on before navigating.
-   * `slice.toggleLeechFocus` remains the control the learner drives.
+   * Queues a session start that waits for `activeScript` to catch up. `leechFocus`
+   * sets leech focus for that session only, unsaved: an "Up next" row raised by
+   * `leeches_detected` turns it on (audit 3, Q2). When the session ends or another
+   * starts, the learner's own setting (`slice.toggleLeechFocus`) applies again.
    */
-  setLeechFocus: (value: boolean) => void
+  requestResumeSession: (request: { script: ScriptKey; minigame: MinigameKey; leechFocus?: boolean }) => void
 }
 
 /**

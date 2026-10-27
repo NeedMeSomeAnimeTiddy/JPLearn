@@ -2752,6 +2752,57 @@ def build_card_mastery_scores() -> dict[str, object]:
     return asdict(payload)
 
 
+@dataclass
+class LevelDeckProgress:
+    """One kanji or vocabulary level deck's size and the sum of its 0..4 counters."""
+
+    family: str
+    level: str
+    slug: str
+    total: int
+    score_sum: int
+
+
+@dataclass
+class LevelProgressPayload:
+    """Per-level figures for the Kanji and Vocabulary level bars (audit 3, F5).
+
+    Summed here so the renderer does not have to fetch every level deck's cards
+    (about 8,000 vocabulary words) through the serial bridge just to draw five chips.
+    """
+
+    levels: list[LevelDeckProgress]
+
+
+_LEVEL_PROGRESS_FAMILIES: tuple[str, ...] = ("kanji", "vocab")
+_LEVEL_PROGRESS_LEVELS: tuple[str, ...] = ("n5", "n4", "n3", "n2", "n1")
+
+
+def build_level_progress() -> dict[str, object]:
+    """Return each kanji and vocab level deck's card count and summed mastery counters.
+
+    Only counters for cards the deck still serves are summed, so a stored row for a
+    card the deck no longer serves cannot push a level past 100%.
+    Topic decks store their answers under the level slug, so they are included.
+    """
+    init_study_db()
+    stored = _card_mastery_repository().load_all_scores()
+    levels: list[LevelDeckProgress] = []
+    for family in _LEVEL_PROGRESS_FAMILIES:
+        for level in _LEVEL_PROGRESS_LEVELS:
+            slug = f"{family}_{level}"
+            card_ids = {card.id for card in ALL_DECKS[slug]().cards}
+            scores = stored.get(slug, {})
+            levels.append(LevelDeckProgress(
+                family=family,
+                level=level,
+                slug=slug,
+                total=len(card_ids),
+                score_sum=sum(score for card_id, score in scores.items() if card_id in card_ids),
+            ))
+    return asdict(LevelProgressPayload(levels=levels))
+
+
 def _slugs_for_legacy_section(section: str) -> list[str]:
     prefixes = _LEGACY_SECTION_PREFIXES.get(section)
     if prefixes is None:
@@ -3638,6 +3689,11 @@ def _cmd_card_scores(argv: list[str]) -> tuple[int, dict[str, object]]:
     return 0, build_card_mastery_scores()
 
 
+def _cmd_level_progress(argv: list[str]) -> tuple[int, dict[str, object]]:
+    del argv
+    return 0, build_level_progress()
+
+
 def _cmd_import_card_scores(argv: list[str]) -> tuple[int, dict[str, object]]:
     if len(argv) < 2:
         return 2, {"error": "Usage: import-card-scores <legacy_scores_json>"}
@@ -4311,6 +4367,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "reset-db": _cmd_reset_db,
     "record-result": _cmd_record_result,
     "card-scores": _cmd_card_scores,
+    "level-progress": _cmd_level_progress,
     "import-card-scores": _cmd_import_card_scores,
     "session-start": _cmd_session_start,
     "session-summary": _cmd_session_summary,

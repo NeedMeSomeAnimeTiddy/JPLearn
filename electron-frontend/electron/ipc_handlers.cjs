@@ -129,6 +129,16 @@ function registerIpcHandlers(options) {
     }
   })
 
+  options.ipcMain.handle('study:get-level-progress', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      return await runPythonBridgeWithArgsRead(['level-progress'])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to fetch level progress: ${detail}`)
+    }
+  })
+
   // One-time adoption of mastery counters that predate issue #66, when they lived
   // in renderer localStorage. The bridge refuses to overwrite existing rows, so
   // this is safe to call on every launch; the renderer only calls it while a

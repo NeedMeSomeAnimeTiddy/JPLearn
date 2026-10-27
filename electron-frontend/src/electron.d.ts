@@ -4,6 +4,7 @@ import type {
   CardMasteryImportPayload,
   CardMasteryScoresPayload,
   CardNoteDeletePayload,
+  LevelProgressPayload,
   CardNoteLookupPayload,
   CardNotePayload,
   ConjugationDrillPayload,
@@ -546,6 +547,9 @@ interface DesktopApi {
   // Per-card mastery counters, keyed by deck slug (issue #66). Optional so a
   // renderer running against an older bridge falls back rather than throwing.
   getCardScores?: () => Promise<CardMasteryScoresPayload>
+  // Each kanji and vocab level deck's size and summed counters, for the level bars
+  // (audit 3, F5). Optional for the same reason.
+  getLevelProgress?: () => Promise<LevelProgressPayload>
   importCardScores?: (legacyScores: Record<string, Record<number, number>>) => Promise<CardMasteryImportPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>

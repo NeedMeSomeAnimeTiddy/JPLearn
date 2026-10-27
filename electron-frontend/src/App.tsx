@@ -90,7 +90,6 @@ import {
   normalizeBlockList,
 } from './lib/deckUtils'
 import {
-  buildJlptLevelProgressFromLevelDecks,
   buildCategoryProgress,
 } from './lib/progressAggregation'
 import { CARD_MASTERY_MAX } from './constants'
@@ -104,6 +103,7 @@ import {
 import './App.css'
 import { useBlockSelection } from './features/block-selection'
 import { useVocabFeed, isFedDeck } from './features/vocab-feed'
+import { useLevelProgress } from './features/level-progress'
 import { useProgression, LOCKED_NODE_REASON } from './features/progression'
 import type { ProgressionNodeView } from './features/progression'
 import { computeMinigameLockReasons } from './lib/minigameAvailability'
@@ -187,12 +187,6 @@ function App() {
   const [overviewKanjiDeck, setOverviewKanjiDeck] = useState<OverviewKanjiCard[]>([])
   const [activeKanjiLevel, setActiveKanjiLevel] = useState<JlptLevel>('n5')
   const [activeVocabLevel, setActiveVocabLevel] = useState<JlptLevel>('n5')
-  const [kanjiDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
-    n5: [], n4: [], n3: [], n2: [], n1: [],
-  })
-  const [vocabDeckCardsByLevel] = useState<Record<JlptLevel, ScriptDeck['cards']>>({
-    n5: [], n4: [], n3: [], n2: [], n1: [],
-  })
   const [activeVocabCategory, setActiveVocabCategory] = useState<VocabCategory>('greetings')
   const [vocabDeckCardsByCategory, setVocabDeckCardsByCategory] = useState<Record<VocabCategory, ScriptDeck['cards']>>({
     greetings: [], numbers: [], time_days: [], family: [], body: [],
@@ -1325,20 +1319,16 @@ function App() {
     void loadScriptCards(activeScript, activeDeckSlug)
   }, [activeScript, activeDeckSlug, loadScriptCards])
 
+  // The selected blocks' leeches, which is the pool a leech-focus session draws from (audit 3, F8).
   const leechCards = useMemo(
-    () => deckCards.filter((card) => card.is_leech),
-    [deckCards],
+    () => activeBlockCards.filter((card) => card.is_leech),
+    [activeBlockCards],
   )
 
-  const kanjiLevelProgress = useMemo(
-    () => buildJlptLevelProgressFromLevelDecks(kanjiDeckCardsByLevel, cardScores.kanji_n5),
-    [kanjiDeckCardsByLevel, cardScores.kanji_n5],
-  )
-
-  const vocabLevelProgress = useMemo(
-    () => buildJlptLevelProgressFromLevelDecks(vocabDeckCardsByLevel, cardScores.vocab_n5),
-    [vocabDeckCardsByLevel, cardScores.vocab_n5],
-  )
+  const { kanji: kanjiLevelProgress, vocab: vocabLevelProgress } = useLevelProgress({
+    cardScores,
+    paused: sessionActive,
+  })
 
   const vocabCategoryProgress = useMemo(
     () => buildCategoryProgress(
@@ -1981,9 +1971,8 @@ function App() {
     setShowOverview(false)
     setShowSettings(false)
     session.clearLastRunReport()
-    if (overrides?.leechFocusEnabled !== undefined) {
-      session.setLeechFocus(overrides.leechFocusEnabled)
-    }
+    // Session-only (audit 3, Q2): it rides on this start and is never saved as the learner's choice.
+    const leechFocus = overrides?.leechFocusEnabled
     setActiveGame(resolvedMinigame)
     navigate('minigame', 'forward')
     resetSessionWithLives()
@@ -2003,12 +1992,12 @@ function App() {
          standing on hiragana drew a kanji round out of hiragana's cards. */
       setGameLoading(true)
       setActiveScript(script)
-      session.requestResumeSession({ script, minigame: resolvedMinigame })
+      session.requestResumeSession({ script, minigame: resolvedMinigame, leechFocus })
       closeShortcutMenu()
       return
     }
 
-    void startSession(resolvedMinigame)
+    void startSession(resolvedMinigame, undefined, undefined, undefined, leechFocus)
     closeShortcutMenu()
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
   }, [activeScript, closeKanjiDetail, closeShortcutMenu, resetSessionWithLives, resolveScriptMinigame, startSession])
