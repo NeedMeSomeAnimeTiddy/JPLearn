@@ -6,6 +6,64 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-27 — Study session and queue
+
+**Scope:** Audit 4, Robbie's words: "the study session and its queue: how a session is built, how
+cards are ordered and served, and what is saved when it ends". Queue building (`queue_builder.py`,
+bridge `study-queue`), `domain/session.py`, `features/study-session/`, App's queue, deck and block
+caches, block selection and the session starts; hand-offs to the Up Next preview, the Ledger's
+Sessions sheet and the tutor's session summary. Left out: tutor, minigames, JLPT queues, answer
+checking internals, mastery and counting rules (audit 3).
+**Commit audited:** 293bcae on main, clean tree.
+**Method:** The Auditor read source, history (blame) and the census and ran nothing; no helpers.
+Known-answers Part 2 was seen at Orient by accident. The lead ran Checks 4-6 at 293bcae: a
+read-only query on the live database (one smoke-test session, no real ones), pytest on the queue
+and session-goal tests (13 passed), and `git log -S` for the preview and the block cache. Checks 1
+and 2 (renderer tests) were not run, because team worktrees have no node_modules; they become
+failing-first regression tests in the repairs. Check 3 (study-queue timing in the built app under
+the launch gate) was not run.
+
+### Where each finding went
+- F1 App keeps each deck's block list for the whole run; starting a block unlocked during the run
+  saves an empty selection, so sessions study the whole deck, across restarts (P1): repair in
+  progress.
+- F2 problem-card flags and grammar stages frozen at deck load for the run (P2): repair in
+  progress, with F1.
+- F3 Ledger Sessions and 30-day accuracy multiplied by 100 (P2; since 1e1c4d25): repair in progress.
+- F4 Up Next preview indexes the block, not the session's pool (P2): repair in progress.
+- F5 two "session goal met" rules; the tutor's cannot be met on kana blocks (P3; no real sessions
+  to size it): Robbie chose "Answers given"; repair in progress.
+- F6 study queue over 1.2 s gives a silent random order (P2, plausible; Check 3 not run): measure
+  first; filed as DEBT #8 with a timing trigger.
+- F7 goal row written before a round is built; failed starts appear in history (P3): repair in
+  progress.
+- F8 no session id means no end screen and an uncleared save (P3): drafted as debt; fixed with the
+  session repairs instead.
+- Nits: unread save fields, unread `queueBucketCounts`, unreachable "+N more": repair in progress.
+
+### Triggers checked
+- DEBT #4: not checked (needs startup telemetry).
+
+### Inspected and found sound — do not re-derive these
+- Queue buckets are disjoint and use `has_been_reviewed`; leech and miss ids limited to deck
+  cards; the JLPT queues' fabricated-state test is not shared with the session queue. Queue and
+  session-goal tests pass (13).
+- Queue ids map to the session pool by id; queue caches cleared on every answer and save.
+- Resume refuses saves without a deck slug and asks the goal only for the remaining rounds; there
+  is no resume card list.
+- Session-only leech focus matches Robbie's "only for that session".
+
+### What this pass could not establish
+- Study-queue latency under bridge load; F5 and F7 frequency (no real sessions in the live
+  database); how often a mid-session round fails to build; whether a first answer can miss its
+  session id; how the screens look.
+
+### Coverage, not a finding
+Four passes so far (scheduling; decks; mastery and counts; session and queue). None has covered:
+runtimes, setup and offline, IPC, startup, tutor, JLPT queues, minigames, dictionary and OCR, the
+menu, renderer state beyond the session, answer checking, progression beyond counts, passages,
+handwriting, packaging.
+
 ## 2026-10-27 — Mastery, problem-card and counting rules
 
 **Scope:** Audit 3 of Robbie's order, his words via `/crew-audit`: "the mastery, problem-card and

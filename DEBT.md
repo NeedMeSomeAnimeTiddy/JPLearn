@@ -104,3 +104,17 @@ nothing diverges, and the SQL readers need the literal in the query, so a shared
 building those queries from it.
 
 **Trigger:** any change to the rule, or an eighth reader added.
+
+## 8. A slow study queue silently plays the session in random order
+
+**Recorded 2026-10-27.** `hydrateRoundCycle` races the bridge's study queue against a 1,200 ms timer
+(`ROUND_QUEUE_TIMEOUT_MS`, `electron-frontend/src/features/study-session/useStudySession.ts:75-76,
+303-315`) and, on a loss, shuffles the pool with no notice. The cycle keeps that order until it
+wraps, so due cards are not served first for that session. The main process allows the same request
+12 s (`electron/main.cjs:303`), and at session start the queue waits behind `startSessionGoal` and
+any answer saves on the serial bridge (ARCH §8 B1). Not fixed now: audit 4 (F6) could not measure
+how long the queue takes in ordinary use, and a fix (wait with a loading state, or swap in the real
+order once it lands) is only worth making if the timer actually fires.
+
+**Trigger:** a measured `getStudyQueue` over 1.2 s when a session starts in the built app (audit 4,
+Check 3), or a learner noticing that due cards were not served first.
