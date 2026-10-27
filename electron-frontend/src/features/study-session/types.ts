@@ -64,6 +64,11 @@ export interface StudySessionDeps {
   setActiveGame: Dispatch<SetStateAction<MinigameKey>>
   setGameError: Dispatch<SetStateAction<string | null>>
   setDeckCards: Dispatch<SetStateAction<ScriptDeck['cards']>>
+  /**
+   * Puts the app on `script` at the level `deckSlug` names, holding `gameLoading` until that deck
+   * has loaded when it is not the one already open. Resume uses it to reopen the saved deck.
+   */
+  openStudyDeck: (script: ScriptKey, deckSlug: DeckSlugInput) => void
 
   // ── Progress/gamification writes from the review path ────────────────────
   setCardScores: Dispatch<SetStateAction<CardScores>>
@@ -118,7 +123,7 @@ export interface StudySessionApi {
   activeSessionId: string | null
   explicitReviewItems: ExplicitReviewItem[] | null
   showResumeToast: boolean
-  resumeData: import('../../types').PersistedSession | null
+  resumeData: import('./persistedSession').PersistedStudySession | null
 
   /**
    * Exposed as the ref *object*, not a snapshot: the Escape handler and
