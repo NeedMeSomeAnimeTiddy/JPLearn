@@ -1650,8 +1650,9 @@ def build_block_progress(slug: str) -> dict[str, object]:
     ``leech_card_ids`` and ``curriculum_stages`` are the per-card fields of ``deck-cards`` that a
     saved answer can change. The renderer re-reads this after each session to refresh them
     (audit 4 F1/F2) instead of ``deck-cards``, which ranks distractors and looks up the dictionary
-    for every card: 3-5 s warm for vocab_n5, against a few milliseconds here. Stages are the
-    stored ones only; a card with none is at stage 1, as in ``deck-cards``.
+    for every card: 3-5 s warm for vocab_n5, against a few milliseconds here. Only stages above 1
+    are sent (``load_curriculum_stages`` fills every card in, and sentence_examples has tens of
+    thousands); a card left out is at stage 1, as in ``deck-cards``.
     """
     init_study_db()
     threshold = unlock_threshold_for_slug(slug)
@@ -1666,6 +1667,7 @@ def build_block_progress(slug: str) -> dict[str, object]:
         "curriculum_stages": {
             str(card_id): stage
             for card_id, stage in load_curriculum_stages(deck.name, "context_cloze", card_ids).items()
+            if stage > 1
         },
     }
     blocks = blocks_for_slug(slug)

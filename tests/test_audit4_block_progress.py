@@ -63,3 +63,13 @@ def test_leech_ids_are_limited_to_the_deck(tmp_path: Path, monkeypatch) -> None:
 
     assert blocks["leech_card_ids"] == [cards[0].id]
     assert blocks["curriculum_stages"] == {}
+
+
+def test_only_stages_above_one_are_sent_with_the_real_stage_loader(tmp_path: Path, monkeypatch) -> None:
+    """The real loader fills every card in at stage 1; sending those would put a deck-sized map
+    on every block-progress read (sentence_examples has tens of thousands of cards)."""
+    _use_temp_db(tmp_path, monkeypatch)
+
+    blocks = desktop_bridge.build_block_progress("hiragana")
+
+    assert blocks["curriculum_stages"] == {}
