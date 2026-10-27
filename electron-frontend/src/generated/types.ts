@@ -292,6 +292,18 @@ export interface CardMasteryImportPayload {
   decks_written: number
 }
 
+export interface LevelDeckProgress {
+  family: string
+  level: string
+  slug: string
+  total: number
+  score_sum: number
+}
+
+export interface LevelProgressPayload {
+  levels: LevelDeckProgress[]
+}
+
 export interface PitchAccent {
   reading: string
   pitch_positions: number[]

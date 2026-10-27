@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { buildCategoryProgress, buildJlptLevelProgress, jlptTagFromCard } from './progressAggregation'
+import {
+  buildCategoryProgress, buildJlptLevelProgress, buildJlptLevelProgressFromTotals, jlptTagFromCard,
+} from './progressAggregation'
 import { CARD_MASTERY_MAX } from '../constants'
 import type { JlptProgressCard, ScriptDeck } from '../types'
 
@@ -67,6 +69,42 @@ describe('buildJlptLevelProgress', () => {
     const [n5] = buildJlptLevelProgress(cards, {})
     expect(n5.sampleChars).toEqual(['1', '2', '3'])
     expect(n5.cardIds).toHaveLength(5)
+  })
+})
+
+describe('buildJlptLevelProgressFromTotals', () => {
+  /* The level bars' builder (audit 3, F5): the same formula as above, from the bridge's per-level
+     card count and summed counters instead of every level's cards. */
+  it('reads each level as its summed counters over four times its size', () => {
+    const byKey = Object.fromEntries(buildJlptLevelProgressFromTotals({
+      n5: { total: 100, scoreSum: 100 },
+      n4: { total: 50, scoreSum: 0 },
+    }).map((l) => [l.key, l]))
+    expect(byKey.n5.total).toBe(100)
+    expect(byKey.n5.mastery).toBeCloseTo(100 / (CARD_MASTERY_MAX * 100))
+    expect(byKey.n4.mastery).toBe(0)
+    expect(byKey.n4.total).toBe(50)
+  })
+
+  it('draws all five levels, empty before the bridge answers', () => {
+    const levels = buildJlptLevelProgressFromTotals({})
+    expect(levels.map((l) => l.key)).toEqual(['n5', 'n4', 'n3', 'n2', 'n1'])
+    expect(levels.every((l) => l.total === 0 && l.mastery === 0)).toBe(true)
+  })
+
+  it('keeps the 80% unlock rule', () => {
+    const byKey = Object.fromEntries(buildJlptLevelProgressFromTotals({
+      n5: { total: 10, scoreSum: 10 * CARD_MASTERY_MAX },
+      n4: { total: 10, scoreSum: 0 },
+      n3: { total: 10, scoreSum: 0 },
+    }).map((l) => [l.key, l]))
+    expect(byKey.n4.unlocked).toBe(true)
+    expect(byKey.n3.unlocked).toBe(false)
+  })
+
+  it('never reads above 100%', () => {
+    const [n5] = buildJlptLevelProgressFromTotals({ n5: { total: 1, scoreSum: 99 } })
+    expect(n5.mastery).toBe(1)
   })
 })
 

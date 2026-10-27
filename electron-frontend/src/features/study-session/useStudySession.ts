@@ -156,6 +156,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     deckSlug?: DeckSlugInput
     targetItems?: number
     restore?: PersistedSessionRestore
+    /** Session-only leech focus (audit 3, Q2); absent means the learner's own setting. */
+    leechFocus?: boolean
   } | null>(null)
   const [sessionStartPending, setSessionStartPending] = useState<boolean>(false)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
@@ -165,7 +167,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   const [resumeData, setResumeData] = useState<PersistedStudySession | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(() => loadSessionPrefs()?.livesEnabled ?? false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
-  const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(() => loadSessionPrefs()?.leechFocusEnabled ?? false)
+  /* THE LEARNER'S OWN FOCUS SETTING IS THE ONLY ONE SAVED (audit 3, Q2). "Up next" can turn focus
+     on for the one session it starts. The override travels with that start and lives here,
+     unsaved: every start sets it (to null when it carries none) and a session's end clears it. */
+  const [savedLeechFocus, setSavedLeechFocus] = useState<boolean>(() => loadSessionPrefs()?.leechFocusEnabled ?? false)
+  const [leechFocusOverride, setLeechFocusOverride] = useState<boolean | null>(null)
+  const leechFocusEnabled = leechFocusOverride ?? savedLeechFocus
   const [interleaveWeights] = useState<InterleaveWeights>({ ...DEFAULT_INTERLEAVE_WEIGHTS })
   const [interleaveSurpriseEnabled] = useState<boolean>(true)
   const [interleaveSurpriseEvery] = useState<number>(5)
@@ -414,7 +421,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     setSessionRunReport(null)
   }, [])
 
-  const requestResumeSession = useCallback((request: { script: ScriptKey; minigame: MinigameKey }): void => {
+  const requestResumeSession = useCallback((request: { script: ScriptKey; minigame: MinigameKey; leechFocus?: boolean }): void => {
     setResumeRequest(request)
   }, [])
 
@@ -425,7 +432,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       script: activeScript,
       game: activeGame,
       livesEnabled,
-      leechFocusEnabled,
+      leechFocusEnabled: savedLeechFocus,
       confidenceCaptureEnabled,
       sessionTargetItems,
     })
@@ -434,7 +441,22 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   useEffect(() => {
     saveSessionPrefs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeScript, activeGame, livesEnabled, leechFocusEnabled, confidenceCaptureEnabled, sessionTargetItems])
+  }, [activeScript, activeGame, livesEnabled, savedLeechFocus, confidenceCaptureEnabled, sessionTargetItems])
+
+  // The override belongs to the session it started: once that session ends, the learner's own
+  // setting applies again. A start that has set an override but not yet gone live is exempt, so a
+  // drill launched while another was still live (one handler ends the old, starts the new) keeps it.
+  const overrideSessionWasActiveRef = useRef(false)
+  const overrideStartPendingRef = useRef(false)
+  useEffect(() => {
+    const wasActive = overrideSessionWasActiveRef.current
+    overrideSessionWasActiveRef.current = sessionActive
+    if (sessionActive) {
+      overrideStartPendingRef.current = false
+      return
+    }
+    if (wasActive && !overrideStartPendingRef.current) setLeechFocusOverride(null)
+  }, [sessionActive])
 
   // ── Focus the answer input whenever a fresh round is live ──────────────────
 
@@ -680,7 +702,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     navigate('home', 'back')
   }, [resetSessionEnd, navigate])
 
-  const startSession = useCallback(async (selectedGame: MinigameKey = activeGame, customCards?: GameCard[], customTargetItems?: number, restore?: PersistedSessionRestore) => {
+  const startSession = useCallback(async (selectedGame: MinigameKey = activeGame, customCards?: GameCard[], customTargetItems?: number, restore?: PersistedSessionRestore, leechFocus?: boolean) => {
+    // Every start says whether it carries a session-only override, so one never outlives its session.
+    setLeechFocusOverride(leechFocus ?? null)
+    overrideStartPendingRef.current = true
+    const focusLeeches = leechFocus ?? savedLeechFocus
     setSessionStartPending(true)
     resetRoundCycle()
     setSessionGoalError(null)
@@ -708,7 +734,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
     try {
       const sourceCards = customCards
-        ?? (leechFocusEnabled && activeBlockCards.filter((card) => card.is_leech).length > 0
+        ?? (focusLeeches && activeBlockCards.filter((card) => card.is_leech).length > 0
           ? activeBlockCards.filter((card) => card.is_leech)
           : activeBlockCards)
       const modeSelection = nextRoundMode(selectedGame)
@@ -742,7 +768,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       if (!nextRound) {
     setSessionActive(false)
     setRoundState(null)
-        if (leechFocusEnabled && activeBlockCards.filter((card) => card.is_leech).length === 0) {
+        if (focusLeeches && activeBlockCards.filter((card) => card.is_leech).length === 0) {
           setGameError('No cards flagged for review. Disable Leech Focus to play normally.')
         } else {
           setGameError('This block has too few cards for this minigame. Try a different block.')
@@ -787,10 +813,10 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     activeGame,
     buildRoundWithBridge,
     hydrateRoundCycle,
-    leechFocusEnabled,
     nextCardIndex,
     nextRoundMode,
     resetRoundCycle,
+    savedLeechFocus,
     resetSessionCore,
     sessionTargetItems,
     setGameError,
@@ -835,9 +861,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     if (resumeRequest.deckSlug !== undefined && activeDeckSlug !== resumeRequest.deckSlug) return
     if (gameLoading || sessionStartPending) return
 
-    const { minigame, targetItems, restore } = resumeRequest
+    const { minigame, targetItems, restore, leechFocus } = resumeRequest
     setResumeRequest(null)
-    void startSession(minigame, undefined, targetItems, restore)
+    void startSession(minigame, undefined, targetItems, restore, leechFocus)
   }, [activeScript, activeDeckSlug, gameLoading, resumeRequest, sessionStartPending, startSession])
 
   /* RESUME IS AN ORDINARY START ON THE SAVED DECK. It reopens the level the session was on and
@@ -857,7 +883,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     collaboratorsRef.current.openStudyDeck(data.activeScript, data.deckSlug)
     setActiveGame(minigame)
     setLivesEnabled(data.livesEnabled)
-    setLeechFocusEnabled(data.leechFocusEnabled)
     setConfidenceCaptureEnabled(data.confidenceCaptureEnabled)
     setSessionTargetItems(targetItems)
     resetSessionWithLives()
@@ -868,6 +893,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       deckSlug: data.deckSlug,
       targetItems: Math.max(1, targetItems - (Number.isFinite(data.restore.sessionRounds) ? data.restore.sessionRounds : 0)),
       restore: data.restore,
+      // The resumed run plays as it was played, without rewriting the learner's saved setting.
+      leechFocus: data.leechFocusEnabled,
     })
   }, [
     resumeData,
@@ -1579,11 +1606,16 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       setLivesEnabled((previous) => !previous)
       setLivesRemaining(DEFAULT_LIVES)
     },
-    toggleLeechFocus: () => setLeechFocusEnabled((previous) => !previous),
-    // Set outright rather than toggled, for callers that know the value they
-    // want: an "Up next" row raised by `leeches_detected` turns leech focus on
-    // before navigating, so a row labelled "problem items" studies them.
-    setLeechFocus: (value: boolean) => setLeechFocusEnabled(value),
+    // The learner's own choice: saved, and it replaces any session-only override.
+    toggleLeechFocus: () => {
+      setSavedLeechFocus(!leechFocusEnabled)
+      setLeechFocusOverride(null)
+    },
+    // Also the learner's own choice: a value set outright is saved like a toggle.
+    setLeechFocus: (value: boolean) => {
+      setSavedLeechFocus(value)
+      setLeechFocusOverride(null)
+    },
     toggleConfidence: () => setConfidenceCaptureEnabled((previous) => !previous),
   }
 
@@ -1614,6 +1646,5 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     resetSessionForDbReset,
     clearLastRunReport,
     requestResumeSession,
-    setLeechFocus: setLeechFocusEnabled,
   }
 }

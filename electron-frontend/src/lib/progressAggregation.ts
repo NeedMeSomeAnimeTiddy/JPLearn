@@ -36,16 +36,25 @@ export function buildJlptLevelProgress(cards: JlptProgressCard[], scores: Record
   })
 }
 
-export function buildJlptLevelProgressFromLevelDecks(
-  levelDecks: Record<JlptLevel, ScriptDeck['cards']>,
-  scores: Record<number, number>,
+/** One level deck's size and summed 0..4 counters, as the bridge's `level-progress` reports them. */
+export interface LevelDeckTotals {
+  total: number
+  scoreSum: number
+}
+
+/**
+ * Level progress from per-level totals rather than from every level's cards (audit 3, F5), with
+ * the same formula and unlock rule as `buildJlptLevelProgress`. A level the bridge has not reported
+ * yet reads as empty. `cardIds` and `sampleChars` stay empty: the level bars do not read them.
+ */
+export function buildJlptLevelProgressFromTotals(
+  totals: Partial<Record<JlptLevel, LevelDeckTotals>>,
 ): JlptLevelProgress[] {
   let canUnlockNext = true
   return JLPT_LEVEL_ORDER.map((level) => {
-    const levelCards = levelDecks[level]
-    const total = levelCards.length
-    const totalScore = levelCards.reduce((sum, card) => sum + (scores[card.id] ?? 0), 0)
-    const mastery = total > 0 ? totalScore / (CARD_MASTERY_MAX * total) : 0
+    const total = totals[level]?.total ?? 0
+    const totalScore = totals[level]?.scoreSum ?? 0
+    const mastery = total > 0 ? Math.min(1, totalScore / (CARD_MASTERY_MAX * total)) : 0
     const unlocked = total > 0 && canUnlockNext
     if (total > 0 && mastery < 0.8) {
       canUnlockNext = false
@@ -53,8 +62,8 @@ export function buildJlptLevelProgressFromLevelDecks(
     return {
       key: level,
       label: JLPT_LEVEL_LABELS[level],
-      cardIds: levelCards.map((card) => card.id),
-      sampleChars: levelCards.slice(0, 3).map((card) => card.character),
+      cardIds: [],
+      sampleChars: [],
       mastery,
       unlocked,
       total,
