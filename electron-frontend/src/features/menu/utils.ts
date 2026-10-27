@@ -169,7 +169,7 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
     STUDY: {
       tok: of ? `STEP ${no}/${of}` : 'THE PATH',
       lab: 'WHERE YOU ARE',
-      val: here ? `STEP ${no} \u00b7 ${here.name.toUpperCase()}` : 'EVERY STEP DONE',
+      val: here ? `STEP ${no} \u00b7 ${here.name.toUpperCase()}` : 'ALL TRACKED STEPS DONE',
       kind: 'gauge', pct: herePct, due: 0, fig: '', figLab: '',
       slab: 'CONTINUE THE PATH \u25b8',
     },

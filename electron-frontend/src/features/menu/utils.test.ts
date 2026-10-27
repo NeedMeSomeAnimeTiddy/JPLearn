@@ -44,7 +44,7 @@ describe('rowsFrom STUDY', () => {
       node('reading', 'Reading', 'unlocked', false),
       node('jlpt_n5', 'JLPT N5', 'unlocked', false),
     ]).STUDY
-    expect(study.val).toBe('EVERY STEP DONE')
+    expect(study.val).toBe('ALL TRACKED STEPS DONE')
   })
 })
 
