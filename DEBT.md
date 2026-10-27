@@ -92,3 +92,15 @@ database holds no topic-slug mastery rows (audit 2, Check 11).
 
 **Trigger:** a new identity migration is written using this file as its template, or a
 `card_mastery_scores` row appears under a topic-deck slug.
+
+## 7. The FSRS "mastered" rule is copied in seven places
+
+**Recorded 2026-10-27.** "Three reviews and a 21-day interval" is written out separately in
+`data/database.py:237`, `data/deck_portability.py:1107`, `data/state_rebuild.py:87`,
+`scripts/desktop_bridge.py:2272` (and the unused `:1345`, removed after audit 3),
+`domain/word_of_the_day.py:64`, and `domain/jlpt_readiness.py:15-16`, and the figure appears in
+learner text at `ledger.ts:436` and `Ascent.tsx:130`. All agree today (audit 3). Not fixed now:
+nothing diverges, and the SQL readers need the literal in the query, so a shared constant means
+building those queries from it.
+
+**Trigger:** any change to the rule, or an eighth reader added.
