@@ -158,10 +158,11 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
      whole obligation, and a learner with four decks due is not one card behind. */
   const due = (block?.recommendations ?? []).reduce((sum, rec) => sum + (rec.review_count ?? 0), 0)
 
-  /* the five JLPT nodes are on the same curriculum the path draws, so how many are finished is a
-     free and honest figure where the readiness sweep is neither */
+  /* the five JLPT nodes are on the same curriculum the path draws. The app cannot measure them, so
+     none is ever mastered; how many the path has opened is the honest figure (audit 3 review,
+     Robbie: "Count open steps") */
   const exams = nodes.filter((node) => /^jlpt_n[1-5]$/.test(node.node_id))
-  const passed = exams.filter((node) => node.status === 'mastered').length
+  const opened = exams.filter((node) => node.status !== 'locked').length
 
   const streak = typeof streakDays === 'number' ? streakDays : null
 
@@ -193,8 +194,8 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
     JLPT: {
       tok: exams.length ? `${exams.length} LEVELS` : 'THE EXAM',
       lab: 'HOW FAR UP',
-      val: exams.length ? `${passed} OF ${exams.length} MASTERED` : 'NOT STARTED',
-      kind: 'fig', pct: 0, due: 0, fig: String(passed), figLab: 'LEVELS MASTERED',
+      val: exams.length ? `${opened} OF ${exams.length} OPEN` : 'NOT STARTED',
+      kind: 'fig', pct: 0, due: 0, fig: String(opened), figLab: 'LEVELS OPEN',
       slab: 'OPEN THE EXAM \u25b8',
     },
     RECORDS: {

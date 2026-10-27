@@ -10,11 +10,14 @@ name, so every card read as 50%.
 
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
 from typing import Any
 
 import pytest
 
 from data import database
+from data.mastery_repository import CardMasteryRepository
 from data.study_pipeline import review_minigame_result
 from domain.blocks import blocks_for_slug
 from domain.decks import ALL_DECKS
@@ -55,6 +58,31 @@ def test_seeding_leaves_a_studied_cards_counter_alone() -> None:
 
     assert _scores()["hiragana"][card_id] == 0
     assert len(_scores()["hiragana"]) == len(deck.cards)
+
+
+def test_seeding_keeps_a_counter_a_card_already_has() -> None:
+    database.init_db()
+    card_id = ALL_DECKS["hiragana"]().cards[0].id
+    CardMasteryRepository().set_deck_scores("hiragana", {card_id: 1})
+
+    desktop_bridge.apply_expertise_level("know_hiragana")
+
+    assert _scores()["hiragana"][card_id] == 1
+
+
+def test_a_failed_counter_write_rolls_the_seeded_schedules_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    database.init_db()
+
+    def fail(*_args: object, **_kwargs: object) -> int:
+        raise RuntimeError("counter write failed")
+
+    monkeypatch.setattr(CardMasteryRepository, "seed_full_scores", fail)
+    with pytest.raises(RuntimeError):
+        desktop_bridge.apply_expertise_level("know_hiragana")
+
+    with closing(sqlite3.connect(database.DB_PATH)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM review_states").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM card_mastery_scores").fetchone()[0] == 0
 
 
 # --- F3 --------------------------------------------------------------------------------------

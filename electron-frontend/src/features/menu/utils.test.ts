@@ -49,14 +49,16 @@ describe('rowsFrom STUDY', () => {
 })
 
 describe('rowsFrom JLPT', () => {
-  it('still counts only mastered JLPT steps, so reached ones do not pass', () => {
+  it('counts the JLPT steps the path has opened, since none can be mastered', () => {
     const jlpt = rows([
       node('jlpt_n5', 'JLPT N5', 'unlocked', false),
       node('jlpt_n4', 'JLPT N4', 'unlocked', false),
-      node('jlpt_n3', 'JLPT N3', 'unlocked', false),
-      node('jlpt_n2', 'JLPT N2', 'unlocked', false),
-      node('jlpt_n1', 'JLPT N1', 'unlocked', false),
+      node('jlpt_n3', 'JLPT N3', 'locked', false),
+      node('jlpt_n2', 'JLPT N2', 'locked', false),
+      node('jlpt_n1', 'JLPT N1', 'locked', false),
     ]).JLPT
-    expect(jlpt.val).toBe('0 OF 5 MASTERED')
+    expect(jlpt.val).toBe('2 OF 5 OPEN')
+    expect(jlpt.fig).toBe('2')
+    expect(jlpt.figLab).toBe('LEVELS OPEN')
   })
 })

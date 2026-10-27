@@ -3,6 +3,8 @@ import type { LevelProgressPayload } from '../../generated/types'
 import type { CardScores, JlptLevelProgress } from '../../types'
 import { levelProgressFor } from './utils'
 
+const LEVEL_PROGRESS_SETTLE_MS = 300
+
 export interface LevelProgressDeps {
   /** The renderer's counters. A new object means a counter moved, so the figures are re-read. */
   cardScores: CardScores
@@ -28,15 +30,19 @@ export function useLevelProgress({ cardScores, paused }: LevelProgressDeps): {
     const getLevelProgress = window.jplearnDesktop?.getLevelProgress
     if (!getLevelProgress) return
     let cancelled = false
-    void (async () => {
-      try {
-        const next = await getLevelProgress()
-        if (!cancelled && next) setPayload(next)
-      } catch {
-        // Best-effort: the bar keeps what it last showed and the next change re-reads.
-      }
-    })()
-    return () => { cancelled = true }
+    /* A burst of counter changes (the launch snapshot then the database read; answers still
+       saving after a session ends) settles into one bridge read rather than one each. */
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const next = await getLevelProgress()
+          if (!cancelled && next) setPayload(next)
+        } catch {
+          // Best-effort: the bar keeps what it last showed and the next change re-reads.
+        }
+      })()
+    }, LEVEL_PROGRESS_SETTLE_MS)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [cardScores, paused])
 
   const kanji = useMemo(() => levelProgressFor(payload, 'kanji'), [payload])

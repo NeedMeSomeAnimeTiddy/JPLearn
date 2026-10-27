@@ -2264,8 +2264,12 @@ function App() {
       await window.jplearnDesktop?.applyExpertiseLevel(level)
       // The bridge writes the seeded cards' mastery counters with their schedules (audit 3, F1), so
       // show what it stored rather than computing a copy here that the next launch would discard.
-      const payload = await window.jplearnDesktop?.getCardScores?.()
-      if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
+      try {
+        const payload = await window.jplearnDesktop?.getCardScores?.()
+        if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
+      } catch {
+        // The seeding has landed; a failed re-read only delays the bars to the next launch.
+      }
       refreshDeckProgressAfterSeedChange()
     } catch {
       // Expertise seeding is best-effort; proceed to mark onboarding complete.

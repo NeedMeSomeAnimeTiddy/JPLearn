@@ -466,7 +466,7 @@ class SummaryTotals:
 
 # Decks on the Python side that the app deliberately does not offer (Robbie,
 # 2026-10-27: keep Conjugation Training hidden); tests/test_deck_slug_lists.py
-# holds the same set against the IPC allowlist.
+# holds the same set against the IPC allowlist and asserts the two are equal.
 _SUMMARY_UNSERVED_SLUGS = frozenset({"conjugation_training"})
 
 
@@ -2045,9 +2045,9 @@ def _tutorial_is_complete() -> bool:
 def _compute_node_mastery_counts(node_id: str) -> tuple[int, int]:
     """Return (mastered_count, total_count) for one synced progression node.
 
-    A card counts as mastered once it has been answered correctly at least
-    once (repetitions > 0) — the same definition already used for block
-    mastery in build_block_progress().
+    A card counts once it has been answered correctly, with the pass test block progress uses
+    (``_block_pass_inputs``), so a step's gauge and its blocks agree (audit 3 review; Robbie:
+    "Yes, same rule").
     """
     if node_id == "tutorial":
         return (1, 1) if _tutorial_is_complete() else (0, 1)
@@ -2055,8 +2055,8 @@ def _compute_node_mastery_counts(node_id: str) -> tuple[int, int]:
     slug = _PROGRESSION_SYNC_DECK_SLUGS[node_id]
     deck = ALL_DECKS[slug]()
     card_ids = [card.id for card in deck.cards]
-    states = load_review_states(deck.name, card_ids)
-    mastered = sum(1 for cid in card_ids if getattr(states.get(cid), "repetitions", 0) > 0)
+    passed, _studied = _block_pass_inputs(deck.name, card_ids)
+    mastered = sum(1 for cid in card_ids if passed.get(cid, 0) >= 1)
     return mastered, len(card_ids)
 
 

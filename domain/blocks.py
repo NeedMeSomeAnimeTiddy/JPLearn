@@ -27,8 +27,8 @@ from domain.kanji_ordering import order_by_components
 from domain.kanji_themes import KANJI_THEMES
 from domain.vocab_themes import VOCAB_THEMES
 
-# Fraction of a block's cards that must have repetitions >= 1 before the
-# following block becomes available.
+# Fraction of a block's cards that must count as passed (answered correctly at least once; see
+# compute_block_mastery) before the following block becomes available.
 UNLOCK_THRESHOLD = 0.8
 
 # Lower threshold used for thematic category blocks (vocab/kanji/grammar
