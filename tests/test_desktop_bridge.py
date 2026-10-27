@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import io
+import re
 import sqlite3
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
@@ -1498,6 +1499,51 @@ def test_build_deck_cards_sentence_examples_falls_back_when_csv_unavailable(tmp_
     assert cards[0]["meaning"] == "fallback"
 
 
+# The renderer keeps only the first SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT sentences
+# (deckUtils.ts), so the bridge ships only those. The capped payload must equal
+# the head of the uncapped one: same cards, order and distractors (audit 2, F8).
+def test_build_deck_cards_sentence_examples_ships_only_what_the_renderer_keeps(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    limit = desktop_bridge.SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT
+    total = limit + 25
+    csv_path = tmp_path / "sentence_examples.csv"
+    csv_path.write_text(
+        "character,romaji,meaning\n"
+        + "".join(f"文{index}。,bun {index}.,Sentence {index}.\n" for index in range(total)),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(desktop_bridge, "SENTENCE_EXAMPLES_CSV_CANDIDATES", (csv_path,))
+    monkeypatch.setattr(desktop_bridge, "_SENTENCE_EXAMPLES_ROWS_CACHE", None)
+
+    capped = cast(list[dict[str, object]], desktop_bridge.build_deck_cards("sentence_examples")["cards"])
+    monkeypatch.setattr(desktop_bridge, "SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT", total * 2)
+    uncapped = cast(list[dict[str, object]], desktop_bridge.build_deck_cards("sentence_examples")["cards"])
+
+    assert len(uncapped) == total
+    assert capped == uncapped[:limit]
+    # The last kept card's distractors reach past the cap, exactly as before.
+    assert capped[-1]["meaning_distractor_ids"] == uncapped[limit - 1]["meaning_distractor_ids"]
+
+
+def test_sentence_examples_cap_matches_the_renderer_limit() -> None:
+    deck_utils = (
+        Path(__file__).resolve().parents[1] / "electron-frontend" / "src" / "lib" / "deckUtils.ts"
+    ).read_text(encoding="utf-8")
+    match = re.search(r"SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT\s*=\s*(\d+)", deck_utils)
+    assert match, "deckUtils.ts no longer declares SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT"
+    assert int(match.group(1)) == desktop_bridge.SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT
+
+
+def test_build_deck_cards_leaves_other_large_decks_uncapped(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    deck = ALL_DECKS["vocab_n3"]()
+    assert len(deck.cards) > desktop_bridge.SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT
+    payload = desktop_bridge.build_deck_cards("vocab_n3")
+    assert len(cast(list[object], payload["cards"])) == len(deck.cards)
+
+
 def test_build_block_progress_includes_new_phase_one_decks(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
@@ -2178,6 +2224,47 @@ def test_build_summary_resolves_legacy_vocab_prompt_text(tmp_path: Path, monkeyp
     assert item_history, "Expected at least one timeline item"
     assert item_history[0]["card_id"] == 496
     assert item_history[0]["prompt"] != "Vocabulary N5 item #496"
+
+
+# Card ids collide across deck families: hiragana card 0 and a retired topic
+# deck's card 0 are different words. A history row whose deck no longer
+# resolves must not borrow another deck's character (audit 2, F10).
+def _hiragana_card_zero_character() -> str:
+    return next(card.character for card in ALL_DECKS["hiragana"]().cards if card.id == 0)
+
+
+def test_build_summary_history_prefers_the_stored_prompt(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+    database.log_review("Retired Topic Deck", 0, 4, script_tag="vocab_n5", prompt_text="猫")
+
+    summary = cast(dict[str, Any], desktop_bridge.build_summary())
+    item = cast(list[dict[str, Any]], summary["item_history"])[0]
+    assert item["card_id"] == 0
+    assert item["prompt"] == "猫"
+    assert item["prompt"] != _hiragana_card_zero_character()
+
+
+def test_build_summary_history_without_a_stored_prompt_skips_other_decks(tmp_path: Path, monkeypatch) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+    database.log_review("Retired Topic Deck", 0, 4, script_tag="vocab_n5", prompt_text="")
+
+    summary = cast(dict[str, Any], desktop_bridge.build_summary())
+    item = cast(list[dict[str, Any]], summary["item_history"])[0]
+    assert item["prompt"] == "Retired Topic Deck item #0"
+
+
+def test_build_summary_history_still_resolves_a_known_deck_without_a_stored_prompt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _use_temp_db(tmp_path, monkeypatch)
+    database.init_db()
+    database.log_review("Hiragana", 0, 4, script_tag="hiragana", prompt_text="")
+
+    summary = cast(dict[str, Any], desktop_bridge.build_summary())
+    item = cast(list[dict[str, Any]], summary["item_history"])[0]
+    assert item["prompt"] == _hiragana_card_zero_character()
 
 
 def test_build_summary_contract_shape(tmp_path: Path, monkeypatch) -> None:

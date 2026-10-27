@@ -70,39 +70,57 @@ class TestSectionResolution:
 
 
 class TestDeckScoping:
-    # Vocabulary is still measured over its category decks: the level decks are
-    # registered but receive no reviews under that routing, which pinned
-    # `mastered_ratio` at 0 and `new_count` at the deck size forever.
-    def test_the_vocabulary_section_excludes_its_level_decks(self) -> None:
-        slugs = desktop_bridge._section_deck_slugs("vocab_n5")
-        for level in range(1, 6):
-            assert f"vocab_n{level}" not in slugs
+    # Both tracks are measured over the level decks, because sessions study the
+    # level slug (`vocab_${level}`, `kanji_${level}`) and that is where reviews
+    # land. Vocabulary used to be measured over its 28 topic views, which cover
+    # 545 of the 8,051 level cards (audit 2, F2).
+    @pytest.mark.parametrize("track", ["vocab", "kanji"])
+    def test_the_section_is_measured_over_the_decks_reviews_land_in(self, track: str) -> None:
+        slugs = desktop_bridge._section_deck_slugs(f"{track}_n5")
+        assert slugs == [f"{track}_n{level}" for level in range(1, 6)]
 
-    # Kanji is the opposite, and deliberately so. Its categories became block
-    # definitions that allocate no ids, and `useStudySession` records every
-    # review against `activeDeckSlug` — `kanji_n5`..`kanji_n1`. The level decks
-    # are exactly where kanji reviews land, so that is what the section measures.
-    def test_the_kanji_section_is_measured_over_the_decks_reviews_land_in(self) -> None:
-        slugs = desktop_bridge._section_deck_slugs("kanji_n5")
-        assert slugs == ["kanji_n1", "kanji_n2", "kanji_n3", "kanji_n4", "kanji_n5"]
+    @pytest.mark.parametrize("track", ["vocab", "kanji"])
+    def test_the_n5_scope_is_just_the_n5_deck(self, track: str) -> None:
+        assert desktop_bridge._section_deck_slugs(f"{track}_n5", n5_only=True) == [f"{track}_n5"]
 
-    def test_the_kanji_n5_scope_is_just_the_n5_deck(self) -> None:
-        assert desktop_bridge._section_deck_slugs("kanji_n5", n5_only=True) == ["kanji_n5"]
+    def test_the_vocabulary_section_excludes_topic_views(self) -> None:
+        slugs = set(desktop_bridge._section_deck_slugs("vocab_n5"))
+        for slug in ("vocab_greetings", "vocab_verbs", "vocab_numbers"):
+            assert slug in ALL_DECKS
+            assert slug not in slugs
 
-    # `vocab_numbers` and `vocab_nouns` begin `vocab_n` without being levelled,
-    # so an N5 scope that matched a bare prefix would silently drop them.
-    def test_the_n5_scope_keeps_categories_whose_name_merely_starts_with_n(self) -> None:
-        n5 = desktop_bridge._section_deck_slugs("vocab_n5", n5_only=True)
-        for slug in ("vocab_numbers", "vocab_nouns"):
-            if slug in ALL_DECKS:
-                assert slug in n5
+    def test_vocabulary_metrics_count_every_level_card(self, bridge_db) -> None:
+        total = sum(len(ALL_DECKS[f"vocab_n{level}"]().cards) for level in range(1, 6))
+        metrics = desktop_bridge._build_category_metrics_for_node("vocabulary_n5")
+        assert metrics.total_items == total
+        n5 = desktop_bridge._build_category_metrics_for_node("vocabulary_n5", n5_only=True)
+        assert n5.total_items == len(ALL_DECKS["vocab_n5"]().cards)
+
+    # A review on a level card outside every topic view never counted before.
+    def test_a_level_card_outside_every_topic_view_counts_as_studied(self, bridge_db) -> None:
+        topic_ids = {
+            card.id
+            for slug in ALL_DECKS
+            if slug.startswith("vocab_") and slug not in {f"vocab_n{level}" for level in range(1, 6)}
+            for card in ALL_DECKS[slug]().cards
+        }
+        deck = ALL_DECKS["vocab_n3"]()
+        card = next(card for card in deck.cards if card.id not in topic_ids)
+        before = desktop_bridge._build_category_metrics_for_node("vocabulary_n5")
+        database.save_state(
+            deck.name,
+            ReviewState(card_id=card.id, repetitions=2, interval=6, ease_factor=2.5,
+                        next_review=date.today()),
+        )
+        after = desktop_bridge._build_category_metrics_for_node("vocabulary_n5")
+        assert after.new_count == before.new_count - 1
+        assert after.due_count == before.due_count + 1
 
     @pytest.mark.parametrize("section", ["vocab_n5", "kanji_n5"])
     def test_the_n5_scope_is_a_strict_subset_of_the_whole_track(self, section: str) -> None:
         whole = set(desktop_bridge._section_deck_slugs(section))
         n5 = set(desktop_bridge._section_deck_slugs(section, n5_only=True))
         assert n5 < whole
-        assert not any("_n1_" in slug or "_n4_" in slug for slug in n5)
 
 
 class TestColdStart:

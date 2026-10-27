@@ -1273,6 +1273,11 @@ def _parse_daily_games_crossword_clues_json(raw: str) -> tuple[DailyCrosswordClu
 
 HEAVY_DECK_ENRICHMENT_CARD_THRESHOLD = 800
 
+# Mirrors SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT in electron-frontend/src/lib/deckUtils.ts:
+# the renderer keeps only the first 1,200 sentences, so `deck-cards` builds and
+# ships only those instead of all 60,000 (audit 2, F8).
+SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT = 1200
+
 
 def _lightweight_distractor_ids(
     card_ids: list[int],
@@ -1350,7 +1355,6 @@ def build_summary() -> dict[str, object]:
 def _build_summary() -> dict[str, object]:
     decks: list[DeckSummary] = []
     prompt_lookup: dict[tuple[str, int], str] = {}
-    prompt_lookup_by_id: dict[int, str] = {}
     legacy_prompt_lookup = _build_legacy_prompt_lookup()
     streak = load_streak_state()
     activity_week = load_activity_summary(7)
@@ -1391,7 +1395,6 @@ def _build_summary() -> dict[str, object]:
             prompt_text = card.character
             prompt_lookup[(deck_key, card.id)] = prompt_text
             prompt_lookup[(slug_key, card.id)] = prompt_text
-            prompt_lookup_by_id[card.id] = prompt_text
         decks.append(
             DeckSummary(
                 slug=slug,
@@ -1422,11 +1425,13 @@ def _build_summary() -> dict[str, object]:
         "item_history": [
             {
                 **asdict(item),
+                # The stored prompt is what the learner answered; deck lookups
+                # only cover rows saved before prompts were stored. No bare-id
+                # fallback: ids collide across deck families (audit 2, F10).
                 "prompt": (
-                    prompt_lookup.get((_normalize_deck_key(item.deck), item.card_id))
+                    item.prompt
+                    or prompt_lookup.get((_normalize_deck_key(item.deck), item.card_id))
                     or legacy_prompt_lookup.get((_normalize_deck_key(item.deck), item.card_id))
-                    or prompt_lookup_by_id.get(item.card_id)
-                    or item.prompt
                     or _legacy_prompt_label(item.deck, item.card_id)
                 ),
             }
@@ -1450,7 +1455,14 @@ def build_deck_cards(slug: str) -> dict[str, object]:
     deck = factory()
     active_leech_ids = load_active_leech_card_ids(deck.name)
     card_ids = [card.id for card in deck.cards]
-    curriculum_stages = load_curriculum_stages(deck.name, "context_cloze", card_ids)
+    # Distractors still come from the whole deck, so a capped card keeps the
+    # same distractor ids it had before the cap.
+    shipped_cards = (
+        deck.cards[:SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT] if slug == "sentence_examples" else deck.cards
+    )
+    curriculum_stages = load_curriculum_stages(
+        deck.name, "context_cloze", [card.id for card in shipped_cards]
+    )
     use_lightweight_enrichment = (
         slug == "sentence_examples" or len(deck.cards) > HEAVY_DECK_ENRICHMENT_CARD_THRESHOLD
     )
@@ -1491,7 +1503,7 @@ def build_deck_cards(slug: str) -> dict[str, object]:
                     else rank_distractor_ids(deck.cards, card, mode="character")[:8]
                 ),
             )
-            for card in deck.cards
+            for card in shipped_cards
         ]
 
     return {
@@ -1772,24 +1784,21 @@ _NODE_TO_SECTION: dict[str, str] = {
 
 # Which decks a section is measured over.
 #
-# The kanji and vocabulary sections span many decks, and *which* many matters.
-# `ALL_DECKS` holds two parallel corpora per track: the five JLPT level decks
-# (`vocab_n5`..`vocab_n1`) and the thematic category decks from issue #68
-# (`vocab_greetings`, `vocab_n4_school_work`, ...).  Only the category decks are
-# ever studied — `resultSlug` in useStudySession.ts routes every review through
-# the category maps — so a level deck can never accumulate a review.
+# The kanji and vocabulary sections each span the five JLPT level decks
+# (`kanji_n5`..`kanji_n1`, `vocab_n5`..`vocab_n1`), because that is where their
+# reviews land: sessions study the level slug (`vocab_${level}` in App.tsx), and
+# since #78 and 737eaf8 vocabulary levels are served through the word feed.
 #
-# This used to load the single level deck `vocab_n5` / `kanji_n5`, which meant
-# the recommender measured 744 vocabulary cards that are structurally incapable
-# of being reviewed: `mastered_ratio` was pinned at 0 and `new_count` at the
-# full deck size forever, so `_rule_new_content_ready` fired for vocabulary and
-# kanji no matter how much the learner had actually studied.  The renderer's
-# coverage bars meanwhile aggregated the category decks, so the two halves of
-# the app disagreed about the same section.  Matching the renderer is what makes
-# one engine possible.
-_LEVEL_DECK_SLUGS = frozenset(
-    f"{track}_n{level}" for track in ("vocab", "kanji") for level in range(1, 6)
-)
+# Vocabulary was once measured over the 28 thematic topic views from issue #68
+# (`vocab_greetings`, `vocab_n4_school_work`, ...), back when sessions studied
+# those.  The views are slices of the level decks, sharing their names and ids,
+# but cover only 545 of the 8,051 level cards, so Up next ignored most of what
+# the learner studied (audit 2, F2).  Topic views are still registered for the
+# renderer's topic progress rows; they are not measured here.
+_LEVEL_DECK_SLUGS: dict[str, tuple[str, ...]] = {
+    track: tuple(f"{track}_n{level}" for level in range(1, 6))
+    for track in ("vocab", "kanji")
+}
 
 
 def _section_deck_slugs(section: str, *, n5_only: bool = False) -> list[str]:
@@ -1800,35 +1809,15 @@ def _section_deck_slugs(section: str, *, n5_only: bool = False) -> list[str]:
     reads as well under the floor against the whole N5-to-N1 track and would be
     stranded on recognition drills.
 
-    Vocabulary is measured over its thematic category decks, narrowed by *n5_only*
-    to the ones carrying no level infix (`vocab_greetings`, not
-    `vocab_n4_home_living`).  Kanji has no category decks — its themes became
-    block definitions in :mod:`domain.kanji_themes` and allocate no ids — so it is
-    measured over its five level decks instead.
+    Kanji and vocabulary are measured over their five level decks, or just the
+    N5 deck with *n5_only*.
     """
     if section not in ("kanji_n5", "vocab_n5"):
         return [section] if section in ALL_DECKS else []
 
-    if section == "kanji_n5":
-        levels = ("kanji_n5",) if n5_only else tuple(sorted(
-            slug for slug in ALL_DECKS if slug.startswith("kanji_") and slug in _LEVEL_DECK_SLUGS
-        ))
-        return [slug for slug in levels if slug in ALL_DECKS]
-
-    prefix = "vocab_"
-    slugs = []
-    for slug in ALL_DECKS:
-        if not slug.startswith(prefix) or slug in _LEVEL_DECK_SLUGS:
-            continue
-        if n5_only:
-            # `vocab_numbers` and `vocab_nouns` begin `vocab_n` without being
-            # levelled, so the check is on a level *segment*, not a bare prefix.
-            rest = slug[len(prefix):]
-            head = rest.split("_", 1)[0]
-            if len(head) == 2 and head[0] == "n" and head[1].isdigit():
-                continue
-        slugs.append(slug)
-    return sorted(slugs)
+    track = section.split("_", 1)[0]
+    levels = (section,) if n5_only else _LEVEL_DECK_SLUGS[track]
+    return sorted(slug for slug in levels if slug in ALL_DECKS)
 
 _NOW_UTC = lambda: datetime.now(timezone.utc).isoformat()  # noqa: E731
 
@@ -2241,7 +2230,7 @@ def _build_category_metrics_for_node(node_id: str, *, n5_only: bool = False) -> 
 
     Sums across every deck the node's section is measured over — see
     `_section_deck_slugs`, which is where the kanji and vocabulary sections fan
-    out to their category decks.
+    out to their level decks.
     """
     section = _NODE_TO_SECTION.get(node_id)
     if section is None:
@@ -2395,7 +2384,7 @@ def build_recommendations_payload() -> dict[str, object]:
         if section is None:
             continue
         # The recall floor wants the N5-scoped figure for the kanji and
-        # vocabulary sections: their N5 categories are a minority of the whole
+        # vocabulary sections: their N5 decks are a minority of the whole
         # N5-to-N1 track, so the track figure would hold a learner who has
         # finished N5 on recognition drills indefinitely.  A missing N5 scope
         # falls back to the wider figure rather than to zero, so an incomplete
