@@ -56,3 +56,39 @@ or seed comes near 30 s.
 
 **Trigger:** any of those four commands takes over 10 s on a warm worker, or a learner reports an
 import that "failed" but changed their progress.
+
+## 4. Decks are rebuilt on every call
+
+**Recorded 2026-10-27.** No `ALL_DECKS` builder is cached (`domain/decks.py:286-355, 923-927,
+1602-1626`); topic views rebuild their parent. All 43 decks take 254.6 ms to build, and an
+empty-database `_build_summary()` takes about 520 ms warm, about half of it building decks (audit 2,
+Check 5). Recommendations rebuild the 28 views again (`scripts/desktop_bridge.py:2263-2286`). Not
+fixed now: within budget once the sentence payload is capped (audit 2, F8). A per-process cache
+needs no invalidation within a run, since the sources are static module data and process-cached CSV
+rows; callers must not mutate the cached cards.
+
+**Trigger:** a warm `summary` passes 1 s, or the first summary misses its 2,500 ms budget in startup
+telemetry on two launches running.
+
+## 5. The list generator positions rows after silently dropping at least 180 cross-level repeats
+
+**Recorded 2026-10-27.** `scripts/import_external_lists.py:138-157` (keep-first, the only policy that
+regenerates; the default `error` fails on about 180 conflicts) drops every later-level row whose
+spelling and reading an earlier list carries, and the header reports 0
+(`domain/external_deck_data.py:5`). Ids are positional, so editing an earlier list can make a later
+row appear or vanish mid-list and move every later id. Nothing compares a regeneration with the
+committed module. Not fixed now: the committed module is reproduced exactly (audit 2, Check 1), and
+no list edit is planned.
+
+**Trigger:** any edit to a `data/external_sources/words_n*.csv` or `kanji_n*.csv`, or any change to
+`data/text_normalization.py` that the generator uses.
+
+## 6. The topic-to-level migration skips the slug-keyed mastery store
+
+**Recorded 2026-10-27.** `data/category_identity_migration.py:83` treats `card_mastery_scores` as
+keyed by deck name; production keys it by slug (`data/mastery_repository.py:92-107`), and
+`tests/test_category_identity_migration.py:183-200` seeds the name shape. Not fixed now: the live
+database holds no topic-slug mastery rows (audit 2, Check 11).
+
+**Trigger:** a new identity migration is written using this file as its template, or a
+`card_mastery_scores` row appears under a topic-deck slug.
