@@ -1565,8 +1565,8 @@ _KANJI_LEVEL_SLUGS: tuple[str, ...] = (
 def _known_kanji() -> set[str]:
     """Every kanji the learner has answered at least once, across all five levels.
 
-    ``repetitions >= 1`` is the same test block unlocking uses, deliberately. If a kanji
-    counts toward opening the next block it counts toward reading a word — one definition
+    The pass test is the one block unlocking uses (``_block_pass_inputs``), deliberately. If a
+    kanji counts toward opening the next block it counts toward reading a word — one definition
     of "met", so the two halves of the curriculum cannot disagree about what the learner
     knows.
     """
@@ -1576,10 +1576,9 @@ def _known_kanji() -> set[str]:
         if factory is None:
             continue
         deck = factory()
-        card_ids = [card.id for card in deck.cards]
-        states = load_review_states(deck.name, card_ids)
+        passed, _studied = _block_pass_inputs(deck.name, [card.id for card in deck.cards])
         for card in deck.cards:
-            if getattr(states.get(card.id), "repetitions", 0) >= 1:
+            if passed.get(card.id, 0) >= 1:
                 known.add(card.character)
     return known
 
@@ -1660,16 +1659,7 @@ def build_block_progress(slug: str) -> dict[str, object]:
 
     deck = factory()
     card_ids = [card.id for card in deck.cards]
-    states = load_review_states(deck.name, card_ids)
-    # A card counts toward its block once it has been answered correctly, even if missed since
-    # (audit 3, F3, Robbie's "Correct once counts"). The current run still counts too, for rows
-    # with no log behind them: pre-FSRS history and onboarding's seeded schedules.
-    ever_correct = load_correct_card_ids(deck.name)
-    repetitions_map: dict[int, int] = {
-        cid: max(getattr(states.get(cid), "repetitions", 0), 1 if cid in ever_correct else 0)
-        for cid in card_ids
-    }
-    studied = {cid for cid in card_ids if cid in states and has_been_reviewed(states[cid])}
+    repetitions_map, studied = _block_pass_inputs(deck.name, card_ids)
 
     unlocked_count = compute_unlocked_count(blocks, repetitions_map, threshold, studied)
     char_map: dict[int, str] = {card.id: card.character for card in deck.cards}
@@ -1696,6 +1686,24 @@ def build_block_progress(slug: str) -> dict[str, object]:
     return {"slug": slug, "blocks": result, "unlock_threshold": threshold}
 
 
+def _block_pass_inputs(deck_name: str, card_ids: list[int]) -> tuple[dict[int, int], set[int]]:
+    """Return the pass map and the studied set block unlocking reads, for *card_ids*.
+
+    A card counts toward its block once it has been answered correctly, even if missed since
+    (audit 3, F3, Robbie's "Correct once counts"). The current run still counts too, for rows with
+    no log behind them: pre-FSRS history and onboarding's seeded schedules. *studied* is every card
+    reviewed at all, which keeps a block the learner has worked in from closing again.
+    """
+    states = load_review_states(deck_name, card_ids)
+    ever_correct = load_correct_card_ids(deck_name)
+    repetitions_map: dict[int, int] = {
+        cid: max(getattr(states.get(cid), "repetitions", 0), 1 if cid in ever_correct else 0)
+        for cid in card_ids
+    }
+    studied = {cid for cid in card_ids if cid in states and has_been_reviewed(states[cid])}
+    return repetitions_map, studied
+
+
 def _overview_vocab_level_blocks(slug: str) -> list[dict[str, object]]:
     """Return one vocabulary level's themes as overview rows.
 
@@ -1707,11 +1715,8 @@ def _overview_vocab_level_blocks(slug: str) -> list[dict[str, object]]:
     deck = ALL_DECKS[slug]()
     by_id = {card.id: card for card in deck.cards}
     card_ids = list(by_id)
-    states = load_review_states(deck.name, card_ids)
-    repetitions_map: dict[int, int] = {
-        cid: getattr(states.get(cid), "repetitions", 0) for cid in card_ids
-    }
-    unlocked_count = compute_unlocked_count(themes, repetitions_map, unlock_threshold_for_slug(slug))
+    repetitions_map, studied = _block_pass_inputs(deck.name, card_ids)
+    unlocked_count = compute_unlocked_count(themes, repetitions_map, unlock_threshold_for_slug(slug), studied)
     rows: list[dict[str, object]] = []
     for theme in themes:
         cards = [by_id[cid] for cid in theme.card_ids if cid in by_id]

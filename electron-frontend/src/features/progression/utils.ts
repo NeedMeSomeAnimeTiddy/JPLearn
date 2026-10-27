@@ -56,10 +56,14 @@ export function toNodeViews(
 /**
  * The node the learner is furthest along in — where the map should draw focus.
  *
- * The first node that is open but not yet mastered; failing that, the last
- * mastered one, so a finished course still highlights something.
+ * The first open node the app measures that is not yet mastered: a step it cannot
+ * measure never finishes, so it would hold the focus for good (audit 3, F7). Then
+ * the first open node of any kind, then the last mastered one, so a finished
+ * course still highlights something.
  */
 export function currentNode(views: ProgressionNodeView[]): ProgressionNodeView | null {
+  const measured = views.find((view) => view.isOpen && view.is_tracked && view.status !== 'mastered')
+  if (measured) return measured
   const inProgress = views.find((view) => view.isOpen && view.status !== 'mastered')
   if (inProgress) return inProgress
   const mastered = views.filter((view) => view.status === 'mastered')
