@@ -268,19 +268,35 @@ Still the most important thing to know before designing anything progress-relate
 the shape changed with issue #66. Mastery now lives in SQLite only:
 
 ```
-review_states       ──► bridge `summary`     ──► deck stats (total/mastered/due)
-card_mastery_scores ──► `card-scores` cmd    ──► JLPT progress, category unlocks,
+review_states       ──► bridge `summary`     ──► deck stats (total/mastered/due), `totals`
+card_mastery_scores ──► `card-scores` cmd    ──► progress bars, round furigana and flag,
   (deck_slug, card_id)  `record-result` reply     study plan, per-card mastery bars
+                    ──► `level-progress` cmd ──► Kanji and Vocabulary level bars
 ```
+
+The summary also carries a `totals` object (`SummaryTotals` in `scripts/desktop_bridge.py`).
+It counts each card the app serves once: topic views, which share their level deck's
+cards, and the hidden Conjugation Training deck are left out, and the sentence deck counts
+at its served size. It holds `total`, `mastered`, `due_today` (today's whole workload),
+`completed_today`, `remaining_due` (only what is still due now) and `deck_count`. The menu
+ledger and REVIEW lane (`features/menu/ledger.ts`, `lanes.ts`) and the tray tooltip and
+due-review notification (`electron/summary_counts.cjs`) read `totals` instead of adding up
+`decks` (audit 3, F2/F4).
 
 There are **three distinct definitions** of "mastered", and they are not
 interchangeable — each answers its own question:
 
 | Notion | Rule | Used for |
 |---|---|---|
-| Counter | `card_mastery_scores.score >= 4` (`domain/mastery.py`) | progress bars, JLPT %, category unlocks |
+| Counter | `card_mastery_scores.score >= 4` (`domain/mastery.py`) | progress bars; the Kanji and Vocabulary level bars (`level-progress` command, `features/level-progress`); round furigana and the "mastered" round flag |
 | FSRS mastered | `repetitions >= 3 AND interval >= 21` | deck stats, `summary` |
-| Block passed | `repetitions >= 1` (`domain/blocks.py`) | block unlock gating |
+| Block passed | answered correctly at least once, or still in a run of correct answers (`_block_pass_inputs`, `domain/blocks.py`) | block unlock gating |
+
+The counter does not gate anything: `buildCategoryProgress` only picks a fallback topic.
+The level bars show each level deck's summed counters over four times its size; the bridge
+sums them (`build_level_progress`) so the renderer does not fetch every level's cards. Onboarding
+writes the counters in the bridge, in the same transaction that seeds the schedules
+(`apply_expertise_level`, audit 3 F1); the renderer re-reads them.
 
 The counter is deliberately **not derived** from FSRS state. Measured against
 `domain/scheduler.py`: `repetitions` counts distinct successful *days*, so it stays
@@ -466,14 +482,27 @@ level decks which top out at 42698. Since #78 those ids are internal to the sour
 builders — nothing studies them, and no `review_states` row should be written against
 one again.
 
-**Unlock is sequential across the whole ordered list.** `buildCategoryProgress`
-(`src/lib/progressAggregation.ts`) walks `VOCAB_CATEGORY_ORDER` (`constants.tsx`; there is
-no kanji equivalent) in order and stops unlocking at the first category below `CATEGORY_UNLOCK_THRESHOLD`
-(0.7). Both families work this way, but the vocabulary chain is **longer**: N4 kanji
-opens after 5 N5 categories, N4 vocabulary after 12 (145 cards at ~2.8 average score,
-given `CARD_MASTERY_MAX` 4). That is the existing design applied to a longer list, not
-a decision made in #68 — worth revisiting if the N4–N1 vocabulary categories turn out
-to be effectively out of reach in practice.
+**Unlocking happens in the bridge, and no renderer chain applies.** An earlier revision
+described a sequential category-unlock chain in `buildCategoryProgress`; nothing applies it
+(that function only picks a fallback topic) and the kanji topics are retired. Blocks unlock
+from `build_block_progress`, which reads `_block_pass_inputs` in `scripts/desktop_bridge.py`:
+
+- A card counts toward its block once it has ever been answered correctly (Robbie, audit 3:
+  "Correct once counts"), or while it is in a current run of correct answers. The second
+  case covers rows with no log behind them, such as onboarding's seeded schedules.
+- A block with any studied card stays reachable (`compute_unlocked_count`, `domain/blocks.py`),
+  right or wrong, so a miss cannot re-lock it.
+- Vocabulary levels are fed, not blocked: they are not chunked into study blocks, and the
+  Mastery screen lists each level by its themes (`_overview_vocab_level_blocks`).
+
+The same pass rule decides which kanji count as known (`_known_kanji`).
+
+**Unmeasured progression steps do not block the path.** `MEASURED_NODE_IDS`
+(`domain/progression_curriculum.py`) names the six nodes the app can measure: the tutorial
+and the five deck-backed ones. The rest (`UNMEASURED_NODE_IDS`) can never be mastered, so
+`gate_status` asks only that they be reached before whatever waits on them opens. Kanji N5,
+the reading step and the JLPT steps therefore open, and the menu's STUDY row and the path's
+focus skip unmeasured steps.
 
 Mastery for every one of these decks lands in the `cardScores.vocab_n5` /
 `cardScores.kanji_n5` bucket. That used to be correct only because the id ranges were
@@ -594,8 +623,10 @@ None of the following duplicate them.
 2. **Unblock the bridge worker** (B1/B2) — every known-slow command is now off the shared
    worker (OCR via its own persistent runtime, #74; `fsrs-optimize` one-shot). What remains
    is B2: stop rejecting unrelated pending requests on timeout.
-3. **Unify mastery on SQLite** (A2/A4) — make `cardScores` a cache derived from
-   `review_states` rather than a parallel truth. Blocks clean multi-profile (#51) too.
+3. ~~**Unify mastery on SQLite** (A2/A4) — make `cardScores` a cache derived from
+   `review_states` rather than a parallel truth. Blocks clean multi-profile (#51) too.~~
+   Superseded: the counter lives in `card_mastery_scores` and is deliberately not derived
+   from `review_states` (§4, A2).
 4. ~~**Lift `_VOCAB_LEVEL_LIMITS`** (C1)~~ done (#67) — level decks now expose the full
    imported corpus; `_VOCAB_ID_CAPACITY` documents the real constraint (card-id slots).
 
