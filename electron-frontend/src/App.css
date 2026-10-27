@@ -2289,14 +2289,6 @@ kbd {
   padding: 12px 0;
 }
 
-.queue-preview-more {
-  font-size: 0.68rem;
-  color: var(--text-soft);
-  margin: 8px 0 0;
-  text-align: center;
-  letter-spacing: 0.03em;
-}
-
 /* ── Pomodoro Timer ──────────────────────────────────────────────────────────── */
 
 .pomodoro-timer {

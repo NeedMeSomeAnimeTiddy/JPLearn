@@ -413,7 +413,5 @@ export interface PersistedSession {
   leechFocusEnabled: boolean
   confidenceCaptureEnabled: boolean
   sessionTargetItems: number
-  seenCardIds: number[]
-  sessionStartedAt: string
   restore: PersistedSessionRestore
 }

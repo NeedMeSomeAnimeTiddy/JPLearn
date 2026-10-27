@@ -117,7 +117,6 @@ function sessionValue(overrides: Partial<SessionContextValue> = {}): SessionCont
     activeSessionLengthPreset: null,
 
     upcomingCards: [],
-    queueBucketCounts: null,
 
     voiceBusy: false,
     voiceUnavailable: false,

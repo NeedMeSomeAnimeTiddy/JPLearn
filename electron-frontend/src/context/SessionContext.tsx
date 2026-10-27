@@ -89,12 +89,6 @@ export interface SessionContextValue {
 
   // Queue preview
   upcomingCards: GameCard[]
-  queueBucketCounts: {
-    due: number
-    leech: number
-    new: number
-    review: number
-  } | null
 
   // Audio
   voiceBusy: boolean

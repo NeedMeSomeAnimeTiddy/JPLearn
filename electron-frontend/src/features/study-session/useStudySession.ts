@@ -211,7 +211,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   /** the cards `roundCycleRef`'s indices point into: the leech, retry or mode pool, not always the block */
   const roundCyclePoolRef = useRef<ScriptDeck['cards']>([])
   const roundCursorRef = useRef<number>(0)
-  const queueBucketCountsRef = useRef<{ due: number; leech: number; new: number; review: number } | null>(null)
   /** set by a missed-word review, whose end has no run report and no save to clear */
   const explicitReviewRunRef = useRef(false)
   const interleaveCursorRef = useRef<number>(0)
@@ -317,15 +316,8 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       roundCycleRef.current = queue
         ? buildQueueCycle(queue, sourceCards)
         : shuffleArray([...Array(sourceCards.length).keys()])
-      queueBucketCountsRef.current = queue?.queue ? {
-        due: queue.queue.buckets_due,
-        leech: queue.queue.buckets_leech,
-        new: queue.queue.buckets_new,
-        review: queue.queue.buckets_review,
-      } : null
     } catch {
       roundCycleRef.current = shuffleArray([...Array(sourceCards.length).keys()])
-      queueBucketCountsRef.current = null
     }
     roundCyclePoolRef.current = sourceCards
     roundCursorRef.current = 0
@@ -1601,7 +1593,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     roundConfidenceScore,
     activeSessionLengthPreset,
     upcomingCards,
-    queueBucketCounts: queueBucketCountsRef.current,
     answerInputRef,
     startSession: (game) => { void startSession(game) },
     submitAnswer,

@@ -11,7 +11,7 @@ import type { DeckSlugInput, JlptLevel, PersistedSession, ScriptKey } from '../.
  * `seenCardIds` and `sessionStartedAt` are no longer written: nothing read them (audit 4 nit 1).
  * Saves that still carry them load as before; the parser ignores fields it does not use.
  */
-export interface PersistedStudySession extends Omit<PersistedSession, 'seenCardIds' | 'sessionStartedAt'> {
+export interface PersistedStudySession extends PersistedSession {
   deckSlug: DeckSlugInput
 }
 
