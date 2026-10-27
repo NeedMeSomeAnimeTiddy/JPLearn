@@ -120,7 +120,7 @@ def test_export_progress_snapshot_includes_progress_and_custom_decks(tmp_path: P
 
     snapshot = export_progress_snapshot()
 
-    assert snapshot["format_version"] == 1
+    assert snapshot["format_version"] == 2
     assert snapshot["custom_decks"] == []
     progress = snapshot["progress"]
     assert len(progress["review_states"]) == 1

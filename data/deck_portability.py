@@ -13,9 +13,16 @@ from typing import Any
 
 from data import database
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
+from domain.block_mapping import parent_slug_for_category
 from domain.daily_games import DEFAULT_DAILY_POOL_LIMIT, MAX_MONTHLY_FREEZES
+from domain.decks import ALL_DECKS
+from domain.mastery import clamp_card_score
 
-FORMAT_VERSION = 1
+# Version 2 adds `progress.card_mastery_scores`, the 0-4 counters behind the progress bars, which
+# cannot be rebuilt from review history (audit 2, F5). A version-1 file is still read: it carries no
+# counters, so importing one leaves the stored counters as they are.
+FORMAT_VERSION = 2
+_READABLE_FORMAT_VERSIONS = frozenset({1, 2})
 
 _DAILY_GAME_TYPES = frozenset({"crossword", "word_search", "match_pairs", "typing_blitz"})
 _DAILY_GAME_MODES = frozenset({"daily", "practice"})
@@ -139,6 +146,33 @@ def _normalize_daily_games_section(snapshot: dict[str, Any]) -> dict[str, Any] |
     }
 
 
+def _normalize_mastery_scores(progress: dict[str, Any]) -> dict[tuple[str, int], int] | None:
+    """Return the snapshot's mastery counters keyed (deck slug, card id), or None if it has none.
+
+    A topic deck's slug is stored under its level deck's, as the bridge records answers since
+    audit 2 (F1), when the card is one of that topic's; a row naming a card the topic does not hold
+    keeps its own slug rather than landing on an unrelated level-deck card. Two rows that land on
+    one card keep the higher counter.
+    """
+    if "card_mastery_scores" not in progress:
+        return None
+    topic_card_ids: dict[str, frozenset[int]] = {}
+    scores: dict[tuple[str, int], int] = {}
+    for row in _normalize_row_list(progress, "card_mastery_scores"):
+        slug = _required_text(row.get("deck_slug"), "card_mastery_scores.deck_slug").strip()
+        card_id = _required_nonnegative_int(row.get("card_id"), "card_mastery_scores.card_id")
+        parent = parent_slug_for_category(slug)
+        if parent is not None and slug in ALL_DECKS:
+            if slug not in topic_card_ids:
+                topic_card_ids[slug] = frozenset(card.id for card in ALL_DECKS[slug]().cards)
+            if card_id in topic_card_ids[slug]:
+                slug = parent
+        score = clamp_card_score(_required_nonnegative_int(row.get("score"), "card_mastery_scores.score"))
+        key = (slug, card_id)
+        scores[key] = max(score, scores.get(key, 0))
+    return scores
+
+
 def _event_key(row: sqlite3.Row | dict[str, Any]) -> tuple[Any, ...]:
     return (
         str(row["deck"]),
@@ -168,6 +202,17 @@ def export_progress_snapshot() -> dict[str, Any]:
                 SELECT deck, card_id, ease_factor, interval, repetitions, next_review,
                        stability, difficulty, last_review
                 FROM review_states
+                ORDER BY deck ASC, card_id ASC
+                """
+            ).fetchall()
+        ]
+        # Keyed by deck slug, not deck name (data/mastery_repository.py).
+        card_mastery_scores = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT deck AS deck_slug, card_id, score
+                FROM card_mastery_scores
                 ORDER BY deck ASC, card_id ASC
                 """
             ).fetchall()
@@ -291,6 +336,7 @@ def export_progress_snapshot() -> dict[str, Any]:
         "format_version": FORMAT_VERSION,
         "exported_at_utc": exported_at_utc,
         "progress": {
+            "card_mastery_scores": card_mastery_scores,
             "review_states": review_states,
             "review_events": review_events,
             "curriculum_stages": curriculum_stages,
@@ -316,9 +362,10 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
     if conflict_mode not in {"merge", "overwrite"}:
         raise ValueError("conflict_mode must be 'merge' or 'overwrite'")
 
-    if int(snapshot.get("format_version", 0)) != FORMAT_VERSION:
+    if int(snapshot.get("format_version", 0)) not in _READABLE_FORMAT_VERSIONS:
         raise ValueError(
-            f"unsupported snapshot format_version {snapshot.get('format_version')}; expected {FORMAT_VERSION}"
+            f"unsupported snapshot format_version {snapshot.get('format_version')}; "
+            f"expected one of {sorted(_READABLE_FORMAT_VERSIONS)}"
         )
 
     progress = snapshot.get("progress")
@@ -330,6 +377,7 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
     curriculum_stages = _normalize_row_list(progress, "curriculum_stages")
     leech_items = _normalize_row_list(progress, "leech_items")
     session_goals = _normalize_row_list(progress, "session_goals")
+    mastery_scores = _normalize_mastery_scores(progress)
     custom_decks = _normalize_row_list(snapshot, "custom_decks")
     daily_games = _normalize_daily_games_section(snapshot)
 
@@ -344,6 +392,8 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
             conn.execute("DELETE FROM leech_items")
             conn.execute("DELETE FROM curriculum_stages")
             conn.execute("DELETE FROM session_goals")
+            if mastery_scores is not None:
+                conn.execute("DELETE FROM card_mastery_scores")
             if daily_games is not None:
                 conn.execute("DELETE FROM daily_game_attempt_word_outcomes")
                 conn.execute("DELETE FROM daily_game_attempts")
@@ -515,6 +565,16 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
             )
             imported_events = len(event_params)
 
+        if mastery_scores is not None:
+            conn.executemany(
+                """
+                INSERT INTO card_mastery_scores (deck, card_id, score)
+                VALUES (?, ?, ?)
+                ON CONFLICT(deck, card_id) DO UPDATE SET score=excluded.score
+                """,
+                [(deck_slug, card_id, score) for (deck_slug, card_id), score in mastery_scores.items()],
+            )
+
         if daily_games is not None:
             _import_daily_games(conn, daily_games, conflict_mode)
 
@@ -524,6 +584,7 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
         "curriculum_stages": len(curriculum_stages),
         "leech_items": len(leech_items),
         "session_goals": len(session_goals),
+        "card_mastery_scores": 0 if mastery_scores is None else len(mastery_scores),
         "custom_decks": len(custom_decks),
         "daily_games": 0 if daily_games is None else len(daily_games["attempts"]),
     }

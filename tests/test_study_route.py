@@ -103,6 +103,16 @@ class TestRecallFloor:
     def test_keeps_the_floor_below_the_target_for_every_track(self, section: str) -> None:
         assert 0 < recall_floor(section) < target_mastery(section)
 
+    # Audit 2 (F2) widened the vocabulary N5 scope from ~145 topic words to the
+    # 744-word vocab_n5 deck; recall drills should still open after ~50 words.
+    def test_vocabulary_recall_opens_after_about_fifty_mastered_n5_words(self) -> None:
+        from domain.decks import ALL_DECKS
+
+        words = len(ALL_DECKS["vocab_n5"]().cards)
+        assert 45 <= recall_floor("vocab_n5") * words <= 60
+        assert choose_route("vocab_n5", "building", 0, 50 / words, "balanced_review").minigame == "meaning_match"
+        assert choose_route("vocab_n5", "building", 0, 55 / words, "balanced_review").minigame == "typed_recall"
+
     @pytest.mark.parametrize("section", SECTIONS)
     def test_leaves_the_starter_routes_untouched(self, section: str) -> None:
         expected = "character_match" if section == "kanji_n5" else "meaning_match"

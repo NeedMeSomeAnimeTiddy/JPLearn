@@ -235,7 +235,8 @@ class TestGeneratedBlocks:
             "conjugation_training", "kanji_n5", "kanji_n4", "kanji_n3", "kanji_n2",
             "kanji_n1", "vocab_n5", "vocab_n4", "vocab_n3", "vocab_n2", "vocab_n1",
         )
-        assert sum(len(blocks_for_slug(s)) for s in every) == 186
+        # 186 before audit 2 F6 rebuilt grammar (6 -> 13 blocks) and sentences (8 -> 60).
+        assert sum(len(blocks_for_slug(s)) for s in every) == 245
 
     def test_category_decks_themselves_have_no_blocks(self) -> None:
         """A category is a block now, so it does not carry blocks of its own."""

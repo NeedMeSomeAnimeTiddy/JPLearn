@@ -99,6 +99,7 @@ import {
   buildRound as buildRoundImpl,
   buildRoundWithBridge as buildRoundWithBridgeImpl,
   buildConjugationPool,
+  deckSlugLevel,
   useStudySession,
 } from './features/study-session'
 import './App.css'
@@ -661,6 +662,17 @@ function App() {
   const activeScriptRef = useRef<ScriptKey>(activeScript)
   activeScriptRef.current = activeScript
 
+  /* Resume reopens the deck a saved session was on. When that is a different deck, `gameLoading`
+     goes up in the same breath, for the reason `launchDrill` gives: the effect that loads the deck
+     runs after the session's start effect, which would otherwise build a round from the old cards. */
+  const openStudyDeck = useCallback((script: ScriptKey, deckSlug: DeckSlugInput) => {
+    const level = deckSlugLevel(deckSlug)
+    if (level && script === 'kanji_n5') setActiveKanjiLevel(level)
+    if (level && script === 'vocab_n5') setActiveVocabLevel(level)
+    if (deckSlug !== activeDeckSlug) setGameLoading(true)
+    setActiveScript(script)
+  }, [activeDeckSlug])
+
   const session = useStudySession({
     view,
     activeScript,
@@ -675,6 +687,7 @@ function App() {
     setActiveGame,
     setGameError,
     setDeckCards,
+    openStudyDeck,
     setCardScores,
     setScriptStats,
     setMinigameStats,
@@ -2413,6 +2426,16 @@ function App() {
           .filter(([, v]) => v > 0)
           .map(([k, v]) => `${v} ${k}`)
         setBackupMessage(`Imported: ${parts.join(', ') || 'no changes'}`)
+        // A format-2 backup replaces the mastery counters (audit 2, F5). Show the stored ones now,
+        // even when empty, and so overwrite the localStorage copy that would otherwise be adopted
+        // back into the table at the next launch.
+        // The import has landed by now, so a failed re-read must not report it as failed.
+        try {
+          const payload = await window.jplearnDesktop.getCardScores?.()
+          if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
+        } catch {
+          // The next launch reads them.
+        }
       } else {
         setBackupMessage('Import failed.')
       }

@@ -16,7 +16,6 @@ import type {
   FeedbackTone,
   InterleaveWeights,
   MinigameKey,
-  PersistedSession,
   PersistedSessionRestore,
   PlayableMinigame,
   RoundState,
@@ -35,6 +34,8 @@ import {
   isHandwritingOutcomeCorrect,
 } from '../handwriting'
 import type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'
+import { parseResumableSession, resumableTargetItems } from './persistedSession'
+import type { PersistedStudySession } from './persistedSession'
 import { assessConjugationAnswer, assessTypedAnswer } from '../../lib/answerAssessment'
 import { buildConjugationPool } from './conjugationRound'
 import type { TypedAnswerState } from '../../lib/answerAssessment'
@@ -57,7 +58,7 @@ import {
   normalizeCurriculumStage,
 } from '../../lib/roundContent'
 import { CARD_MASTERY_MAX } from '../../constants'
-import { mergeStoredScores, toSectionScores } from '../../lib/cardScores'
+import { mergeStoredScores, sectionForDeckSlug, toSectionScores } from '../../lib/cardScores'
 import type { AnswerSavedEvent, PendingAnswersSnapshot } from '../../electron'
 import { answerCardKey, newAnswerIdentity } from '../pending-answers/answerIdentity'
 import { hasNewerPendingAnswer, useAnswerOutcomes } from '../pending-answers/useAnswerOutcomes'
@@ -148,13 +149,20 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [lastSessionSummary, setLastSessionSummary] = useState<SessionSummaryPayload | null>(null)
   const [sessionRunReport, setSessionRunReport] = useState<SessionRunReport | null>(null)
-  const [resumeRequest, setResumeRequest] = useState<{ script: ScriptKey; minigame: MinigameKey } | null>(null)
+  /** A start waiting for its deck; `deckSlug`, `targetItems` and `restore` are set only by a resume. */
+  const [resumeRequest, setResumeRequest] = useState<{
+    script: ScriptKey
+    minigame: MinigameKey
+    deckSlug?: DeckSlugInput
+    targetItems?: number
+    restore?: PersistedSessionRestore
+  } | null>(null)
   const [sessionStartPending, setSessionStartPending] = useState<boolean>(false)
   const [sessionSummaryLoading, setSessionSummaryLoading] = useState<boolean>(false)
   const [sessionGoalError, setSessionGoalError] = useState<string | null>(null)
   const [explicitReviewItems, setExplicitReviewItems] = useState<ExplicitReviewItem[] | null>(null)
   const [showResumeToast, setShowResumeToast] = useState<boolean>(false)
-  const [resumeData, setResumeData] = useState<PersistedSession | null>(null)
+  const [resumeData, setResumeData] = useState<PersistedStudySession | null>(null)
   const [livesEnabled, setLivesEnabled] = useState<boolean>(() => loadSessionPrefs()?.livesEnabled ?? false)
   const [livesRemaining, setLivesRemaining] = useState<number>(DEFAULT_LIVES)
   const [leechFocusEnabled, setLeechFocusEnabled] = useState<boolean>(() => loadSessionPrefs()?.leechFocusEnabled ?? false)
@@ -206,8 +214,13 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     try {
       const raw = localStorage.getItem(SESSION_STORAGE_KEY)
       if (!raw) return
-      const parsed: PersistedSession = JSON.parse(raw)
-      if (!parsed.activeScript || !parsed.activeGame || !Array.isArray(parsed.seenCardIds) || !parsed.restore) return
+      const parsed = parseResumableSession(raw)
+      if (!parsed) {
+        // A save that cannot be resumed (from before audit 2 F7, or damaged) is dropped rather
+        // than left to be reconsidered on every launch.
+        localStorage.removeItem(SESSION_STORAGE_KEY)
+        return
+      }
       const timer = setTimeout(() => {
         if (localStorage.getItem(SESSION_STORAGE_KEY) !== raw) return
         setResumeData(parsed)
@@ -819,13 +832,19 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   useEffect(() => {
     if (!resumeRequest) return
     if (activeScript !== resumeRequest.script) return
+    if (resumeRequest.deckSlug !== undefined && activeDeckSlug !== resumeRequest.deckSlug) return
     if (gameLoading || sessionStartPending) return
 
-    const { minigame } = resumeRequest
+    const { minigame, targetItems, restore } = resumeRequest
     setResumeRequest(null)
-    void startSession(minigame)
-  }, [activeScript, gameLoading, resumeRequest, sessionStartPending, startSession])
+    void startSession(minigame, undefined, targetItems, restore)
+  }, [activeScript, activeDeckSlug, gameLoading, resumeRequest, sessionStartPending, startSession])
 
+  /* RESUME IS AN ORDINARY START ON THE SAVED DECK. It reopens the level the session was on and
+     queues the same start the deck and feed screens make, so the round draws from the block
+     selection (or the whole fed level) through the study queue. The run's counters come back,
+     and since `sessionRounds` is restored the session ends after the saved length's remaining
+     rounds; the backend goal is asked for only those. */
   const handleResume = useCallback(async () => {
     if (!resumeData) return
     const data = resumeData
@@ -833,36 +852,29 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     setResumeData(null)
     clearPersistedSession()
 
-    setActiveScript(data.activeScript)
-    setActiveGame(data.activeGame)
+    const targetItems = resumableTargetItems(data.sessionTargetItems)
+    const minigame = resolveScriptMinigame(data.activeScript, data.activeGame)
+    collaboratorsRef.current.openStudyDeck(data.activeScript, data.deckSlug)
+    setActiveGame(minigame)
     setLivesEnabled(data.livesEnabled)
     setLeechFocusEnabled(data.leechFocusEnabled)
     setConfidenceCaptureEnabled(data.confidenceCaptureEnabled)
-
-    try {
-      const deckPayload = await window.jplearnDesktop.getDeckCards(data.activeScript)
-      const seenSet = new Set(data.seenCardIds)
-      const remainingCards = deckPayload.cards.filter((c) => !seenSet.has(c.id))
-      const targetItems = Math.max(1, remainingCards.length)
-      setSessionTargetItems(targetItems)
-
-      navigate('minigame', 'forward')
-
-      if (targetItems > 0) {
-        setTimeout(() => {
-          startSession(data.activeGame, remainingCards, targetItems, data.restore)
-        }, 100)
-      }
-    } catch {
-      navigate('minigame', 'forward')
-      startSession(data.activeGame)
-    }
+    setSessionTargetItems(targetItems)
+    resetSessionWithLives()
+    navigate('minigame', 'forward')
+    setResumeRequest({
+      script: data.activeScript,
+      minigame,
+      deckSlug: data.deckSlug,
+      targetItems: Math.max(1, targetItems - (Number.isFinite(data.restore.sessionRounds) ? data.restore.sessionRounds : 0)),
+      restore: data.restore,
+    })
   }, [
     resumeData,
-    startSession,
     clearPersistedSession,
+    resetSessionWithLives,
+    resolveScriptMinigame,
     setActiveGame,
-    setActiveScript,
     navigate,
   ])
 
@@ -973,6 +985,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     (answer: string, correctnessOverride?: boolean, handwritingOutcome?: HandwritingOutcome) => {
       if (!roundState || isRoundResolving) return
       if (answer.trim().length === 0) return
+      // The score belongs to the section of the deck the card came from, which a missed-word review
+      // can leave different from the active section (audit 2, F1).
+      const scoreSection = (roundState.deckSlug ? sectionForDeckSlug(roundState.deckSlug) : null) ?? activeScript
 
       setIsRoundResolving(true)
       const completedRoundsAfterAnswer = sessionRounds + 1
@@ -1098,11 +1113,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         // Update per-card score: correct → +1 (capped at CARD_MASTERY_MAX).
         const answeredCardId = roundState.cardId
         setCardScores((prev) => {
-          const current = prev[activeScript][answeredCardId] ?? 0
+          const current = prev[scoreSection][answeredCardId] ?? 0
           return {
             ...prev,
-            [activeScript]: {
-              ...prev[activeScript],
+            [scoreSection]: {
+              ...prev[scoreSection],
               [answeredCardId]: Math.min(current + 1, CARD_MASTERY_MAX),
             },
           }
@@ -1146,11 +1161,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         // Wrong answer deducts 1 from the card score (floored at 0).
         const answeredCardId = roundState.cardId
         setCardScores((prev) => {
-          const current = prev[activeScript][answeredCardId] ?? 0
+          const current = prev[scoreSection][answeredCardId] ?? 0
           return {
             ...prev,
-            [activeScript]: {
-              ...prev[activeScript],
+            [scoreSection]: {
+              ...prev[scoreSection],
               [answeredCardId]: Math.max(current - 1, 0),
             },
           }
@@ -1169,8 +1184,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
       if (!explicitReviewItemsRef.current) {
         try {
-          const data: PersistedSession = {
+          const data: PersistedStudySession = {
             activeScript,
+            deckSlug: activeDeckSlug,
             activeGame,
             livesEnabled,
             leechFocusEnabled,
@@ -1248,7 +1264,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         cardKey: answerCardKey(resultSlug, roundState.cardId),
         slug: resultSlug,
         admitted: false,
-        script: activeScript,
+        script: scoreSection,
         cardId: roundState.cardId,
         mode: roundState.mode,
         round: roundState,

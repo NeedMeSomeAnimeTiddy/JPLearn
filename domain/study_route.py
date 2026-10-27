@@ -100,8 +100,20 @@ def recall_floor(section: str) -> float:
     two mastered kana tracks are enough to reach ``building``.  Each track
     therefore carries its own floor: half the mastery it is being steered
     toward.
+
+    Vocabulary is the exception.  Its N5 scope was the ~145 N5 words in the
+    topic decks until audit 2 (F2) made it the whole 744-word ``vocab_n5``
+    deck; half the target there would hold recall drills back until ~268 words
+    were mastered.  The floor keeps the old pace instead: about 52 mastered N5
+    words (Robbie's call, 2026-10-27).
     """
+    if section == "vocab_n5":
+        return VOCAB_N5_RECALL_FLOOR
     return target_mastery(section) / 2
+
+
+# 52 of the 744 vocab_n5 words; see recall_floor.
+VOCAB_N5_RECALL_FLOOR = 0.07
 
 
 def learner_stage(overall_mastery: float, current_streak: int) -> LearnerStage:
@@ -168,7 +180,7 @@ def choose_route(
       ``starter`` route.
 
     *track_mastery* must be scoped to the same content the learner can reach —
-    the N5 categories for the kanji/vocabulary sections, not the whole N5→N1
+    the N5 level deck for the kanji/vocabulary sections, not the whole N5→N1
     track.  Passing the wider figure strands a learner who has mastered all of
     N5 below the recall floor.
     """

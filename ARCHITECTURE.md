@@ -316,8 +316,8 @@ type ScriptKey = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5'
                | 'grammar_patterns' | 'sentence_examples'
 ```
 
-But `domain/decks.ALL_DECKS` registers 45+ decks including `kanji_n1..n4`, `vocab_n1..n4`
-and 12 N4–N1 kanji category decks. `ScriptKey` names the app's six *sections*, not deck
+But `domain/decks.ALL_DECKS` registers 45+ decks including `kanji_n1..n4` and `vocab_n1..n4`
+(the kanji topic decks were retired in 0b99582; there are none now). `ScriptKey` names the app's six *sections*, not deck
 slugs, and a section spans many decks — the vocabulary section reaches
 `vocab_n1_law_justice`.
 
@@ -356,7 +356,7 @@ data/external_sources/*.csv
 |---|---|---|---|
 | Kanji N5→N1 | 0, 1000, 2000, 3000, 4000 | 1,000 | `kanji_n1.csv` = 1,246 rows |
 | Vocab N5→N1 | 0, 10000, 20000, 30000, 40000 | 10,000 | `words_n1.csv` = 2,700 rows |
-| Vocab N5 categories | 0–144, hand-partitioned per topic | — | — |
+| Vocab N5 categories | 1000–1144, hand-partitioned per topic; now views over `vocab_n5` | — | — |
 
 Kanji N1 already **exceeds its 1,000-slot spacing** (ids 4000–5245). It is harmless only
 because nothing is allocated above 4000. A future N4/N3/N2 import crossing 1,000 rows
@@ -391,23 +391,26 @@ in different forms); a word only on spelling and reading together, so homographs
 開く aku/hiraku stay two cards. Today that hides 81 kanji and 6 words (greetings the N5
 supplement added that N2/N3 also carry).
 
+Since audit 2 the bridge's Up next and recommendations measure vocabulary over the five
+level decks (`_section_deck_slugs` in `scripts/desktop_bridge.py`), not the topic views.
+Deck-cards for `sentence_examples` is capped at 1,200 cards at the bridge
+(`SENTENCE_EXAMPLES_RUNTIME_CARD_LIMIT`).
+
 Pacing is **not** a deck-sizing concern: a study session draws only 8–20 items
 (`SESSION_LENGTH_PRESETS`) from an SRS-ordered queue, so corpus size affects
 denominators and deck-total labels, not how much a learner faces per session.
 
-Since #78 every `vocab_n*` and `kanji_n*` deck does have blocks — `blocks_for_slug`
-generates them (it used to return `[]` for both families). The authored thematic
-categories come first as named blocks, then `GENERATED_BLOCK_SIZE` (20) blocks cover the
-remainder, so the blocks partition the deck exactly. Large corpora therefore yield a lot
-of blocks: 42 for N5, 106 for N3, 134 for N1.
+The vocabulary level decks have no blocks since 737eaf8; they use the word feed. The kanji
+level decks still get generated blocks from `blocks_for_slug` (#78).
 
 Kanji has no equivalent cap and no capacity guard — kanji_n1 already overflows its
 nominal 1,000-slot spacing (§5, A1).
 
 ### Thematic category decks
 
-Both content families now have thematic categories at every JLPT level (#68): kanji has
-19, vocabulary has 28 (12 N5 + 4 each for N4–N1).
+Vocabulary has thematic categories at every JLPT level (#68): 28 (12 N5 + 4 each for
+N4–N1). The kanji topic decks were retired in 0b99582; there are none now. The text below
+that describes kanji categories is history.
 
 **They are views over their parent level deck, not decks of their own (#78).** The
 builders described below still exist and are still what curation is checked against, but
@@ -422,8 +425,11 @@ close it.
 by reading plus overlapping meaning, restricted to the category's own JLPT level and
 tie-broken on the lowest card id. Kanji never match on reading: 三, 賛, 算 and 傘 are all
 `san`. Words no parent corpus carried are appended to the parent by
-`domain/deck_supplements.py` so that collapsing a category loses no content — 30 words,
-mostly greetings and the basic numerals `Kanji N5` never had.
+`domain/deck_supplements.py` so that collapsing a category loses no content — 26
+vocabulary and 22 kanji rows (audit 2), mostly greetings and the basic numerals `Kanji N5`
+never had. They are appended after each level's imported rows, so their ids depend on the
+list length: adding one imported row moves every supplement id. `tests/test_supplement_ids.py`
+pins them.
 
 Before this, a category was a separate deck with its own `id_offset`, so one word held
 two ids, two FSRS schedules and two mastery values: `見る`/647 in `vocab_n5` and
@@ -461,8 +467,8 @@ builders — nothing studies them, and no `review_states` row should be written 
 one again.
 
 **Unlock is sequential across the whole ordered list.** `buildCategoryProgress`
-(`src/lib/progressAggregation.ts`) walks `VOCAB_CATEGORY_ORDER` / `KANJI_CATEGORY_ORDER`
-in order and stops unlocking at the first category below `CATEGORY_UNLOCK_THRESHOLD`
+(`src/lib/progressAggregation.ts`) walks `VOCAB_CATEGORY_ORDER` (`constants.tsx`; there is
+no kanji equivalent) in order and stops unlocking at the first category below `CATEGORY_UNLOCK_THRESHOLD`
 (0.7). Both families work this way, but the vocabulary chain is **longer**: N4 kanji
 opens after 5 N5 categories, N4 vocabulary after 12 (145 cards at ~2.8 average score,
 given `CARD_MASTERY_MAX` 4). That is the existing design applied to a longer list, not
@@ -484,7 +490,7 @@ Use these rather than inventing new plumbing:
 |---|---|
 | Add a minigame | `types.ts` `MinigameKey` → `constants.tsx` `SCRIPT_MINIGAMES` → round builder in App.tsx → `MinigameView.tsx` |
 | Add a backend query | `@dataclass` in `desktop_bridge.py` → `_run_command` branch → `ipc_handlers.cjs` route + validator → `preload.cjs` → regenerate `generated/types.ts` |
-| Add a deck | CSV in `data/external_sources/` → `import_external_lists.py` → builder in `decks.py` with a **verified-disjoint** `id_offset` → `ALL_DECKS` |
+| Add a deck | CSV in `data/external_sources/` → `import_external_lists.py` → builder in `decks.py` with a **verified-disjoint** `id_offset` → `ALL_DECKS` → the IPC allowlist (`VALID_DECK_SLUGS` in `electron-frontend/electron/ipc_security.cjs`) → the startup preload list if it should preload (`STARTUP_PRELOAD_DECK_SLUGS` in `main.cjs`). `tests/test_deck_slug_lists.py` cross-checks them |
 | Add a stateful UI system | new `src/features/<name>/` module, hook-over-context |
 | Add persisted state | migration in `data/database.py` (bump `LATEST_SCHEMA_VERSION`) — **not** a new localStorage key |
 | Add a slow backend job | dedicated runtime process, **not** the shared bridge worker |
