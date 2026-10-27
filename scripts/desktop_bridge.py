@@ -1795,10 +1795,7 @@ _NODE_TO_SECTION: dict[str, str] = {
 # but cover only 545 of the 8,051 level cards, so Up next ignored most of what
 # the learner studied (audit 2, F2).  Topic views are still registered for the
 # renderer's topic progress rows; they are not measured here.
-_LEVEL_DECK_SLUGS: dict[str, tuple[str, ...]] = {
-    track: tuple(f"{track}_n{level}" for level in range(1, 6))
-    for track in ("vocab", "kanji")
-}
+_LEVELS = range(1, 6)
 
 
 def _section_deck_slugs(section: str, *, n5_only: bool = False) -> list[str]:
@@ -1816,7 +1813,7 @@ def _section_deck_slugs(section: str, *, n5_only: bool = False) -> list[str]:
         return [section] if section in ALL_DECKS else []
 
     track = section.split("_", 1)[0]
-    levels = (section,) if n5_only else _LEVEL_DECK_SLUGS[track]
+    levels = (section,) if n5_only else tuple(f"{track}_n{level}" for level in _LEVELS)
     return sorted(slug for slug in levels if slug in ALL_DECKS)
 
 _NOW_UTC = lambda: datetime.now(timezone.utc).isoformat()  # noqa: E731
@@ -2883,12 +2880,12 @@ def _record_game_result_in_transaction(
     # (a daily-games pool saved before audit 2, F1, can still hold a topic slug).
     store_slug = parent_slug_for_category(slug) or slug
 
-    if slug.startswith("kanji_n"):
+    if store_slug.startswith("kanji_n"):
         script_tag = "kanji_n5"
-    elif slug.startswith("vocab_n"):
+    elif store_slug.startswith("vocab_n"):
         script_tag = "vocab_n5"
     else:
-        script_tag = slug
+        script_tag = store_slug
 
     updated_state = review_minigame_result(
         deck_name=deck.name,

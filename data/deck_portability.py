@@ -15,6 +15,7 @@ from data import database
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
 from domain.block_mapping import parent_slug_for_category
 from domain.daily_games import DEFAULT_DAILY_POOL_LIMIT, MAX_MONTHLY_FREEZES
+from domain.decks import ALL_DECKS
 from domain.mastery import clamp_card_score
 
 # Version 2 adds `progress.card_mastery_scores`, the 0-4 counters behind the progress bars, which
@@ -149,15 +150,23 @@ def _normalize_mastery_scores(progress: dict[str, Any]) -> dict[tuple[str, int],
     """Return the snapshot's mastery counters keyed (deck slug, card id), or None if it has none.
 
     A topic deck's slug is stored under its level deck's, as the bridge records answers since
-    audit 2 (F1); two rows that land on one card keep the higher counter.
+    audit 2 (F1), when the card is one of that topic's; a row naming a card the topic does not hold
+    keeps its own slug rather than landing on an unrelated level-deck card. Two rows that land on
+    one card keep the higher counter.
     """
     if "card_mastery_scores" not in progress:
         return None
+    topic_card_ids: dict[str, frozenset[int]] = {}
     scores: dict[tuple[str, int], int] = {}
     for row in _normalize_row_list(progress, "card_mastery_scores"):
         slug = _required_text(row.get("deck_slug"), "card_mastery_scores.deck_slug").strip()
-        slug = parent_slug_for_category(slug) or slug
         card_id = _required_nonnegative_int(row.get("card_id"), "card_mastery_scores.card_id")
+        parent = parent_slug_for_category(slug)
+        if parent is not None and slug in ALL_DECKS:
+            if slug not in topic_card_ids:
+                topic_card_ids[slug] = frozenset(card.id for card in ALL_DECKS[slug]().cards)
+            if card_id in topic_card_ids[slug]:
+                slug = parent
         score = clamp_card_score(_required_nonnegative_int(row.get("score"), "card_mastery_scores.score"))
         key = (slug, card_id)
         scores[key] = max(score, scores.get(key, 0))

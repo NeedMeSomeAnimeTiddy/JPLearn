@@ -2426,6 +2426,11 @@ function App() {
           .filter(([, v]) => v > 0)
           .map(([k, v]) => `${v} ${k}`)
         setBackupMessage(`Imported: ${parts.join(', ') || 'no changes'}`)
+        // A format-2 backup replaces the mastery counters (audit 2, F5). Show the stored ones now,
+        // even when empty, and so overwrite the localStorage copy that would otherwise be adopted
+        // back into the table at the next launch.
+        const payload = await window.jplearnDesktop.getCardScores?.()
+        if (payload) setCardScores(toSectionScores(payload.scores ?? {}))
       } else {
         setBackupMessage('Import failed.')
       }

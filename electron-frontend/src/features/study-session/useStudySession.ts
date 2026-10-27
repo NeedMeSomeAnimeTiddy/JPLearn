@@ -866,7 +866,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       script: data.activeScript,
       minigame,
       deckSlug: data.deckSlug,
-      targetItems: Math.max(1, targetItems - data.restore.sessionRounds),
+      targetItems: Math.max(1, targetItems - (Number.isFinite(data.restore.sessionRounds) ? data.restore.sessionRounds : 0)),
       restore: data.restore,
     })
   }, [

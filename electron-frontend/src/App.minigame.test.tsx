@@ -558,6 +558,37 @@ describe('what each deck offers', () => {
     expect(await screen.findByRole('heading', { name: /Welcome to JPLearn/i })).toBeTruthy()
   })
 
+  // Audit 2, F5: a backup carries the mastery counters, so after an import the app shows the
+  // stored ones and overwrites the localStorage copy, which would otherwise be adopted back.
+  it('shows the imported mastery counters straight after a backup import', async () => {
+    window.localStorage.setItem('jplearn-card-scores-v2', JSON.stringify({ hiragana: { 1: 4 } }))
+    let stored: Record<string, Record<number, number>> = {}
+    const getCardScores = vi.fn(async () => ({ scores: stored }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      getCardScores,
+      exportAnalyticsJSON: vi.fn(async () => ({ ok: true })),
+      importAnalyticsJSON: vi.fn(async () => {
+        stored = { katakana: { 7: 2 } }
+        return { ok: true, imported: { card_mastery_scores: 1 } }
+      }),
+    } as unknown as typeof window.jplearnDesktop
+
+    render(<App />)
+    await screen.findByRole('button', { name: /open shortcuts/i })
+    const settingsButtons = screen.getAllByRole('button', { name: /open settings/i })
+    fireEvent.click(settingsButtons[settingsButtons.length - 1])
+    fireEvent.click(await screen.findByRole('tab', { name: /system/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /backup & restore/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /import backup from json file/i }))
+
+    await waitFor(() => {
+      const scores = JSON.parse(window.localStorage.getItem('jplearn-card-scores-v2') ?? '{}')
+      expect(scores.katakana?.[7]).toBe(2)
+      expect(scores.hiragana?.[1]).toBeUndefined()
+    })
+  })
+
   it('supports typed recall and forwards confidence score to record payload', async () => {
     const recordGameResult = vi.fn(async (_payload: { minigame: string; confidenceScore?: number }) => ({ ok: true, card_id: 0, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))
     window.jplearnDesktop = {

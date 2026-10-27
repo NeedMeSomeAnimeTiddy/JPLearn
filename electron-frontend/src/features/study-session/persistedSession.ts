@@ -32,13 +32,13 @@ function deckBelongsToScript(script: ScriptKey, slug: unknown): slug is DeckSlug
  * The saved session, if it can be resumed.
  *
  * A save from before F7 has no `deckSlug` and is not offered: for kanji and vocabulary its level
- * is unknowable, and guessing reopened the wrong level's cards. The answers it recorded are
- * already saved; only the run's score counters are lost.
+ * is unknowable, and guessing reopened the wrong level's cards. Each answer was sent to be saved
+ * as it was given, so what is lost is the run itself: its rounds, score and lives.
  */
 export function parseResumableSession(raw: string): PersistedStudySession | null {
   try {
     const parsed = JSON.parse(raw) as Partial<PersistedStudySession> | null
-    if (!parsed || !parsed.activeScript || !parsed.activeGame || !Array.isArray(parsed.seenCardIds) || !parsed.restore) {
+    if (!parsed || !parsed.activeScript || !parsed.activeGame || !parsed.restore) {
       return null
     }
     if (!deckBelongsToScript(parsed.activeScript, parsed.deckSlug)) return null

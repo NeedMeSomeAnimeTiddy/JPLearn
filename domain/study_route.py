@@ -180,7 +180,7 @@ def choose_route(
       ``starter`` route.
 
     *track_mastery* must be scoped to the same content the learner can reach —
-    the N5 categories for the kanji/vocabulary sections, not the whole N5→N1
+    the N5 level deck for the kanji/vocabulary sections, not the whole N5→N1
     track.  Passing the wider figure strands a learner who has mastered all of
     N5 below the recall floor.
     """

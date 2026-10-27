@@ -144,6 +144,19 @@ def test_imported_counters_under_a_topic_slug_land_on_the_level_deck_and_stay_in
     assert _mastery_rows() == [("hiragana", 2, 4), ("vocab_n5", card_id, 3)]
 
 
+def test_an_imported_topic_counter_for_a_card_the_topic_lacks_keeps_its_own_slug() -> None:
+    database.init_db()
+    topic_slug, _ = _topic_word()
+    stray = max(card.id for card in ALL_DECKS["vocab_n5"]().cards) + 1
+
+    import_progress_snapshot(
+        _snapshot(2, card_mastery_scores=[{"deck_slug": topic_slug, "card_id": stray, "score": 2}]),
+        conflict_mode="merge",
+    )
+
+    assert _mastery_rows() == [(topic_slug, stray, 2)]
+
+
 @pytest.mark.parametrize(
     "row",
     [

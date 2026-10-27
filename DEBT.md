@@ -62,8 +62,8 @@ import that "failed" but changed their progress.
 **Recorded 2026-10-27.** No `ALL_DECKS` builder is cached (`domain/decks.py:286-355, 923-927,
 1602-1626`); topic views rebuild their parent. All 43 decks take 254.6 ms to build, and an
 empty-database `_build_summary()` takes about 520 ms warm, about half of it building decks (audit 2,
-Check 5). Recommendations rebuild the 28 views again (`scripts/desktop_bridge.py:2263-2286`). Not
-fixed now: within budget once the sentence payload is capped (audit 2, F8). A per-process cache
+Check 5). Recommendations rebuild the level decks again for each section's metrics
+(`scripts/desktop_bridge.py`, `_section_deck_slugs`). Not fixed now: within budget once the sentence payload is capped (audit 2, F8). A per-process cache
 needs no invalidation within a run, since the sources are static module data and process-cached CSV
 rows; callers must not mutate the cached cards.
 
