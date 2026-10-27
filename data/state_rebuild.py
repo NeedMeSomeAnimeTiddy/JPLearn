@@ -134,7 +134,10 @@ def plan_rebuild(
             if before.last_review == reviews[-1].day:
                 # A row the app maintained review by review carries the date of
                 # its own last logged review. A row written over it does not:
-                # seeding backdates last_review to a date of its own choosing.
+                # seeding backdated last_review to a date of its own choosing.
+                # Seeding since audit 1 (F7) dates it the onboarding day and
+                # writes only cards with no events, so a new seed never meets
+                # this gate; rows it overwrote before then still do.
                 #
                 # This is the gate rather than comparing repetitions, which only
                 # catches an overwrite when the synthetic count happens to

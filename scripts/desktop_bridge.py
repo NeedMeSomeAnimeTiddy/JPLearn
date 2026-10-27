@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 import unicodedata
-from typing import Callable, Mapping
+from typing import Callable, Mapping, NamedTuple
 from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -152,6 +152,7 @@ from domain.tutor_service import (  # noqa: E402
 )
 from data.database import (  # noqa: E402
     count_total_reviews,
+    load_answer_receipt,
     load_badges,
     load_daily_counts,
     load_feature_unlock_times,
@@ -159,12 +160,15 @@ from data.database import (  # noqa: E402
     load_tutor_seen_keys,
     load_user_progression,
     load_user_xp,
+    save_answer_receipt,
     save_badge,
     save_feature_unlock,
     save_tutor_seen_key,
     save_user_xp,
+    seed_review_states_if_unstudied,
     shared_connection,
     upsert_progression_node,
+    write_transaction,
 )
 from data.jlpt_repository import (  # noqa: E402
     load_card_accuracy_map,
@@ -2530,50 +2534,57 @@ def dismiss_tutor_reaction_key(dedup_key: str) -> dict[str, object]:
     return {"ok": True}
 
 
-def _mastered_seed_state(card_id: int) -> ReviewState:
-    from datetime import date as _date
+def _mastered_seed_state(card_id: int, onboarding_day: date) -> ReviewState:
+    """Return the schedule a card the learner says they know starts with.
+
+    The app treats mastered as repetitions >= 3 and interval >= 21. FSRS only grows stability when
+    time has elapsed since the last review, so each of the four simulated Good reviews is placed on
+    the previous one's due date. The last one is dated the onboarding day itself: the card was last
+    "reviewed" when the learner claimed it, and is due ``interval`` days later. Dating it back
+    instead made the first real review look long overdue and pushed the card out ~50% too far
+    (audit 1, F7: 223 days against 145 with the default weights).
+    """
     from datetime import timedelta as _timedelta
 
     state = ReviewState(card_id=card_id)
-    # The app treats mastered as repetitions >= 3 and interval >= 21.
-    # FSRS only grows stability when time has actually elapsed since the last
-    # review, so backdate last_review to simulate reviewing on the due date
-    # each time; four successful reviews reaches interval >= 21 this way.
     for _ in range(4):
-        state = update(state, quality=4)
-        state.last_review = _date.today() - _timedelta(days=state.interval)
+        state = update(state, quality=4, today=onboarding_day)
+        state.last_review = onboarding_day - _timedelta(days=state.interval)
+    state.last_review = onboarding_day
+    state.next_review = onboarding_day + _timedelta(days=state.interval)
     return state
 
 
 def apply_expertise_level(level: str) -> dict[str, object]:
+    """Give every card of the claimed decks a mastered schedule, unless it has history of its own.
+
+    A card with a review_states row or any logged review is left exactly as it is: seeding used to
+    overwrite real schedules it judged weaker (see ``data/state_rebuild.py``), and a row from before
+    the FSRS columns can carry real progress with no last-review date, so absence of a row and of
+    events is the only safe test. Robbie decided (2026-10-26) that claiming a level writes schedules,
+    not only mastery.
+    """
     init_study_db()
     normalized_level = level.strip().lower()
     target_slugs = EXPERTISE_LEVEL_TO_SLUGS.get(normalized_level)
     if target_slugs is None:
         raise ValueError(f"Unknown expertise level: {level}")
 
-    seeded_cards = 0
-    touched_decks: list[str] = []
+    onboarding_day = date.today()
+    seeds: list[tuple[str, list[ReviewState]]] = []
     for slug in target_slugs:
         factory = ALL_DECKS.get(slug)
         if factory is None:
             continue
         deck = factory()
-        target_state_by_id = {card.id: _mastered_seed_state(card.id) for card in deck.cards}
-        states = load_review_states(deck.name, list(target_state_by_id.keys()))
+        seeds.append((deck.name, [_mastered_seed_state(card.id, onboarding_day) for card in deck.cards]))
 
-        for card_id, target_state in target_state_by_id.items():
-            current = states.get(card_id)
-            if current is None:
-                save_state(deck.name, target_state)
-                seeded_cards += 1
-                continue
-            if current.repetitions >= target_state.repetitions and current.interval >= target_state.interval:
-                continue
-            save_state(deck.name, target_state)
-            seeded_cards += 1
-
-        touched_decks.append(deck.name)
+    seeded_cards = 0
+    touched_decks: list[str] = []
+    with write_transaction():
+        for deck_name, states in seeds:
+            seeded_cards += seed_review_states_if_unstudied(deck_name, states)
+            touched_decks.append(deck_name)
 
     return {
         "ok": True,
@@ -2728,6 +2739,72 @@ def import_legacy_card_scores(legacy_scores: dict[str, dict[str, int]]) -> dict[
     )
 
 
+class InvalidAnswerError(ValueError):
+    """An answer that can never be saved as sent: retrying it cannot help.
+
+    `_cmd_record_result` reports it with exit code 3 so the main process drops that answer from its
+    retry queue instead of blocking every later answer behind it.
+    """
+
+
+class AnswerIdentity(NamedTuple):
+    """The id and moment the renderer gave one answer, unchanged across retries."""
+
+    answer_id: str
+    answered_at_utc: datetime
+    answered_local_date: date
+
+
+_ANSWER_ID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+def _parse_answer_identity(answer_id: str, answered_at: str, local_date: str) -> AnswerIdentity | None:
+    """Parse the optional answer-identity arguments; all three or none.
+
+    Format only. The main process checked the times were plausible when it first accepted the answer;
+    a retry days later must not be refused for its age, or one old answer would block the queue.
+    """
+    if not (answer_id or answered_at or local_date):
+        return None
+    if not (answer_id and answered_at and local_date):
+        raise InvalidAnswerError("answer id, answered-at and local date must be given together")
+    if not _ANSWER_ID_PATTERN.match(answer_id):
+        raise InvalidAnswerError(f"Invalid answer id: {answer_id}")
+    try:
+        answered_at_utc = datetime.fromisoformat(answered_at.replace("Z", "+00:00"))
+        answered_local_date = date.fromisoformat(local_date)
+    except ValueError as exc:
+        raise InvalidAnswerError(f"Invalid answer time: {exc}") from exc
+    if answered_at_utc.tzinfo is None:
+        raise InvalidAnswerError("answered-at must carry a timezone")
+    return AnswerIdentity(answer_id, answered_at_utc.astimezone(timezone.utc), answered_local_date)
+
+
+def _answer_fingerprint(
+    answer: AnswerIdentity,
+    slug: str,
+    card_id: int,
+    is_correct: bool,
+    minigame: str,
+    curriculum_stage: int | None,
+    session_id: str,
+    confidence_score: int | None,
+) -> str:
+    """Hash what was answered, so a reused answer id cannot claim another answer's result."""
+    fields = [
+        slug.strip(),
+        str(card_id),
+        "1" if is_correct else "0",
+        minigame.strip().lower(),
+        "" if curriculum_stage is None else str(curriculum_stage),
+        session_id.strip(),
+        "" if confidence_score is None else str(confidence_score),
+        answer.answered_at_utc.isoformat(timespec="seconds"),
+        answer.answered_local_date.isoformat(),
+    ]
+    return hashlib.sha256("".join(fields).encode("utf-8")).hexdigest()
+
+
 def record_game_result(
     slug: str,
     card_id: int,
@@ -2736,18 +2813,66 @@ def record_game_result(
     curriculum_stage: int | None = None,
     session_id: str = "",
     confidence_score: int | None = None,
+    *,
+    answer: AnswerIdentity | None = None,
 ) -> dict[str, object]:
+    """Save one answer: schedule, review log, leech, streak, stage, XP, mastery and badges.
+
+    All of it commits in one transaction or none of it does (audit 1, F3). With ``answer`` -- the
+    id and moment the renderer gave this answer -- a repeat of the same answer returns the payload
+    stored the first time instead of reviewing again (F1): the main process retries saves that
+    failed or timed out, and the first attempt may have committed before its reply was lost.
+    """
     init_study_db()
     factory = ALL_DECKS.get(slug)
     if factory is None:
-        raise ValueError(f"Unknown deck slug: {slug}")
-
-    previous_best_streak = load_streak_state().best_streak_days
+        raise InvalidAnswerError(f"Unknown deck slug: {slug}")
 
     deck = factory()
     matching_card = next((card for card in deck.cards if card.id == card_id), None)
     if matching_card is None:
-        raise ValueError(f"Unknown card id {card_id} for deck slug: {slug}")
+        raise InvalidAnswerError(f"Unknown card id {card_id} for deck slug: {slug}")
+    mastery_repository = _card_mastery_repository()
+    fingerprint = (
+        _answer_fingerprint(
+            answer, slug, card_id, is_correct, minigame, curriculum_stage, session_id, confidence_score
+        )
+        if answer is not None
+        else ""
+    )
+    with write_transaction():
+        if answer is not None:
+            stored = load_answer_receipt(answer.answer_id)
+            if stored is not None:
+                stored_fingerprint, stored_payload = stored
+                if stored_fingerprint != fingerprint:
+                    raise InvalidAnswerError(
+                        f"Answer id {answer.answer_id} was already used for a different answer"
+                    )
+                return {**stored_payload, "replayed": True}
+        payload = _record_game_result_in_transaction(
+            slug, deck, matching_card, card_id, is_correct, minigame, curriculum_stage,
+            session_id, confidence_score, answer, mastery_repository,
+        )
+        if answer is not None:
+            save_answer_receipt(answer.answer_id, fingerprint, payload, _NOW_UTC())
+    return payload
+
+
+def _record_game_result_in_transaction(
+    slug: str,
+    deck: Deck,
+    matching_card: Card,
+    card_id: int,
+    is_correct: bool,
+    minigame: str,
+    curriculum_stage: int | None,
+    session_id: str,
+    confidence_score: int | None,
+    answer: AnswerIdentity | None,
+    mastery_repository: CardMasteryRepository,
+) -> dict[str, object]:
+    previous_best_streak = load_streak_state().best_streak_days
 
     normalized_minigame = minigame.strip().lower()
     stage_mode = (
@@ -2778,6 +2903,8 @@ def record_game_result(
         tags=tags,
         session_id=session_id.strip(),
         confidence_score=confidence_score,
+        reviewed_on_local=answer.answered_local_date if answer is not None else None,
+        reviewed_at_utc=answer.answered_at_utc if answer is not None else None,
     )
 
     # Q1: Award XP piggybacked on this call (correct answer only).
@@ -2805,7 +2932,7 @@ def record_game_result(
     # and a counter written independently of the review is the drift the issue is
     # about. The new value goes back in the payload so the renderer displays stored
     # state instead of recomputing its own.
-    mastery_score = _card_mastery_repository().apply_result(slug, card_id, is_correct=is_correct)
+    mastery_score = mastery_repository.apply_result(slug, card_id, is_correct=is_correct)
 
     # review_minigame_result() above logs exactly one review_events row, so
     # the pre-review total is always one less than the post-review total.
@@ -3369,7 +3496,7 @@ def _cmd_reset_db(argv: list[str]) -> tuple[int, dict[str, object]]:
 def _cmd_record_result(argv: list[str]) -> tuple[int, dict[str, object]]:
     if len(argv) < 4:
         return 2, {
-            "error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score]"
+            "error": "Usage: record-result <slug> <card_id> <is_correct> [minigame] [curriculum_stage] [session_id] [confidence_score] [answer_id answered_at_utc answered_local_date]"
         }
     slug = argv[1]
     try:
@@ -3379,6 +3506,11 @@ def _cmd_record_result(argv: list[str]) -> tuple[int, dict[str, object]]:
         curriculum_stage = int(argv[5]) if len(argv) > 5 and argv[5].strip() else None
         session_id = argv[6] if len(argv) > 6 else ""
         confidence_score = int(argv[7]) if len(argv) > 7 and argv[7].strip() else None
+        answer = _parse_answer_identity(
+            argv[8] if len(argv) > 8 else "",
+            argv[9] if len(argv) > 9 else "",
+            argv[10] if len(argv) > 10 else "",
+        )
         payload = record_game_result(
             slug,
             card_id,
@@ -3387,7 +3519,11 @@ def _cmd_record_result(argv: list[str]) -> tuple[int, dict[str, object]]:
             curriculum_stage=curriculum_stage,
             session_id=session_id,
             confidence_score=confidence_score,
+            answer=answer,
         )
+    except InvalidAnswerError as exc:
+        # Exit code 3: this answer can never save as sent; the caller should not retry it.
+        return 3, {"error": str(exc)}
     except ValueError as exc:
         return 2, {"error": str(exc)}
     return 0, payload
