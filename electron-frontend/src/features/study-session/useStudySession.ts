@@ -57,7 +57,7 @@ import {
   normalizeCurriculumStage,
 } from '../../lib/roundContent'
 import { CARD_MASTERY_MAX } from '../../constants'
-import { mergeStoredScores, toSectionScores } from '../../lib/cardScores'
+import { mergeStoredScores, sectionForDeckSlug, toSectionScores } from '../../lib/cardScores'
 import type { AnswerSavedEvent, PendingAnswersSnapshot } from '../../electron'
 import { answerCardKey, newAnswerIdentity } from '../pending-answers/answerIdentity'
 import { hasNewerPendingAnswer, useAnswerOutcomes } from '../pending-answers/useAnswerOutcomes'
@@ -973,6 +973,9 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     (answer: string, correctnessOverride?: boolean, handwritingOutcome?: HandwritingOutcome) => {
       if (!roundState || isRoundResolving) return
       if (answer.trim().length === 0) return
+      // The score belongs to the section of the deck the card came from, which a missed-word review
+      // can leave different from the active section (audit 2, F1).
+      const scoreSection = (roundState.deckSlug ? sectionForDeckSlug(roundState.deckSlug) : null) ?? activeScript
 
       setIsRoundResolving(true)
       const completedRoundsAfterAnswer = sessionRounds + 1
@@ -1098,11 +1101,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         // Update per-card score: correct → +1 (capped at CARD_MASTERY_MAX).
         const answeredCardId = roundState.cardId
         setCardScores((prev) => {
-          const current = prev[activeScript][answeredCardId] ?? 0
+          const current = prev[scoreSection][answeredCardId] ?? 0
           return {
             ...prev,
-            [activeScript]: {
-              ...prev[activeScript],
+            [scoreSection]: {
+              ...prev[scoreSection],
               [answeredCardId]: Math.min(current + 1, CARD_MASTERY_MAX),
             },
           }
@@ -1146,11 +1149,11 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         // Wrong answer deducts 1 from the card score (floored at 0).
         const answeredCardId = roundState.cardId
         setCardScores((prev) => {
-          const current = prev[activeScript][answeredCardId] ?? 0
+          const current = prev[scoreSection][answeredCardId] ?? 0
           return {
             ...prev,
-            [activeScript]: {
-              ...prev[activeScript],
+            [scoreSection]: {
+              ...prev[scoreSection],
               [answeredCardId]: Math.max(current - 1, 0),
             },
           }
@@ -1248,7 +1251,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         cardKey: answerCardKey(resultSlug, roundState.cardId),
         slug: resultSlug,
         admitted: false,
-        script: activeScript,
+        script: scoreSection,
         cardId: roundState.cardId,
         mode: roundState.mode,
         round: roundState,

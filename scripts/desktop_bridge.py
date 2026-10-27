@@ -91,6 +91,7 @@ from domain.blocks import (  # noqa: E402
 from domain.cards import Card, Deck  # noqa: E402
 from domain.distractors import rank_distractor_ids  # noqa: E402
 from domain.decks import ALL_DECKS  # noqa: E402
+from domain.block_mapping import parent_slug_for_category  # noqa: E402
 from domain.scheduler import ReviewState, get_weights, has_been_reviewed, set_weights as set_scheduler_weights, update  # noqa: E402
 from domain.word_of_the_day import WordOfDay, select_word_of_the_day  # noqa: E402
 from domain.queue_builder import build_study_queue  # noqa: E402
@@ -998,7 +999,10 @@ def _daily_games_candidates(repository: DailyGamesRepository) -> list[DailyGameW
     """Join static vocabulary cards with persisted metadata for domain selection."""
     candidates: list[DailyGameWordCandidate] = []
     for deck_slug, factory in ALL_DECKS.items():
-        if not deck_slug.startswith("vocab_"):
+        # Level decks only. A topic deck is a view over its level's cards (#78), so it would offer
+        # each word a second time under its own slug, and a missed-word review of that copy would
+        # step a second mastery counter for the same card (audit 2, F1).
+        if not deck_slug.startswith("vocab_") or parent_slug_for_category(deck_slug) is not None:
             continue
         deck = factory()
         metadata_by_card_id = repository.load_persisted_review_metadata(
@@ -2885,6 +2889,11 @@ def _record_game_result_in_transaction(
     if normalized_minigame == "imposter" and normalized_stage is not None:
         tags.append(f"chapter_{normalized_stage}")
 
+    # A topic deck is a view over its level deck's cards (#78), so its answers count for the level
+    # deck: one mastery counter and one XP guard per card, whichever slug the answer came in under
+    # (a daily-games pool saved before audit 2, F1, can still hold a topic slug).
+    store_slug = parent_slug_for_category(slug) or slug
+
     if slug.startswith("kanji_n"):
         script_tag = "kanji_n5"
     elif slug.startswith("vocab_n"):
@@ -2914,7 +2923,7 @@ def _record_game_result_in_transaction(
     if is_correct:
         progress = _load_user_progress()
         level_before = progress.level
-        dedup = f"correct:{slug}:{card_id}:{updated_state.next_review.isoformat()}"
+        dedup = f"correct:{store_slug}:{card_id}:{updated_state.next_review.isoformat()}"
         xp_event = XPEvent(
             source="correct_answer",
             amount=XP_CORRECT_ANSWER,
@@ -2932,7 +2941,7 @@ def _record_game_result_in_transaction(
     # and a counter written independently of the review is the drift the issue is
     # about. The new value goes back in the payload so the renderer displays stored
     # state instead of recomputing its own.
-    mastery_score = mastery_repository.apply_result(slug, card_id, is_correct=is_correct)
+    mastery_score = mastery_repository.apply_result(store_slug, card_id, is_correct=is_correct)
 
     # review_minigame_result() above logs exactly one review_events row, so
     # the pre-review total is always one less than the post-review total.

@@ -353,3 +353,45 @@ describe('Daily Games navigation', () => {
     expect(screen.queryByText('Resume session?')).toBeNull()
   })
 })
+
+describe('missed-word review scores', () => {
+  afterEach(() => {
+    cleanup()
+    window.localStorage.clear()
+  })
+
+  // A pool word from a vocabulary deck keeps its score in the vocabulary section, whichever section
+  // was active when the review started (audit 2, F1): card ids repeat across sections.
+  it('keeps a vocabulary word\'s score in the vocabulary section, not the active one', async () => {
+    const vocabWords = [
+      { ...reviewDailyState.pool.words[0], deck_slug: 'vocab_n5', card_id: 2 },
+      { ...reviewDailyState.pool.words[1], deck_slug: 'vocab_n5', card_id: 1 },
+    ]
+    const vocabState = { ...reviewDailyState, pool: { ...reviewDailyState.pool, words: vocabWords } }
+    const recordGameResult = vi.fn(async () => ({ ...DEFAULT_RECORD_RESULT, mastery_score: 3 }))
+    const review = buildReviewDesktopApi(recordGameResult as never)
+    window.jplearnDesktop = {
+      ...review.api,
+      getDailyGamesState: async () => vocabState,
+      recordDailyGamesAttempt: async () => ({
+        ...vocabState,
+        progress: { ...vocabState.progress, missed_words: vocabWords.map((word) => ({ word, miss_count: 1 })) },
+      }),
+      getDeckCards: vi.fn(async (slug: string) => ({ slug, name: slug, cards: [deckACard, { ...deckBCard, id: 2 }] })),
+    } as unknown as typeof window.jplearnDesktop
+    render(<App />)
+
+    await openMissedWordReview()
+    const showsA = screen.queryByText('あ') !== null
+    fireEvent.change(screen.getByPlaceholderText(/enter romaji/i), { target: { value: showsA ? 'a' : 'i' } })
+    fireEvent.click(screen.getByRole('button', { name: /submit answer/i }))
+    const cardId = showsA ? 1 : 2
+
+    await waitFor(() => expect(recordGameResult).toHaveBeenCalledWith(expect.objectContaining({ slug: 'vocab_n5', cardId, isCorrect: true })))
+    await waitFor(() => {
+      const scores = JSON.parse(window.localStorage.getItem('jplearn-card-scores-v2') ?? '{}')
+      expect(scores.vocab_n5?.[cardId]).toBe(3)
+      expect(scores.hiragana?.[cardId]).toBeUndefined()
+    })
+  })
+})
