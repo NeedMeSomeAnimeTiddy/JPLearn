@@ -12,7 +12,7 @@ import {
 import { feedAt, feedHead, feedNote, kanjiOf, wordKanji, wordSize } from './feed'
 import { levelForKey, levelStep } from './levels'
 
-/* THE LADDER THE TWO STUDY SCREENS DRAW, as `buildJlptLevelProgressFromLevelDecks` shapes it. */
+/* THE LADDER THE TWO STUDY SCREENS DRAW, as `buildJlptLevelProgressFromTotals` shapes it. */
 const LEVELS: JlptLevelProgress[] = (['n5', 'n4', 'n3', 'n2', 'n1'] as const).map((key, i) => ({
   key, label: key.toUpperCase(), cardIds: [], sampleChars: [],
   mastery: [0.81, 0.4, 0.12, 0, 0][i], unlocked: i < 3, total: 100 * (i + 1),

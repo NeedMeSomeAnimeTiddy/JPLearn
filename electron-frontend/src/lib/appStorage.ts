@@ -1,6 +1,6 @@
 import type {
   AppSettings, CardScores, ExpertiseLevel, LastSessionPrefs, MinigameStats, MinigameStatsByScript,
-  ScriptKey, ScriptStats, StatsByScript, StudySummaryPayload,
+  ScriptStats, StatsByScript, StudySummaryPayload,
 } from '../types'
 import type { CustomTheme, ThemeScope } from '../features/theme/types'
 import {
@@ -56,17 +56,6 @@ export function mergeSessionPrefs(update: Partial<LastSessionPrefs>): void {
   } catch { /* ignore — persistence is best-effort */ }
 }
 
-
-export const EXPERTISE_LEVEL_TO_SCRIPT_KEYS: Record<ExpertiseLevel, ScriptKey[]> = {
-  total_beginner:       [],
-  know_hiragana:        ['hiragana'],
-  know_kana:            ['hiragana', 'katakana'],
-  jlpt_n5_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n4_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n3_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n2_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-  jlpt_n1_foundation:  ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5'],
-}
 
 export function deriveExpertiseLevelFromChecked(checked: Set<string>): ExpertiseLevel {
   if (checked.has('kanji_n1') || checked.has('vocab_n1')) return 'jlpt_n1_foundation'

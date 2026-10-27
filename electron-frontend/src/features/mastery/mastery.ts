@@ -17,7 +17,8 @@ import type { CardScores, JlptLevel } from '../../types'
 
    KANJI ARE GROUPED BY LEVEL AND THEN BY THE BLOCK THEY ARE TAUGHT IN, which is the same name the
    deck screen uses — the bridge reads it off the block rather than a theme table for exactly that
-   reason. Five levels rather than one group of two thousand: N1 alone is 1,192 cards.
+   reason. Five levels rather than one group of two thousand: N1 alone is 1,192 cards. Vocabulary
+   is split into the same five levels.
    ================================================================================================== */
 
 export interface MasteryChar {
@@ -101,9 +102,11 @@ function fromRaw(prefix: string, raw: readonly RawBlock[], scores: Scores): Mast
 
 const LEVELS: JlptLevel[] = ['n5', 'n4', 'n3', 'n2', 'n1']
 
+type VocabLevelSlug = `vocab_${JlptLevel}`
+
 export interface MasteryInput {
   blocks: Partial<Record<'hiragana' | 'katakana', RawBlock[]>>
-  categoryBlocks: Partial<Record<'vocab_n5' | 'grammar_patterns', RawBlock[]>>
+  categoryBlocks: Partial<Record<VocabLevelSlug | 'grammar_patterns', RawBlock[]>>
   kanji: readonly RawKanji[]
   scores: CardScores
 }
@@ -146,8 +149,14 @@ export function masteryGroups(input: MasteryInput): MasteryGroup[] {
       [...byTheme].map(([name, chars], i) => block(`kanji-${level}-${i}`, name, chars)))
   }
 
-  push('vocab', 'VOCABULARY', '語彙',
-    fromRaw('vocab', input.categoryBlocks.vocab_n5 ?? [], input.scores.vocab_n5 ?? {}))
+  /* VOCABULARY IS FIVE LEVELS TOO, for the kanji's reason: N1 alone is 2,699 words. The bridge
+     sends each level as the themes the deck screen names its words with, and the scores share one
+     key the same way the kanji's do -- `vocab_n5` is the script, the levels are decks under it. */
+  const vocabScores = input.scores.vocab_n5 ?? {}
+  for (const level of LEVELS) {
+    push(`vocab-${level}`, `VOCABULARY ${level.toUpperCase()}`, '語彙',
+      fromRaw(`vocab-${level}`, input.categoryBlocks[`vocab_${level}`] ?? [], vocabScores))
+  }
   push('grammar', 'GRAMMAR', '文法',
     fromRaw('grammar', input.categoryBlocks.grammar_patterns ?? [], input.scores.grammar_patterns ?? {}))
 

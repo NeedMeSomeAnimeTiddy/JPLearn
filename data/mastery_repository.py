@@ -19,12 +19,12 @@ The scale itself and the ±1 rule are domain concerns and live in
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Generator, Mapping
+from collections.abc import Collection, Generator, Mapping
 from contextlib import contextmanager
 
 from data import database
 from data.text_normalization import normalize_storage_text
-from domain.mastery import clamp_card_score, next_card_score
+from domain.mastery import CARD_MASTERY_MAX, clamp_card_score, next_card_score
 
 
 def _normalize_slug(deck_slug: str) -> str:
@@ -107,12 +107,32 @@ class CardMasteryRepository:
             )
         return updated
 
+    def seed_full_scores(self, deck_slug: str, card_ids: Collection[int]) -> int:
+        """Give each card the full score unless it already has a counter; return how many were added.
+
+        Used by onboarding expertise seeding, for the cards it has just given a mastered schedule.
+        A card that already has a counter keeps it.
+        """
+        slug = _normalize_slug(deck_slug)
+        rows = [(slug, int(card_id), CARD_MASTERY_MAX) for card_id in card_ids]
+        if not rows:
+            return 0
+        with self._connect() as conn:
+            before = conn.total_changes
+            conn.executemany(
+                """
+                INSERT INTO card_mastery_scores (deck, card_id, score)
+                VALUES (?, ?, ?)
+                ON CONFLICT(deck, card_id) DO NOTHING
+                """,
+                rows,
+            )
+            return conn.total_changes - before
+
     def set_deck_scores(self, deck_slug: str, scores: Mapping[int, int]) -> int:
         """Overwrite scores for the given cards and return how many rows were written.
 
-        Used by onboarding expertise seeding, which awards a full score for every
-        card in a deck without any review having taken place, and by the one-time
-        import of legacy renderer scores. Scores are clamped to the scale on the
+        Used by the one-time import of legacy renderer scores. Scores are clamped to the scale on the
         way in, so a corrupted stored value cannot enter the table.
 
         Args:

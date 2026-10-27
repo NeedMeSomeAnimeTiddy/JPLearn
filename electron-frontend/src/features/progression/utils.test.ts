@@ -125,6 +125,15 @@ describe('currentNode', () => {
     expect(currentNode(views)?.node_id).toBe('hiragana')
   })
 
+  it('passes over an open step the app cannot measure', () => {
+    const views = toNodeViews([
+      node({ node_id: 'grammar_n5', status: 'mastered' }),
+      node({ node_id: 'sentence_examples', status: 'unlocked', is_tracked: false, total_count: 0 }),
+      node({ node_id: 'kanji_n5', status: 'unlocked' }),
+    ], new Set())
+    expect(currentNode(views)?.node_id).toBe('kanji_n5')
+  })
+
   it('falls back to the last finished node when everything is done', () => {
     const views = toNodeViews([
       node({ node_id: 'tutorial', status: 'mastered' }),

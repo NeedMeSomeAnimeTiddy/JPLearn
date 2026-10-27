@@ -67,3 +67,10 @@ def test_startup_preload_slugs_are_allowed() -> None:
         f"STARTUP_PRELOAD_DECK_SLUGS (main.cjs) names decks that VALID_DECK_SLUGS "
         f"rejects: {sorted(unknown)}"
     )
+
+
+def test_the_summary_totals_leave_out_exactly_the_hidden_decks() -> None:
+    """The Ledger's totals skip the decks the app hides (audit 3, F2); offering one must count it."""
+    from scripts.desktop_bridge import _SUMMARY_UNSERVED_SLUGS
+
+    assert set(_SUMMARY_UNSERVED_SLUGS) == _HIDDEN_BY_DECISION

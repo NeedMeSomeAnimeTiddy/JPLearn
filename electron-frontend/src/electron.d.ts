@@ -4,6 +4,7 @@ import type {
   CardMasteryImportPayload,
   CardMasteryScoresPayload,
   CardNoteDeletePayload,
+  LevelProgressPayload,
   CardNoteLookupPayload,
   CardNotePayload,
   ConjugationDrillPayload,
@@ -375,7 +376,12 @@ interface OverviewCharacterMasteryPayload {
     katakana: BlockInfo[]
   }
   category_blocks: {
+    /** each vocabulary level's themes, N5 to N1 */
     vocab_n5: BlockInfo[]
+    vocab_n4?: BlockInfo[]
+    vocab_n3?: BlockInfo[]
+    vocab_n2?: BlockInfo[]
+    vocab_n1?: BlockInfo[]
     grammar_patterns: BlockInfo[]
   }
   kanji_cards: OverviewCharacterCard[]
@@ -541,6 +547,9 @@ interface DesktopApi {
   // Per-card mastery counters, keyed by deck slug (issue #66). Optional so a
   // renderer running against an older bridge falls back rather than throwing.
   getCardScores?: () => Promise<CardMasteryScoresPayload>
+  // Each kanji and vocab level deck's size and summed counters, for the level bars
+  // (audit 3, F5). Optional for the same reason.
+  getLevelProgress?: () => Promise<LevelProgressPayload>
   importCardScores?: (legacyScores: Record<string, Record<number, number>>) => Promise<CardMasteryImportPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>

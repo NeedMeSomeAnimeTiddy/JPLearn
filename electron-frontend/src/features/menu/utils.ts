@@ -140,9 +140,12 @@ export interface MenuRowSources {
 
 export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<MenuSectionKey, MenuRow> {
   /* THE PATH'S PLACE IS THE FIRST STEP NOT YET MASTERED, which is what "where you are" means on a
-     road you walk in order. A finished curriculum has no such node, and then you are at the end. */
+     road you walk in order. A finished curriculum has no such node, and then you are at the end.
+     A step the app cannot measure is walked past: it can never be mastered, so stopping at it left
+     the row on Sentence Examples for good, showing a figure that was not that step's (audit 3, F7).
+     The curriculum stopped waiting on those steps for the same reason. */
   const of = nodes.length
-  const at = nodes.findIndex((node) => node.status !== 'mastered')
+  const at = nodes.findIndex((node) => node.is_tracked && node.status !== 'mastered')
   const step = at < 0 ? of : at + 1
   const here = at < 0 ? null : nodes[at]
   const no = String(step).padStart(2, '0')
@@ -155,10 +158,11 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
      whole obligation, and a learner with four decks due is not one card behind. */
   const due = (block?.recommendations ?? []).reduce((sum, rec) => sum + (rec.review_count ?? 0), 0)
 
-  /* the five JLPT nodes are on the same curriculum the path draws, so how many are finished is a
-     free and honest figure where the readiness sweep is neither */
+  /* the five JLPT nodes are on the same curriculum the path draws. The app cannot measure them, so
+     none is ever mastered; how many the path has opened is the honest figure (audit 3 review,
+     Robbie: "Count open steps") */
   const exams = nodes.filter((node) => /^jlpt_n[1-5]$/.test(node.node_id))
-  const passed = exams.filter((node) => node.status === 'mastered').length
+  const opened = exams.filter((node) => node.status !== 'locked').length
 
   const streak = typeof streakDays === 'number' ? streakDays : null
 
@@ -166,7 +170,7 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
     STUDY: {
       tok: of ? `STEP ${no}/${of}` : 'THE PATH',
       lab: 'WHERE YOU ARE',
-      val: here ? `STEP ${no} \u00b7 ${here.name.toUpperCase()}` : 'EVERY STEP DONE',
+      val: here ? `STEP ${no} \u00b7 ${here.name.toUpperCase()}` : 'ALL TRACKED STEPS DONE',
       kind: 'gauge', pct: herePct, due: 0, fig: '', figLab: '',
       slab: 'CONTINUE THE PATH \u25b8',
     },
@@ -190,8 +194,8 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
     JLPT: {
       tok: exams.length ? `${exams.length} LEVELS` : 'THE EXAM',
       lab: 'HOW FAR UP',
-      val: exams.length ? `${passed} OF ${exams.length} MASTERED` : 'NOT STARTED',
-      kind: 'fig', pct: 0, due: 0, fig: String(passed), figLab: 'LEVELS MASTERED',
+      val: exams.length ? `${opened} OF ${exams.length} OPEN` : 'NOT STARTED',
+      kind: 'fig', pct: 0, due: 0, fig: String(opened), figLab: 'LEVELS OPEN',
       slab: 'OPEN THE EXAM \u25b8',
     },
     RECORDS: {

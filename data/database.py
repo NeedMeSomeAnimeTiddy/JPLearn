@@ -1217,15 +1217,31 @@ def save_state(deck_name: str, state: ReviewState) -> None:
         )
 
 
-def seed_review_states_if_unstudied(deck_name: str, states: Collection[ReviewState]) -> int:
+def load_correct_card_ids(deck_name: str) -> set[int]:
+    """Return the ids of every card in *deck_name* with at least one correct answer in the log.
+
+    A correct answer is quality 3 or more, the line the scheduler treats as a pass. Block unlocking
+    counts a card once it has been answered correctly, whatever has happened to it since (audit 3,
+    F3, Robbie's "Correct once counts"); the schedule cannot say that, because a lapse resets it.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT card_id FROM review_events WHERE deck = ? AND quality >= 3",
+            (_normalize_deck_name(deck_name),),
+        ).fetchall()
+    return {int(row[0]) for row in rows}
+
+
+def seed_review_states_if_unstudied(deck_name: str, states: Collection[ReviewState]) -> list[int]:
     """Insert each state only for a card with no review_states row and no logged review.
 
-    Returns how many rows were inserted. Existing rows are never touched -- including rows from
+    Returns the ids of the cards it inserted, so onboarding can give exactly those cards a mastery
+    counter too (audit 3, F1). Existing rows are never touched -- including rows from
     before the FSRS columns, whose real progress may carry no last-review date -- so `load_states`,
     which fabricates defaults for absent rows, cannot be used to decide what is unstudied.
     """
     normalized_deck_name = _normalize_deck_name(deck_name)
-    inserted = 0
+    inserted: list[int] = []
     with _connect() as conn:
         for state in states:
             cursor = conn.execute(
@@ -1254,7 +1270,8 @@ def seed_review_states_if_unstudied(deck_name: str, states: Collection[ReviewSta
                     state.card_id,
                 ),
             )
-            inserted += cursor.rowcount
+            if cursor.rowcount:
+                inserted.append(state.card_id)
     return inserted
 
 

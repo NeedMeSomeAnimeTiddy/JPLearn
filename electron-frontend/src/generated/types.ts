@@ -14,6 +14,15 @@ export interface DeckSummary {
   completed_today: number
 }
 
+export interface SummaryTotals {
+  total: number
+  mastered: number
+  due_today: number
+  completed_today: number
+  remaining_due: number
+  deck_count: number
+}
+
 export interface StudyStreak {
   current_days: number
   best_days: number
@@ -290,6 +299,18 @@ export interface CardMasteryImportPayload {
   cards_imported: number
   cards_unresolved: number
   decks_written: number
+}
+
+export interface LevelDeckProgress {
+  family: string
+  level: string
+  slug: string
+  total: number
+  score_sum: number
+}
+
+export interface LevelProgressPayload {
+  levels: LevelDeckProgress[]
 }
 
 export interface PitchAccent {

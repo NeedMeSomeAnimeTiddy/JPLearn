@@ -161,16 +161,18 @@ export function buildLedger(
     ? Math.round((drills.reduce((a, d) => a + d.correct, 0) / drillTried) * 100)
     : null
   const sessions = summary?.session_history ?? []
-  const decks = summary?.decks ?? []
-  const deckTotals = decks.reduce(
-    (a, d) => ({
-      total: a.total + d.total,
-      mastered: a.mastered + d.mastered,
-      due: a.due + d.due_today,
-      done: a.done + d.completed_today,
-    }),
-    { total: 0, mastered: 0, due: 0, done: 0 },
-  )
+  /* THE BRIDGE ADDS THESE UP, NOT THIS FILE. Summing `decks` here counted every topic word twice
+     (topic views share their level deck's cards), the hidden Conjugation deck, and all 60,000
+     sentences where the app serves 1,200 (audit 3, F2). A snapshot from before `totals` existed
+     reads as nothing loaded until the fresh summary replaces it. */
+  const totals = summary?.totals
+  const deckTotals = {
+    count: totals?.deck_count ?? 0,
+    total: totals?.total ?? 0,
+    mastered: totals?.mastered ?? 0,
+    due: totals?.due_today ?? 0,
+    done: totals?.completed_today ?? 0,
+  }
 
   return {
     streak: {
@@ -234,7 +236,7 @@ export function buildLedger(
     badges,
     detail: {
       mistakes, drills, sessions,
-      decks: { count: decks.length, ...deckTotals },
+      decks: deckTotals,
       month: summary?.activity?.month ?? null,
     },
   }

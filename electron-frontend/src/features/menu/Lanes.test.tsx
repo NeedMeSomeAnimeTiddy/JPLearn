@@ -8,9 +8,17 @@ import { dueToday, practiceLanes, type Lane } from './lanes'
 const onPick = vi.fn()
 const onUp = vi.fn()
 
-const summary = (...due: number[]) => ({
-  decks: due.map((d, i) => ({ slug: `d${i}`, name: `D${i}`, total: 10, mastered: 1, due_today: d, completed_today: 0 })),
-} as unknown as StudySummaryPayload)
+/* the bridge's totals, still due now; `decks` is there to show it is not what is read */
+const summary = (...due: number[]) => {
+  const remaining = due.reduce((a, d) => a + d, 0)
+  return {
+    decks: due.map((d, i) => ({ slug: `d${i}`, name: `D${i}`, total: 10, mastered: 1, due_today: d, completed_today: 0 })),
+    totals: {
+      total: 10 * due.length, mastered: due.length, due_today: remaining, completed_today: 0,
+      remaining_due: remaining, deck_count: due.length,
+    },
+  } as unknown as StudySummaryPayload
+}
 
 function show(lanes: Lane[]) {
   render(<Lanes section="DRILLS" jp="練習" en="PRACTICE" note="NOTE" lanes={lanes} onPick={onPick} onUp={onUp} />)
@@ -23,8 +31,37 @@ afterEach(() => {
 })
 
 describe('what the practice lanes are made of', () => {
-  it('adds the due count across every deck', () => {
+  it("reads the bridge's still-due total", () => {
     expect(dueToday(summary(3, 0, 9))).toBe(12)
+  })
+
+  it('does not count a topic view a second time over its level deck', () => {
+    /* vocab_greetings is a view over vocab_n5's cards: the same 4 due cards in both entries, and
+       the bridge's totals count them once (audit 3, F2) */
+    const overlap = {
+      decks: [
+        { slug: 'vocab_n5', name: 'Vocabulary N5', total: 700, mastered: 0, due_today: 4, completed_today: 0 },
+        { slug: 'vocab_greetings', name: 'Vocabulary N5', total: 20, mastered: 0, due_today: 4, completed_today: 0 },
+      ],
+      totals: { total: 700, mastered: 0, due_today: 4, completed_today: 0, remaining_due: 4, deck_count: 1 },
+    } as unknown as StudySummaryPayload
+    expect(dueToday(overlap)).toBe(4)
+    expect(practiceLanes(overlap)[0].fig).toBe('4')
+  })
+
+  it('stops owing a card once it is done today', () => {
+    /* today's workload is 3, all three are done: nothing is still owed (audit 3, F4) */
+    const done = {
+      decks: [{ slug: 'hiragana', name: 'Hiragana', total: 46, mastered: 0, due_today: 3, completed_today: 3 }],
+      totals: { total: 46, mastered: 0, due_today: 3, completed_today: 3, remaining_due: 0, deck_count: 1 },
+    } as unknown as StudySummaryPayload
+    const review = practiceLanes(done)[0]
+    expect(review).toMatchObject({ fig: '—', figLab: 'NOTHING DUE', duty: false })
+  })
+
+  it('says not-counted-yet for a saved summary from before the bridge sent totals', () => {
+    const old = { decks: [{ slug: 'a', name: 'A', total: 10, mastered: 0, due_today: 5, completed_today: 0 }] }
+    expect(dueToday(old as unknown as StudySummaryPayload)).toBeNull()
   })
 
   it('says not-counted-yet rather than zero when there is no summary', () => {

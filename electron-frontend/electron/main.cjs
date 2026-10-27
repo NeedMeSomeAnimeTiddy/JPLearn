@@ -14,6 +14,7 @@ const { createOcrRuntime } = require('./ocr_runtime.cjs')
 const { loadFontCSS } = require('./font_loader.cjs')
 const { initAutoUpdater } = require('./updater.cjs')
 const { getConfigValue } = require('./config_store.cjs')
+const { remainingDue } = require('./summary_counts.cjs')
 const {
   isAllowedRendererUrl,
 } = require('./ipc_security.cjs')
@@ -1449,8 +1450,7 @@ function createTray(mainWindowRef) {
   async function refreshDueCount() {
     try {
       const summary = await runPythonBridge('summary')
-      const decks = Array.isArray(summary?.decks) ? summary.decks : []
-      const totalDue = decks.reduce((sum, d) => sum + (typeof d.due_today === 'number' ? d.due_today : 0), 0)
+      const totalDue = remainingDue(summary)
       tray.setToolTip(totalDue > 0 ? `JPLearn — ${totalDue} cards due` : 'JPLearn')
       tray.setContextMenu(buildContextMenu(totalDue))
     } catch { /* non-fatal */ }
@@ -2411,8 +2411,7 @@ app.whenReady().then(async () => {
 
     try {
       const summary = await runPythonBridge('summary')
-      const decks = Array.isArray(summary?.decks) ? summary.decks : []
-      const totalDue = decks.reduce((sum, d) => sum + (typeof d.due_today === 'number' ? d.due_today : 0), 0)
+      const totalDue = remainingDue(summary)
       if (totalDue >= 1) {
         dueReviewNotified = true
         const n = new Notification({

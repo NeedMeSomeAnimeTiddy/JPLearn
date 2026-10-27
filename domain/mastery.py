@@ -29,8 +29,8 @@ rather than being mirrored in renderer storage.
 
 The separate FSRS-derived notions remain as they were, because they answer their
 own questions: "mastered" for deck statistics is
-``repetitions >= 3 and interval >= 21``, and block unlocking keys off
-``repetitions >= 1`` (see :mod:`domain.blocks`).
+``repetitions >= 3 and interval >= 21``, and block unlocking counts a card once it has
+been answered correctly (see :mod:`domain.blocks` and ``_block_pass_inputs`` in the bridge).
 """
 
 CARD_MASTERY_MAX = 4
