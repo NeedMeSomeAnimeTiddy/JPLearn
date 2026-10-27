@@ -21,20 +21,18 @@ import { SCRIPT_LABELS } from '../constants'
 // registry in domain/decks.py. That registry holds two parallel corpora per
 // track: the five JLPT *level* decks (`vocab_n5`..`vocab_n1`) and the *thematic
 // category* decks from issue #68 (`vocab_greetings`, `vocab_n4_school_work`, …).
-// Their card ids are disjoint — nothing is double-counted — but only the
-// category decks are ever studied. `resultSlug` in
-// features/study-session/useStudySession.ts:1159-1164 routes every review from
-// the kanji/vocab sections through KANJI_/VOCAB_CATEGORY_TO_DECK_SLUG, so no
-// review is ever recorded against a level deck; the level decks are marked
-// "kept for backward compatibility" in decks.py and are loaded only to seed
-// onboarding scores. Confirmed against data/jplearn.db: every deck holding
-// review rows is a category deck or hiragana/grammar, never a level deck.
+// Their card ids are disjoint — nothing is double-counted.
 //
-// So a level-deck denominator can never move — it would peg these rows at
-// exactly 0 over 8,031 vocab / 2,196 kanji cards forever. Aggregating the
-// category decks (545 vocab / 211 kanji cards) measures the content the learner
-// can actually reach, which is what `focusRows`/`needsWorkRows` need. Both sets
-// still span N5→N1, so these stay whole-track rows.
+// Sessions study the level decks through the word feed, and the category decks
+// are views over their level deck (they carry its name and card ids). Reviews
+// for kanji and vocabulary are recorded against the level decks. The bridge's
+// Up next (`_section_deck_slugs` in scripts/desktop_bridge.py) now measures the
+// five level decks per track, so this file and the bridge no longer scope
+// vocabulary the same way.
+//
+// This file deliberately still gates grammar on the N5 topic words
+// (`VOCAB_N5_STUDY_DECK` below). Robbie's decision of 2026-10-27 kept the
+// behaviour of that gate unchanged; changing it would move when grammar unlocks.
 //
 // The negative lookahead excludes only an exact level slug. `vocab_numbers` and
 // `vocab_nouns` begin `vocab_n` but are N5 categories, so matching on a bare
@@ -42,9 +40,9 @@ import { SCRIPT_LABELS } from '../constants'
 //
 // Kanji is the exception now. Its categories became block definitions that
 // allocate no ids, so no kanji deck but the five level decks exists, and
-// `resultSlug` records kanji reviews against those level decks. The level decks
-// are therefore exactly where kanji mastery accumulates — the opposite of the
-// vocabulary case above — so kanji matches its level slugs instead.
+// reviews are recorded against those level decks, so kanji matches its level
+// slugs. Vocabulary reviews land on the level decks too (see above); the
+// vocabulary matcher below is the one left as it was.
 const KANJI_STUDY_DECK = /^kanji_n[1-5]$/
 const VOCAB_STUDY_DECK = /^vocab_(?!n[1-5]$)/
 
@@ -54,8 +52,9 @@ const VOCAB_STUDY_DECK = /^vocab_(?!n[1-5]$)/
 // whole-track aggregate answers wrongly: N5 grammar must not wait on N1 words.
 //
 // The recall floor used to need it too. That gate moved to
-// `domain/study_route.py`, which scopes the same way through
-// `_section_deck_slugs(..., n5_only=True)` in the bridge.
+// `domain/study_route.py`, which scopes through
+// `_section_deck_slugs(..., n5_only=True)` in the bridge. That call now
+// returns just the `vocab_n5` level deck, not the N5 category decks.
 const VOCAB_N5_STUDY_DECK = /^vocab_(?!n[1-5](?:_|$))/
 
 export function aggregateDeckMastery(

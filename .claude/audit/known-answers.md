@@ -98,7 +98,9 @@ cannot reach, a colour that fails contrast), not for the rule alone.
 
 `electron-frontend/src/generated/types.ts` (`scripts/generate_ts_types.py`, whose `SOURCE_FILES`
 lists the payload modules), `domain/external_deck_data.py`
-(`python -m scripts.import_external_lists --conflict-policy keep-first`) and the handwriting manifest
+(`python -m scripts.import_external_lists --conflict-policy keep-first`; `keep-first` drops
+cross-level repeats, so editing an earlier list can move later ids, DEBT #5; `--output` must be
+inside the repo) and the handwriting manifest
 (`scripts/build_handwriting_assets.py`) are outputs. A finding about their content is a finding
 about their generator or source data; a hand edit is never the fix.
 
