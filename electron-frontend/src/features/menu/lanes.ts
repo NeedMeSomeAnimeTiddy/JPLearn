@@ -66,11 +66,11 @@ export interface Lane {
   items?: readonly LaneItem[]
 }
 
-/** total cards the scheduler says are due, across every deck */
+/** cards still due now across the decks the app serves, each counted once — not today's whole
+    workload, which also holds the cards already done today (audit 3, F2 and F4). Null until a
+    summary with bridge totals arrives; an older snapshot has none. */
 export function dueToday(summary: StudySummaryPayload | null | undefined): number | null {
-  const decks = summary?.decks
-  if (!decks) return null
-  return decks.reduce((sum: number, deck) => sum + (deck.due_today ?? 0), 0)
+  return summary?.totals?.remaining_due ?? null
 }
 
 /* THE FIGURES ARE COUNTED, NOT COPIED — and this comment nearly proved its own point. It first

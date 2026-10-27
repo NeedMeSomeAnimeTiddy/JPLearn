@@ -14,6 +14,15 @@ export interface DeckSummary {
   completed_today: number
 }
 
+export interface SummaryTotals {
+  total: number
+  mastered: number
+  due_today: number
+  completed_today: number
+  remaining_due: number
+  deck_count: number
+}
+
 export interface StudyStreak {
   current_days: number
   best_days: number

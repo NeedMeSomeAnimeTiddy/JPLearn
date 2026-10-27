@@ -129,6 +129,7 @@ describe('what the ledger is made of', () => {
         { slug: 'a', name: 'A', total: 100, mastered: 40, due_today: 5, completed_today: 2 },
         { slug: 'b', name: 'B', total: 60, mastered: 12, due_today: 0, completed_today: 0 },
       ],
+      totals: { total: 160, mastered: 52, due_today: 5, completed_today: 2, remaining_due: 3, deck_count: 2 },
       mistakes: [
         { key: 'kanji_n5', attempts: 340, mistakes: 75, error_rate: 22 },
         { key: 'hiragana', attempts: 120, mistakes: 6, error_rate: 5 },
@@ -186,6 +187,32 @@ describe('what the ledger is made of', () => {
       expect(lines[0].v).toBe('52 OF 160')
       expect(lines[1].v).toBe('2 DECKS')
       expect(lines[2].v).toBe('5')
+      expect(lines[3].v).toBe('2')
+    })
+
+    it("reads the bridge's totals, so a topic view is not counted again over its level deck", () => {
+      /* vocab_greetings shares vocab_n5's cards; summing the entries would say 30 OF 720 across
+         2 decks, where the cards the app serves are 15 OF 700 in one (audit 3, F2) */
+      const L = built({
+        decks: [
+          { slug: 'vocab_n5', name: 'Vocabulary N5', total: 700, mastered: 15, due_today: 6, completed_today: 2 },
+          { slug: 'vocab_greetings', name: 'Vocabulary N5', total: 20, mastered: 15, due_today: 6, completed_today: 2 },
+        ],
+        totals: { total: 700, mastered: 15, due_today: 6, completed_today: 2, remaining_due: 4, deck_count: 1 },
+      })
+      const lines = ledgerSheet('decks', L)!.lines
+      expect(lines[0].v).toBe('15 OF 700')
+      expect(lines[1].v).toBe('1 DECK')
+      /* the Ledger keeps today's whole workload beside what is done; only the REVIEW lane owes
+         the remainder */
+      expect(lines[2].v).toBe('6')
+      expect(lines[3].v).toBe('2')
+    })
+
+    it('reads a saved summary from before the bridge sent totals as nothing loaded', () => {
+      const L = built({ totals: undefined })
+      expect(L.rows.find((r) => r.key === 'decks')!.value).toBeNull()
+      expect(ledgerSheet('decks', L)!.lines[0].off).toBe(true)
     })
 
     it('carries the thirty-day window, which neither the week chip nor the year strip shows', () => {
