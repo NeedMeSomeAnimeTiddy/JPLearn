@@ -10,6 +10,8 @@ import {
 import { DEFAULT_VOICE_SPEED } from '../features/voice'
 import { clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from '../features/tutor'
 import { isAppFontPreset } from '../constants'
+// From constants.ts, not the feature barrel: constants.ts imports only a type, so no cycle back here.
+import { PROGRESSION_OVERRIDES_STORAGE_KEY } from '../features/progression/constants'
 
 export const STATS_STORAGE_KEY = 'jplearn-desktop-script-stats-v1'
 
@@ -24,6 +26,18 @@ export const SESSION_STORAGE_KEY = 'jplearn-desktop-session-v1'
 export const PREFS_STORAGE_KEY = 'jplearn-desktop-session-prefs-v1'
 
 export const SUMMARY_SNAPSHOT_MAX_AGE_MS = 20 * 60 * 1000
+
+/**
+ * The window's own storage that "Back up everything" carries beside the database, and that a
+ * restore writes back. Must match BACKUP_WINDOW_STATE_KEYS in electron/ipc_security.cjs, which
+ * refuses any other key on the way in and out.
+ */
+export const BACKUP_WINDOW_STATE_KEYS: readonly string[] = [
+  STATS_STORAGE_KEY,
+  PROGRESSION_OVERRIDES_STORAGE_KEY,
+  PREFS_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+]
 
 /**
  * Last-used deck/minigame and session toggles. Read by both App (activeScript,

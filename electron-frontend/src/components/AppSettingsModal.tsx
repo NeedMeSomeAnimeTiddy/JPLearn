@@ -42,6 +42,9 @@ export interface AppSettingsModalProps {
   resetStudyDb: () => void | Promise<void>
   backupLoading: boolean
   backupMessage: string | null
+  /** the whole-database copy, with the allowlisted window storage */
+  backUpEverything: () => void | Promise<void>
+  restoreFromBackup: () => void | Promise<void>
   exportBackup: () => void | Promise<void>
   /** the three CSV exports, which have no other home in the app */
   exportCsv: (type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot') => void | Promise<void>
@@ -77,6 +80,8 @@ export function AppSettingsModal({
   resetStudyDb,
   backupLoading,
   backupMessage,
+  backUpEverything,
+  restoreFromBackup,
   exportBackup,
   exportCsv,
   importBackup,
@@ -865,7 +870,7 @@ export function AppSettingsModal({
                   <SettingsCollapsibleSection
                     id="backup-restore"
                     title="Backup &amp; Restore"
-                    description="Export or restore your full study progress — review history, streaks, leech data, and SRS state."
+                    description="Save, restore or move your study progress."
                     collapsed={Boolean(collapsedSettingsSections['backup-restore'])}
                     onToggle={() => toggleThemeSectionCollapsed('backup-restore')}
                     className="settings-theme-card"
@@ -873,32 +878,69 @@ export function AppSettingsModal({
                   >
                     {window.jplearnDesktop.exportAnalyticsJSON ? (
                       <div className="settings-control-content" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="jlpt-action-btn"
-                            onClick={() => { void exportBackup() }}
-                            disabled={backupLoading}
-                            aria-label="Export full backup as JSON"
-                          >
-                            <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                            Export Backup
-                          </button>
-                          {window.jplearnDesktop.importAnalyticsJSON ? (
+                        {window.jplearnDesktop.backupDatabase || window.jplearnDesktop.restoreDatabase ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                              {window.jplearnDesktop.backupDatabase ? (
+                                <button
+                                  type="button"
+                                  className="jlpt-action-btn"
+                                  onClick={() => { void backUpEverything() }}
+                                  disabled={backupLoading}
+                                  aria-label="Back up everything"
+                                >
+                                  <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                                  Back up everything
+                                </button>
+                              ) : null}
+                              {window.jplearnDesktop.restoreDatabase ? (
+                                <button
+                                  type="button"
+                                  className="jlpt-action-btn"
+                                  onClick={() => { void restoreFromBackup() }}
+                                  disabled={backupLoading}
+                                  aria-label="Restore from a backup"
+                                >
+                                  <RotateCcw aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                                  Restore from a backup
+                                </button>
+                              ) : null}
+                            </div>
+                            <p className="settings-help">Saves or restores an exact copy of all your study data.</p>
+                          </div>
+                        ) : null}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                             <button
                               type="button"
                               className="jlpt-action-btn"
-                              onClick={() => { void importBackup() }}
+                              onClick={() => { void exportBackup() }}
                               disabled={backupLoading}
-                              aria-label="Import backup from JSON file"
+                              aria-label="Export progress (JSON)"
                             >
-                              <Upload aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
-                              Import Backup
+                              <Download aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                              Export progress (JSON)
                             </button>
-                          ) : null}
+                            {window.jplearnDesktop.importAnalyticsJSON ? (
+                              <button
+                                type="button"
+                                className="jlpt-action-btn"
+                                onClick={() => { void importBackup() }}
+                                disabled={backupLoading}
+                                aria-label="Import progress (JSON)"
+                              >
+                                <Upload aria-hidden="true" className="inline-button-icon" strokeWidth={2.2} />
+                                Import progress (JSON)
+                              </button>
+                            ) : null}
+                          </div>
+                          <p className="settings-help">
+                            Your schedules, review history, problem cards and Daily Games, as a file you can merge into another copy of JPLearn.
+                          </p>
                         </div>
-                        {/* AND THE SAME DATA AS SPREADSHEETS. The JSON backup above is everything,
-                            for putting back; these three are one table each, for reading elsewhere.
+                        {/* AND THE SAME DATA AS SPREADSHEETS. "Back up everything" is the whole-database
+                            copy, for putting back; the JSON export is progress, for merging into another
+                            copy; these three are one table each, for reading elsewhere.
                             They moved here from the Study Overview, which was their only home. */}
                         {window.jplearnDesktop.exportAnalyticsCSV ? (
                           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

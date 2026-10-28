@@ -82,7 +82,9 @@ import {
   loadSessionPrefs,
   loadSummarySnapshot,
   saveSummarySnapshot,
+  BACKUP_WINDOW_STATE_KEYS,
 } from './lib/appStorage'
+import { backupFailureMessage, importSummaryMessage } from './lib/backupMessages'
 import { emptyCardScores, hasAnyCardScore, toSectionScores } from './lib/cardScores'
 import {
   normalizeDeckCards,
@@ -2438,8 +2440,9 @@ function App() {
   /* THE THREE CSV EXPORTS, WHICH USED TO LIVE IN THE STUDY OVERVIEW AND NOWHERE ELSE.
      `exportAnalyticsCSV` had exactly one call site in the renderer -- the Overview's Export Data
      panel -- so retiring that modal would have taken review history, accuracy trends and the
-     mastery snapshot out of the app entirely. They belong beside the JSON backup and import, which
-     are the same act at a different granularity and already sit in Settings. */
+     mastery snapshot out of the app entirely. They belong in Settings beside the other two ways out:
+     the JSON export, which is progress for merging into another copy, and "Back up everything",
+     which is the whole-database copy. */
   const exportCsv = useCallback(async (type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot') => {
     if (!window.jplearnDesktop.exportAnalyticsCSV) return
     setBackupLoading(true)
@@ -2456,6 +2459,73 @@ function App() {
     }
   }, [])
 
+  /* "BACK UP EVERYTHING" IS THE WHOLE DATABASE, plus the few things that live only in this
+     window's storage (per-section stats, progression overrides, session prefs, settings). The main
+     process shows the save dialog and refuses any key outside its own copy of the list. */
+  const backUpEverything = useCallback(async () => {
+    if (!window.jplearnDesktop.backupDatabase) return
+    setBackupLoading(true)
+    setBackupMessage(null)
+    try {
+      const windowState: Record<string, string> = {}
+      for (const key of BACKUP_WINDOW_STATE_KEYS) {
+        try {
+          const value = window.localStorage.getItem(key)
+          if (value !== null) windowState[key] = value
+        } catch {
+          // An unreadable key is left out; the database itself is still copied.
+        }
+      }
+      const result = await window.jplearnDesktop.backupDatabase(windowState)
+      if (result.ok) setBackupMessage(`Saved: ${result.path}`)
+    } catch (err) {
+      setBackupMessage(backupFailureMessage(err, 'backup'))
+    } finally {
+      setBackupLoading(false)
+    }
+  }, [])
+
+  /* A RESTORE REPLACES THE DATABASE, so this window's copies of it are dropped exactly as a reset
+     drops them, the backed-up window storage is written over them, and the page reloads so every
+     piece of React state starts again from what is now stored. The main process already asked. */
+  const restoreFromBackup = useCallback(async () => {
+    if (!window.jplearnDesktop.restoreDatabase) return
+    setBackupLoading(true)
+    setBackupMessage(null)
+    try {
+      const result = await window.jplearnDesktop.restoreDatabase()
+      if (!result.ok) {
+        setBackupLoading(false)
+        return
+      }
+      const emptyStats: StatsByScript = {
+        hiragana: { ...EMPTY_SCRIPT_STATS },
+        katakana: { ...EMPTY_SCRIPT_STATS },
+        kanji_n5: { ...EMPTY_SCRIPT_STATS },
+        vocab_n5: { ...EMPTY_SCRIPT_STATS },
+        grammar_patterns: { ...EMPTY_SCRIPT_STATS },
+        sentence_examples: { ...EMPTY_SCRIPT_STATS },
+      }
+      // The database has been replaced by now, so a storage write that throws must not turn this
+      // into "Restore failed." — the reload still has to happen.
+      try {
+        window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyCardScores()))
+        window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
+        window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
+        window.localStorage.removeItem(SESSION_STORAGE_KEY)
+        for (const [key, value] of Object.entries(result.window_state ?? {})) {
+          if (BACKUP_WINDOW_STATE_KEYS.includes(key)) window.localStorage.setItem(key, value)
+        }
+      } catch {
+        // Best effort: the stored database is what the reloaded window reads its progress from.
+      }
+      window.location.reload()
+    } catch (err) {
+      setBackupMessage(backupFailureMessage(err, 'restore'))
+      setBackupLoading(false)
+    }
+  }, [])
+
   const exportBackup = useCallback(async () => {
     setBackupLoading(true)
     setBackupMessage(null)
@@ -2468,8 +2538,8 @@ function App() {
       } else {
         setBackupMessage('Export failed.')
       }
-    } catch {
-      setBackupMessage('Export failed.')
+    } catch (err) {
+      setBackupMessage(backupFailureMessage(err, 'export'))
     } finally {
       setBackupLoading(false)
     }
@@ -2480,14 +2550,8 @@ function App() {
     setBackupMessage(null)
     try {
       const result = await window.jplearnDesktop.importAnalyticsJSON!()
-      if (result.cancelled) {
-        setBackupMessage(null)
-      } else if (result.ok) {
-        const counts = result.imported ?? {}
-        const parts = Object.entries(counts)
-          .filter(([, v]) => v > 0)
-          .map(([k, v]) => `${v} ${k}`)
-        setBackupMessage(`Imported: ${parts.join(', ') || 'no changes'}`)
+      if (result.ok) {
+        setBackupMessage(importSummaryMessage(result))
         // A format-2 backup replaces the mastery counters (audit 2, F5). Show the stored ones now,
         // even when empty, and so overwrite the localStorage copy that would otherwise be adopted
         // back into the table at the next launch.
@@ -2498,11 +2562,9 @@ function App() {
         } catch {
           // The next launch reads them.
         }
-      } else {
-        setBackupMessage('Import failed.')
       }
-    } catch {
-      setBackupMessage('Import failed.')
+    } catch (err) {
+      setBackupMessage(backupFailureMessage(err, 'import'))
     } finally {
       setBackupLoading(false)
     }
@@ -3350,6 +3412,8 @@ function App() {
           resetStudyDb={resetStudyDb}
           backupLoading={backupLoading}
           backupMessage={backupMessage}
+          backUpEverything={backUpEverything}
+          restoreFromBackup={restoreFromBackup}
           exportBackup={exportBackup}
           exportCsv={exportCsv}
           importBackup={importBackup}
