@@ -223,16 +223,19 @@ export function SetupWizard({ onComplete }: Props) {
         setter()
         return result
       }
-      if (needsModel && selectedTier) {
-        appendProgressLog(`Starting model download (${selectedTier})…`)
-        const task = api.downloadModel?.(selectedTier)
-        if (task) downloadTasks.push({ name: 'model', promise: markDone(task, () => setModelProgress(100)) })
-      }
+      // llama.cpp first: the model download also ensures llama.cpp, with the detected backend,
+      // and joins an install already running. Started second, it would run first and the
+      // backend chosen here would be lost (audit 6 review).
       if (needsLlama && selectedTier) {
         const backendLabel = LLAMA_BACKEND_OPTIONS.find((o) => o.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend
         appendProgressLog(`Starting llama.cpp runtime download (${backendLabel})…`)
         const task = api.downloadLlama?.(selectedLlamaBackend)
         if (task) downloadTasks.push({ name: 'llama', promise: markDone(task, () => setLlamaProgress(100)) })
+      }
+      if (needsModel && selectedTier) {
+        appendProgressLog(`Starting model download (${selectedTier})…`)
+        const task = api.downloadModel?.(selectedTier)
+        if (task) downloadTasks.push({ name: 'model', promise: markDone(task, () => setModelProgress(100)) })
       }
       if (needsVoice) {
         appendProgressLog(`Starting Japanese voice model download (${selectedVoiceTier})…`)

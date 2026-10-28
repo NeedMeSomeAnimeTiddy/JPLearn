@@ -54,6 +54,56 @@ function Get-FullPath {
   return [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
 }
 
+function Test-IsInside {
+  param([string]$Path, [string]$Folder)
+  $p = Get-FullPath $Path
+  $f = Get-FullPath $Folder
+  return ($p -eq $f -or $p.StartsWith("$f\", [System.StringComparison]::OrdinalIgnoreCase))
+}
+
+# Moves $Path to the Recycle Bin, except anything a kept item owns inside it: the translation
+# model lives in the tutor models folder, so unticking tutor models must not take it along.
+function Remove-PathKeeping {
+  param([string]$Path, [string[]]$Kept)
+
+  foreach ($keptPath in $Kept) {
+    if (Test-IsInside -Path $Path -Folder $keptPath) {
+      return $false
+    }
+  }
+  $holdsKept = $false
+  foreach ($keptPath in $Kept) {
+    if (Test-IsInside -Path $keptPath -Folder $Path) {
+      $holdsKept = $true
+    }
+  }
+  if ($holdsKept) {
+    $any = $false
+    foreach ($child in (Get-ChildItem -LiteralPath $Path -Force)) {
+      if (Remove-PathKeeping -Path $child.FullName -Kept $Kept) {
+        $any = $true
+      }
+    }
+    return $any
+  }
+  # The Recycle Bin rather than a permanent delete: a learner who unticks the wrong box can
+  # still get their history back.
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
+      $Path,
+      [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+      [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+    )
+  } else {
+    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile(
+      $Path,
+      [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
+      [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
+    )
+  }
+  return $true
+}
+
 function Format-Size {
   param([string]$Path)
   if (-not (Test-Path -LiteralPath $Path)) {
@@ -112,6 +162,7 @@ $downloadOptions = @(
     Paths = @(
       (Join-Path $assetsDir 'ocr'),
       (Join-Path $assetsDir 'translation'),
+      (Join-Path $assetsDir 'models\llama\Qwen3.5-0.8B-JP-Q4_K_M.gguf'),
       (Join-Path $assetsDir 'tools\llama.cpp'),
       (Join-Path $assetsDir 'fonts'),
       (Join-Path $assetsDir 'data\external_sources\offline_dictionary')
@@ -226,6 +277,15 @@ for ($i = 0; $i -lt $learningOptions.Count; $i++) {
   $choices += @{ Option = $learningOptions[$i]; Keep = $learningList.GetItemChecked($i) }
 }
 
+# Everything a kept item covers, and the learner's progress whatever was ticked, is left alone
+# even where it sits inside a folder another item removes.
+$keptPaths = @($progressPath)
+foreach ($choice in $choices) {
+  if ($choice.Keep) {
+    $keptPaths += $choice.Option.Paths
+  }
+}
+
 foreach ($choice in $choices) {
   $opt = $choice.Option
 
@@ -240,16 +300,17 @@ foreach ($choice in $choices) {
       Write-CleanupLog -LogPath $logPath -Message "Nothing to remove at: $path"
       continue
     }
+    # The progress item itself may remove the progress folder; every other item keeps it.
+    $keptHere = if ($opt.Paths -contains $progressPath) {
+      @($keptPaths | Where-Object { $_ -ne $progressPath })
+    } else {
+      $keptPaths
+    }
     try {
-      # The Recycle Bin rather than a permanent delete: a learner who unticks the wrong box can
-      # still get their history back.
-      [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory(
-        $path,
-        [Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,
-        [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin
-      )
-      $removedAny = $true
-      Write-CleanupLog -LogPath $logPath -Message "Moved to Recycle Bin: $path"
+      if (Remove-PathKeeping -Path $path -Kept $keptHere) {
+        $removedAny = $true
+        Write-CleanupLog -LogPath $logPath -Message "Moved to Recycle Bin: $path"
+      }
     } catch {
       $failed += "$($opt.Label): $($_.Exception.Message)"
       Write-CleanupLog -LogPath $logPath -Message "Failed to remove ${path}: $($_.Exception.Message)"

@@ -1197,10 +1197,22 @@ function createLlamaServerAdapter(config = {}) {
   let exitHandlerRegistered = false
   let startPromise = null
 
+  // Resolves once the stopped process has exited (capped at 5 s), so a caller about to delete
+  // the model file is not racing Windows releasing it (audit 6 review). Callers that only need
+  // the server gone may ignore the promise.
   function stopServer() {
+    let exited = Promise.resolve()
     if (serverProcess && serverProcess.exitCode === null) {
+      const stopping = serverProcess
+      exited = new Promise((resolve) => {
+        const timer = setTimeout(resolve, 5000)
+        stopping.once('exit', () => {
+          clearTimeout(timer)
+          resolve()
+        })
+      })
       try {
-        serverProcess.kill()
+        stopping.kill()
       } catch {
         // Process may already be gone.
       }
@@ -1210,6 +1222,7 @@ function createLlamaServerAdapter(config = {}) {
     if (activeLlamaServerGuard && activeLlamaServerGuard.ownerId === ownerId) {
       activeLlamaServerGuard = null
     }
+    return exited
   }
 
   // An inference request past its timeout leaves llama-server busy with it, so the server is
@@ -1339,7 +1352,7 @@ function createLlamaServerAdapter(config = {}) {
     },
 
     async unload() {
-      stopServer()
+      await stopServer()
       return undefined
     },
 

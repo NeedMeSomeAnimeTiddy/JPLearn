@@ -274,8 +274,7 @@ def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: floa
         os.environ.setdefault("FLAGS_use_mkldnn", "0")
         paddleocr_module = importlib.import_module("paddleocr")
         PaddleOCR = getattr(paddleocr_module, "PaddleOCR")
-        if os.environ.get("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"):
-            forbid_downloads()
+        forbid_downloads()
     except Exception as exc:  # pragma: no cover - environment-dependent
         raise RuntimeError(
             "PaddleOCR runtime is unavailable in this environment. Install Python package 'paddleocr'."

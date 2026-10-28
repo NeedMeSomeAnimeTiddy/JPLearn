@@ -105,12 +105,15 @@ def prepare_offline_runtime() -> None:
     """Run before the OCR engine is built: the cache in the app folder, and no downloads.
 
     Raises RuntimeError with a message the learner can act on when the weights are missing.
+    Without an assets folder (the OCR server or the bridge run outside the app) the weights are
+    read from PaddleX's default cache, under the same rule: use never downloads.
     """
-    models_dir = configure_cache()
-    if models_dir is None:
-        return
     # Without this PaddleX probes four model hosts before it even looks at the cache.
     os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
-    adopt_legacy_weights(models_dir)
+    models_dir = configure_cache()
+    if models_dir is None:
+        models_dir = legacy_models_dir()
+    else:
+        adopt_legacy_weights(models_dir)
     if not has_required_weights(models_dir):
         raise RuntimeError(MISSING_WEIGHTS_MESSAGE)

@@ -167,6 +167,19 @@ class TestOcrModelCache:
         with pytest.raises(RuntimeError, match="Reinstall OCR"):
             ocr_model_cache.prepare_offline_runtime()
 
+    def test_outside_the_app_the_default_cache_is_held_to_the_same_rule(self, tmp_path: Path, monkeypatch) -> None:
+        for name in ("JPLEARN_ASSETS_DIR", "JPLEARN_USER_DATA_DIR", "JPLEARN_DOCUMENTS_DIR", "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"):
+            monkeypatch.delenv(name, raising=False)
+        legacy = tmp_path / "home-cache"
+        monkeypatch.setattr(ocr_model_cache, "legacy_models_dir", lambda: legacy)
+        with pytest.raises(RuntimeError, match="Reinstall OCR"):
+            ocr_model_cache.prepare_offline_runtime()
+        import os
+
+        assert os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] == "True"
+        self._make_models(legacy, "PP-OCRv6_medium_det_onnx", "PP-OCRv6_medium_rec_onnx")
+        ocr_model_cache.prepare_offline_runtime()
+
     def test_present_weights_pass(self, tmp_path: Path, monkeypatch) -> None:
         assets = tmp_path / "assets"
         monkeypatch.setenv("JPLEARN_ASSETS_DIR", str(assets))
