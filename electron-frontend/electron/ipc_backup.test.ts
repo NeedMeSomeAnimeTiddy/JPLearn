@@ -183,14 +183,13 @@ describe('analytics:import-from-json', () => {
 
 describe('analytics:export-and-save-json', () => {
   it('exports after any waiting answers and writes the whole file', async () => {
-    const { handlers, options, folder } = register()
+    const { handlers, options, dialog, folder } = register()
 
     const result = await handlers.get('analytics:export-and-save-json')(createValidEvent())
 
     expect(options.answerQueue.runExclusive).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ ok: true, path: join(folder, 'saved') })
     expect(JSON.parse(readFileSync(join(folder, 'saved'), 'utf-8'))).toEqual({ format_version: 2 })
-    const [, saveOptions] = options.dialog.showSaveDialog.mock.calls[0]
-    expect(saveOptions.defaultPath).toMatch(/jplearn-progress-\d{4}-\d{2}-\d{2}\.json$/)
+    expect(dialog.showSaveDialog.mock.calls[0]?.[1].defaultPath).toMatch(/jplearn-progress-\d{4}-\d{2}-\d{2}\.json$/)
   })
 })
