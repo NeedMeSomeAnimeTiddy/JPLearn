@@ -2561,3 +2561,36 @@ def test_feature_unlock_status_only_claims_the_transition_once(
         _feature(second, "themes")["unlocked_at"]
         == _feature(first, "themes")["unlocked_at"]
     )
+
+
+def test_worker_reads_japanese_arguments_through_a_real_pipe(tmp_path: Path) -> None:
+    # Node writes UTF-8; without the stdin reconfigure a cp1252 machine garbled 日 and died on
+    # hiragana (audit 7 F1). The variables Claude's or a developer's shell may set are removed so
+    # the child sees the encoding the app's child would.
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONIOENCODING", "PYTHONUTF8"}}
+    env["JPLEARN_DOCUMENTS_DIR"] = str(tmp_path)
+    requests = "".join(
+        json.dumps({"id": index, "args": args}, ensure_ascii=False) + "\n"
+        for index, args in enumerate((["kanji-detail", "日"], ["dictionary-search", "たべる"], ["xp-progress"]))
+    ).encode("utf-8")
+    script = Path(desktop_bridge.__file__).resolve()
+    completed = subprocess.run(
+        [sys.executable, str(script), "--server"],
+        input=requests,
+        capture_output=True,
+        env=env,
+        cwd=script.parent.parent,
+        timeout=120,
+    )
+
+    assert completed.returncode == 0, completed.stderr.decode("utf-8", "replace")[-800:]
+    responses = [json.loads(line) for line in completed.stdout.decode("utf-8").splitlines() if line.strip()]
+    assert [response["id"] for response in responses] == [0, 1, 2]
+    assert responses[0]["ok"] is True
+    assert responses[0]["payload"]["character"] == "日"
+    assert responses[1]["payload"].get("query", "たべる") == "たべる"
+    assert responses[2]["ok"] is True
