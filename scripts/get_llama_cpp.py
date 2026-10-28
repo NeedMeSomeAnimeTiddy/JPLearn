@@ -32,6 +32,13 @@ DOCUMENTS_DIR = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
 TARGET_ROOT = Path(DOCUMENTS_DIR).expanduser().resolve() if DOCUMENTS_DIR else REPO_ROOT
 TARGET_DIR = TARGET_ROOT / "tools" / "llama.cpp" / "build" / "bin" / "Release"
 API_URL = "https://api.github.com/repos/ggerganov/llama.cpp/releases/latest"
+# Everything is downloaded and extracted here and moved to TARGET_DIR only once complete, so
+# llama-server.exe existing means the install finished (audit 6 F4). A run that is killed or
+# fails leaves only this folder, which the next run starts over.
+STAGING_DIR = TARGET_DIR.with_name(TARGET_DIR.name + ".partial")
+# Socket timeout: a connection that stays open but sends nothing fails instead of hanging setup
+# forever (audit 6 F5).
+NETWORK_TIMEOUT_S = 30
 
 
 def report(done: int, total: int, offset: int = 0, grand_total: int = 0) -> None:
@@ -45,7 +52,7 @@ def report(done: int, total: int, offset: int = 0, grand_total: int = 0) -> None
 
 def fetch_json(url: str) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT_S) as response:
         return json.loads(response.read().decode())
 
 
@@ -144,7 +151,7 @@ def find_cudart_asset(assets: list[dict], cuda_asset_name: str) -> dict | None:
 
 def download(url: str, destination: Path, offset: int = 0, grand_total: int = 0) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT_S) as response:
         total = int(response.headers.get("Content-Length") or 0)
         done = 0
         with open(destination, "wb") as handle:
@@ -155,6 +162,10 @@ def download(url: str, destination: Path, offset: int = 0, grand_total: int = 0)
                 handle.write(chunk)
                 done += len(chunk)
                 report(done, total, offset, grand_total)
+    # An early close reads as end of file rather than an error; a cut-short archive would then
+    # fail to extract with a less useful message.
+    if total and done != total:
+        raise OSError(f"download ended after {done} of {total} bytes")
     sys.stdout.write("\n")
 
 
@@ -198,7 +209,6 @@ def main() -> int:
         return 1
 
     name: str = asset["name"]
-    url: str = asset["browser_download_url"]
 
     # Resolve the CUDA runtime asset now so we can compute the grand total
     # before any downloading begins, giving the progress display a stable total.
@@ -210,53 +220,42 @@ def main() -> int:
     grand_total_mb = grand_total_bytes // (1024 * 1024)
     print(f"Found: {name}  ({grand_total_mb} MB)  release {tag}")
 
-    TARGET_DIR.mkdir(parents=True, exist_ok=True)
-    zip_path = TARGET_DIR / name
+    if STAGING_DIR.exists():
+        shutil.rmtree(STAGING_DIR)
+    STAGING_DIR.mkdir(parents=True)
 
-    if not zip_path.exists():
-        print(f"Downloading to {zip_path} ...")
+    archives = [(asset, 0)]
+    if cudart_asset is not None:
+        archives.append((cudart_asset, asset["size"]))
+    for archive, offset in archives:
+        zip_path = STAGING_DIR / archive["name"]
+        print(f"Downloading {archive['name']} ...")
         try:
-            download(url, zip_path, offset=0, grand_total=grand_total_bytes)
+            download(archive["browser_download_url"], zip_path, offset=offset, grand_total=grand_total_bytes)
         except Exception as exc:
-            zip_path.unlink(missing_ok=True)
             print(f"\nDownload failed: {exc}", file=sys.stderr)
             return 1
-    else:
-        print(f"Archive already present: {zip_path}")
+        print(f"Extracting {archive['name']} ...")
+        try:
+            extract_flat(zip_path, STAGING_DIR)
+        except Exception as exc:
+            print(f"Extraction failed: {exc}", file=sys.stderr)
+            return 1
+        # The archives are not needed once extracted, and nothing else would remove them.
+        zip_path.unlink(missing_ok=True)
 
-    print(f"Extracting to {TARGET_DIR} ...")
-    try:
-        extract_flat(zip_path, TARGET_DIR)
-    except Exception as exc:
-        print(f"Extraction failed: {exc}", file=sys.stderr)
+    if not (STAGING_DIR / "llama-server.exe").exists():
+        print("Error: llama-server.exe not found after extraction.", file=sys.stderr)
+        print("Files present:", [f.name for f in STAGING_DIR.iterdir() if f.is_file()], file=sys.stderr)
         return 1
 
-    if cudart_asset is not None:
-        cudart_name = cudart_asset["name"]
-        cudart_url = cudart_asset["browser_download_url"]
-        cudart_zip_path = TARGET_DIR / cudart_name
-        print(f"Downloading CUDA runtime package: {cudart_name}")
-        if not cudart_zip_path.exists():
-            try:
-                download(cudart_url, cudart_zip_path, offset=asset["size"], grand_total=grand_total_bytes)
-            except Exception as exc:
-                cudart_zip_path.unlink(missing_ok=True)
-                print(f"\nCUDA runtime download failed: {exc}", file=sys.stderr)
-                return 1
-        print(f"Extracting CUDA runtime to {TARGET_DIR} ...")
-        try:
-            extract_flat(cudart_zip_path, TARGET_DIR)
-        except Exception as exc:
-            print(f"CUDA runtime extraction failed: {exc}", file=sys.stderr)
-            return 1
+    # TARGET_DIR has no llama-server.exe (checked above), so whatever is in it is an older,
+    # unfinished attempt.
+    if TARGET_DIR.exists():
+        shutil.rmtree(TARGET_DIR)
+    STAGING_DIR.rename(TARGET_DIR)
 
-    server_exe = TARGET_DIR / "llama-server.exe"
-    if server_exe.exists():
-        print(f"\nDone — llama-server.exe is ready at:\n  {server_exe}")
-    else:
-        print("Warning: llama-server.exe not found after extraction.", file=sys.stderr)
-        extracted = [f.name for f in TARGET_DIR.iterdir() if f.is_file()]
-        print("Files present:", extracted, file=sys.stderr)
+    print(f"\nDone — llama-server.exe is ready at:\n  {TARGET_DIR / 'llama-server.exe'}")
 
     return 0
 

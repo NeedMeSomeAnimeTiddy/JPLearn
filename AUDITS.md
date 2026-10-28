@@ -34,33 +34,56 @@ except models.
 - Not run: the tutor-uninstall-while-loaded check (needs a launch-gated app with a tutor model).
 
 ### Where each finding went
-- F1 every launch contacts proof.ovh.net and huggingface.co (P1, confirmed): to repair. Outside the
-  wizard, install-state reads start no network work. Robbie asked for "our own" speed test and chose
-  "Time the real host": the third-party test server goes; the wizard alone times a short range read
-  from Hugging Face, the host the models come from.
-- F2 uninstall leaves JPLearn Assets; the dialog points at Documents (P1): to repair. Robbie chose
-  "Separate the two": a downloads list (tutor, voice, speech, OCR/translation/tools/fonts) and a
-  learning-progress item, all kept by default. In-app uninstall also removes partials; llama.cpp
-  zips go after extraction.
-- F6 synchronous PowerShell and pip on the main process, about 1.4–1.7 s per read, twice per launch
-  (P1, measured): to repair (async, cached GPU detection; no pip at download time).
-- F3 Reapply translation deletes the model before downloading (P2): to repair.
-- F4 partial llama.cpp and speech installs read as installed, never repaired (P2): to repair.
-- F5 stalled downloads hang setup, no cancel (P2): to repair.
-- F7 OCR installed flag is a marker; weights in ~/.paddlex; cold cache downloads at use (P2,
-  confirmed): Robbie chose "No, offline only". To repair: PaddleX's cache moves into the app folder
-  (existing weights copied, never re-downloaded), use never fetches, installed and uninstall look at
-  the real weights.
-- F8 tutor uninstall deletes before unloading (P3, plausible): to repair (unload first).
-- F9 no checksums; Python fallback accepts cut-short files (P3, confirmed): to repair rather than
-  debt (length and 206 checks).
-- Nit 1 fonts manifest written despite failures: to repair. Nit 2 unannounced pip install of
-  nvidia-cublas after a speech download on a GPU without CUDA: left; it follows a learner-started
-  download. Nit 3 duplicate concurrent llama.cpp download: to repair rather than debt
-  (single-flight).
-- STALE RECORD: ARCHITECTURE.md:122 and ocr_runtime.cjs:27-29 ("from BOS"); downloader docstrings
-  and the uninstall dialog say Documents\JPLearn. Corrected with the repairs.
-- Dropped: none.
+Repairs on branch audit6-repairs, implemented by the lead (networking, file installs and deletes,
+concurrency), reviewed by an Astra reviewer over five rounds (5X was out); Robbie approved rounds
+four and five.
+- F1 every launch contacts proof.ovh.net and huggingface.co (P1, confirmed): fixed. A non-waiting
+  install-state read starts no network work (`createDeferredValue.get(false)` starts nothing).
+  Robbie asked for "our own" speed test and chose "Time the real host": the wizard alone times a
+  4 MB range read of a tutor model from Hugging Face. A test fails if a plain read contacts any
+  non-loopback host.
+- F2 uninstall leaves JPLearn Assets; the dialog points at Documents (P1): fixed. Robbie chose
+  "Separate the two": a downloads list (tutor; voice; speech; OCR, translation, tools, fonts) and
+  "Keep learning progress", all kept by default; Enter now means Keep Everything, and removal goes
+  to the Recycle Bin. The lead labelled progress without "and settings": settings are not in that
+  folder. Review rounds hardened it: an item never removes what a kept item owns inside its folder,
+  the item naming a path wins over a kept folder around it, and nothing reached through a junction
+  or symbolic link is followed or removed (probed under PowerShell 5.1 on scratch trees, five
+  selections, a decoy file behind a junction into progress). Tutor and translation uninstall remove
+  `.tmp`, `.partN` and the hf CLI bookkeeping; get_llama_cpp.py deletes its zips. The uninstall hook
+  itself still has no automated test (the probe moves files to the Recycle Bin, so it is not in the
+  suite).
+- F6 synchronous PowerShell and pip on the main process (P1, measured): fixed. GPU detection is one
+  async PowerShell call cached per process; the hf CLI check is async with timeouts and never
+  pip-installs (the Node downloader is the fallback).
+- F3 Reapply translation deletes the model before downloading (P2): fixed. A forced reinstall
+  downloads to `.tmp` over the working file; installed needs the GGUF as well as the marker.
+- F4 partial llama.cpp and speech installs read as installed (P2): fixed. get_llama_cpp.py works in
+  `Release.partial` and renames into place only when complete (also checks the byte count); a speech
+  tier needs all four files; `--force` replaces them. Installs left incomplete by older builds
+  (llama-server.exe present, CUDA runtime missing) are not detected.
+- F5 stalled downloads hang setup, no cancel (P2): fixed for the hang: a 60 s idle timeout on Node
+  downloads and a 30 s socket timeout on every urlopen. No cancel button this round (the lead's call;
+  it is something Robbie would see).
+- F7 OCR weights in ~/.paddlex; cold cache downloads at use (P2): fixed. Robbie chose "No, offline
+  only" (asked first how big they are: about 310 MB there, about 140 MB used). `scripts/ocr_model_cache.py`
+  points PaddleX's cache at `ocr/paddlex` in the assets folder, copies old weights across rather than
+  downloading, refuses to download in use (source check off, no model hosts) with or without an
+  assets folder, and fails with "Reinstall OCR from Settings" when weights are missing; installed
+  checks the weights (or the old cache); uninstall removes them.
+- F8 tutor uninstall deletes before unloading (P3): fixed. Both uninstall routes unload the tutor
+  runtime first, and the llama-server stop now resolves on process exit (5 s cap), from review.
+- F9 Python fallback accepts cut-short files (P3, confirmed): fixed rather than filed as debt. The
+  sequential path compares bytes to Content-Length; the range worker requires 206 and retries an
+  early close. Downloads are still not checked against a hash (Hugging Face publishes an LFS
+  SHA-256 per file; not used yet).
+- Nit 1 fonts read installed with files missing: fixed (any extraction failure fails the install;
+  each weight's CSS is written last). Nit 2 unannounced pip install of nvidia-cublas: left. Nit 3
+  duplicate concurrent llama.cpp download: fixed rather than filed (single-flight); review found the
+  join lost the wizard's chosen backend, so the wizard now starts llama.cpp before the model.
+- STALE RECORD: ARCHITECTURE.md §2 OCR notes and §8 B4, the ocr_runtime.cjs comment, and the
+  downloader docstrings corrected.
+- Dropped: none. No debt rows filed.
 
 ### Triggers checked
 - No DEBT.md row covers setup or downloads. DEBT #4's startup-budget clause: not fired on evidence

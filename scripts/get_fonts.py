@@ -33,6 +33,8 @@ FONTS: list[tuple[str, list[int]]] = [
     ("ibm-plex-mono", [400, 500]),
 ]
 
+# A connection that stays open but sends nothing fails instead of hanging setup (audit 6 F5).
+NETWORK_TIMEOUT_S = 30
 NPM_REGISTRY_BASE = "https://registry.npmjs.org/@fontsource"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 READY_MARKER = ".fonts-ready"
@@ -50,7 +52,7 @@ def resolve_target_dir() -> Path:
 
 def fetch(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT_S) as resp:
         return resp.read()
 
 
@@ -92,41 +94,36 @@ def extract_font_from_package(
     family_dir.mkdir(parents=True, exist_ok=True)
     files_dir.mkdir(exist_ok=True)
 
-    try:
-        css_member = tar.getmember(f"package/{weight}.css")
-        css_bytes = tar.extractfile(css_member)
-        if css_bytes is None:
-            raise RuntimeError("missing css payload")
-        css = css_bytes.read().decode("utf-8")
-    except Exception as exc:
-        print(f"  WARNING: failed to load CSS for {family}/{weight}: {exc}", file=sys.stderr)
-        return
-
-    css_path.write_text(css, encoding="utf-8")
+    # A failure here fails the install, so the ready marker and manifest are never written over
+    # missing files (audit 6 nit 1). The CSS is written last: its presence is what tells a later
+    # run this weight is already done.
+    css_member = tar.getmember(f"package/{weight}.css")
+    css_bytes = tar.extractfile(css_member)
+    if css_bytes is None:
+        raise RuntimeError(f"missing css payload for {family}/{weight}")
+    css = css_bytes.read().decode("utf-8")
 
     # Parse woff2 file references from the CSS (skip woff fallbacks)
     woff2_files = sorted(
         set(re.findall(r"url\(['\"]?\./files/([^'\")\s]+\.woff2)['\"]?\)", css))
     )
     if not woff2_files:
-        print(f"  WARNING: no woff2 files found for {family}/{weight}", file=sys.stderr)
-        return
+        raise RuntimeError(f"no woff2 files found for {family}/{weight}")
 
     done = 0
     total = len(woff2_files)
     for filename in woff2_files:
         dest = files_dir / filename
         if not dest.exists() or force:
-            try:
-                member = tar.getmember(f"package/files/{filename}")
-                payload = tar.extractfile(member)
-                if payload is None:
-                    raise RuntimeError(f"archive member missing: {filename}")
-                dest.write_bytes(payload.read())
-            except Exception as exc:
-                print(f"\n  WARNING: failed to extract {filename}: {exc}", file=sys.stderr)
+            member = tar.getmember(f"package/files/{filename}")
+            payload = tar.extractfile(member)
+            if payload is None:
+                raise RuntimeError(f"archive member missing: {filename}")
+            dest.write_bytes(payload.read())
         done += 1
         report(done, total)
+
+    css_path.write_text(css, encoding="utf-8")
 
     sys.stdout.write(f"\r  {total} woff2 files - {family}/{weight}.css\n")
 

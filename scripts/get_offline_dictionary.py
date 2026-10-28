@@ -26,6 +26,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_offline_dictionary_sqlite as sqlite_builder  # noqa: E402
 
+# A connection that stays open but sends nothing fails instead of hanging setup (audit 6 F5).
+NETWORK_TIMEOUT_S = 30
 API_URL = "https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest"
 PITCH_ACCENT_URL = (
     "https://raw.githubusercontent.com/jkindrix/japanese-language-data/"
@@ -58,7 +60,7 @@ def resolve_target_dir() -> Path:
 
 def fetch_json(url: str) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT_S) as response:
         return json.loads(response.read().decode())
 
 
@@ -79,7 +81,7 @@ def find_asset(assets: list[dict], pattern: re.Pattern[str]) -> dict | None:
 
 def download_and_extract_zip(url: str, target_dir: Path) -> list[str]:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT_S) as response:
         total = int(response.headers.get("Content-Length") or 0)
         done = 0
         chunks: list[bytes] = []
@@ -108,7 +110,7 @@ def download_and_extract_zip(url: str, target_dir: Path) -> list[str]:
 def download_file(url: str, target_path: Path) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "JPLearn/1.0"})
     temporary_path = target_path.with_suffix(f"{target_path.suffix}.part")
-    with urllib.request.urlopen(req) as response, temporary_path.open("wb") as output:
+    with urllib.request.urlopen(req, timeout=NETWORK_TIMEOUT_S) as response, temporary_path.open("wb") as output:
         total = int(response.headers.get("Content-Length") or 0)
         done = 0
         while True:

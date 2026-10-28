@@ -5,8 +5,11 @@ This script warms up the ONNX OCR models used by the desktop bridge:
 - Text detection: PP-OCRv6_medium_det
 - Text recognition: PP-OCRv6_medium_rec
 
-PaddleOCR handles model retrieval/caching internally (HF/BOS depending on
-runtime settings). The script keeps setup progress compatible with the
+PaddleOCR fetches the models by name into PaddleX's cache, which
+``scripts/ocr_model_cache.py`` points inside the app's assets folder: the OCR
+runtime reads them from there and never downloads (audit 6 F7). Weights an
+older install left in ``~/.paddlex`` are copied across first, so updating
+does not download them again. The script keeps setup progress compatible with the
 Electron setup runtime by emitting:
 
 - "PHASE i/N: ..."
@@ -27,6 +30,15 @@ import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.ocr_model_cache import (  # noqa: E402
+    MISSING_WEIGHTS_MESSAGE,
+    adopt_legacy_weights,
+    configure_cache,
+    has_required_weights,
+)
 
 TOTAL_PHASES = 3
 
@@ -53,6 +65,11 @@ def resolve_default_dest(tier: str) -> Path:
 
 
 def _warmup_onnx_models(tier: str) -> None:
+    # Before PaddleOCR is imported: PaddleX reads its cache folder at import.
+    models_dir = configure_cache()
+    if models_dir is not None:
+        adopt_legacy_weights(models_dir)
+
     try:
         from paddleocr import TextDetection, TextRecognition  # type: ignore
     except Exception as exc:  # pragma: no cover - environment dependent
@@ -75,6 +92,8 @@ def _warmup_onnx_models(tier: str) -> None:
     sys.stdout.write("\n")
 
     print("PHASE 3/3: finalize")
+    if models_dir is not None and not has_required_weights(models_dir):
+        raise RuntimeError(MISSING_WEIGHTS_MESSAGE)
     report(100, 100)
     sys.stdout.write("\n")
 
@@ -100,9 +119,6 @@ def main() -> int:
         "text_recognition_model_name": MODEL_NAMES[args.tier]["rec"],
         "engine": "onnxruntime",
     }
-    (target_dir / "det").mkdir(parents=True, exist_ok=True)
-    (target_dir / "rec").mkdir(parents=True, exist_ok=True)
-    (target_dir / "cls").mkdir(parents=True, exist_ok=True)
     (target_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"PaddleOCR ONNX '{args.tier}' assets ready at {target_dir}")

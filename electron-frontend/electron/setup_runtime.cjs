@@ -12,7 +12,7 @@ const https = require('node:https')
 const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
-const { spawn, spawnSync } = require('node:child_process')
+const { execFile, spawn } = require('node:child_process')
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
 
@@ -187,10 +187,11 @@ const ACTIVE_OCR_MODEL_STATE_FILENAME = 'active-ocr-model.json'
 const ACTIVE_TRANSLATION_MODEL_STATE_FILENAME = 'active-translation-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
 const REMOTE_SIZE_PROBE_TIMEOUT_MS = 8000
-const SPEED_TEST_TARGETS = [
-  { url: 'https://proof.ovh.net/files/10Mb.dat', bytes: 10485760 },
-  { url: 'https://proof.ovh.net/files/100Mb.dat', bytes: 20971520 },
-]
+// The speed test reads the start of a model the wizard offers, from the host the models come
+// from, rather than a third-party test file (audit 6 F1, Robbie's choice). Enough bytes to get
+// past TCP slow start; a slow line that cannot finish them in time is measured on what arrived.
+const SPEED_TEST_BYTES = 4 * 1024 * 1024
+const SPEED_TEST_MIN_BYTES = 256 * 1024
 // url -> createDeferredValue holding the asset's exact byte size.
 const REMOTE_SIZE_CACHE = new Map()
 const LLAMA_BACKEND_LABELS = {
@@ -767,8 +768,14 @@ function getSpeechModelDir(base, tier) {
   return path.join(base, 'whisper', tier)
 }
 
+// Every file, not just model.bin: model.bin downloads first, so a failure on a later file used
+// to leave the tier "installed" and active with no tokenizer (audit 6 F4). Each file lands by
+// rename once complete, so a present file is a whole one.
 function isSpeechModelInstalled(base, tier) {
-  return fs.existsSync(path.join(getSpeechModelDir(base, tier), 'model.bin'))
+  const model = SPEECH_MODELS[tier]
+  if (!model) return false
+  const dir = getSpeechModelDir(base, tier)
+  return model.files.every((filename) => fs.existsSync(path.join(dir, filename)))
 }
 
 function getActiveSpeechModelStatePath(base) {
@@ -837,8 +844,27 @@ function getOcrReadyMarkerPath(base, tier) {
   return path.join(getOcrModelDir(base, tier), 'model.ready')
 }
 
+// PaddleX's cache inside the assets folder, where the OCR weights live (audit 6 F7); the same
+// groups as REQUIRED_MODEL_GROUPS in scripts/ocr_model_cache.py.
+function getOcrWeightsDir(base) {
+  return path.join(base, 'ocr', 'paddlex', 'official_models')
+}
+
+const OCR_REQUIRED_MODEL_GROUPS = [
+  ['PP-OCRv6_medium_det', 'PP-OCRv6_medium_det_onnx'],
+  ['PP-OCRv6_medium_rec', 'PP-OCRv6_medium_rec_onnx'],
+]
+
+function hasOcrWeightsIn(weightsDir) {
+  return OCR_REQUIRED_MODEL_GROUPS.every((group) => group.some((name) => fs.existsSync(path.join(weightsDir, name))))
+}
+
+// The marker says setup finished; the weights decide. Installs before audit 6 left them in
+// PaddleX's default cache, which the OCR server copies into the assets folder on first use.
 function isOcrModelInstalled(base, tier) {
-  return fs.existsSync(getOcrReadyMarkerPath(base, tier))
+  if (!fs.existsSync(getOcrReadyMarkerPath(base, tier))) return false
+  return hasOcrWeightsIn(getOcrWeightsDir(base))
+    || hasOcrWeightsIn(path.join(os.homedir(), '.paddlex', 'official_models'))
 }
 
 function getActiveOcrModelStatePath(base) {
@@ -892,6 +918,11 @@ function uninstallOcrModel(tier) {
   if (fs.existsSync(dir)) {
     fs.rmSync(dir, { recursive: true, force: true })
   }
+  // One OCR tier exists, so its weights go with it.
+  const paddlexCache = path.join(base, 'ocr', 'paddlex')
+  if (fs.existsSync(paddlexCache)) {
+    fs.rmSync(paddlexCache, { recursive: true, force: true })
+  }
   const selection = readActiveOcrModelSelection(base)
   if (selection && selection.tier === tier) {
     try { fs.unlinkSync(getActiveOcrModelStatePath(base)) } catch { /* ignore */ }
@@ -908,7 +939,10 @@ function getTranslationReadyMarkerPath(base, tier) {
 }
 
 function isTranslationModelInstalled(base, tier) {
+  const translationModel = TRANSLATION_MODELS[tier]
   return fs.existsSync(getTranslationReadyMarkerPath(base, tier))
+    && Boolean(translationModel)
+    && fs.existsSync(path.join(base, 'models', 'llama', translationModel.filename))
 }
 
 function getActiveTranslationModelStatePath(base) {
@@ -968,6 +1002,7 @@ function uninstallTranslationModel(tier) {
     if (fs.existsSync(modelPath)) {
       fs.rmSync(modelPath, { force: true })
     }
+    removeTutorDownloadLeftovers(path.join(base, 'models', 'llama'), translationModel.filename)
   }
   const selection = readActiveTranslationModelSelection(base)
   if (selection && selection.tier === tier) {
@@ -1133,6 +1168,8 @@ function measureDownloadMbps(url, byteLimit, timeoutMs) {
     let settled = false
     let request = null
     let timer = null
+    let startedAt = Date.now()
+    let received = 0
 
     const finish = (value) => {
       if (settled) return
@@ -1146,67 +1183,84 @@ function measureDownloadMbps(url, byteLimit, timeoutMs) {
       resolve(value)
     }
 
-    timer = setTimeout(() => finish(null), timeoutMs)
-    const startedAt = Date.now()
-    let received = 0
-
     const throughput = () => {
       const seconds = (Date.now() - startedAt) / 1000
       if (seconds <= 0 || received <= 0) return null
       return (received * 8) / (seconds * 1_000_000)
     }
+    // A slow line is still measured on what arrived; too little to judge is no estimate.
+    const finishWithWhatArrived = () => finish(received >= SPEED_TEST_MIN_BYTES ? throughput() : null)
 
-    try {
-      request = https.get(url, (response) => {
-        if (response.statusCode !== 200) {
-          response.destroy()
-          finish(null)
-          return
-        }
-        response.on('data', (chunk) => {
-          received += chunk.length
-          if (received >= byteLimit) {
-            const mbps = throughput()
-            response.destroy()
-            finish(mbps)
+    timer = setTimeout(finishWithWhatArrived, timeoutMs)
+
+    const follow = (currentUrl, hops) => {
+      if (hops > 8) { finish(null); return }
+      try {
+        const mod = currentUrl.startsWith('https') ? https : http
+        request = mod.get(currentUrl, {
+          headers: { 'User-Agent': 'JPLearn/1.0', 'Range': `bytes=0-${byteLimit - 1}` },
+        }, (response) => {
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            response.resume()
+            follow(new URL(response.headers.location, currentUrl).toString(), hops + 1)
+            return
           }
+          if (response.statusCode !== 200 && response.statusCode !== 206) {
+            response.destroy()
+            finish(null)
+            return
+          }
+          // Time the body only: redirects and TLS handshakes are not throughput.
+          startedAt = Date.now()
+          response.on('data', (chunk) => {
+            received += chunk.length
+            if (received >= byteLimit) {
+              const mbps = throughput()
+              response.destroy()
+              finish(mbps)
+            }
+          })
+          response.on('end', finishWithWhatArrived)
+          response.on('error', () => finish(null))
         })
-        response.on('end', () => finish(throughput()))
-        response.on('error', () => finish(null))
-      })
-      request.on('error', () => finish(null))
-      request.setTimeout(timeoutMs, () => finish(null))
-    } catch {
-      finish(null)
+        request.on('error', () => finish(null))
+      } catch {
+        finish(null)
+      }
     }
+    follow(url, 0)
   })
 }
 
 async function measureNetworkMbps() {
-  for (const target of SPEED_TEST_TARGETS) {
-    const mbps = await measureDownloadMbps(target.url, target.bytes, SPEED_TEST_TIMEOUT_MS)
-    if (mbps && Number.isFinite(mbps)) {
-      return mbps
-    }
-  }
-  return null
+  const model = Object.values(MODELS)[0]
+  const mbps = await measureDownloadMbps(
+    toHfResolveUrl(model.repo, model.filename),
+    SPEED_TEST_BYTES,
+    SPEED_TEST_TIMEOUT_MS,
+  )
+  return mbps && Number.isFinite(mbps) ? mbps : null
 }
 
 /**
  * A value that is slow to compute and that most callers can do without.
  *
  * `get(false)` returns whatever has already been computed -- null on a cold
- * cache -- and starts the computation in the background, so the caller is never
- * blocked. `get(true)` awaits it. Concurrent callers share one computation, and
- * a computation that fails or yields null is retried on the next call rather
- * than caching the failure forever.
+ * cache -- and starts nothing, so the caller is never blocked and never causes
+ * the computation. `get(true)` starts it (or joins one in flight) and awaits it.
+ * Concurrent callers share one computation, and a computation that fails or
+ * yields null is retried on the next waiting call rather than caching the
+ * failure forever.
  *
  * Both network probes behind the setup screen use this. They exist only for the
  * cosmetic "about N minutes to download" hints and exact byte sizes, but
  * `getSystemInfo` also carries the install flags the renderer gates features on
  * (Image Translation checks `ocrInstalled`), and awaiting the probes meant those
  * flags read false for as long as the network took -- up to ~20 seconds after
- * launch, or forever on a stalled connection.
+ * launch, or forever on a stalled connection. Starting them from a non-waiting
+ * call meant every launch contacted the network without the learner asking
+ * (audit 6 F1): only the setup wizard, which the learner opened in order to
+ * download something, waits, so only the wizard starts them.
  */
 function createDeferredValue(compute) {
   let value = null
@@ -1216,6 +1270,9 @@ function createDeferredValue(compute) {
     async get(wait = false) {
       if (value !== null) {
         return value
+      }
+      if (!wait) {
+        return null
       }
       if (!inFlight) {
         inFlight = Promise.resolve()
@@ -1227,8 +1284,7 @@ function createDeferredValue(compute) {
             return result
           })
       }
-      const pending = inFlight
-      return wait ? await pending : null
+      return await inFlight
     },
     reset() {
       value = null
@@ -1264,79 +1320,69 @@ function recommendSpeechTier(totalRamGb, gpuVramGb) {
   return 'fast'
 }
 
-function detectGpuNames() {
-  if (process.platform !== 'win32') {
-    return []
-  }
-  try {
-    const result = spawnSync(
-      'powershell',
-      ['-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).Name'],
-      { encoding: 'utf8', windowsHide: true, timeout: 10000 },
-    )
-    if (result.status !== 0 || !result.stdout) {
-      return []
+function runQuiet(command, args, timeoutMs) {
+  return new Promise((resolve) => {
+    try {
+      execFile(command, args, { encoding: 'utf8', windowsHide: true, timeout: timeoutMs }, (error, stdout) => {
+        resolve({ ok: !error, stdout: typeof stdout === 'string' ? stdout : '' })
+      })
+    } catch {
+      resolve({ ok: false, stdout: '' })
     }
-    return result.stdout
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-  } catch {
-    return []
-  }
+  })
 }
 
-function detectGpuVramGb() {
-  if (process.platform !== 'win32') {
-    return null
+/**
+ * The graphics adapters, their largest memory and whether an NVIDIA driver answers.
+ *
+ * Asynchronous and computed once per process: it used to be three `spawnSync` calls on every
+ * install-state read, about 1.4-1.7 s of a frozen main process each time, twice per launch
+ * (audit 6 F6). The adapter list does not change while the app runs, so the cache needs no
+ * invalidation; a failed detection is cached too, as the empty result it always was.
+ */
+let gpuInfoPromise = null
+
+function detectGpuInfo() {
+  if (!gpuInfoPromise) {
+    gpuInfoPromise = (async () => {
+      if (process.platform !== 'win32') {
+        return { names: [], vramGb: null, nvidiaDriver: false }
+      }
+      const listing = await runQuiet('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Get-CimInstance Win32_VideoController | ForEach-Object { "$($_.AdapterRAM)|$($_.Name)" }',
+      ], 10000)
+      const names = []
+      const ramValues = []
+      for (const line of listing.ok ? listing.stdout.split(/\r?\n/) : []) {
+        const separator = line.indexOf('|')
+        if (separator < 0) continue
+        const ram = Number(line.slice(0, separator).trim())
+        const name = line.slice(separator + 1).trim()
+        if (name) names.push(name)
+        if (Number.isFinite(ram) && ram > 0) ramValues.push(ram)
+      }
+      const vramGb = ramValues.length > 0
+        ? Math.round((Math.max(...ramValues) / (1024 ** 3)) * 10) / 10
+        : null
+      const nvidiaDriver = names.join(' ').toLowerCase().includes('nvidia')
+        ? (await runQuiet('nvidia-smi', ['-L'], 5000)).ok
+        : false
+      return { names, vramGb, nvidiaDriver }
+    })()
   }
-  try {
-    const result = spawnSync(
-      'powershell',
-      ['-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).AdapterRAM'],
-      { encoding: 'utf8', windowsHide: true, timeout: 10000 },
-    )
-    if (result.status !== 0 || !result.stdout) {
-      return null
-    }
-    const values = result.stdout
-      .split(/\r?\n/)
-      .map((line) => Number(line.trim()))
-      .filter((value) => Number.isFinite(value) && value > 0)
-    if (values.length <= 0) {
-      return null
-    }
-    const maxBytes = Math.max(...values)
-    return Math.round((maxBytes / (1024 ** 3)) * 10) / 10
-  } catch {
-    return null
-  }
+  return gpuInfoPromise
 }
 
-function hasNvidiaDriver() {
-  if (process.platform !== 'win32') {
-    return false
-  }
-  try {
-    const result = spawnSync('nvidia-smi', ['-L'], {
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 5000,
-    })
-    return result.status === 0
-  } catch {
-    return false
-  }
-}
-
-function detectLlamaBackend(gpuNames) {
+function detectLlamaBackend(gpuInfo) {
   const forced = String(process.env.JPLEARN_LLAMA_BACKEND || '').trim().toLowerCase()
   if (forced === 'cuda' || forced === 'hip' || forced === 'vulkan' || forced === 'cpu') {
     return forced
   }
 
-  const names = gpuNames.join(' ').toLowerCase()
-  if (names.includes('nvidia') && hasNvidiaDriver()) {
+  const names = gpuInfo.names.join(' ').toLowerCase()
+  if (names.includes('nvidia') && gpuInfo.nvidiaDriver) {
     return 'cuda'
   }
   if (names.includes('amd') || names.includes('radeon')) {
@@ -1364,10 +1410,11 @@ async function getSystemInfo(options = {}) {
   const totalRamGb = os.totalmem() / (1024 ** 3)
   const llamaCppDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
   const llamaCppInstalled = fs.existsSync(path.join(llamaCppDir, 'llama-server.exe'))
-  const gpuAdapters = detectGpuNames()
-  const gpuVramGb = detectGpuVramGb()
+  const gpuInfo = await detectGpuInfo()
+  const gpuAdapters = gpuInfo.names
+  const gpuVramGb = gpuInfo.vramGb
   const recommendedTier = recommendTutorTier(totalRamGb, gpuVramGb || 0)
-  const llamaCppBackend = detectLlamaBackend(gpuAdapters)
+  const llamaCppBackend = detectLlamaBackend(gpuInfo)
   const networkMbpsRaw = await networkMbpsValue.get(waitForNetworkEstimate)
   const networkMbps = typeof networkMbpsRaw === 'number' && Number.isFinite(networkMbpsRaw)
     ? Math.round(networkMbpsRaw * 10) / 10
@@ -1591,6 +1638,7 @@ function uninstallModel(tier) {
       fs.unlinkSync(modelPath)
     }
   }
+  removeTutorDownloadLeftovers(getTutorModelsDir(base), model.filename)
   const selection = readActiveModelSelection(base)
   if (selection && selection.filename === model.filename) {
     try { fs.unlinkSync(getActiveModelStatePath(base)) } catch { /* ignore */ }
@@ -1609,6 +1657,29 @@ function uninstallModel(tier) {
   return { ok: true, tier }
 }
 
+/**
+ * The pieces a failed or abandoned download of `filename` leaves beside it: the HTTP downloader's
+ * `.tmp` and `.partN` files, and the Hugging Face CLI's bookkeeping under `--local-dir`. Nothing
+ * else removes them, and they can add up to a whole model (audit 6 F2).
+ */
+function removeTutorDownloadLeftovers(modelsDir, filename) {
+  const leftovers = [`${filename}.tmp`]
+  for (let index = 0; index < PARALLEL_CONNECTIONS; index += 1) {
+    leftovers.push(`${filename}.part${index}`)
+  }
+  for (const leftover of leftovers) {
+    try { fs.rmSync(path.join(modelsDir, leftover), { force: true }) } catch { /* best effort */ }
+  }
+  const hfDownloadDir = path.join(modelsDir, '.cache', 'huggingface', 'download')
+  let entries = []
+  try { entries = fs.readdirSync(hfDownloadDir) } catch { /* no CLI download was made here */ }
+  for (const entry of entries) {
+    if (entry.startsWith(filename)) {
+      try { fs.rmSync(path.join(hfDownloadDir, entry), { recursive: true, force: true }) } catch { /* best effort */ }
+    }
+  }
+}
+
 function writeSentinel() {
   const base = getJPLearnDir()
   fs.mkdirSync(path.join(base, 'models'), { recursive: true })
@@ -1625,6 +1696,15 @@ function writeSentinel() {
 // CDNs (HuggingFace/S3/Cloudflare) throttle individual connections; 8 parallel
 // connections saturates the available bandwidth on fast lines.
 const PARALLEL_CONNECTIONS = 8
+// A download connection that stays open but sends nothing for this long fails, rather than
+// holding setup on an endless progress bar (audit 6 F5). The partial files stay and resume.
+const DOWNLOAD_IDLE_TIMEOUT_MS = 60000
+
+function failWhenIdle(req, what) {
+  req.setTimeout(DOWNLOAD_IDLE_TIMEOUT_MS, () => {
+    req.destroy(new Error(`${what} stalled: no data for ${DOWNLOAD_IDLE_TIMEOUT_MS / 1000} s`))
+  })
+}
 
 /**
  * Follow all HTTP redirects for url, sending Range: bytes=0-0 on the final hop
@@ -1688,8 +1768,8 @@ function toHfResolveUrl(repo, filename, revision = 'main') {
  * Exact download size for a remote asset, or null when it isn't known yet.
  *
  * Same opt-in shape as the throughput probe: with `wait: false` this returns
- * only what has already been fetched and warms the rest in the background, so
- * callers that just want install flags are never held up by huggingface.co.
+ * only what has already been fetched and contacts nothing, so callers that just
+ * want install flags never reach huggingface.co.
  */
 async function getCachedUrlSizeBytes(url, wait = false) {
   let entry = REMOTE_SIZE_CACHE.get(url)
@@ -1757,50 +1837,28 @@ function parseHfResolveUrl(url) {
   }
 }
 
-function resolveHfCliCommand(pythonCmd) {
-  const check = (cmd, args) => {
-    try {
-      const result = spawnSync(cmd, args, { windowsHide: true, stdio: 'ignore' })
-      return (result.status ?? 1) === 0
-    } catch {
-      return false
-    }
-  }
-
-  const hasPythonHfModule = () => {
-    if (!pythonCmd) return false
-    return check(pythonCmd, ['-c', 'import huggingface_hub.commands.huggingface_cli'])
-  }
-
-  const ensurePythonHfModule = () => {
-    if (!pythonCmd) return false
-    if (hasPythonHfModule()) return true
-    try {
-      const install = spawnSync(
-        pythonCmd,
-        ['-m', 'pip', 'install', '--disable-pip-version-check', 'huggingface-hub'],
-        { windowsHide: true, stdio: 'ignore' },
-      )
-      if ((install.status ?? 1) !== 0) return false
-    } catch {
-      return false
-    }
-    return hasPythonHfModule()
-  }
-
-  if (check('hf', ['--help'])) return ['hf']
-  if (check('huggingface-cli', ['--help'])) return ['huggingface-cli']
-  if (ensurePythonHfModule()) {
+/**
+ * The Hugging Face CLI to download with, or null to use the built-in HTTP downloader.
+ *
+ * Asynchronous and bounded: these checks used to be `spawnSync` calls with no time limit on the
+ * main process, ending in a `pip install huggingface-hub` that froze the window for as long as
+ * pip took (forever-ish offline) and changed the bundled Python (audit 6 F6). Nothing is
+ * installed here now; without a CLI, `downloadWithProgress` does the job.
+ */
+async function resolveHfCliCommand(pythonCmd) {
+  if ((await runQuiet('hf', ['--help'], 10000)).ok) return ['hf']
+  if ((await runQuiet('huggingface-cli', ['--help'], 10000)).ok) return ['huggingface-cli']
+  if (pythonCmd && (await runQuiet(pythonCmd, ['-c', 'import huggingface_hub.commands.huggingface_cli'], 15000)).ok) {
     return [pythonCmd, '-m', 'huggingface_hub.commands.huggingface_cli']
   }
   return null
 }
 
-function downloadWithHfCli(url, destPath, pythonCmd, onProgress, expectedTotalBytes) {
+async function downloadWithHfCli(url, destPath, pythonCmd, onProgress, expectedTotalBytes) {
   const parsed = parseHfResolveUrl(url)
-  const cliCommand = resolveHfCliCommand(pythonCmd)
+  const cliCommand = parsed ? await resolveHfCliCommand(pythonCmd) : null
   if (!parsed || !cliCommand) {
-    return Promise.resolve({ ok: false, reason: 'HF CLI not available (no hf executable and no python huggingface-hub CLI).' })
+    return { ok: false, reason: 'HF CLI not available (no hf executable and no python huggingface-hub CLI).' }
   }
 
   const outputDir = path.dirname(destPath)
@@ -1956,6 +2014,7 @@ function downloadRange(finalUrl, start, end, partPath, onBytes, append = false) 
       out.on('error', cleanup)
       res.on('error', cleanup)
     })
+    failWhenIdle(req, `Download of range ${start}-${end}`)
     req.on('error', (err) => {
       out.destroy()
       reject(err)
@@ -2068,6 +2127,7 @@ function singleConnectionDownload(finalUrl, tmpPath, knownTotal, onProgress) {
         out.on('error', cleanup)
         res.on('error', cleanup)
       })
+      failWhenIdle(req, 'Download')
       req.on('error', reject)
     }
 
@@ -2254,7 +2314,8 @@ function downloadModel(tier, sender, scriptRoot) {
 
   return ensureLlamaCpp().then(async (llamaCppDownloaded) => {
     const pythonCmd = scriptRoot ? resolvePythonCommand(scriptRoot) : null
-    const exactTotalBytes = await getCachedUrlSizeBytes(url)
+    // The learner started this download, so the host may be asked for its exact size.
+    const exactTotalBytes = await getCachedUrlSizeBytes(url, true)
     const expectedTotalBytes = exactTotalBytes && exactTotalBytes > 0
       ? exactTotalBytes
       : Math.round((model.sizeMb || 0) * 1024 * 1024)
@@ -2313,16 +2374,29 @@ function downloadVoiceModel(tier, sender, scriptRoot) {
   })()
 }
 
+// The wizard starts the tutor model download (which ensures llama.cpp) and the llama.cpp step at
+// the same time; two get_llama_cpp.py runs then shared one folder (audit 6 nit 3). A second
+// caller joins the install already running.
+let llamaCppInstall = null
+
 function downloadLlamaCpp(sender, scriptRoot, requestedBackend) {
+  if (!llamaCppInstall) {
+    llamaCppInstall = installLlamaCpp(sender, scriptRoot, requestedBackend)
+      .finally(() => { llamaCppInstall = null })
+  }
+  return llamaCppInstall
+}
+
+async function installLlamaCpp(sender, scriptRoot, requestedBackend) {
   const base = ensureJPLearnDirs()
   const llamaDir = path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
-  const detectedBackend = detectLlamaBackend(detectGpuNames())
+  const detectedBackend = detectLlamaBackend(await detectGpuInfo())
   const llamaBackend = ['cuda', 'hip', 'vulkan', 'cpu'].includes(requestedBackend)
     ? requestedBackend
     : detectedBackend
 
   if (fs.existsSync(path.join(llamaDir, 'llama-server.exe'))) {
-    return Promise.resolve({ alreadyInstalled: true })
+    return { alreadyInstalled: true }
   }
 
   const scriptPath = path.join(scriptRoot, 'scripts', 'get_llama_cpp.py')
@@ -2463,7 +2537,8 @@ function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
   const pythonCmd = resolvePythonCommand(scriptRoot)
 
   return new Promise((resolve, reject) => {
-    const child = spawn(pythonCmd, [scriptPath, '--tier', tier], {
+    const args = [scriptPath, '--tier', tier, ...(downloadOptions.force ? ['--force'] : [])]
+    const child = spawn(pythonCmd, args, {
       env: {
         ...process.env,
         JPLEARN_ASSETS_DIR: base,
@@ -2706,11 +2781,10 @@ async function downloadTranslationModel(tier, sender, scriptRoot, options = {}) 
   fs.mkdirSync(modelsDir, { recursive: true })
   const destPath = path.join(modelsDir, translationModel.filename)
 
-  if (force && fs.existsSync(destPath)) {
-    fs.rmSync(destPath, { force: true })
-  }
-
-  if (!fs.existsSync(destPath)) {
+  // A forced reinstall downloads over the working model: downloadWithProgress writes `.tmp` and
+  // replaces the file only once complete, so a failed Reapply leaves the old model working
+  // (audit 6 F3).
+  if (force || !fs.existsSync(destPath)) {
     if (sender && !sender.isDestroyed()) {
       sender.send('setup:download-progress', { id: 'translation', percent: 20, mb: null, totalMb: null, etaSec: null })
     }
@@ -2914,6 +2988,11 @@ module.exports = {
   // Exported for tests. This is the primitive that keeps the setup screen's
   // network probes off the path that reports what is installed.
   createDeferredValue,
+  // Exported for tests: what "installed" means, and what an uninstall clears (audit 6).
+  isSpeechModelInstalled,
+  isOcrModelInstalled,
+  isTranslationModelInstalled,
+  removeTutorDownloadLeftovers,
 }
 
 

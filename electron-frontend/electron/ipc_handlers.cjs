@@ -1554,6 +1554,10 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid model tier')
       }
       try {
+        // Stop the server before deleting the file it may hold open (audit 6 F8).
+        if (typeof options.unloadTutorChatRuntime === 'function') {
+          await options.unloadTutorChatRuntime()
+        }
         const result = setupRuntime.uninstallModel(tier)
         if (typeof options.refreshTutorChatRuntime === 'function') {
           await options.refreshTutorChatRuntime()
@@ -1772,12 +1776,16 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:uninstall-translation-model', (event, tier) => {
+    options.ipcMain.handle('setup:uninstall-translation-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['qwen_ja_en'].includes(tier)) {
         throw new Error('Invalid translation model tier')
       }
       try {
+        // The tutor runtime may have this model loaded (audit 6 F8).
+        if (typeof options.unloadTutorChatRuntime === 'function') {
+          await options.unloadTutorChatRuntime()
+        }
         return setupRuntime.uninstallTranslationModel(tier)
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
