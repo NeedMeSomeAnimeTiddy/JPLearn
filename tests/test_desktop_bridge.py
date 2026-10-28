@@ -2594,3 +2594,25 @@ def test_worker_reads_japanese_arguments_through_a_real_pipe(tmp_path: Path) -> 
     assert responses[0]["payload"]["character"] == "日"
     assert responses[1]["payload"].get("query", "たべる") == "たべる"
     assert responses[2]["ok"] is True
+
+
+def test_worker_survives_a_reply_utf8_cannot_carry(tmp_path: Path, monkeypatch, capsys) -> None:
+    # A lone surrogate echoed back in a reply used to raise inside the write and end the worker,
+    # taking every queued request with it (audit 7 F1).
+    _use_temp_db(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        desktop_bridge.sys,
+        "stdin",
+        io.StringIO(
+            '{"id":1,"args":["dictionary-search","\udc81x"]}\n'
+            '{"id":2,"args":["xp-progress"]}\n'
+        ),
+    )
+
+    code = desktop_bridge._run_server()
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.strip()]
+
+    assert code == 0
+    assert [json.loads(line)["id"] for line in lines] == [1, 2]
+    lines[0].encode("utf-8")
+    assert json.loads(lines[1])["ok"] is True

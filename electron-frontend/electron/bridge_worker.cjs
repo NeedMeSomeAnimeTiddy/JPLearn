@@ -246,4 +246,11 @@ function createBridgeWorker(options) {
   return { state, start, stop, request }
 }
 
-module.exports = { createBridgeWorker }
+// True when the worker answered with a non-zero code: the command ran and refused, so running it
+// again in a one-shot would refuse the same way after a cold Python start, and a write that a
+// timeout cut short could save twice. Only a crash or a timeout is worth a one-shot (audit 7 F2).
+function isWorkerRefusal(error) {
+  return Boolean(error) && typeof error.bridgeCode === 'number'
+}
+
+module.exports = { createBridgeWorker, isWorkerRefusal }

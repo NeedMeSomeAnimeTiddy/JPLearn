@@ -15,7 +15,7 @@ function registerOptimizeHandler(overrides = {}) {
     isDev: false,
     getWindowFromSender: () => ({ id: 1, isDestroyed: () => false }),
     runPythonBridge: vi.fn(),
-    runPythonBridgeWithArgs: vi.fn(async () => ({ ok: true, is_custom: true })),
+    runPythonBridgeWorkerOnly: vi.fn(async () => ({ ok: true, is_custom: true })),
     runPythonBridgeIsolated: vi.fn(async () => ({ ok: true })),
     ...overrides,
   }
@@ -37,7 +37,7 @@ describe('fsrs:optimize', () => {
     await expect(optimize(createValidEvent())).resolves.toBe(result)
 
     expect(options.runPythonBridgeIsolated).toHaveBeenCalledWith(['fsrs-optimize'])
-    expect(options.runPythonBridgeWithArgs).toHaveBeenCalledWith(['fsrs-reload-weights'])
+    expect(options.runPythonBridgeWorkerOnly).toHaveBeenCalledWith(['fsrs-reload-weights'])
   })
 
   it('starts the reload only after optimize settles, and answers only after the reload', async () => {
@@ -45,7 +45,7 @@ describe('fsrs:optimize', () => {
     let finishReload: (value: unknown) => void = () => {}
     const { optimize, options } = registerOptimizeHandler({
       runPythonBridgeIsolated: vi.fn(() => new Promise((resolve) => { finishOptimize = resolve })),
-      runPythonBridgeWithArgs: vi.fn(() => new Promise((resolve) => { finishReload = resolve })),
+      runPythonBridgeWorkerOnly: vi.fn(() => new Promise((resolve) => { finishReload = resolve })),
     })
     let answered = false
     const pending = optimize(createValidEvent()).then((value: unknown) => {
@@ -54,10 +54,10 @@ describe('fsrs:optimize', () => {
     })
 
     await Promise.resolve()
-    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+    expect(options.runPythonBridgeWorkerOnly).not.toHaveBeenCalled()
 
     finishOptimize({ ok: true })
-    await vi.waitFor(() => expect(options.runPythonBridgeWithArgs).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(options.runPythonBridgeWorkerOnly).toHaveBeenCalledTimes(1))
     expect(answered).toBe(false)
 
     finishReload({ ok: true, is_custom: true })
@@ -72,7 +72,7 @@ describe('fsrs:optimize', () => {
 
     await expect(optimize(createValidEvent())).resolves.toBe(result)
 
-    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+    expect(options.runPythonBridgeWorkerOnly).not.toHaveBeenCalled()
   })
 
   it('does not reload when the optimize process fails', async () => {
@@ -84,7 +84,7 @@ describe('fsrs:optimize', () => {
 
     await expect(optimize(createValidEvent())).rejects.toThrow('optimize crashed')
 
-    expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+    expect(options.runPythonBridgeWorkerOnly).not.toHaveBeenCalled()
   })
 
   it('logs a failed reload and still returns the optimize result', async () => {
@@ -92,7 +92,7 @@ describe('fsrs:optimize', () => {
     const result = { ok: true, new_weights: [1, 2] }
     const { optimize } = registerOptimizeHandler({
       runPythonBridgeIsolated: vi.fn(async () => result),
-      runPythonBridgeWithArgs: vi.fn(async () => {
+      runPythonBridgeWorkerOnly: vi.fn(async () => {
         throw new Error('worker down')
       }),
     })

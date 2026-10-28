@@ -54,12 +54,12 @@ default; escalate to `python scripts/dev.py` only on request or when a change is
 ```
 domain/              Pure SRS/learning logic, no I/O (24 modules)
 data/                SQLite persistence, row↔domain mapping, Japanese text normalization
-scripts/desktop_bridge.py   68-command dispatcher the Electron main process spawns as a
+scripts/desktop_bridge.py   ~73-command dispatcher the Electron main process spawns as a
                             single long-lived child process (JSON-lines over stdin/stdout)
 scripts/ocr_server.py       Persistent PaddleOCR process (own lifecycle, not the bridge)
 scripts/ocr_extraction.py   The OCR logic it runs; keeps one engine warm across calls
 electron-frontend/
-  electron/*.cjs      Main process: window lifecycle, IPC routes, bridge worker pool,
+  electron/*.cjs      Main process: window lifecycle, IPC routes, the bridge worker,
                        llama.cpp/VOICEVOX/Whisper/PaddleOCR child-process management
   src/App.tsx          Orchestrator + most study session state (large — see caveat below)
   src/features/<name>/ Self-contained feature modules (hook-over-context pattern)

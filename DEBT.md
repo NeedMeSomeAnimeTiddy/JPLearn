@@ -111,10 +111,22 @@ building those queries from it.
 (`ROUND_QUEUE_TIMEOUT_MS`, `electron-frontend/src/features/study-session/useStudySession.ts:75-76,
 303-315`) and, on a loss, shuffles the pool with no notice. The cycle keeps that order until it
 wraps, so due cards are not served first for that session. The main process allows the same request
-12 s (`electron/main.cjs:303`), and at session start the queue waits behind `startSessionGoal` and
+30 s (`BRIDGE_REQUEST_TIMEOUT_MS`; the 12 s at `electron/main.cjs:306` is its read-cache lifetime,
+corrected by audit 7), and at session start the queue waits behind `startSessionGoal` and
 any answer saves on the serial bridge (ARCH §8 B1). Not fixed now: audit 4 (F6) could not measure
 how long the queue takes in ordinary use, and a fix (wait with a loading state, or swap in the real
 order once it lands) is only worth making if the timer actually fires.
 
 **Trigger:** a measured `getStudyQueue` over 1.2 s when a session starts in the built app (audit 4,
 Check 3), or a learner noticing that due cards were not served first.
+
+## 9. Daily Games state reads every attempt ever played, one query per attempt
+
+**Recorded 2026-10-28.** `_reconcile_daily_games_streak` (`scripts/desktop_bridge.py:1125-1142`)
+calls `load_attempts()` with no day. That selects every `daily_game_attempts` row and runs one
+outcomes query per row (`data/daily_games_repository.py:370-393`), on every `daily-games-state` and
+`daily-games-record-attempt`. Not fixed now: the live table holds 0 rows (audit 7, Check 4), and it
+grows by a few rows a day.
+
+**Trigger:** `daily_game_attempts` passes 2,000 rows, or `daily-games-state` takes over 300 ms on a
+warm worker.
