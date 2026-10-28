@@ -164,6 +164,14 @@ describe('grading an answer (audit 9)', () => {
     expect(hook.result.current.slice.roundFeedback).toContain('がき')
   })
 
+  it('names each spelling readably when a reading has two', async () => {
+    const { hook, submit, saved } = await startWith({ mode: 'dictation', answer: 'なん/なに', focusText: '何' })
+    submit('なね')
+    await act(async () => {})
+    expect(saved()?.isCorrect).toBe(false)
+    expect(hook.result.current.slice.roundFeedback).toContain('なん or なに')
+  })
+
   it('saves いえ for いぬ as wrong in Dictation (F1)', async () => {
     const { submit, saved } = await startWith({ mode: 'dictation', answer: 'いぬ', focusText: '犬' })
     submit('いえ')

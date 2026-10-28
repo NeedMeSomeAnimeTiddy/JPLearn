@@ -11,13 +11,15 @@ interface AssessTypedRecallParams {
 const ANSWER_DELIMITER_REGEX = /(?:\s*\/\s*|\s*;\s*|\s*\|\s*|\s*,\s*|\s+or\s+)/i
 
 function addCandidate(store: Set<string>, candidate: string): void {
+  // One letter is a real answer: a kana card's meaning is its romaji, and あ is "a", を is "o".
+  // assessTypedAnswer grades words under four letters exactly, so it cannot be matched loosely.
   const compact = candidate.trim().replace(/\s+/g, ' ')
-  if (!compact || compact.length < 2) return
+  if (!compact) return
   store.add(compact)
 
   if (/^to\s+/i.test(compact)) {
     const withoutTo = compact.replace(/^to\s+/i, '').trim()
-    if (withoutTo.length >= 2) {
+    if (withoutTo) {
       store.add(withoutTo)
     }
   }
@@ -52,7 +54,8 @@ function assessAgainstCandidates(candidates: readonly string[], given: string): 
   return bestAssessment
 }
 
-function buildFuzzyCandidates(expectedAnswer: string, dictionaryNote: RoundDictionaryNote | null): string[] {
+/** Every answer the meaning grader accepts for this round, as the learner would type it. */
+export function typedRecallCandidates(expectedAnswer: string, dictionaryNote: RoundDictionaryNote | null): string[] {
   const rawCandidates = [
     expectedAnswer,
     dictionaryNote?.primaryGloss,
@@ -76,7 +79,7 @@ export function assessTypedRecallAnswer({
   givenAnswer,
   dictionaryNote,
 }: AssessTypedRecallParams): TypedAnswerState {
-  const candidates = buildFuzzyCandidates(expectedAnswer, dictionaryNote)
+  const candidates = typedRecallCandidates(expectedAnswer, dictionaryNote)
   if (candidates.length === 0) {
     return 'incorrect'
   }

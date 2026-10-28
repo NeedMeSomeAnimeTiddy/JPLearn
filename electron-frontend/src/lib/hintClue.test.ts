@@ -42,6 +42,32 @@ describe('buildHintClue', () => {
     expect(clue).toEqual({ text: 'Type the reading you hear in Japanese.', character: null, reading: null, glosses: ['coffee'] })
   })
 
+  it('Dictation: drops a gloss that is the reading in romaji, since the field turns romaji into kana', () => {
+    const kanji: RoundDictionaryNote = {
+      ...dogNote, character: '漢字', reading: 'かんじ', primaryGloss: 'kanji', secondaryGlosses: ['Chinese character'],
+    }
+    const clue = buildHintClue(round({ mode: 'dictation', answer: 'かんじ', dictionaryNote: kanji }))
+    expect(clue.glosses).toEqual(['Chinese character'])
+    expect(clue.character).toBe('漢字')
+
+    const futon: RoundDictionaryNote = {
+      ...dogNote, character: '布団', reading: 'ふとん', primaryGloss: 'futon', secondaryGlosses: ['Japanese-style bedding'],
+    }
+    expect(buildHintClue(round({ mode: 'dictation', answer: 'ふとん', dictionaryNote: futon })).glosses)
+      .toEqual(['Japanese-style bedding'])
+  })
+
+  it('Dictation: drops a hint line that spells the reading in romaji', () => {
+    const clue = buildHintClue(round({ mode: 'dictation', answer: 'ふとん', hintText: 'It sounds like futon.', dictionaryNote: null }))
+    expect(clue.text).toBeNull()
+  })
+
+  it('Typed Recall: a gloss carrying "to " is still caught through the grader\'s own forms', () => {
+    // the grader accepts "eat" for "to eat", so a hint line saying "eat" gives it away
+    const clue = buildHintClue(round({ mode: 'typed_recall', answer: 'to eat', hintText: 'What do you do with food? You eat it.', dictionaryNote: null }))
+    expect(clue.text).toBeNull()
+  })
+
   it('Dictation: keeps a written form wholly in kanji, drops one with kana in it', () => {
     expect(buildHintClue(round({ mode: 'dictation', answer: 'いぬ' })).character).toBe('犬')
     const eat = { ...dogNote, character: '食べる', reading: 'たべる' }

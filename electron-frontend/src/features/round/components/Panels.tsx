@@ -289,7 +289,8 @@ export function RoundSpeak({
     try {
       const audioBase64 = await blobToBase64(blob)
       const result = await transcribe({
-        audioBase64, mimeType: normalizeSpeechMimeType(mimeType), language: 'ja',
+        /* the round asks for the meaning and is graded on English only (audit 9, F2) */
+        audioBase64, mimeType: normalizeSpeechMimeType(mimeType), language: 'en',
       })
       setHeard(result.text)
       /* a beat to read what it heard before the verdict lands on top of it */
@@ -334,7 +335,7 @@ export function RoundSpeak({
         <em>{recording ? 'STOP' : 'SPEAK'}</em>
       </button>
       <p className={stuck ? 'rd-speak-line is-bad' : 'rd-speak-line'} aria-live="polite">{line}</p>
-      {heard && !failure ? <p className="rd-heard" lang="ja">{heard}</p> : null}
+      {heard && !failure ? <p className="rd-heard" lang="en">{heard}</p> : null}
       {stuck ? (
         <button type="button" className="rd-instead" onClick={onFallback}>
           TYPE IT INSTEAD

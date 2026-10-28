@@ -36,7 +36,7 @@ import {
 import type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'
 import { parseResumableSession, resumableTargetItems } from './persistedSession'
 import type { PersistedStudySession } from './persistedSession'
-import { assessConjugationAnswer, assessJapaneseAnswer } from '../../lib/answerAssessment'
+import { assessConjugationAnswer, assessJapaneseAnswer, formatKanaSpellings } from '../../lib/answerAssessment'
 import { buildConjugationPool } from './conjugationRound'
 import { assessTypedRecallAnswer } from '../../lib/typedRecallAssessment'
 import { HINT_STEP_FULL_ANSWER, type SubmitAnswerOptions } from '../../context/SessionContext'
@@ -1128,7 +1128,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       if (isCorrect) {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
-        if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall' || roundState.mode === 'dictation') && typedAssessment === 'near_miss') {
+        if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall') && typedAssessment === 'near_miss') {
           setRoundFeedback(`Close enough — we’ll count it! ${pointsCopy}${comboCopy}.`)
         } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
@@ -1168,7 +1168,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
           setRoundFeedback('The hint showed the answer, so this one counts as a miss.')
         } else if (typedAssessment === 'close') {
           // One kana off is a different sound, so it is a miss; say it was close and show the spelling.
-          setRoundFeedback(`Close: one kana is off, so it counts as a miss. The answer is ${roundState.answer}.`)
+          setRoundFeedback(`Close: one kana is off, so it counts as a miss. The answer is ${formatKanaSpellings(roundState.answer)}.`)
         } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
           setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} → ${nextStage}.`)

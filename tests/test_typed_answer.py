@@ -27,5 +27,7 @@ def test_assess_typed_answer_matches_shared_case_table(expected: str, given: str
 
 def test_short_words_get_no_typo_tolerance() -> None:
     # Robbie's ruling (audit 9): one-letter slips count only on words of 4+ letters.
+    # one edit apart, so the old any-length rule called this a near miss
+    assert assess_typed_answer("go", "do").state == "incorrect"
     assert assess_typed_answer("to go", "do").state == "incorrect"
     assert assess_typed_answer("water", "watr").state == "near_miss"

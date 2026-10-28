@@ -6,8 +6,10 @@
 // accepted answers, and a piece that gives the answer away is left out while
 // the rest of the clue stays.
 
+import { toHiragana } from 'wanakana'
 import type { PlayableMinigame, RoundState } from '../types'
 import { foldKana, normalizeTypedText } from './answerAssessment'
+import { typedRecallCandidates } from './typedRecallAssessment'
 
 /** How many dictionary glosses the popover prints. */
 export const HINT_GLOSS_LIMIT = 2
@@ -57,8 +59,8 @@ export function acceptedAnswerTexts(round: RoundState): string[] {
       : round.mode === 'conjugation_drill' ? (round.acceptedAnswers ?? [round.answer])
         : round.mode === 'romaji_sprint' || round.mode === 'dictation' ? splitSpellings(round.answer)
           : round.mode === 'typed_recall' || round.mode === 'speech_recall'
-            // the meaning graders also take every dictionary gloss
-            ? [round.answer, note?.primaryGloss ?? '', ...(note?.secondaryGlosses ?? [])]
+            // the grader's own candidates: each meaning and gloss, split, with and without "to "
+            ? typedRecallCandidates(round.answer, note)
             : [round.answer]
   return texts.map((text) => text.trim()).filter((text) => text.length > 0)
 }
@@ -75,14 +77,23 @@ function containsWordRun(haystack: string[], needle: string[]): boolean {
   return false
 }
 
+function foldedKanaOf(value: string): string {
+  return foldKana(normalizeTypedText(value))
+}
+
 /**
  * Does `piece` contain `answer`? Japanese is compared as folded kana with no spaces (so コーヒー
- * contains こおひい); anything else word by word, so the answer "at" is not found in "what".
+ * contains こおひい), and romaji in the piece counts too: Dictation's field turns typed romaji into
+ * kana, so a gloss "kanji" is the answer かんじ. Each word is converted on its own and the whole
+ * piece run together, which can over-hide (an English word that spells the kana) but never leak.
+ * Anything else is compared word by word, so the answer "at" is not found in "what".
  */
 function contains(piece: string, answer: string): boolean {
   if (JAPANESE_SCRIPT.test(answer)) {
-    const folded = foldKana(normalizeTypedText(answer))
-    return folded.length > 0 && foldKana(normalizeTypedText(piece)).includes(folded)
+    const folded = foldedKanaOf(answer)
+    if (!folded) return false
+    const asKana = [piece, ...words(piece), words(piece).join('')].map((part) => foldedKanaOf(toHiragana(part)))
+    return foldedKanaOf(piece).includes(folded) || asKana.some((part) => part.includes(folded))
   }
   return containsWordRun(words(piece), words(answer))
 }

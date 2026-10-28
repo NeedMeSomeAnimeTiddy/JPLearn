@@ -4,6 +4,7 @@ import {
   assessJapaneseAnswer,
   assessTypedAnswer,
   foldKana,
+  formatKanaSpellings,
   type TypedAnswerState,
 } from './answerAssessment'
 import typedAnswerCases from './typedAnswerCases.json'
@@ -70,6 +71,14 @@ describe('assessJapaneseAnswer', () => {
 
   it('treats an empty answer as incorrect', () => {
     expect(assessJapaneseAnswer(['いぬ'], '  ')).toBe('incorrect')
+  })
+})
+
+describe('formatKanaSpellings', () => {
+  it('joins stored alternatives readably', () => {
+    expect(formatKanaSpellings('なん/なに')).toBe('なん or なに')
+    expect(formatKanaSpellings('なん・なに')).toBe('なん or なに')
+    expect(formatKanaSpellings('いぬ')).toBe('いぬ')
   })
 })
 
