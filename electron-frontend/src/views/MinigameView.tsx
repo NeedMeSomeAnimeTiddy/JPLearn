@@ -20,6 +20,7 @@ import { formatTagLabel } from '../utils'
 import { lookupGrammarExplanation } from '../lib/grammarExplanations'
 import { isGrammarCurriculumMode, sanitizeRomajiInput } from '../utils'
 import { useSession, type HintStep } from '../context/SessionContext'
+import { usesHintLadder } from '../lib/hintClue'
 
 /* ==================================================================================================
    THE ROUND — the last screen in the app still drawn in the old language, and the most used one.
@@ -207,10 +208,12 @@ export function MinigameView({
   }, [roundState?.mode])
 
   /* EVERY ANSWER CARRIES HOW FAR THE HINT WENT: once it has printed the answer, the session saves
-     the answer as wrong (audit 9, F4). */
+     the answer as wrong (audit 9, F4). A mode whose popover only ever shows the clue never prints
+     the answer, so pressing H past the clue there is still only the clue. */
+  const answerHintStep: HintStep = roundState && !usesHintLadder(roundState.mode) ? Math.min(hintStep, 1) as HintStep : hintStep
   const submitAnswer = useCallback(
-    (answer: string) => submitSessionAnswer(answer, { hintStep }),
-    [submitSessionAnswer, hintStep],
+    (answer: string) => submitSessionAnswer(answer, { hintStep: answerHintStep }),
+    [submitSessionAnswer, answerHintStep],
   )
 
   // Reset hint when a new round starts. Keyed on the round itself, not its card, so a retry of the

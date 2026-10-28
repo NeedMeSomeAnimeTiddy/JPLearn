@@ -5,6 +5,7 @@ import { ChevronDown, Lightbulb, LightbulbOff } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { TypeAnimation } from 'react-type-animation'
 import type { RoundState } from '../../types'
+import { buildHintClue, hintClueIsEmpty, usesHintLadder, type HintClue } from '../../lib/hintClue'
 
 interface HintPopoverProps {
   roundState: RoundState
@@ -37,14 +38,10 @@ export function HintPopover({
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const isAnswering = hintStep < 2
-  const hasClue = Boolean(roundState.hintText || roundState.dictionaryNote)
-
-  const alwaysShowHint =
-    roundState.mode !== 'romaji_sprint' &&
-    roundState.mode !== 'typed_recall' &&
-    roundState.mode !== 'speech_recall' &&
-    roundState.mode !== 'listening_audio_first' &&
-    roundState.mode !== 'dictation'
+  /* the clue never holds anything the grader would accept (audit 9); the full answer is step 2's */
+  const clue = buildHintClue(roundState)
+  const hasClue = !hintClueIsEmpty(clue)
+  const alwaysShowHint = !usesHintLadder(roundState.mode)
 
   useEffect(() => {
     if (!open || !triggerRef.current) {
@@ -122,7 +119,6 @@ export function HintPopover({
     }
   }
 
-  const clueText = roundState.hintText ?? ''
   const note = roundState.dictionaryNote
   const glosses = note ? [note.primaryGloss, ...note.secondaryGlosses] : []
 
@@ -169,28 +165,10 @@ export function HintPopover({
             {alwaysShowHint ? (
               <div className="minigame-hint-popover-content">
                 <div className="minigame-hint-popover-stage-body">
-                  {roundState.hintText ? (
-                    <p className="minigame-hint-popover-text">
-                      <TypeAnimation
-                        key={`popover-hint-${roundState.hintText}`}
-                        sequence={[roundState.hintText]}
-                        speed={12}
-                        cursor={false}
-                        style={{ display: 'inline' }}
-                      />
-                    </p>
-                  ) : null}
-                  {note ? (
-                    <div className="minigame-hint-dict-inline">
-                      <span className="minigame-hint-dict-chip" lang="ja">{note.character}</span>
-                      <span className="minigame-hint-dict-chip minigame-hint-dict-reading">{note.reading}</span>
-                      {glosses.slice(0, 2).map((g, i) => (
-                        <span key={g} className={`minigame-hint-dict-gloss ${i === 0 ? 'is-primary' : ''}`}>
-                          {g}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <ClueBody clue={clue} keyPrefix="popover-hint" />
+                  {hasClue ? null : (
+                    <p className="minigame-hint-popover-empty">No clues available for this round.</p>
+                  )}
                 </div>
               </div>
             ) : hintStep === 0 ? (
@@ -201,34 +179,23 @@ export function HintPopover({
                     {showKeyboardPrompts ? 'Reveal clue (Space)' : 'Reveal clue'}
                   </button>
                 ) : (
-                  <p className="minigame-hint-popover-empty">No clues available for this round.</p>
+                  <>
+                    <p className="minigame-hint-popover-empty">No clues available for this round.</p>
+                    {/* the clue was all answer, so the only step left is the answer itself */}
+                    <button
+                      type="button"
+                      className="minigame-hint-popover-reveal"
+                      onClick={(event) => { event.stopPropagation(); onRevealHint(); onRevealMoreHint() }}
+                    >
+                      Reveal answer · counts as a miss
+                    </button>
+                  </>
                 )}
               </div>
             ) : hintStep === 1 ? (
               <div className="minigame-hint-popover-content">
                 <div className="minigame-hint-popover-stage-body">
-                  {clueText ? (
-                    <p className="minigame-hint-popover-text">
-                      <TypeAnimation
-                        key={`popover-clue-${clueText}`}
-                        sequence={[clueText]}
-                        speed={12}
-                        cursor={false}
-                        style={{ display: 'inline' }}
-                      />
-                    </p>
-                  ) : null}
-                  {note ? (
-                    <div className="minigame-hint-dict-inline">
-                      <span className="minigame-hint-dict-chip" lang="ja">{note.character}</span>
-                      <span className="minigame-hint-dict-chip minigame-hint-dict-reading">{note.reading}</span>
-                      {glosses.slice(0, 2).map((g, i) => (
-                        <span key={g} className={`minigame-hint-dict-gloss ${i === 0 ? 'is-primary' : ''}`}>
-                          {g}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <ClueBody clue={clue} keyPrefix="popover-clue" />
                 </div>
                 <button type="button" className="minigame-hint-popover-reveal" onClick={handleReveal}>
                   {/* an answer given after this is saved as a miss (audit 9, F4), so the button says so */}
@@ -275,4 +242,35 @@ export function HintPopover({
   )
 
   return createPortal(content, document.body)
+}
+
+/** The clue as the popover prints it: the hint line, then the dictionary chips that are left. */
+function ClueBody({ clue, keyPrefix }: { clue: HintClue; keyPrefix: string }) {
+  const hasChips = Boolean(clue.character || clue.reading || clue.glosses.length > 0)
+  return (
+    <>
+      {clue.text ? (
+        <p className="minigame-hint-popover-text">
+          <TypeAnimation
+            key={`${keyPrefix}-${clue.text}`}
+            sequence={[clue.text]}
+            speed={12}
+            cursor={false}
+            style={{ display: 'inline' }}
+          />
+        </p>
+      ) : null}
+      {hasChips ? (
+        <div className="minigame-hint-dict-inline">
+          {clue.character ? <span className="minigame-hint-dict-chip" lang="ja">{clue.character}</span> : null}
+          {clue.reading ? <span className="minigame-hint-dict-chip minigame-hint-dict-reading">{clue.reading}</span> : null}
+          {clue.glosses.map((g, i) => (
+            <span key={g} className={`minigame-hint-dict-gloss ${i === 0 ? 'is-primary' : ''}`}>
+              {g}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </>
+  )
 }

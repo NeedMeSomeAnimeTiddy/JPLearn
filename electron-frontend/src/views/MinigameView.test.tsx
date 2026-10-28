@@ -272,12 +272,36 @@ describe('MinigameView — asking', () => {
 
   it('tells the session how far the hint went, so a revealed answer is saved as a miss', () => {
     const submitAnswer = vi.fn()
-    renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
+    const { container } = renderView({
+      sessionActive: true, roundState: roundState({ mode: 'romaji_sprint' }), roundInput: 'ichi', submitAnswer,
+    })
     /* H twice: the clue, then the answer printed */
     fireEvent.keyDown(window, { key: 'h' })
     fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.submit(container.querySelector('form.rd-type') as HTMLFormElement)
+    expect(submitAnswer).toHaveBeenCalledWith('ichi', { hintStep: 2 })
+  })
+
+  it('leaves the accepted meanings out of the clue at step 1', async () => {
+    const dictionaryNote = {
+      title: '', copy: '', character: '一', reading: 'いち', primaryGloss: 'one', secondaryGlosses: ['single'], source: 'test',
+    }
+    renderView({ sessionActive: true, roundState: roundState({ mode: 'typed_recall', dictionaryNote }) })
+    fireEvent.keyDown(window, { key: 'h' })
+    await waitFor(() => expect(document.querySelector('.minigame-hint-dict-inline')).toBeTruthy())
+    const chips = document.querySelector('.minigame-hint-dict-inline') as HTMLElement
+    expect(chips.textContent).toContain('いち')
+    expect(chips.querySelector('.minigame-hint-dict-gloss')).toBeNull()
+  })
+
+  it('never counts a full reveal where the popover only shows the clue', () => {
+    const submitAnswer = vi.fn()
+    renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
+    /* meaning match shows its clue at once and never prints the answer */
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.keyDown(window, { key: 'h' })
     fireEvent.click(slip('two'))
-    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 2 })
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 1 })
   })
 
   it('passes the clue step alone through, which can still be right', () => {
