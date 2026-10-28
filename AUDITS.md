@@ -6,6 +6,87 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-28 — Setup and downloads (offline, #36)
+
+**Scope:** Audit 6, Robbie's choice "Setup and downloads (offline, #36)": setup_runtime.cjs, the
+get_*.py downloaders and hf_download.py, fetch-models.cjs, the setup IPC routes and the screens that
+drive them, installed-state reporting, download integrity, cancellation, timeouts, where files land
+and how uninstall removes them, every outbound path including updater.cjs, and whether OCR downloads
+weights by itself (flagged by audit 5). Offered and declined: IPC trust boundary, the Python bridge,
+the whole repository. Out: runtime lifecycle after install (audit 5), tutor behaviour, packaging
+except models.
+**Commit audited:** 4869f29 on main, tree clean.
+**Method:**
+- Read: setup_runtime.cjs, the setup routes in ipc_handlers.cjs, ocr_runtime.cjs, updater.cjs, the
+  uninstall hooks in main.cjs, every get_*.py, hf_download.py, uninstall_cleanup.ps1,
+  fetch-models.cjs, the wizard and Settings model screens, installed paddlex 3.7.2 and CPython 3.11
+  sources, the census and the records. No helpers.
+- The lead ran, at 4869f29 in the main checkout:
+  - a Node stub probe: a plain getSystemInfo({}) contacts proof.ovh.net and huggingface.co
+    (22 calls) and returns in 2,246 ms with the network stubbed;
+  - the three GPU-detection spawns timed: about 1.4–1.7 s per call;
+  - a Python short-read stub: hf_download keeps a 400-of-1,000-byte file with no error;
+  - read-only listings: no partials or zips in JPLearn Assets; the OCR weights are in
+    ~/.paddlex/official_models (about 310 MB, of which about 140 MB is used);
+  - gh issue view 36 (no ruling on OCR fetch-at-use or the speed test); gh issue list for
+    uninstall (none);
+  - vitest electron/setup_runtime.test.ts: 7 passed.
+- Not run: the tutor-uninstall-while-loaded check (needs a launch-gated app with a tutor model).
+
+### Where each finding went
+- F1 every launch contacts proof.ovh.net and huggingface.co (P1, confirmed): to repair. Outside the
+  wizard, install-state reads start no network work. Robbie asked for "our own" speed test and chose
+  "Time the real host": the third-party test server goes; the wizard alone times a short range read
+  from Hugging Face, the host the models come from.
+- F2 uninstall leaves JPLearn Assets; the dialog points at Documents (P1): to repair. Robbie chose
+  "Separate the two": a downloads list (tutor, voice, speech, OCR/translation/tools/fonts) and a
+  learning-progress item, all kept by default. In-app uninstall also removes partials; llama.cpp
+  zips go after extraction.
+- F6 synchronous PowerShell and pip on the main process, about 1.4–1.7 s per read, twice per launch
+  (P1, measured): to repair (async, cached GPU detection; no pip at download time).
+- F3 Reapply translation deletes the model before downloading (P2): to repair.
+- F4 partial llama.cpp and speech installs read as installed, never repaired (P2): to repair.
+- F5 stalled downloads hang setup, no cancel (P2): to repair.
+- F7 OCR installed flag is a marker; weights in ~/.paddlex; cold cache downloads at use (P2,
+  confirmed): Robbie chose "No, offline only". To repair: PaddleX's cache moves into the app folder
+  (existing weights copied, never re-downloaded), use never fetches, installed and uninstall look at
+  the real weights.
+- F8 tutor uninstall deletes before unloading (P3, plausible): to repair (unload first).
+- F9 no checksums; Python fallback accepts cut-short files (P3, confirmed): to repair rather than
+  debt (length and 206 checks).
+- Nit 1 fonts manifest written despite failures: to repair. Nit 2 unannounced pip install of
+  nvidia-cublas after a speech download on a GPU without CUDA: left; it follows a learner-started
+  download. Nit 3 duplicate concurrent llama.cpp download: to repair rather than debt
+  (single-flight).
+- STALE RECORD: ARCHITECTURE.md:122 and ocr_runtime.cjs:27-29 ("from BOS"); downloader docstrings
+  and the uninstall dialog say Documents\JPLearn. Corrected with the repairs.
+- Dropped: none.
+
+### Triggers checked
+- No DEBT.md row covers setup or downloads. DEBT #4's startup-budget clause: not fired on evidence
+  supplied; F6's measured block could produce it on its own. ARCH §8 B4's rule holds.
+
+### Inspected and found sound — do not re-derive these
+- fetch-models.cjs (SHA-256, idle timeout, partials outside public/).
+- updater.cjs is a no-op by default (no repository in package.json).
+- Renderer CSP and window.open deny; renderer fetches are bundled files.
+- Install flags never wait on the network; probeUrl timer; VOICEVOX loopback probe.
+- Speech server is local-folder only.
+- Dictionary and embedder markers written last.
+- Node GGUF .tmp + rename.
+- Setup route tier allow-lists.
+- hf_download timeouts and retries.
+- OCR server lazy start.
+
+### What this pass could not establish
+- Windows delete-while-open for a loaded GGUF; pip duration offline; whether the first summary
+  misses its budget at launch; bundled Python and paddlex versions. No test reaches any download,
+  resume, extract or uninstall path.
+
+### Coverage, not a finding
+- None of the last three passes covered IPC, startup, tutor, JLPT, minigames, dictionary/OCR
+  content, menu, renderer state, answer checking, progression, passages, handwriting or packaging.
+
 ## 2026-10-28 — Dedicated runtimes
 
 **Scope:** Audit 5, Robbie's choice "Dedicated runtimes": the separate processes for the tutor model,
