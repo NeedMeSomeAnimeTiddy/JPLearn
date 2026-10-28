@@ -170,6 +170,20 @@ describe('bridge worker', () => {
     await again
     expect(spawned[1].killed).toBe(true)
   })
+
+  it('a database job keeps its own time limit, and reads queued behind it do not restart the worker', async () => {
+    vi.useFakeTimers()
+    const { bridge, spawned } = createHarness({ maxConsecutiveTimeouts: 2 })
+    const restore = bridge.request(['database-restore', 'b.db'], { timeoutMs: 60_000 })
+    const reads = [bridge.request(['summary']), bridge.request(['summary'])].map((read) => read.catch(() => 'timed out'))
+    await vi.advanceTimersByTimeAsync(1001)
+    expect(await Promise.all(reads)).toEqual(['timed out', 'timed out'])
+    expect(spawned[0].killed).toBe(false)
+
+    const [job] = spawned[0].requests
+    spawned[0].answer(job.id, { ok: true })
+    await expect(restore).resolves.toEqual({ ok: true })
+  })
 })
 
 describe('isWorkerRefusal (audit 7 F2)', () => {

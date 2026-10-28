@@ -11,6 +11,7 @@ describe('backupFailureMessage', () => {
     ['not a progress file: the file does not hold a JSON object', "This file isn't a JPLearn backup."],
     ['not a backup: the file is not a JPLearn database', "This file isn't a JPLearn backup."],
     ['damaged file: the backup failed SQLite\'s integrity check', 'This backup file is damaged.'],
+    ['Failed to restore: Some answers are still waiting to save. Try again in a moment.', 'Some answers are still waiting to save. Try again in a moment.'],
     ['busy: an optimization is running', 'Another backup or optimization is still running. Try again when it finishes.'],
     ['choose another place: that is where the app keeps its own database', 'Choose another place to save the backup.'],
     ['choose another file: that is the database the app is using now', 'That is the file JPLearn is using now. Choose another backup file.'],

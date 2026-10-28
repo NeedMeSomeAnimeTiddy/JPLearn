@@ -45,6 +45,10 @@ const WINDOW_DRAG_INTERVAL_MS = 16
 const WINDOW_DRAG_MAX_DURATION_MS = 60_000
 // A progress file this big is not one JPLearn wrote; refused before Python reads it (audit 10, S8).
 const MAX_PROGRESS_FILE_BYTES = 256 * 1024 * 1024
+/* A whole-database job copies and checks the database several times; on a slow disk that can pass the
+   worker's usual 30 s, and a timed-out job would still finish in Python after the window was told it
+   failed (audit 10, review finding 2). */
+const DATABASE_JOB = Object.freeze({ timeoutMs: 10 * 60_000 })
 
 function assertBackupFileSize(filePath, maxBytes) {
   const { size } = require('fs').statSync(filePath)
@@ -1478,8 +1482,8 @@ function registerIpcHandlers(options) {
       }
       const filePath = filePaths[0]
       assertBackupFileSize(filePath, MAX_PROGRESS_FILE_BYTES)
-      // Read and summarised once, in Python (audit 10, design S8); nothing is written yet.
-      const summary = await options.runPythonBridgeWorkerOnly(['analytics-inspect-json', filePath])
+      // Read and summarised by Python, not here (audit 10, design S8); nothing is written yet.
+      const summary = await options.runPythonBridgeWorkerOnly(['analytics-inspect-json', filePath], DATABASE_JOB)
       const exported = typeof summary.exported_at_utc === 'string' ? formatBackupDay(summary.exported_at_utc) : null
       const confirmed = await confirmBackupAction(event, {
         message: 'Import this progress file?',
@@ -1496,13 +1500,17 @@ function registerIpcHandlers(options) {
       // Not while answers are waiting to save: the import would land between them. Worker only: a
       // one-shot fallback could still be writing after a reset that ran next on the worker.
       const response = await runDatabaseJob('import', () => options.answerQueue.runExclusive(
-        () => options.runPythonBridgeWorkerOnly(['analytics-import-json', filePath, 'merge']),
+        () => options.runPythonBridgeWorkerOnly(['analytics-import-json', filePath, 'merge'], DATABASE_JOB),
       ))
       if (!response || typeof response !== 'object') {
         throw new Error('Invalid import response from bridge')
       }
       clearBridgeReadCaches()
-      return { ok: true, ...response }
+      // The bridge nests the counts under `imported`; the window reads them at the top level.
+      if (!response.imported || typeof response.imported !== 'object') {
+        throw new Error('Invalid import response from bridge')
+      }
+      return { ok: true, ...response.imported }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to import analytics JSON: ${detail}`)
@@ -1526,7 +1534,7 @@ function registerIpcHandlers(options) {
         return { ok: false, cancelled: true }
       }
       const summary = await runDatabaseJob('backup', () => options.answerQueue.runExclusive(
-        () => options.runPythonBridgeWorkerOnly(['database-backup', filePath, JSON.stringify(windowState)]),
+        () => options.runPythonBridgeWorkerOnly(['database-backup', filePath, JSON.stringify(windowState)], DATABASE_JOB),
       ))
       return { ok: true, path: filePath, summary }
     } catch (error) {
@@ -1551,7 +1559,7 @@ function registerIpcHandlers(options) {
         return { ok: false, cancelled: true }
       }
       const filePath = filePaths[0]
-      const summary = await options.runPythonBridgeWorkerOnly(['database-inspect', filePath])
+      const summary = await options.runPythonBridgeWorkerOnly(['database-inspect', filePath], DATABASE_JOB)
       const lastReview = typeof summary.last_review_day === 'string' ? formatBackupDay(summary.last_review_day) : null
       const confirmed = await confirmBackupAction(event, {
         message: 'Replace all your current progress with this backup?',
@@ -1565,10 +1573,19 @@ function registerIpcHandlers(options) {
         return { ok: false, cancelled: true }
       }
       const result = await runDatabaseJob('restore', () => options.answerQueue.runExclusive(
-        () => options.runPythonBridgeWorkerOnly(['database-restore', filePath]),
+        () => options.runPythonBridgeWorkerOnly(['database-restore', filePath], DATABASE_JOB),
       ))
       clearBridgeReadCaches()
-      return { ok: true, ...result }
+      // Only the allowlisted window keys go back to the window (audit 10, review nit).
+      const windowState = {}
+      for (const [key, value] of Object.entries(result && result.window_state ? result.window_state : {})) {
+        try {
+          Object.assign(windowState, validateBackupWindowState({ [key]: value }))
+        } catch {
+          // A key this build does not carry is left in the backup file.
+        }
+      }
+      return { ok: true, ...result, window_state: windowState }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to restore: ${detail}`)

@@ -15,7 +15,8 @@ const KNOWN_FAILURES: ReadonlyArray<readonly [readonly string[], string]> = [
   [['newer format'], 'This file is from a newer version of JPLearn.'],
   [['not a progress file', 'not a backup'], "This file isn't a JPLearn backup."],
   [['damaged file'], 'This backup file is damaged.'],
-  [['busy:'], 'Another backup or optimization is still running. Try again when it finishes.'],
+  [['still waiting to save'], 'Some answers are still waiting to save. Try again in a moment.'],
+  [['busy:'],'Another backup or optimization is still running. Try again when it finishes.'],
   [['choose another place'], 'Choose another place to save the backup.'],
   [['choose another file'], 'That is the file JPLearn is using now. Choose another backup file.'],
 ]

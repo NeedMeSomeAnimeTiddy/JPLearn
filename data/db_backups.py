@@ -38,7 +38,12 @@ def backups_dir(db_path: Path) -> Path:
 
 def open_read_only(path: Path) -> sqlite3.Connection:
     """A read-only connection that never creates the file when it is missing."""
-    return sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=BUSY_TIMEOUT_SECONDS)
+    uri = path.resolve().as_uri()
+    # A network share comes out as file://server/share/...; SQLite refuses a URI naming a host, but
+    # reads the same path with an empty host, file:////server/share/... (audit 10, review finding 5).
+    if not uri.startswith("file:///"):
+        uri = "file:////" + uri[len("file://"):]
+    return sqlite3.connect(f"{uri}?mode=ro", uri=True, timeout=BUSY_TIMEOUT_SECONDS)
 
 
 def copy_database(source: sqlite3.Connection, target: Path) -> None:
@@ -76,7 +81,7 @@ def make_safety_copy(
         copy_database(source, target)
     finally:
         source.close()
-    prune_safety_copies(backups_dir(db_path), keep=keep)
+    prune_safety_copies(backups_dir(db_path), keep=keep, protect=target)
     return target
 
 
@@ -92,11 +97,22 @@ def safety_copies(folder: Path) -> list[Path]:
     return [entry for _stamp, entry in sorted(found, reverse=True)]
 
 
-def prune_safety_copies(folder: Path, *, keep: int = SAFETY_COPIES_KEPT) -> list[Path]:
-    """Remove all but the newest ``keep`` safety copies; returns what was removed."""
-    removed = safety_copies(folder)[keep:]
+def prune_safety_copies(
+    folder: Path, *, keep: int = SAFETY_COPIES_KEPT, protect: Path | None = None
+) -> list[Path]:
+    """Remove all but the newest ``keep`` safety copies; returns what was removed.
+
+    ``protect`` (the copy just made) is never removed, even when a clock set back has given it an
+    older name than the copies already there (audit 10, review finding 3).
+    """
+    copies = safety_copies(folder)
+    if protect is not None and protect in copies:
+        copies.remove(protect)
+        copies.insert(0, protect)
+    removed = copies[keep:]
     for entry in removed:
-        entry.unlink()
+        # Another process pruning at the same moment may have got there first.
+        entry.unlink(missing_ok=True)
     return removed
 
 

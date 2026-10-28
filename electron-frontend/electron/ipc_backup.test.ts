@@ -4,7 +4,29 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
+import { importSummaryMessage } from '../src/lib/backupMessages'
+
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
+
+/* What scripts/desktop_bridge.py _cmd_analytics_import_json really answers: the counts are
+   asdict(ProgressImportResult), nested under `imported` (audit 10, review finding 1). */
+const BRIDGE_IMPORT_REPLY = {
+  ok: true,
+  conflict_mode: 'merge',
+  imported: {
+    cards_updated: 12,
+    cards_kept_current: 3,
+    reviews_added: 340,
+    stages_updated: 0,
+    problem_cards_updated: 0,
+    counters_updated: 0,
+    session_goals_added: 0,
+    topic_rows_moved: 0,
+    daily_games_attempts_added: 0,
+    daily_games_days_kept_current: ['2026-10-02'],
+    safety_copy: 'before-import.db',
+  },
+}
 
 // Audit 10: import, "Back up everything", "Restore from a backup", and the export.
 
@@ -57,9 +79,13 @@ function register(overrides: Record<string, unknown> = {}) {
         return { schema_version: 21, cards: 1, reviews: 2345, last_review_day: '2026-10-27' }
       }
       if (args[0] === 'database-restore') {
-        return { summary: {}, safety_copy: 'copy.db', window_state: { k: 'v' } }
+        return {
+          summary: {},
+          safety_copy: 'copy.db',
+          window_state: { 'jplearn-desktop-settings-v1': '{}', 'some-other-key': 'x' },
+        }
       }
-      return { cards_updated: 1 }
+      return BRIDGE_IMPORT_REPLY
     }),
     ...overrides,
   }
@@ -91,7 +117,9 @@ describe('backup:restore-database', () => {
 
     const result = await handlers.get('backup:restore-database')(createValidEvent())
 
-    expect(result).toMatchObject({ ok: true, safety_copy: 'copy.db', window_state: { k: 'v' } })
+    // Only the allowlisted keys go back to the window.
+    expect(result).toMatchObject({ ok: true, safety_copy: 'copy.db', window_state: { 'jplearn-desktop-settings-v1': '{}' } })
+    expect(Object.keys(result.window_state)).toEqual(['jplearn-desktop-settings-v1'])
     expect(calls).toEqual(['database-inspect', 'exclusive', 'database-restore', 'clear-caches'])
   })
 
@@ -162,7 +190,21 @@ describe('analytics:import-from-json', () => {
       + 'A safety copy of your data is saved first.',
     )
     expect(calls).toEqual(['analytics-inspect-json', 'exclusive', 'analytics-import-json', 'clear-caches'])
-    expect(result).toEqual({ ok: true, cards_updated: 1 })
+    expect(result).toEqual({ ok: true, ...BRIDGE_IMPORT_REPLY.imported })
+    // The real reply, through the route, reads as a summary rather than throwing in the window.
+    expect(importSummaryMessage(result)).toBe(
+      'Imported: 12 cards updated, 340 reviews added. 3 cards you had studied further kept your progress. '
+      + 'Daily Games for 1 day kept the words you already had.',
+    )
+  })
+
+  it('gives the database jobs their own time limit', async () => {
+    const { handlers, options } = register()
+    await handlers.get('analytics:import-from-json')(createValidEvent())
+    await handlers.get('backup:restore-database')(createValidEvent())
+    for (const [args, requestOptions] of options.runPythonBridgeWorkerOnly.mock.calls) {
+      expect([args[0], requestOptions]).toEqual([args[0], { timeoutMs: 600_000 }])
+    }
   })
 
   it('refuses an oversized file before Python reads it', async () => {

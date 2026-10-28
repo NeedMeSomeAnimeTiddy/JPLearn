@@ -73,6 +73,44 @@ def test_pruning_never_touches_other_files(tmp_path: Path) -> None:
     assert len(db_backups.safety_copies(folder)) == 3
 
 
+def test_a_copy_made_after_the_clock_went_back_is_kept(tmp_path: Path) -> None:
+    live = tmp_path / "jplearn.db"
+    _db_with(live, 1)
+    for i in range(3):
+        db_backups.make_safety_copy(live, "before-import", now=T0 + timedelta(days=i))
+    _db_with(live, 2)
+
+    newest = db_backups.make_safety_copy(live, "before-restore", now=T0 - timedelta(days=365))
+
+    assert newest is not None and newest.exists() and _marker(newest) == 2
+    assert len(db_backups.safety_copies(tmp_path / "backups")) == 3
+
+
+def test_pruning_a_copy_another_process_already_removed_is_not_an_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    live = tmp_path / "jplearn.db"
+    _db_with(live, 1)
+    for i in range(4):
+        db_backups.make_safety_copy(live, "before-upgrade", now=T0 + timedelta(seconds=i))
+    folder = tmp_path / "backups"
+    listed = db_backups.safety_copies(folder)
+    listed[-1].unlink()
+    monkeypatch.setattr(db_backups, "safety_copies", lambda _folder: list(listed))
+
+    db_backups.prune_safety_copies(folder, keep=3)
+
+
+def test_a_network_share_path_is_opened_with_an_empty_uri_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[str] = []
+    monkeypatch.setattr(db_backups.sqlite3, "connect", lambda database, **_kwargs: seen.append(database))
+    share = Path("//server/share/jplearn.db")
+    monkeypatch.setattr(Path, "resolve", lambda self, strict=False: self)
+    monkeypatch.setattr(Path, "as_uri", lambda self: "file://server/share/jplearn.db")
+
+    db_backups.open_read_only(share)
+
+    assert seen == ["file:////server/share/jplearn.db?mode=ro"]
+
+
 def test_two_copies_in_the_same_second_both_survive(tmp_path: Path) -> None:
     live = tmp_path / "jplearn.db"
     _db_with(live, 1)
