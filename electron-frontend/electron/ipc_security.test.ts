@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest'
 const {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
+  isRendererPermissionAllowed,
+  validateDictionarySearchQuery,
   validateDeckSlug,
   validateExpertiseLevelInput,
   validateSessionGoalPayload,
   validateSessionId,
-  validateAssistantEventInteractionPayload,
   validateKanjiDetailCharacter,
   validateStartupThemeInput,
   validateGrammarMinigameRequest,
@@ -44,7 +45,27 @@ function answer() {
 describe('ipc_security', () => {
   it('accepts allowed renderer URLs in dev and prod', () => {
     expect(isAllowedRendererUrl('http://localhost:5173', true)).toBe(true)
-    expect(isAllowedRendererUrl('file:///index.html', false)).toBe(true)
+    expect(isAllowedRendererUrl('file:///index.html', false, 'file:///index.html')).toBe(true)
+  })
+
+  it('accepts only the app page in production, with any query or hash (audit 8 F1)', () => {
+    const appPage = 'file:///C:/Program%20Files/JPLearn/resources/app/dist/index.html'
+    expect(isAllowedRendererUrl(`${appPage}?valley=off#menu`, false, appPage)).toBe(true)
+    expect(isAllowedRendererUrl(appPage.replace('Program%20Files', 'program%20files'), false, appPage)).toBe(true)
+    expect(isAllowedRendererUrl('file:///C:/Users/x/Downloads/page.html', false, appPage)).toBe(false)
+    expect(isAllowedRendererUrl('file:///C:/Program%20Files/JPLearn/resources/app/dist/other.html', false, appPage)).toBe(false)
+    expect(isAllowedRendererUrl('file://evil-host/C:/Program%20Files/JPLearn/resources/app/dist/index.html', false, appPage)).toBe(false)
+    expect(isAllowedRendererUrl(appPage, false, undefined)).toBe(false)
+  })
+
+  it('accepts the app page from a folder with a percent sign in its name', () => {
+    // pathToFileURL writes '%25'; Electron's loadFile leaves the '%' as it is.
+    const expected = 'file:///C:/Users/Ana/100%25/JPLearn/dist/index.html'
+    expect(isAllowedRendererUrl('file:///C:/Users/Ana/100%/JPLearn/dist/index.html', false, expected)).toBe(true)
+    expect(isAllowedRendererUrl(expected, false, expected)).toBe(true)
+    expect(isAllowedRendererUrl('file:///C:/Users/Ana/100%/Other/index.html', false, expected)).toBe(false)
+    const spaced = 'file:///C:/Users/Ana%20Smith/100%25/JPLearn/dist/index.html'
+    expect(isAllowedRendererUrl('file:///C:/Users/Ana%20Smith/100%/JPLearn/dist/index.html', false, spaced)).toBe(true)
   })
 
   it('rejects untrusted renderer URLs', () => {
@@ -455,41 +476,51 @@ describe('ipc_security', () => {
     expect(() => validateSessionId('   ')).toThrow(/invalid session id/i)
   })
 
-  it('validates assistant event interaction payload', () => {
-    const valid = validateAssistantEventInteractionPayload({
-      eventId: 12,
-      interactionType: 'clicked',
-      metadata: {
-        target_mode: 'context_cloze',
-        reason: 'cta',
-      },
-    })
+})
 
-    expect(valid.eventId).toBe(12)
-    expect(valid.interactionType).toBe('clicked')
-    expect(valid.metadata.target_mode).toBe('context_cloze')
+describe('renderer permissions (audit 8 F2)', () => {
+  const appPageUrl = 'file:///C:/JPLearn/dist/index.html'
+  const allowed = (permission: string, extra: Record<string, unknown> = {}) =>
+    isRendererPermissionAllowed({ permission, url: `${appPageUrl}?valley=off`, isDev: false, appPageUrl, ...extra })
 
-    expect(() =>
-      validateAssistantEventInteractionPayload({
-        eventId: 0,
-        interactionType: 'clicked',
-      }),
-    ).toThrow(/invalid assistant event id/i)
-
-    expect(() =>
-      validateAssistantEventInteractionPayload({
-        eventId: 5,
-        interactionType: 'unknown',
-      }),
-    ).toThrow(/invalid assistant interaction type/i)
-
-    expect(() =>
-      validateAssistantEventInteractionPayload({
-        eventId: 5,
-        interactionType: 'expired',
-        metadata: 'bad',
-      }),
-    ).toThrow(/invalid assistant interaction metadata/i)
+  it('grants the microphone, fullscreen and the clipboard to the app page', () => {
+    expect(allowed('media', { mediaTypes: ['audio'] })).toBe(true)
+    expect(allowed('fullscreen')).toBe(true)
+    expect(allowed('clipboard-read')).toBe(true)
+    expect(allowed('clipboard-sanitized-write')).toBe(true)
   })
 
+  it('refuses the camera, other permissions and other pages', () => {
+    expect(allowed('media', { mediaTypes: ['audio', 'video'] })).toBe(false)
+    expect(allowed('media', { mediaTypes: ['video'] })).toBe(false)
+    expect(allowed('media', { mediaTypes: [] })).toBe(false)
+    expect(allowed('geolocation')).toBe(false)
+    expect(allowed('notifications')).toBe(false)
+    expect(allowed('display-capture')).toBe(false)
+    expect(allowed('openExternal')).toBe(false)
+    expect(allowed('fullscreen', { url: 'file:///C:/Users/x/page.html' })).toBe(false)
+    expect(allowed('fullscreen', { url: 'data:text/html,splash' })).toBe(false)
+  })
+})
+
+describe('payload bounds (audit 8 F3)', () => {
+  it('cuts a dictionary search at 200 characters', () => {
+    expect(validateDictionarySearchQuery('  たべる  ')).toBe('たべる')
+    expect(validateDictionarySearchQuery('あ'.repeat(5000))).toHaveLength(200)
+    const edge = validateDictionarySearchQuery(`${'あ'.repeat(199)}𠮟${'い'.repeat(10)}`)
+    expect(Array.from(edge)).toHaveLength(200)
+    expect(edge.endsWith('𠮟')).toBe(true)
+    expect(() => validateDictionarySearchQuery('   ')).toThrow(/must not be empty/)
+  })
+
+  it('bounds session ids', () => {
+    expect(validateSessionId('3f2b8c1e-0d4a-4b7e-9a51-2c6f0e9d1b7a')).toBe('3f2b8c1e-0d4a-4b7e-9a51-2c6f0e9d1b7a')
+    expect(() => validateSessionId('x'.repeat(129))).toThrow(/too long/)
+    expect(() => validateSessionId(`a${String.fromCharCode(10)}b`)).toThrow(/control characters/)
+  })
+
+  it('refuses an oversized grammar minigame sentence', () => {
+    expect(() => validateGrammarMinigameRequest({ gameType: 'particle_cloze', sentence: 'あ'.repeat(1001) })).toThrow(/too long/)
+    expect(validateGrammarMinigameRequest({ gameType: 'particle_cloze', sentence: '私は学生です。' }).sentence).toBe('私は学生です。')
+  })
 })

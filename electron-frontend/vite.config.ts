@@ -1,10 +1,29 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+// The dev server's address is in index.html's content security policy so `npm run dev` can load
+// and hot-reload. The built app never talks to it, so the build takes it out (audit 8 nit 2); if
+// the policy is edited and the address is no longer there, the build fails rather than ship it
+// unchecked.
+const DEV_SERVER_CONNECT_SOURCES = ' http://localhost:5173 ws://localhost:5173'
+
+function dropDevServerFromBuiltPolicy(): Plugin {
+  return {
+    name: 'jplearn-drop-dev-server-from-csp',
+    apply: 'build',
+    transformIndexHtml(html) {
+      if (!html.includes(DEV_SERVER_CONNECT_SOURCES)) {
+        throw new Error('index.html content security policy no longer lists the dev server address')
+      }
+      return html.replace(DEV_SERVER_CONNECT_SOURCES, '')
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [react(), dropDevServerFromBuiltPolicy()],
   build: {
     rollupOptions: {
       // A lazy import that something else also imports statically is not lazy: the module lands in

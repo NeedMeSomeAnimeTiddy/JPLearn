@@ -38,6 +38,8 @@ export interface AppTitlebarProps {
   refreshDataFromMenu: () => void
   inspectElementFromMenu: () => void | Promise<void>
   openDevDashboard: () => void
+  /** false in the installed app: the Developer Tools submenu is left out */
+  developerToolsAvailable: boolean
   runCheckFromMenu: (checkName: string) => void
   restartBridgeFromMenu: () => void | Promise<void>
   clearCachesFromMenu: () => void | Promise<void>
@@ -101,6 +103,7 @@ export function AppTitlebar({
   refreshDataFromMenu,
   inspectElementFromMenu,
   openDevDashboard,
+  developerToolsAvailable,
   runCheckFromMenu,
   restartBridgeFromMenu,
   clearCachesFromMenu,
@@ -277,108 +280,112 @@ export function AppTitlebar({
                   Refresh Data
                 </button>
 
-                <div className="titlebar-shortcut-tree-anchor">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="titlebar-shortcut-item titlebar-shortcut-parent"
-                    aria-haspopup="true"
-                    aria-expanded={activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks'}
-                    onClick={toggleDevToolsFlyout}
-                  >
-                    <Code2 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
-                    Developer Tools
-                    <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks' ? '▾' : '▸'}</span>
-                  </button>
+                {/* Running from source only: the installed app hides these, as it does in the
+                    command palette (audit 8 F4). */}
+                {developerToolsAvailable ? (
+                  <div className="titlebar-shortcut-tree-anchor">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="titlebar-shortcut-item titlebar-shortcut-parent"
+                      aria-haspopup="true"
+                      aria-expanded={activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks'}
+                      onClick={toggleDevToolsFlyout}
+                    >
+                      <Code2 className="titlebar-shortcut-icon" strokeWidth={2.1} aria-hidden="true" />
+                      Developer Tools
+                      <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks' ? '▾' : '▸'}</span>
+                    </button>
 
-                  {(activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks') ? (
-                    <div className="titlebar-shortcut-righttree" role="group" aria-label="Developer tools">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                        onClick={openDevDashboard}
-                      >
-                        <Bug className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
-                        Developer Dashboard
-                      </button>
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                        onClick={() => { void inspectElementFromMenu() }}
-                      >
-                        <span className="titlebar-shortcut-glyph" aria-hidden="true">&lt;/&gt;</span>
-                        Inspect Element
-                      </button>
-
-                      <div className="titlebar-shortcut-tree-anchor">
+                    {(activeShortcutFlyout === 'dev_tools' || activeShortcutFlyout === 'dev_checks') ? (
+                      <div className="titlebar-shortcut-righttree" role="group" aria-label="Developer tools">
                         <button
                           type="button"
                           role="menuitem"
-                          className="titlebar-shortcut-item titlebar-shortcut-parent"
-                          aria-haspopup="true"
-                          aria-expanded={activeShortcutFlyout === 'dev_checks'}
-                          onClick={toggleDevChecksFlyout}
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={openDevDashboard}
                         >
-                          <PlayCircle className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
-                          Run Checks
-                          <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_checks' ? '▾' : '▸'}</span>
+                          <Bug className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                          Developer Dashboard
                         </button>
 
-                        {activeShortcutFlyout === 'dev_checks' ? (
-                          <div className="titlebar-shortcut-childmenu" role="group" aria-label="Run checks">
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                              onClick={() => runCheckFromMenu('arch')}
-                            >
-                              Architecture Check
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                              onClick={() => runCheckFromMenu('db')}
-                            >
-                              DB Schema Check
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                              onClick={() => runCheckFromMenu('srs')}
-                            >
-                              SRS Integrity Check
-                            </button>
-                          </div>
-                        ) : null}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={() => { void inspectElementFromMenu() }}
+                        >
+                          <span className="titlebar-shortcut-glyph" aria-hidden="true">&lt;/&gt;</span>
+                          Inspect Element
+                        </button>
+
+                        <div className="titlebar-shortcut-tree-anchor">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="titlebar-shortcut-item titlebar-shortcut-parent"
+                            aria-haspopup="true"
+                            aria-expanded={activeShortcutFlyout === 'dev_checks'}
+                            onClick={toggleDevChecksFlyout}
+                          >
+                            <PlayCircle className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                            Run Checks
+                            <span className="titlebar-shortcut-caret" aria-hidden="true">{activeShortcutFlyout === 'dev_checks' ? '▾' : '▸'}</span>
+                          </button>
+
+                          {activeShortcutFlyout === 'dev_checks' ? (
+                            <div className="titlebar-shortcut-childmenu" role="group" aria-label="Run checks">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                onClick={() => runCheckFromMenu('arch')}
+                              >
+                                Architecture Check
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                onClick={() => runCheckFromMenu('db')}
+                              >
+                                DB Schema Check
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                                onClick={() => runCheckFromMenu('srs')}
+                              >
+                                SRS Integrity Check
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={() => { void restartBridgeFromMenu() }}
+                        >
+                          <RotateCcw className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                          Restart Bridge
+                        </button>
+
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="titlebar-shortcut-item titlebar-shortcut-leaf"
+                          onClick={() => { void clearCachesFromMenu() }}
+                        >
+                          <Trash2 className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
+                          Clear Caches
+                        </button>
                       </div>
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                        onClick={() => { void restartBridgeFromMenu() }}
-                      >
-                        <RotateCcw className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
-                        Restart Bridge
-                      </button>
-
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="titlebar-shortcut-item titlebar-shortcut-leaf"
-                        onClick={() => { void clearCachesFromMenu() }}
-                      >
-                        <Trash2 className="titlebar-shortcut-icon" strokeWidth={2} aria-hidden="true" />
-                        Clear Caches
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

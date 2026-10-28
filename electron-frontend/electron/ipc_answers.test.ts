@@ -26,6 +26,7 @@ function register(send: (args: string[]) => Promise<unknown>) {
   const options = {
     ipcMain: { handle: (channel: string, handler: (...args: unknown[]) => Promise<unknown>) => handlers.set(channel, handler) },
     isDev: false,
+    appPageUrl: 'file:///index.html',
     getWindowFromSender: () => ({ id: 1, isDestroyed: () => false }),
     runPythonBridge: vi.fn(async () => ({ ok: true })),
     runPythonBridgeWithArgs: vi.fn(async () => ({ ok: true })),

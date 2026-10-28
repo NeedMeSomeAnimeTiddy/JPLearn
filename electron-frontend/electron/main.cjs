@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, screen, Notification, Tray, Menu, nativeImage, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, Notification, Tray, Menu, nativeImage, dialog, session } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { pathToFileURL } = require('node:url')
 const { createBridgeWorker, isWorkerRefusal } = require('./bridge_worker.cjs')
 const { createAnswerQueue, createUnsavedAnswersQuitGuard } = require('./answer_queue.cjs')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
@@ -17,6 +18,7 @@ const { getConfigValue } = require('./config_store.cjs')
 const { remainingDue } = require('./summary_counts.cjs')
 const {
   isAllowedRendererUrl,
+  isRendererPermissionAllowed,
 } = require('./ipc_security.cjs')
 
 async function reloadLocalFontsForContents(webContents) {
@@ -265,6 +267,9 @@ if (!process.env.JPLEARN_ASSETS_DIR) {
 }
 
 const repoRoot = path.join(__dirname, '..', '..')
+// The built page the main window loads; IPC senders and navigations must be this page (audit 8 F1).
+const APP_PAGE_PATH = path.join(__dirname, '..', 'dist', 'index.html')
+const APP_PAGE_URL = pathToFileURL(APP_PAGE_PATH).href
 const startupReadyResolvers = new Map()
 const startupTelemetryByContentsId = new Map()
 const windowExpandedStateById = new Map()
@@ -1343,6 +1348,8 @@ registerIpcHandlers({
   runPythonBridgeWorkerOnly,
   screen,
   isDev: process.env.ELECTRON_DEV === '1',
+  isPackaged: app.isPackaged,
+  appPageUrl: APP_PAGE_URL,
   getWindowFromSender: BrowserWindow.fromWebContents,
   runPythonBridge,
   runPythonBridgeWithArgs,
@@ -1890,7 +1897,7 @@ function updateSplashStatus(splash, title, detail, pct = 0) {
 
 function loadMainWindow(win) {
   win.webContents.on('will-navigate', (event, url) => {
-    if (!isAllowedRendererUrl(url, process.env.ELECTRON_DEV === '1')) {
+    if (!isAllowedRendererUrl(url, process.env.ELECTRON_DEV === '1', APP_PAGE_URL)) {
       event.preventDefault()
       console.warn('Blocked renderer navigation', { url })
     }
@@ -1938,7 +1945,7 @@ function loadMainWindow(win) {
   }
   if ((process.env.JPLEARN_VALLEY || '').trim() === 'off') valleyQuery.valley = 'off'
   win.loadFile(
-    path.join(__dirname, '..', 'dist', 'index.html'),
+    APP_PAGE_PATH,
     Object.keys(valleyQuery).length ? { query: valleyQuery } : undefined,
   )
 
@@ -2395,7 +2402,33 @@ if (!_squirrelArg && hasSingleInstanceLock) {
   }
 }
 
+function installPermissionHandlers() {
+  const isDev = process.env.ELECTRON_DEV === '1'
+  // A request names its media types; a check names one (`mediaType`, 'unknown' when it is not yet
+  // known, which the request that follows settles).
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    callback(isRendererPermissionAllowed({
+      permission,
+      url: details?.requestingUrl || webContents?.getURL(),
+      mediaTypes: details?.mediaTypes,
+      isDev,
+      appPageUrl: APP_PAGE_URL,
+    }))
+  })
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, _requestingOrigin, details) => {
+    const mediaType = details?.mediaType
+    return isRendererPermissionAllowed({
+      permission,
+      url: details?.requestingUrl || webContents?.getURL(),
+      mediaTypes: permission === 'media' ? [mediaType === 'unknown' || !mediaType ? 'audio' : mediaType] : undefined,
+      isDev,
+      appPageUrl: APP_PAGE_URL,
+    })
+  })
+}
+
 app.whenReady().then(async () => {
+  installPermissionHandlers()
   // Ensure Documents\JPLearn\ subdirectories exist on every launch
   try { localSetupRuntime.ensureJPLearnDirs() } catch { /* non-fatal */ }
   // If bundled voice profiles are present, seed missing ones into Documents once.

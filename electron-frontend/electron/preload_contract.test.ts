@@ -33,7 +33,6 @@ describe('preload contract', () => {
       "deleteCardNote: (noteKey) => ipcRenderer.invoke('study:delete-card-note', noteKey)",
       "saveScenarioSession: (payload) => ipcRenderer.invoke('scenario:save-session', payload)",
       "listScenarioSessions: () => ipcRenderer.invoke('scenario:list-sessions')",
-      "getScenarioSession: (sessionId) => ipcRenderer.invoke('scenario:get-session', sessionId)",
       "deleteScenarioSession: (sessionId) => ipcRenderer.invoke('scenario:delete-session', sessionId)",
       "clearScenarioSessions: () => ipcRenderer.invoke('scenario:clear-sessions')",
       "saveScenarioSrsCard: (payload) => ipcRenderer.invoke('scenario:save-srs-card', payload)",
@@ -47,8 +46,6 @@ describe('preload contract', () => {
       "getAssistantSnapshot: (sessionId) => ipcRenderer.invoke('assistant:get-snapshot', sessionId)",
       "getAssistantEvents: (limit) => ipcRenderer.invoke('assistant:get-events', limit)",
       "consumeAssistantEvents: (eventIds) => ipcRenderer.invoke('assistant:consume-events', eventIds)",
-      "trackAssistantEvent: (payload) => ipcRenderer.invoke('assistant:track-event', payload)",
-      "appendAssistantChatTurn: (payload) => ipcRenderer.invoke('assistant:append-chat-turn', payload)",
       "getAssistantChatHistory: (limit) => ipcRenderer.invoke('assistant:get-chat-history', limit)",
       "getPreloadedAssistantChatHistory: () => ipcRenderer.invoke('assistant:get-chat-history-preloaded')",
       "clearAssistantChatHistory: () => ipcRenderer.invoke('assistant:clear-chat-history')",
@@ -73,10 +70,29 @@ describe('preload contract', () => {
       "minimizeToTray: () => ipcRenderer.invoke('window:minimize-to-tray')",
       "quitApp: () => ipcRenderer.invoke('window:quit-app')",
       "completeOnboarding: (payload) => ipcRenderer.invoke('learning-path:complete-onboarding', payload)",
+      "isPackagedApp: () => ipcRenderer.invoke('app:is-packaged')",
     ]
 
     for (const mapping of expectedMappings) {
       expect(preloadSource).toContain(mapping)
+    }
+  })
+
+  it('exposes none of the methods removed because nothing in the renderer called them (audit 8)', () => {
+    const removed = [
+      'getScenarioSession',
+      'trackAssistantEvent',
+      'appendAssistantChatTurn',
+      'listVoices',
+      'getTutorReactions',
+      'dismissTutorReaction',
+      'getDailyGoal',
+      'setDailyGoal',
+      'getWordOfDay',
+      'testNotification',
+    ]
+    for (const name of removed) {
+      expect(preloadSource, `${name} should not be exposed`).not.toContain(`  ${name}:`)
     }
   })
 

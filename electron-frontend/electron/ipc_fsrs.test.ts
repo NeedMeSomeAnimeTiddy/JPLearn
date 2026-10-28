@@ -13,6 +13,7 @@ function registerOptimizeHandler(overrides = {}) {
   const options = {
     ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
     isDev: false,
+    appPageUrl: 'file:///index.html',
     getWindowFromSender: () => ({ id: 1, isDestroyed: () => false }),
     runPythonBridge: vi.fn(),
     runPythonBridgeWorkerOnly: vi.fn(async () => ({ ok: true, is_custom: true })),

@@ -169,7 +169,7 @@ RECORDED.
 | `ARCH §8 B3` | The fallback after a worker failure spawns a one-shot Python process per request |
 | `ARCH §8 D1` | `App.tsx` size and routing; its figures are older than the code |
 | `ARCH §8 D4` | `data/app.db` and `SRSRepository` are unused by the app but documented as live |
-| `ARCH §8 D5`, `D6`, `E1`-`E3`, `F1`-`F5` | Leftover packages, incomplete modules, test gaps, stale docs |
+| `ARCH §8 D5`, `D6`, `E1`, `E3`, `F1`-`F5` | Leftover packages, incomplete modules, test gaps, stale docs (E2 closed by audit 8: main-process tests exist) |
 | `desktop_bridge.py` and `data/database.py` over 2,000 lines | `arch_check.py` warns on purpose |
 
 ## Historical fixes — a regression is a finding

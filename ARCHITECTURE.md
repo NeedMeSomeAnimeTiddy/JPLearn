@@ -96,7 +96,9 @@ pipe on Windows is the ANSI code page, which garbled Japanese arguments and cras
 
 3. **Positional string args only.** Commands take `argv: list[str]`; structured payloads
    are JSON strings passed as a single positional arg. There is no schema at the Python
-   boundary — validation lives entirely in `ipc_security.cjs` on the Electron side.
+   boundary. Validation is on the Electron side: mostly the validators in `ipc_security.cjs`,
+   with some allowlists inline in `ipc_handlers.cjs` (setup tiers, OCR languages); a few bridge
+   handlers re-check (card membership in `record_game_result`).
 
 If you add a long-running backend operation, do **not** put it on the shared worker.
 Either give it a dedicated child process (the pattern `llm_runtime.cjs`,
@@ -560,9 +562,9 @@ Gaps:
 - **Zero tests for any of the 6 view components.** `OverviewView` (975 lines),
   `MinigameView` (739), `JLPTPrepView` (602), `ScriptHubView` (471) are exercised only
   indirectly through the 6 `App.*.test.tsx` integration files.
-- **Zero tests for the Electron main process** — `ipc_handlers.cjs` (1,821),
-  `ipc_security.cjs` (1,035), `setup_runtime.cjs` (2,799), `llm_runtime.cjs` (2,243)
-  have no unit tests. `ipc_security.cjs` is the entire trust boundary.
+- **Main-process tests** (was "zero tests", closed by #72): `electron-frontend/electron` has its
+  own vitest suite, run with `npx vitest run electron` (174 tests at audit 8), covering
+  `ipc_security.cjs`, the sender guard, the IPC contracts, the bridge worker and the answer queue.
 
 ---
 
@@ -612,7 +614,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | # | Finding | Issue |
 |---|---|---|
 | E1 | No unit tests for any of the 6 view components (2,800+ lines total). | none |
-| E2 | No tests for the Electron main process, including `ipc_security.cjs` — the trust boundary. | none |
+| ~~E2~~ | ~~No tests for the Electron main process, including `ipc_security.cjs` — the trust boundary~~ — closed: `electron-frontend/electron` has its own suite (`npx vitest run electron`, 174 tests at audit 8), covering `ipc_security.cjs`, the sender guard, IPC contracts, the bridge worker and the answer queue. | #72; audit 8 |
 | E3 | `test_desktop_bridge.py` cannot meaningfully cover 73 commands. | none |
 
 ### Stale documentation
@@ -655,5 +657,5 @@ None of the following duplicate them.
    `features/study-session/` module for round/scoring state.
 7. ~~Extend `arch_check.py` to `scripts/` (D3)~~ done; ~~delete dead MT code, move dictionary to `data/`, convert `_run_command` to a route table~~ done; ~~persistent OCR runtime (D2)~~ done (#74).
 8. Retire or wire `app.db` (D4) and delete `src/`, `ui/`, `nul` (D5).
-9. View-component tests (E1) and `ipc_security.cjs` tests (E2).
+9. View-component tests (E1). (`ipc_security.cjs` tests, E2, exist since #72.)
 10. ROADMAP/FEATURES accuracy pass (F1–F5).
