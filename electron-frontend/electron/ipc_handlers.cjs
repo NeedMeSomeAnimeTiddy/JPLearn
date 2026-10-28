@@ -40,6 +40,7 @@ const {
   validateConfigSetPayload,
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
+const { SPEECH_TIERS } = require('./speech_runtime.cjs')
 
 const WINDOW_DRAG_INTERVAL_MS = 16
 const WINDOW_DRAG_MAX_DURATION_MS = 60_000
@@ -1652,7 +1653,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:download-speech-model', async (event, tier, downloadOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
@@ -1668,11 +1669,14 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:set-active-speech-model', (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
-        return setupRuntime.setActiveSpeechModelTier(tier)
+        const result = setupRuntime.setActiveSpeechModelTier(tier)
+        // the model is chosen when the process starts, so the next request loads this one (audit 5, F8)
+        options.speechRuntime?.restart()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to select speech model: ${detail}`)
@@ -1681,10 +1685,12 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:uninstall-speech-model', (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
+        // stop first: a running server holds the model file open, and it may be this one (audit 5, F8)
+        options.speechRuntime?.restart()
         return setupRuntime.uninstallSpeechModel(tier)
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)

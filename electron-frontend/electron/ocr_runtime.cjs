@@ -18,6 +18,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const { resolvePythonCommand } = require('./python_command.cjs')
 
 // A warm extraction is sub-second on the sample images, so two minutes means
 // "something is wrong" rather than "this is a big image".
@@ -30,26 +31,6 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 120000
 // hanging forever, not to bound honest work.
 const DEFAULT_COLD_REQUEST_TIMEOUT_MS = 15 * 60 * 1000
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
-
-function resolvePythonCommand(repoRoot) {
-  const explicit = (process.env.JPLEARN_PYTHON || '').trim()
-  if (explicit) return explicit
-
-  const resourcesPath = (process.resourcesPath || '').trim()
-  if (resourcesPath) {
-    const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
-    if (fs.existsSync(bundled)) return bundled
-  }
-
-  const candidates = process.platform === 'win32'
-    ? [path.join(repoRoot, '.venv', 'Scripts', 'python.exe')]
-    : [path.join(repoRoot, '.venv', 'bin', 'python3'), path.join(repoRoot, '.venv', 'bin', 'python')]
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate
-  }
-
-  return 'python'
-}
 
 function createOcrRuntime(options = {}) {
   const repoRoot = options.repoRoot || path.resolve(__dirname, '..', '..')
@@ -102,10 +83,12 @@ function createOcrRuntime(options = {}) {
     }, inactivityUnloadMs)
   }
 
-  function rejectPending(error) {
+  // Only the request sent to `proc` is settled by `proc`'s failure: a process killed for a
+  // timeout closes later, by when the next queued image is with a fresh one (audit 5, F6).
+  function rejectPendingFor(proc, error) {
+    if (!pending || pending.proc !== proc) return
     const entry = pending
     pending = null
-    if (!entry) return
     clearTimeout(entry.timer)
     entry.reject(error)
   }
@@ -164,6 +147,7 @@ function createOcrRuntime(options = {}) {
     }
 
     const pythonCmd = resolvePythonCommand(repoRoot)
+    stderrTail = ''
     // Inherit the environment unchanged: scripts/ocr_extraction.py resolves its
     // model-root candidates from JPLEARN_ASSETS_DIR / JPLEARN_USER_DATA_DIR /
     // JPLEARN_DOCUMENTS_DIR, exactly as the old isolated spawn did.
@@ -181,6 +165,7 @@ function createOcrRuntime(options = {}) {
       lastError = error.message
     })
     proc.stderr.on('data', (chunk) => {
+      if (child !== proc) return
       const text = chunk.toString().trim()
       if (!text) return
       stderrTail = `${stderrTail}${stderrTail ? '\n' : ''}${text}`.slice(-4000)
@@ -191,16 +176,17 @@ function createOcrRuntime(options = {}) {
         child = null
         loadedAtUtc = null
       }
-      rejectPending(new Error(`OCR runtime failed to start: ${error.message}`))
+      rejectPendingFor(proc, new Error(`OCR runtime failed to start: ${error.message}`))
     })
     proc.on('close', () => {
+      const tail = child === proc ? stderrTail : ''
       if (child === proc) {
         child = null
         loadedAtUtc = null
         stdoutBuffer = ''
       }
-      rejectPending(new Error(
-        `OCR runtime exited unexpectedly${stderrTail ? `: ${stderrTail}` : ''}`,
+      rejectPendingFor(proc, new Error(
+        `OCR runtime exited unexpectedly${tail ? `: ${tail}` : ''}`,
       ))
     })
 
@@ -227,7 +213,7 @@ function createOcrRuntime(options = {}) {
         reject(new Error(lastError))
       }, timeoutMs)
 
-      pending = { id, resolve, reject, timer }
+      pending = { id, proc, resolve, reject, timer }
 
       try {
         proc.stdin.write(`${JSON.stringify({ id, image_path: imagePath, min_confidence: minConfidence })}\n`)

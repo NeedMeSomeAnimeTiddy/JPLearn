@@ -29,11 +29,14 @@ or a poll/progress channel instead. Four dedicated runtimes already exist to cop
 `llm_runtime.cjs` and `voice_runtime.cjs` (HTTP to a spawned server), `speech_runtime.cjs` and
 `ocr_runtime.cjs` (newline-JSON over stdin/stdout to `scripts/speech_recognition_server.py` /
 `scripts/ocr_server.py`). See ARCHITECTURE.md §2 "Dedicated runtimes" for the lifecycle rules
-these share (single-flight queue, kill-on-timeout, unload only between requests).
+(single-flight queue, kill-on-timeout, unload only between requests). Copy `ocr_runtime.cjs` or
+`speech_runtime.cjs`, which follow all three (speech since audit 5); the tutor runtime talks HTTP
+to one llama-server and voice to a VOICEVOX it may not own, so neither is a template for a
+stdin/stdout runtime.
 
 **Card ids are hand-allocated by offset** (`domain/decks.py`, e.g. kanji N5→N1 at 0/1000/2000/…).
-Adding a deck means picking a verified-disjoint `id_offset` — there's no uniqueness assertion,
-so a collision silently corrupts SRS/mastery state rather than erroring.
+Adding a deck means picking a verified-disjoint `id_offset`; `tests/test_deck_id_uniqueness.py`
+fails on a collision (ARCH §8 A1), which would otherwise silently corrupt SRS/mastery state.
 
 ## Data and bridge conventions
 

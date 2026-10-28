@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -38,7 +39,14 @@ def _detect_gpu() -> tuple[str, str]:
     Verifies CUDA runtime is functional via ctranslate2 before returning "cuda".
     Falls back to CPU if the GPU is present but CUDA libraries are missing.
     """
-    if subprocess.run(["nvidia-smi"], capture_output=True).returncode != 0:
+    # A machine without the NVIDIA driver tools has no nvidia-smi at all, and running a missing
+    # executable raises rather than failing with a code (audit 5, F4).
+    nvidia_smi = shutil.which("nvidia-smi")
+    try:
+        has_gpu = nvidia_smi is not None and subprocess.run([nvidia_smi], capture_output=True).returncode == 0
+    except OSError:
+        has_gpu = False
+    if not has_gpu:
         print("[speech-server] No GPU detected — using CPU", file=sys.stderr, flush=True)
         return ("cpu", "int8")
 

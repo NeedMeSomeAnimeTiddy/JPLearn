@@ -162,6 +162,25 @@ describe('ocr runtime', () => {
     await expect(next).resolves.toMatchObject({ text: 'fresh' })
   })
 
+  it('does not fail the next queued image when the timed-out process closes late (audit 5, F6)', async () => {
+    vi.useFakeTimers()
+    const { runtime, spawned } = createHarness({ requestTimeoutMs: 5000, coldRequestTimeoutMs: 5000 })
+
+    const stalled = runtime.extractText('slow.png')
+    const stalledSettled = expect(stalled).rejects.toThrow(/timed out after 5000ms/)
+    const queued = runtime.extractText('queued.png')
+    await vi.waitFor(() => expect(spawned[0].requests).toHaveLength(1))
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await stalledSettled
+    await vi.waitFor(() => expect(spawned[1]?.requests).toHaveLength(1))
+    spawned[0].stderr.emit('data', Buffer.from('old traceback'))
+    spawned[0].exit() // the killed process's 'close' arrives after the fresh one took the queued image
+
+    spawned[1].respondOk(spawned[1].requests[0].id, 'queued text')
+    await expect(queued).resolves.toMatchObject({ text: 'queued text' })
+  })
+
   it('gives the engine-loading first request a longer budget than warm ones', async () => {
     vi.useFakeTimers()
     const { runtime, spawned } = createHarness({ requestTimeoutMs: 5000, coldRequestTimeoutMs: 60000 })
