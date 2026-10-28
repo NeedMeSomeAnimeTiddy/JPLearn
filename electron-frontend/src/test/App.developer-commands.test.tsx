@@ -136,3 +136,29 @@ describe('developer commands in the command palette', () => {
     }
   })
 })
+
+describe('developer tools in the titlebar shortcut menu (audit 8 review)', () => {
+  async function developerSubmenuShown(): Promise<boolean> {
+    fireEvent.click(await screen.findByRole('button', { name: 'Open shortcuts' }))
+    return screen.queryAllByRole('menuitem').some((item) => (item.textContent ?? '').includes('Developer Tools'))
+      || screen.queryAllByRole('button').some((item) => (item.textContent ?? '').trim() === 'Developer Tools')
+  }
+
+  it('leaves the Developer Tools submenu out of the installed app', async () => {
+    const isPackagedApp = vi.fn(async () => true)
+    window.jplearnDesktop = makeApi(isPackagedApp)
+    render(<App />)
+    await waitFor(() => expect(isPackagedApp).toHaveBeenCalled())
+
+    expect(await developerSubmenuShown()).toBe(false)
+  })
+
+  it('shows it when running from source', async () => {
+    const isPackagedApp = vi.fn(async () => false)
+    window.jplearnDesktop = makeApi(isPackagedApp)
+    render(<App />)
+    await waitFor(() => expect(isPackagedApp).toHaveBeenCalled())
+
+    await waitFor(async () => expect(await developerSubmenuShown()).toBe(true))
+  })
+})

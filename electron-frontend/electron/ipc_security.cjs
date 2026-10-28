@@ -51,8 +51,17 @@ const VALID_DECK_SLUGS = new Set([
   'sentence_examples',
 ])
 
+// Electron's loadFile leaves a '%' in a folder name as it is, while pathToFileURL writes '%25', so
+// both sides are decoded; a path whose escapes do not decode (a folder named "100%") is compared
+// as written instead of throwing and refusing every request.
 function normalizedFilePath(fileUrl) {
-  return decodeURIComponent(fileUrl.pathname).toLowerCase()
+  let pathname = fileUrl.pathname
+  try {
+    pathname = decodeURIComponent(pathname)
+  } catch {
+    // Not decodable: compare as written.
+  }
+  return pathname.toLowerCase()
 }
 
 // In production only the app's own page passes, whatever its query or hash: a check for any local
@@ -312,7 +321,8 @@ function validateDictionarySearchQuery(value) {
   if (typeof value !== 'string') {
     throw new Error(`Invalid dictionary search query: ${String(value)}`)
   }
-  const normalized = value.trim().slice(0, MAX_DICTIONARY_SEARCH_QUERY_LENGTH).trim()
+  // Cut by character, not UTF-16 unit, so a rare kanji at the edge is never split in half.
+  const normalized = Array.from(value.trim()).slice(0, MAX_DICTIONARY_SEARCH_QUERY_LENGTH).join('').trim()
   if (!normalized) {
     throw new Error('Invalid dictionary search query: value must not be empty')
   }

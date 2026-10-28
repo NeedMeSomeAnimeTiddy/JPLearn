@@ -3169,6 +3169,7 @@ function App() {
   return (
     <main className="app-shell mn-showing">
       <AppTitlebar
+        developerToolsAvailable={developerToolsAvailable}
         /* ALWAYS BARE: the full titlebar is 40px of dark chrome at the top of the window, and the
            heading slab is authored at y 20 of a board that starts at the window's own top edge, so
            it was drawn straight through the heading of every screen on the sheet -- which is all

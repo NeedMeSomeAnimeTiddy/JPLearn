@@ -563,7 +563,7 @@ Gaps:
   `MinigameView` (739), `JLPTPrepView` (602), `ScriptHubView` (471) are exercised only
   indirectly through the 6 `App.*.test.tsx` integration files.
 - **Main-process tests** (was "zero tests", closed by #72): `electron-frontend/electron` has its
-  own vitest suite, run with `npx vitest run electron` (169 tests at audit 8), covering
+  own vitest suite, run with `npx vitest run electron` (174 tests at audit 8), covering
   `ipc_security.cjs`, the sender guard, the IPC contracts, the bridge worker and the answer queue.
 
 ---
@@ -614,7 +614,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | # | Finding | Issue |
 |---|---|---|
 | E1 | No unit tests for any of the 6 view components (2,800+ lines total). | none |
-| ~~E2~~ | ~~No tests for the Electron main process, including `ipc_security.cjs` — the trust boundary~~ — closed: `electron-frontend/electron` has its own suite (`npx vitest run electron`, 169 tests at audit 8), covering `ipc_security.cjs`, the sender guard, IPC contracts, the bridge worker and the answer queue. | #72; audit 8 |
+| ~~E2~~ | ~~No tests for the Electron main process, including `ipc_security.cjs` — the trust boundary~~ — closed: `electron-frontend/electron` has its own suite (`npx vitest run electron`, 174 tests at audit 8), covering `ipc_security.cjs`, the sender guard, IPC contracts, the bridge worker and the answer queue. | #72; audit 8 |
 | E3 | `test_desktop_bridge.py` cannot meaningfully cover 73 commands. | none |
 
 ### Stale documentation

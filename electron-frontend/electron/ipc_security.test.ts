@@ -58,6 +58,14 @@ describe('ipc_security', () => {
     expect(isAllowedRendererUrl(appPage, false, undefined)).toBe(false)
   })
 
+  it('accepts the app page from a folder with a percent sign in its name', () => {
+    // pathToFileURL writes '%25'; Electron's loadFile leaves the '%' as it is.
+    const expected = 'file:///C:/Users/Ana/100%25/JPLearn/dist/index.html'
+    expect(isAllowedRendererUrl('file:///C:/Users/Ana/100%/JPLearn/dist/index.html', false, expected)).toBe(true)
+    expect(isAllowedRendererUrl(expected, false, expected)).toBe(true)
+    expect(isAllowedRendererUrl('file:///C:/Users/Ana/100%/Other/index.html', false, expected)).toBe(false)
+  })
+
   it('rejects untrusted renderer URLs', () => {
     expect(isAllowedRendererUrl('https://example.com', true)).toBe(false)
     expect(isAllowedRendererUrl('https://example.com', false)).toBe(false)
@@ -497,6 +505,9 @@ describe('payload bounds (audit 8 F3)', () => {
   it('cuts a dictionary search at 200 characters', () => {
     expect(validateDictionarySearchQuery('  たべる  ')).toBe('たべる')
     expect(validateDictionarySearchQuery('あ'.repeat(5000))).toHaveLength(200)
+    const edge = validateDictionarySearchQuery(`${'あ'.repeat(199)}𠮟${'い'.repeat(10)}`)
+    expect(Array.from(edge)).toHaveLength(200)
+    expect(edge.endsWith('𠮟')).toBe(true)
     expect(() => validateDictionarySearchQuery('   ')).toThrow(/must not be empty/)
   })
 

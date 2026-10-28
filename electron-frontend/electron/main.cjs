@@ -2419,7 +2419,7 @@ function installPermissionHandlers() {
     const mediaType = details?.mediaType
     return isRendererPermissionAllowed({
       permission,
-      url: webContents?.getURL() || details?.requestingUrl,
+      url: details?.requestingUrl || webContents?.getURL(),
       mediaTypes: permission === 'media' ? [mediaType === 'unknown' || !mediaType ? 'audio' : mediaType] : undefined,
       isDev,
       appPageUrl: APP_PAGE_URL,
