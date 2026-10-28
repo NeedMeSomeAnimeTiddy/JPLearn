@@ -66,6 +66,14 @@ function Test-IsInside {
 function Remove-PathKeeping {
   param([string]$Path, [string[]]$Kept)
 
+  # A junction or symbolic link is left alone, never followed or removed: through it a path that
+  # looks like a download could reach the learner's progress, and the path checks below compare
+  # names, not the folders they resolve to.
+  $item = Get-Item -LiteralPath $Path -Force
+  if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+    return $false
+  }
+
   foreach ($keptPath in $Kept) {
     if (Test-IsInside -Path $Path -Folder $keptPath) {
       return $false
@@ -122,6 +130,67 @@ function Format-Size {
     return ('{0:N1} GB' -f ($bytes / 1GB))
   }
   return ('{0:N0} MB' -f ($bytes / 1MB))
+}
+
+# Carries out the choices: each is @{ Option = @{ Label; Paths }; Keep = $bool }. A function so the
+# keep rules can be exercised on scratch folders without the dialog.
+function Invoke-CleanupChoices {
+  param([object[]]$Choices, [string]$ProgressPath, [string]$LogPath)
+
+  $choices = $Choices
+  $progressPath = $ProgressPath
+  $logPath = $LogPath
+  $removed = @()
+  $failed = @()
+
+  # Everything a kept item covers, and the learner's progress whatever was ticked, is left alone
+  # even where it sits inside a folder another item removes.
+  $keptPaths = @($progressPath)
+  foreach ($choice in $choices) {
+    if ($choice.Keep) {
+      $keptPaths += $choice.Option.Paths
+    }
+  }
+
+  foreach ($choice in $choices) {
+    $opt = $choice.Option
+
+    if ($choice.Keep) {
+      Write-CleanupLog -LogPath $logPath -Message "Keeping: $($opt.Paths -join '; ')"
+      continue
+    }
+
+    $removedAny = $false
+    foreach ($path in $opt.Paths) {
+      if (-not (Test-Path -LiteralPath $path)) {
+        Write-CleanupLog -LogPath $logPath -Message "Nothing to remove at: $path"
+        continue
+      }
+      # The progress item itself may remove the progress folder; every other item keeps it. A kept
+      # folder that merely contains this path does not protect it: the item naming the path itself
+      # is the more specific choice (tutor models kept, translation unticked: its model, inside the
+      # tutor models folder, still goes).
+      $keptHere = @($keptPaths | Where-Object {
+        $isProgressOfThisItem = ($_ -eq $progressPath -and $opt.Paths -contains $progressPath)
+        $containsThisPath = ((Test-IsInside -Path $path -Folder $_) -and ((Get-FullPath $_) -ne (Get-FullPath $path)))
+        -not $isProgressOfThisItem -and -not $containsThisPath
+      })
+      try {
+        if (Remove-PathKeeping -Path $path -Kept $keptHere) {
+          $removedAny = $true
+          Write-CleanupLog -LogPath $logPath -Message "Moved to Recycle Bin: $path"
+        }
+      } catch {
+        $failed += "$($opt.Label): $($_.Exception.Message)"
+        Write-CleanupLog -LogPath $logPath -Message "Failed to remove ${path}: $($_.Exception.Message)"
+      }
+    }
+    if ($removedAny) {
+      $removed += ($opt.Label -replace '^Keep ', '')
+    }
+  }
+
+  return @{ Removed = $removed; Failed = $failed }
 }
 
 $targetDir = Resolve-JPLearnDir -Candidate $JPLearnDir
@@ -266,9 +335,6 @@ if ($result -ne [System.Windows.Forms.DialogResult]::OK) {
   exit 0
 }
 
-$removed = @()
-$failed = @()
-
 $choices = @()
 for ($i = 0; $i -lt $downloadOptions.Count; $i++) {
   $choices += @{ Option = $downloadOptions[$i]; Keep = $downloadsList.GetItemChecked($i) }
@@ -277,49 +343,9 @@ for ($i = 0; $i -lt $learningOptions.Count; $i++) {
   $choices += @{ Option = $learningOptions[$i]; Keep = $learningList.GetItemChecked($i) }
 }
 
-# Everything a kept item covers, and the learner's progress whatever was ticked, is left alone
-# even where it sits inside a folder another item removes.
-$keptPaths = @($progressPath)
-foreach ($choice in $choices) {
-  if ($choice.Keep) {
-    $keptPaths += $choice.Option.Paths
-  }
-}
-
-foreach ($choice in $choices) {
-  $opt = $choice.Option
-
-  if ($choice.Keep) {
-    Write-CleanupLog -LogPath $logPath -Message "Keeping: $($opt.Paths -join '; ')"
-    continue
-  }
-
-  $removedAny = $false
-  foreach ($path in $opt.Paths) {
-    if (-not (Test-Path -LiteralPath $path)) {
-      Write-CleanupLog -LogPath $logPath -Message "Nothing to remove at: $path"
-      continue
-    }
-    # The progress item itself may remove the progress folder; every other item keeps it.
-    $keptHere = if ($opt.Paths -contains $progressPath) {
-      @($keptPaths | Where-Object { $_ -ne $progressPath })
-    } else {
-      $keptPaths
-    }
-    try {
-      if (Remove-PathKeeping -Path $path -Kept $keptHere) {
-        $removedAny = $true
-        Write-CleanupLog -LogPath $logPath -Message "Moved to Recycle Bin: $path"
-      }
-    } catch {
-      $failed += "$($opt.Label): $($_.Exception.Message)"
-      Write-CleanupLog -LogPath $logPath -Message "Failed to remove ${path}: $($_.Exception.Message)"
-    }
-  }
-  if ($removedAny) {
-    $removed += ($opt.Label -replace '^Keep ', '')
-  }
-}
+$outcome = Invoke-CleanupChoices -Choices $choices -ProgressPath $progressPath -LogPath $logPath
+$removed = @($outcome.Removed)
+$failed = @($outcome.Failed)
 
 if ($failed.Count -gt 0) {
   [System.Windows.Forms.MessageBox]::Show(
