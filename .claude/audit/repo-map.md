@@ -61,7 +61,7 @@ The units a scoped audit can name. Each is a reasonable single pass.
 | Import, export and backups | `data/deck_portability.py`, `scripts/deck_portability.py` |
 | The menu and the valley | `features/menu/`, `src/valley/` |
 | Renderer state and settings | `App.tsx`, `src/types.ts`, `src/constants.tsx`, `components/AppSettingsModal.tsx`, `electron/config_store.cjs` |
-| Answer checking and grading | `domain/answer_check.py`, `domain/conjugation.py`, `features/round/` |
+| Answer checking and grading | `lib/answerAssessment.ts`, `lib/typedRecallAssessment.ts`, `lib/hintClue.ts`, `features/study-session/useStudySession.ts` (`submitAnswer`), `domain/conjugation.py`, `features/round/`; `domain/answer_check.py` is a test-only mirror |
 | Progression and onboarding | `domain/progression*.py`, `domain/curriculum.py`, `features/progression/`, `features/onboarding/` |
 | Reading passages | `scripts/build_passages_db.py`, `views/PassageHubView.tsx`, `features/passages/` |
 | Handwriting | `features/handwriting/`, `public/handwriting-data/`, `scripts/build_handwriting_assets.py` |

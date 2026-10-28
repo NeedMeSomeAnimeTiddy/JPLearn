@@ -37,8 +37,8 @@ JPLearn is a desktop Japanese learning app focused on daily retention, fast revi
 |------|-------------|
 | **Stroke Order** | Type kanji from meaning while reinforcing writing sequence |
 | **Handwriting** | Draw the kanji stroke-by-stroke on a canvas (mouse/touch/stylus); validates order, direction, and completeness |
-| **Typed Recall** | Type the meaning directly with near-miss tolerance (Levenshtein distance, transposition detection) |
-| **Speech Recall** | Say the meaning aloud — transcribed and graded offline via VOICEVOX/Whisper |
+| **Typed Recall** | Type the meaning directly; one typo or swapped pair is forgiven on words of 4+ letters, shorter words must be exact |
+| **Speech Recall** | Say the meaning aloud — transcribed offline by Whisper and graded against the English meanings only |
 
 ### Challenge Modes
 | Mode | Description |
