@@ -102,7 +102,7 @@ def test_a_backup_carries_the_mastery_counters_and_restores_them() -> None:
     database.reset_db()
     summary = import_progress_snapshot(snapshot, conflict_mode="merge")
 
-    assert summary["card_mastery_scores"] == 2
+    assert summary.counters_updated == 2
     assert _mastery_rows() == [("hiragana", 3, 2), ("vocab_n5", 647, 1)]
 
 
@@ -124,7 +124,7 @@ def test_a_version_1_backup_still_imports_and_leaves_the_counters_alone() -> Non
 
     for mode in ("merge", "overwrite"):
         summary = import_progress_snapshot(_snapshot(1), conflict_mode=mode)
-        assert summary["card_mastery_scores"] == 0
+        assert summary.counters_updated == 0
         assert _mastery_rows() == [("katakana", 9, 1)]
 
 

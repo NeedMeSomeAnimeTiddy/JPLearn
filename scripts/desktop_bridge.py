@@ -182,6 +182,7 @@ from data.jlpt_repository import (  # noqa: E402
     save_jlpt_exam_result,
 )
 from data import deck_portability  # noqa: E402
+from data import whole_backup  # noqa: E402
 from data.grammar_minigame_generator import (  # noqa: E402
     generate_assembly_data,
     generate_imposter_data,
@@ -4289,6 +4290,63 @@ def _cmd_analytics_import_json(argv: list[str]) -> tuple[int, dict[str, object]]
         return 2, {"error": str(exc)}
 
 
+def _cmd_analytics_inspect_json(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """Summarise a progress file for the import confirmation, without writing anything."""
+    if len(argv) < 2:
+        return 2, {"error": "Usage: analytics-inspect-json <file_path>"}
+    try:
+        import json as _json
+        with open(argv[1], "r", encoding="utf-8") as f:
+            snapshot = _json.load(f)
+    except (OSError, ValueError) as exc:
+        return 2, {"error": f"not a progress file: {exc}"}
+    try:
+        return 0, asdict(deck_portability.inspect_progress_snapshot(snapshot))
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_database_backup(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """Save an exact copy of the database, with the window's own settings (audit 10, F3)."""
+    if len(argv) < 2:
+        return 2, {"error": "Usage: database-backup <file_path> [window_state_json]"}
+    try:
+        import json as _json
+        window_state = _json.loads(argv[2]) if len(argv) > 2 else {}
+        if not isinstance(window_state, dict):
+            return 2, {"error": "window settings must be a JSON object"}
+        summary = whole_backup.backup_database(Path(argv[1]), window_state)
+        return 0, asdict(summary)
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_database_inspect(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: database-inspect <file_path>"}
+    try:
+        return 0, asdict(whole_backup.inspect_database_file(Path(argv[1])))
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+
+
+def _cmd_database_restore(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """Replace the database with a backup, then reload this worker's FSRS weights from it: the
+    worker keeps them in memory, so it would otherwise schedule with the old database's."""
+    if len(argv) < 2:
+        return 2, {"error": "Usage: database-restore <file_path>"}
+    try:
+        result = whole_backup.restore_database(Path(argv[1]))
+    except Exception as exc:
+        return 2, {"error": str(exc)}
+    reload_code, reload_payload = _cmd_fsrs_reload_weights(["fsrs-reload-weights"])
+    payload: dict[str, object] = asdict(result)
+    payload["weights_reloaded"] = reload_code == 0
+    if reload_code != 0:
+        payload["weights_error"] = reload_payload.get("error")
+    return 0, payload
+
+
 def _cmd_diagnostics(argv: list[str]) -> tuple[int, dict[str, object]]:
     try:
         return 0, build_diagnostics_report()
@@ -4463,6 +4521,10 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "analytics-export": _cmd_analytics_export,
     "analytics-export-json": _cmd_analytics_export_json,
     "analytics-import-json": _cmd_analytics_import_json,
+    "analytics-inspect-json": _cmd_analytics_inspect_json,
+    "database-backup": _cmd_database_backup,
+    "database-inspect": _cmd_database_inspect,
+    "database-restore": _cmd_database_restore,
     "diagnostics": _cmd_diagnostics,
     "snapshot": _cmd_snapshot,
     "run-check": _cmd_run_check,

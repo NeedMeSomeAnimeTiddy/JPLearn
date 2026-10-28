@@ -17,6 +17,8 @@ SOURCE_FILES: tuple[Path, ...] = (
     PROJECT_ROOT / "scripts" / "desktop_bridge.py",
     PROJECT_ROOT / "data" / "dictionary_repository.py",
     PROJECT_ROOT / "data" / "conjugation_drill.py",
+    PROJECT_ROOT / "data" / "deck_portability.py",
+    PROJECT_ROOT / "data" / "whole_backup.py",
 )
 OUTPUT_FILE = PROJECT_ROOT / "electron-frontend" / "src" / "generated" / "types.ts"
 
