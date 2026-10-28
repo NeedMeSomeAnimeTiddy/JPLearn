@@ -20,6 +20,7 @@ from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow, Session
 from domain.scheduler import ReviewState
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
+from data import db_backups
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
 def _resolve_db_path() -> Path:
@@ -924,10 +925,24 @@ def _validate_migration_plan() -> None:
         )
 
 
-def _apply_migrations(conn: sqlite3.Connection) -> None:
+def _apply_migrations(conn: sqlite3.Connection, *, take_safety_copy: bool = True) -> None:
+    """Bring ``conn``'s database to the latest schema.
+
+    An existing database due an upgrade is copied first (audit 10, F7), so a wrong migration has
+    something to go back to. A failed copy is reported and the upgrade goes ahead: a full disk must
+    not stop the app from starting. A restore migrates its staging copy with ``take_safety_copy``
+    off, having taken its own copy of the live database.
+    """
     _validate_migration_plan()
     _ensure_schema_version_table(conn)
     current_version = _load_schema_version(conn)
+    if take_safety_copy and 0 < current_version < LATEST_SCHEMA_VERSION:
+        database_file = db_backups.main_database_file(conn)
+        if database_file is not None:
+            try:
+                db_backups.make_safety_copy(database_file, "before-upgrade")
+            except (OSError, sqlite3.Error) as error:
+                print(f"[database] no safety copy before the upgrade: {error}", file=sys.stderr)
     for target_version in range(current_version + 1, LATEST_SCHEMA_VERSION + 1):
         migration = MIGRATIONS.get(target_version)
         if migration is None:
