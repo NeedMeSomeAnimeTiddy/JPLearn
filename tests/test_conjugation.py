@@ -231,6 +231,13 @@ class TestApplicability:
     def test_dekiru_is_not_asked_for_a_potential(self) -> None:
         assert "potential" not in applicable_forms("ichidan", "できる")
 
+    def test_aru_is_not_asked_for_a_potential(self) -> None:
+        """あれる is not standard Japanese (audit 9, F5); 有る shares the reading."""
+        assert "potential" not in applicable_forms("godan", "ある")
+        assert "potential" in applicable_forms("ichidan", "いる")
+        with pytest.raises(ConjugationError):
+            conjugate("有る", "ある", "godan", "potential")  # type: ignore[arg-type]
+
     def test_adjectives_have_no_verb_voices(self) -> None:
         forms = applicable_forms("i_adjective", "たかい")
         assert forms.isdisjoint({"passive", "causative", "imperative", "potential"})

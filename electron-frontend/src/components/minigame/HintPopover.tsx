@@ -231,7 +231,8 @@ export function HintPopover({
                   ) : null}
                 </div>
                 <button type="button" className="minigame-hint-popover-reveal" onClick={handleReveal}>
-                  {showKeyboardPrompts ? 'Reveal answer (Space)' : 'Reveal answer'}
+                  {/* an answer given after this is saved as a miss (audit 9, F4), so the button says so */}
+                  {showKeyboardPrompts ? 'Reveal answer (Space) · counts as a miss' : 'Reveal answer · counts as a miss'}
                 </button>
               </div>
             ) : (

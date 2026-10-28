@@ -36,10 +36,10 @@ import {
 import type { StudySessionApi, StudySessionDeps, StudySessionSlice } from './types'
 import { parseResumableSession, resumableTargetItems } from './persistedSession'
 import type { PersistedStudySession } from './persistedSession'
-import { assessConjugationAnswer, assessTypedAnswer } from '../../lib/answerAssessment'
+import { assessConjugationAnswer, assessJapaneseAnswer } from '../../lib/answerAssessment'
 import { buildConjugationPool } from './conjugationRound'
-import type { TypedAnswerState } from '../../lib/answerAssessment'
 import { assessTypedRecallAnswer } from '../../lib/typedRecallAssessment'
+import { HINT_STEP_FULL_ANSWER, type SubmitAnswerOptions } from '../../context/SessionContext'
 import { isGrammarCurriculumMode } from '../../utils'
 import { KANJI_MEANINGS } from '../../lib/kanjiMeanings'
 import {
@@ -1020,7 +1020,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
   ])
 
   const submitAnswer = useCallback(
-    (answer: string, correctnessOverride?: boolean, handwritingOutcome?: HandwritingOutcome) => {
+    (
+      answer: string,
+      options: SubmitAnswerOptions = {},
+      correctnessOverride?: boolean,
+      handwritingOutcome?: HandwritingOutcome,
+    ) => {
       if (!roundState || isRoundResolving) return
       if (answer.trim().length === 0) return
       // The score belongs to the section of the deck the card came from, which a missed-word review
@@ -1040,31 +1045,17 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
             dictionaryNote: roundState.dictionaryNote,
           })
           : roundState.mode === 'speech_recall'
-            ? (() => {
-              const candidates = [
-                roundState.answer,
-                roundState.focusText,
-                roundState.dictionaryNote?.reading,
-                roundState.dictionaryNote?.primaryGloss,
-                ...(roundState.dictionaryNote?.secondaryGlosses ?? []),
-              ]
-                .map((value) => (typeof value === 'string' ? value.trim() : ''))
-                .filter((value) => value.length > 0)
-
-              let bestAssessment: TypedAnswerState = 'incorrect'
-              for (const candidate of candidates) {
-                const candidateAssessment = assessTypedAnswer(candidate, answer)
-                if (candidateAssessment === 'exact') {
-                  return 'exact'
-                }
-                if (candidateAssessment === 'near_miss') {
-                  bestAssessment = 'near_miss'
-                }
-              }
-              return bestAssessment
-            })()
+            // The round shows the word and asks for its meaning, so it is graded on the English
+            // meanings only, like Typed Recall; saying (or typing) the shown word is not the
+            // meaning (audit 9, F2).
+            ? assessTypedRecallAnswer({
+              script: activeScript,
+              expectedAnswer: roundState.answer,
+              givenAnswer: answer,
+              dictionaryNote: roundState.dictionaryNote,
+            })
             : roundState.mode === 'dictation'
-              ? assessTypedAnswer(roundState.answer, answer)
+              ? assessJapaneseAnswer([roundState.answer], answer)
               : roundState.mode === 'romaji_sprint'
                 ? (() => {
                     const variants = roundState.answer.split('/').map(v => normalizeText(v.trim()))
@@ -1076,10 +1067,13 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
                     answer,
                   )
                   : null
+      // Once the hint has printed the answer, typing it is not recall: saved as wrong, as
+      // Handwriting's Give up is (audit 9, F4). The clue step alone still allows a right answer.
+      const answerWasRevealed = (options.hintStep ?? 0) >= HINT_STEP_FULL_ANSWER
       const isCorrect = correctnessOverride
-        ?? (typedAssessment !== null
-          ? typedAssessment !== 'incorrect'
-          : normalizeText(answer) === normalizeText(roundState.answer))
+        ?? (!answerWasRevealed && (typedAssessment !== null
+          ? typedAssessment === 'exact' || typedAssessment === 'near_miss'
+          : normalizeText(answer) === normalizeText(roundState.answer)))
       const responseMs =
         roundPresentedAtRef.current > 0
           ? Math.max(0, performance.now() - roundPresentedAtRef.current)
@@ -1170,7 +1164,12 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
           nextLives = Math.max(0, livesRemaining - 1)
           setLivesRemaining(nextLives)
         }
-        if (isImposterMode(roundState.mode)) {
+        if (answerWasRevealed && correctnessOverride === undefined) {
+          setRoundFeedback('The hint showed the answer, so this one counts as a miss.')
+        } else if (typedAssessment === 'close') {
+          // One kana off is a different sound, so it is a miss; say it was close and show the spelling.
+          setRoundFeedback(`Close: one kana is off, so it counts as a miss. The answer is ${roundState.answer}.`)
+        } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage - 1)
           setRoundFeedback(`Not quite. Stage ${roundState.curriculumStage} → ${nextStage}.`)
         } else if (isParticleClozeMode(roundState.mode)) {
@@ -1552,7 +1551,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
 
   const submitHandwritingOutcome = useCallback((outcome: HandwritingOutcome) => {
     if (!roundState || roundState.mode !== 'handwriting') return
-    submitAnswer(roundState.answer, isHandwritingOutcomeCorrect(outcome), outcome)
+    submitAnswer(roundState.answer, {}, isHandwritingOutcomeCorrect(outcome), outcome)
   }, [roundState, submitAnswer])
 
   // ── Context slice ──────────────────────────────────────────────────────────

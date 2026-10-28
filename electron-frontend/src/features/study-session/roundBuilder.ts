@@ -419,7 +419,8 @@ export function buildRound(
         }
       }
       const allKana = [card, ...companions].map(c => c.character).join('')
-      const firstPairRomaji = [card, ...companions.slice(0, 1)].map(c => c.romaji).join('')
+      // first spelling only: ぢ is stored as "ji/di", and the hint runs the pair together
+      const firstPairRomaji = [card, ...companions.slice(0, 1)].map(c => c.romaji.split('/')[0]).join('')
 
       return {
         cardId: card.id,

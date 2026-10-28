@@ -458,3 +458,14 @@ class TestExistingDecksUnchanged:
 
     def test_katakana_deck_still_has_correct_count(self) -> None:
         assert len(get_katakana_deck()) == 104
+
+
+@pytest.mark.parametrize("loader", [get_hiragana_deck, get_katakana_deck])
+def test_kana_with_two_spellings_accept_the_pronounced_one(loader) -> None:
+    """Romaji Sprint takes any '/'-separated spelling: ji, zu and o are how ぢ, づ, を sound
+    (audit 9, F6). Only the romaji changed; the cards keep their places and ids."""
+    by_character = {card.character: card for card in loader().cards}
+    expected = {"ぢ": "ji/di", "づ": "zu/du", "を": "o/wo"}
+    for hiragana, romaji in expected.items():
+        character = hiragana if loader is get_hiragana_deck else chr(ord(hiragana) + 0x60)
+        assert by_character[character].romaji == romaji

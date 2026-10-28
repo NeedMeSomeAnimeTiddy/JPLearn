@@ -138,6 +138,100 @@ describe('the session goal (audit 4 F7)', () => {
   })
 })
 
+describe('grading an answer (audit 9)', () => {
+  /** a session whose every round is `round`, with the saved review captured */
+  async function startWith(round: Partial<RoundState>) {
+    window.localStorage.clear()
+    const recordGameResult = vi.fn(async () => true)
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult } as unknown as typeof window.jplearnDesktop
+    const build = (pool: ScriptDeck['cards'], _mode: unknown, index: number) => ({ ...roundFor(pool, index), ...round })
+    const deps = makeDeps({ buildRound: build, buildRoundWithBridge: async (pool, mode, index) => build(pool, mode, index) })
+    const hook = renderHook(() => useStudySession(deps))
+    await act(async () => { await hook.result.current.startSession('meaning_match') })
+    const submit = (answer: string, hintStep?: 0 | 1 | 2) => {
+      act(() => { hook.result.current.slice.submitAnswer(answer, hintStep === undefined ? undefined : { hintStep }) })
+    }
+    const saved = () => (recordGameResult.mock.calls.at(-1) as unknown as [{ isCorrect: boolean }] | undefined)?.[0]
+    return { hook, submit, saved }
+  }
+
+  it('saves a Dictation answer one kana off as wrong and says it was close (F1)', async () => {
+    const { hook, submit, saved } = await startWith({ mode: 'dictation', answer: 'がき', focusText: 'がき' })
+    submit('かき')
+    await act(async () => {})
+    expect(saved()?.isCorrect).toBe(false)
+    expect(hook.result.current.slice.roundFeedback).toMatch(/^Close/)
+    expect(hook.result.current.slice.roundFeedback).toContain('がき')
+  })
+
+  it('saves いえ for いぬ as wrong in Dictation (F1)', async () => {
+    const { submit, saved } = await startWith({ mode: 'dictation', answer: 'いぬ', focusText: '犬' })
+    submit('いえ')
+    await act(async () => {})
+    expect(saved()?.isCorrect).toBe(false)
+  })
+
+  it('accepts coffee typed with the long-vowel mark or in katakana (F8)', async () => {
+    for (const given of ['こーひー', 'コーヒー', 'こおひい']) {
+      const { submit, saved, hook } = await startWith({ mode: 'dictation', answer: 'こおひい', focusText: 'コーヒー' })
+      submit(given)
+      await act(async () => {})
+      expect(saved()?.isCorrect).toBe(true)
+      hook.unmount()
+    }
+  })
+
+  it('does not take "do" for "to go" in Typed Recall, but forgives a typo in a longer word (Q1)', async () => {
+    const short = await startWith({ mode: 'typed_recall', answer: 'to go' })
+    short.submit('do')
+    await act(async () => {})
+    expect(short.saved()?.isCorrect).toBe(false)
+    short.hook.unmount()
+
+    const long = await startWith({ mode: 'typed_recall', answer: 'water' })
+    long.submit('watr')
+    await act(async () => {})
+    expect(long.saved()?.isCorrect).toBe(true)
+  })
+
+  it('does not take the displayed Japanese word as the meaning in Speech Recall (F2)', async () => {
+    const note = {
+      title: '', copy: '', character: '犬', reading: 'いぬ', primaryGloss: 'dog', secondaryGlosses: ['hound'],
+    } as unknown as RoundState['dictionaryNote']
+    const shown = await startWith({ mode: 'speech_recall', answer: 'dog', focusText: '犬', dictionaryNote: note })
+    shown.submit('犬')
+    await act(async () => {})
+    expect(shown.saved()?.isCorrect).toBe(false)
+    shown.hook.unmount()
+
+    const reading = await startWith({ mode: 'speech_recall', answer: 'dog', focusText: '犬', dictionaryNote: note })
+    reading.submit('いぬ')
+    await act(async () => {})
+    expect(reading.saved()?.isCorrect).toBe(false)
+    reading.hook.unmount()
+
+    const meaning = await startWith({ mode: 'speech_recall', answer: 'dog', focusText: '犬', dictionaryNote: note })
+    meaning.submit('Hound')
+    await act(async () => {})
+    expect(meaning.saved()?.isCorrect).toBe(true)
+  })
+
+  it('saves a right answer given after the hint printed it as wrong (F4)', async () => {
+    const { hook, submit, saved } = await startWith({})
+    submit(hook.result.current.slice.roundState?.answer ?? '', 2)
+    await act(async () => {})
+    expect(saved()?.isCorrect).toBe(false)
+    expect(hook.result.current.slice.roundFeedback).toMatch(/hint showed the answer/i)
+  })
+
+  it('still saves a right answer given after only the clue as right (F4)', async () => {
+    const { hook, submit, saved } = await startWith({})
+    submit(hook.result.current.slice.roundState?.answer ?? '', 1)
+    await act(async () => {})
+    expect(saved()?.isCorrect).toBe(true)
+  })
+})
+
 describe('a session whose goal never started (audit 4 F8)', () => {
   it('clears its save and builds its run report when it ends', async () => {
     const getSessionSummary = vi.fn(baseDesktopApi.getSessionSummary)

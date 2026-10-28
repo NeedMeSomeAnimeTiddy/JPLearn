@@ -218,7 +218,7 @@ describe('MinigameView — asking', () => {
     await waitFor(() => expect(screen.getByText('WHAT DOES THIS MEAN?')).toBeTruthy())
     expect(screen.getByText('一')).toBeTruthy()
     fireEvent.click(slip('two'))
-    expect(submitAnswer).toHaveBeenCalledWith('two')
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 0 })
   })
 
   it('selects and submits a slip via the number-key shortcut', () => {
@@ -226,7 +226,7 @@ describe('MinigameView — asking', () => {
     renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
 
     fireEvent.keyDown(window, { key: '2' })
-    expect(submitAnswer).toHaveBeenCalledWith('two')
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 0 })
   })
 
   it('walks the slips with the arrows and takes the one under the cursor on Enter', () => {
@@ -234,7 +234,7 @@ describe('MinigameView — asking', () => {
     renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(submitAnswer).toHaveBeenCalledWith('two')
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 0 })
   })
 
   it('solves the prompt’s size from its own length', () => {
@@ -267,7 +267,25 @@ describe('MinigameView — asking', () => {
     const input = screen.getByLabelText('Enter romaji') as HTMLInputElement
     expect(input.value).toBe('ichi')
     fireEvent.submit(input.closest('form') as HTMLFormElement)
-    expect(submitAnswer).toHaveBeenCalledWith('ichi')
+    expect(submitAnswer).toHaveBeenCalledWith('ichi', { hintStep: 0 })
+  })
+
+  it('tells the session how far the hint went, so a revealed answer is saved as a miss', () => {
+    const submitAnswer = vi.fn()
+    renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
+    /* H twice: the clue, then the answer printed */
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.click(slip('two'))
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 2 })
+  })
+
+  it('passes the clue step alone through, which can still be right', () => {
+    const submitAnswer = vi.fn()
+    renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.click(slip('two'))
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 1 })
   })
 
   it('knocks rather than submitting nothing at all', () => {
