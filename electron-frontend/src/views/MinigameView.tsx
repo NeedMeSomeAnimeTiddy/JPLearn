@@ -789,7 +789,8 @@ export function MinigameView({
       : roundState.mode === 'stroke_order'
         ? { text: chosen, face: 'jp' as const, label: 'YOU BUILT' }
         : roundState.mode === 'speech_recall'
-          ? { text: chosen, face: 'jp' as const, label: 'YOU SAID' }
+          /* transcribed in English: the round asks for the meaning (audit 9) */
+          ? { text: chosen, face: 'lat' as const, label: 'YOU SAID' }
           : null
 
   const nextReview = said && roundSrsResult ? roundSrsResult.interval : null

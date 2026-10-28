@@ -37,11 +37,13 @@ export function HintPopover({
 }: HintPopoverProps) {
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
-  const isAnswering = hintStep < 2
   /* the clue never holds anything the grader would accept (audit 9); the full answer is step 2's */
   const clue = buildHintClue(roundState)
   const hasClue = !hintClueIsEmpty(clue)
   const alwaysShowHint = !usesHintLadder(roundState.mode)
+  /* a mode that only ever shows its clue never reaches the answer, however often H is pressed */
+  const shownStep = alwaysShowHint ? Math.min(hintStep, 1) : hintStep
+  const isAnswering = shownStep < 2
 
   useEffect(() => {
     if (!open || !triggerRef.current) {
@@ -149,7 +151,7 @@ export function HintPopover({
               <Lightbulb size={14} aria-hidden="true" className="minigame-hint-popover-icon" />
               <span className="minigame-hint-popover-title">Hint</span>
               <span className="minigame-hint-popover-stage">
-                Stage {hintStep}/2 &middot; {hintRevealCount}x
+                Stage {shownStep}/2 &middot; {hintRevealCount}x
               </span>
               <button
                 type="button"
@@ -232,7 +234,7 @@ export function HintPopover({
             <div className="minigame-hint-popover-footer">
               <LightbulbOff size={11} aria-hidden="true" />
               <span>
-                {isAnswering ? `Stage ${hintStep}/2 — ${hintRevealCount} hint${hintRevealCount !== 1 ? 's' : ''} used` : 'Answer revealed'}
+                {isAnswering ? `Stage ${shownStep}/2 — ${hintRevealCount} hint${hintRevealCount !== 1 ? 's' : ''} used` : 'Answer revealed'}
               </span>
             </div>
           </div>

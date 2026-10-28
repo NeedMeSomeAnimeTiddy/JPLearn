@@ -132,6 +132,8 @@ export function foldKana(value: string): string {
       : char
     const previousVowel = KANA_VOWEL.get(folded.slice(-1))
     if (next === LONG_VOWEL_MARK && previousVowel) next = previousVowel
+    // Deliberate: after an お-row kana, う and お sound the same (こうひい/こおひい), and Dictation
+    // grades what was heard, so a listener cannot be expected to tell them apart.
     if (next === 'う' && previousVowel === 'お') next = 'お'
     folded += next
   }
@@ -141,6 +143,12 @@ export function foldKana(value: string): string {
 /** Split a stored reading such as なん・なに or nan/nani into its spellings. */
 function splitSpellings(value: string): string[] {
   return value.split(/[/・]/).map((part) => part.trim()).filter((part) => part.length > 0)
+}
+
+/** A stored reading as the learner should read it: なん/なに becomes "なん or なに". */
+export function formatKanaSpellings(value: string): string {
+  const spellings = splitSpellings(value)
+  return spellings.length > 0 ? spellings.join(' or ') : value
 }
 
 /**
