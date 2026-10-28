@@ -40,6 +40,7 @@ const {
   validateConfigSetPayload,
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
+const { SPEECH_TIERS } = require('./speech_runtime.cjs')
 
 const WINDOW_DRAG_INTERVAL_MS = 16
 const WINDOW_DRAG_MAX_DURATION_MS = 60_000
@@ -61,6 +62,14 @@ async function runWithTransientRetry(fn) {
 }
 
 function registerIpcHandlers(options) {
+  /* The tutor runtime is replaced when setup installs, selects or removes a model
+     (main.cjs refreshTutorRuntimeAfterSetup), so every route asks for the current one
+     rather than keeping the object it was registered with (audit 5, F2). */
+  const tutorRuntime = () => (
+    typeof options.getLocalTutorRuntime === 'function'
+      ? options.getLocalTutorRuntime()
+      : options.localTutorRuntime
+  )
   const transientAssistantChatTurns = []
   const appendTransientAssistantChatTurn = (role, content) => {
     transientAssistantChatTurns.push({
@@ -402,7 +411,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedRequest = validateScenarioEvaluationRequest(payload)
     try {
-      return await options.localTutorRuntime.evaluateScenarioResponse(validatedRequest)
+      return await tutorRuntime().evaluateScenarioResponse(validatedRequest)
     } catch {
       // A failed judgement is never an error the learner has to deal with —
       // the scenario falls back to its authored recovery line.
@@ -554,7 +563,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedEntries = validateDailyGamesCrosswordClues(entries, true)
     try {
-      return await options.localTutorRuntime.generateCrosswordClues(validatedEntries)
+      return await tutorRuntime().generateCrosswordClues(validatedEntries)
     } catch {
       return { ok: false, text: '' }
     }
@@ -756,13 +765,13 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('assistant-chat:status', (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    return options.localTutorRuntime.getStatus()
+    return tutorRuntime().getStatus()
   })
 
   options.ipcMain.handle('assistant-chat:preload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.localTutorRuntime.preload('renderer-startup')
+      return await tutorRuntime().preload('renderer-startup')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to preload assistant chat runtime: ${detail}`)
@@ -809,7 +818,7 @@ function registerIpcHandlers(options) {
         ...assembledContext,
         ...validatedPayload.context,
       }
-      const response = await options.localTutorRuntime.sendMessage(validatedPayload.message, runtimeContext)
+      const response = await tutorRuntime().sendMessage(validatedPayload.message, runtimeContext)
       appendTransientAssistantChatTurn('assistant', response.text)
       return response
     } catch (error) {
@@ -872,14 +881,14 @@ function registerIpcHandlers(options) {
     const targetLang = typeof payload?.targetLang === 'string' ? payload.targetLang.trim().toLowerCase() : 'en'
     try {
       if (
-        typeof options.localTutorRuntime.translateText !== 'function'
+        typeof tutorRuntime().translateText !== 'function'
         || sourceLang !== 'ja'
         || targetLang !== 'en'
       ) {
         throw new Error('OCR translation is unavailable: no translation runtime found.')
       }
 
-      return await options.localTutorRuntime.translateText(text, {
+      return await tutorRuntime().translateText(text, {
         sourceLang,
         targetLang,
         maxOutputTokens: 240,
@@ -893,7 +902,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:unload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.localTutorRuntime.unload('manual')
+      return await tutorRuntime().unload('manual')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to unload assistant chat runtime: ${detail}`)
@@ -903,7 +912,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:cancel', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.localTutorRuntime.cancelActiveInference('renderer-cancel')
+      return await tutorRuntime().cancelActiveInference('renderer-cancel')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to cancel assistant chat inference: ${detail}`)
@@ -1644,7 +1653,7 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:download-speech-model', async (event, tier, downloadOptions) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
@@ -1660,23 +1669,29 @@ function registerIpcHandlers(options) {
 
     options.ipcMain.handle('setup:set-active-speech-model', (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
-        return setupRuntime.setActiveSpeechModelTier(tier)
+        const result = setupRuntime.setActiveSpeechModelTier(tier)
+        // the model is chosen when the process starts, so the next request loads this one (audit 5, F8)
+        options.speechRuntime?.restart()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to select speech model: ${detail}`)
       }
     })
 
-    options.ipcMain.handle('setup:uninstall-speech-model', (event, tier) => {
+    options.ipcMain.handle('setup:uninstall-speech-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      if (typeof tier !== 'string' || !['fast', 'balanced', 'high', 'ultra'].includes(tier)) {
+      if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
+        // stop first, and wait for it to close: a running server holds the model file open, and
+        // it may be this one (audit 5, F8)
+        await options.speechRuntime?.restart()
         return setupRuntime.uninstallSpeechModel(tier)
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)

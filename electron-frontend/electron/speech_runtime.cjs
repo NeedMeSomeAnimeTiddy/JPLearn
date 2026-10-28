@@ -2,17 +2,30 @@
  * speech_runtime.cjs — offline Japanese speech-to-text via a persistent
  * faster-whisper subprocess (scripts/speech_recognition_server.py).
  *
- * The Python process is spawned lazily on first use and stays alive so the
- * (multi-second) model load only happens once per app session. Requests are
- * sent as newline-delimited JSON over stdin and matched to responses by an
- * incrementing request id.
+ * Same shape as ocr_runtime.cjs (audit 5, F5): the Python process is spawned
+ * lazily, requests are newline-delimited JSON over stdin matched back by an
+ * incrementing id, and calls are queued one at a time because the server
+ * handles one at a time. A timed-out request kills the process, the first
+ * request on a new process gets the longer cold budget (the server loads the
+ * Whisper model before it reads stdin), and the process is unloaded after a
+ * spell of inactivity once nothing is in flight or queued.
  */
 
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const { resolvePythonCommand } = require('./python_command.cjs')
 
-const REQUEST_TIMEOUT_MS = 20000
+// A warm transcription of a spoken answer takes well under a second; twenty
+// seconds means something is wrong.
+const DEFAULT_REQUEST_TIMEOUT_MS = 20000
+// The first request on a fresh process also waits for the Python import, the
+// GPU probe and the model load. Measured 2026-10-28: the `fast` tier on CUDA
+// loads in 6-12 s; larger tiers and CPU take longer and were not measured, so
+// this is generous. It stops a wedged process, not honest work.
+const DEFAULT_COLD_REQUEST_TIMEOUT_MS = 3 * 60 * 1000
+const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
+const RESTART_CLOSE_WAIT_MS = 5000
 const SPEECH_TIERS = ['fast', 'balanced', 'high', 'ultra']
 
 function resolveAssetsBaseDir() {
@@ -53,17 +66,6 @@ function resolveModelDir(repoRoot) {
   return null
 }
 
-function resolvePythonCommand(repoRoot) {
-  const resourcesPath = (process.resourcesPath || '').trim()
-  if (resourcesPath) {
-    const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
-    if (fs.existsSync(bundled)) return bundled
-  }
-  const venvWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe')
-  if (fs.existsSync(venvWin)) return venvWin
-  return 'python'
-}
-
 // Rough heuristic mapping faster-whisper's average log-probability per
 // segment (typically in the range of about -1.5 to 0, closer to 0 is
 // better) onto a 0-1 confidence score for the minigame's confidence
@@ -78,15 +80,79 @@ function estimateConfidence(avgLogprob) {
 
 function createSpeechRuntime(options = {}) {
   const repoRoot = options.repoRoot || path.resolve(__dirname, '..', '..')
+  const scriptPath = options.scriptPath || path.join(repoRoot, 'scripts', 'speech_recognition_server.py')
+  const spawnFn = typeof options.spawnFn === 'function' ? options.spawnFn : spawn
+  const resolveModel = typeof options.resolveModelDir === 'function'
+    ? options.resolveModelDir
+    : () => resolveModelDir(repoRoot)
+  const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs)
+    ? Math.max(1000, Math.floor(options.requestTimeoutMs))
+    : DEFAULT_REQUEST_TIMEOUT_MS
+  const coldRequestTimeoutMs = Number.isFinite(options.coldRequestTimeoutMs)
+    ? Math.max(requestTimeoutMs, Math.floor(options.coldRequestTimeoutMs))
+    : Math.max(requestTimeoutMs, DEFAULT_COLD_REQUEST_TIMEOUT_MS)
+  const inactivityUnloadMs = Number.isFinite(options.inactivityUnloadMs)
+    ? Math.max(15000, Math.floor(options.inactivityUnloadMs))
+    : DEFAULT_INACTIVITY_UNLOAD_MS
 
   let child = null
   let stdoutBuffer = ''
+  let stderrTail = ''
   let nextRequestId = 1
-  const pending = new Map()
+  let pending = null
+  let queueTail = Promise.resolve()
+  let unloadTimer = null
   let lastError = null
-  let startPromise = null
+  let inFlightCount = 0
+  // Whether the current child has answered anything yet, i.e. whether its model is loaded.
+  let childHasResponded = false
 
-  function handleStdoutData(chunk) {
+  function clearUnloadTimer() {
+    if (unloadTimer) {
+      clearTimeout(unloadTimer)
+      unloadTimer = null
+    }
+  }
+
+  // Armed only once every request has settled, including ones still queued, so it never fires
+  // mid-request.
+  function scheduleInactivityUnload() {
+    clearUnloadTimer()
+    if (inFlightCount > 0 || !child) {
+      return
+    }
+    unloadTimer = setTimeout(() => {
+      unloadTimer = null
+      stopChild()
+    }, inactivityUnloadMs)
+  }
+
+  // Only the request sent to `proc` is settled by `proc`'s failure: a killed process's late
+  // 'close' must not reject the request a fresh process is already answering.
+  function rejectPendingFor(proc, error) {
+    if (!pending || pending.proc !== proc) return
+    const entry = pending
+    pending = null
+    clearTimeout(entry.timer)
+    entry.reject(error)
+  }
+
+  function stopChild() {
+    const current = child
+    child = null
+    stdoutBuffer = ''
+    childHasResponded = false
+    if (!current) return null
+    try {
+      current.kill()
+    } catch {
+      // Process may already be gone.
+    }
+    return current
+  }
+
+  function handleStdoutData(proc, chunk) {
+    if (child !== proc) return
     stdoutBuffer += chunk.toString()
     let newlineIndex = stdoutBuffer.indexOf('\n')
     while (newlineIndex >= 0) {
@@ -101,10 +167,13 @@ function createSpeechRuntime(options = {}) {
       } catch {
         continue
       }
-      const entry = pending.get(parsed.id)
-      if (!entry) continue
-      pending.delete(parsed.id)
+      if (!pending || parsed.id !== pending.id) {
+        continue
+      }
+      const entry = pending
+      pending = null
       clearTimeout(entry.timer)
+      childHasResponded = true
       if (parsed.error) {
         entry.reject(new Error(parsed.error))
       } else {
@@ -119,98 +188,146 @@ function createSpeechRuntime(options = {}) {
   }
 
   function ensureStarted() {
-    if (child) return Promise.resolve()
-    if (startPromise) return startPromise
+    if (child) return
 
-    startPromise = new Promise((resolve, reject) => {
-      const modelDir = resolveModelDir(repoRoot)
-      if (!modelDir) {
-        startPromise = null
-        reject(new Error('No speech recognition model installed. Install one from Settings > Speech Recognition.'))
-        return
-      }
-
-      const scriptPath = path.join(repoRoot, 'scripts', 'speech_recognition_server.py')
-      const pythonCmd = resolvePythonCommand(repoRoot)
-      const proc = spawn(pythonCmd, [scriptPath], {
-        env: { ...process.env, SPEECH_MODEL_DIR: modelDir },
-        windowsHide: true,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      })
-
-      proc.stdout.on('data', handleStdoutData)
-      // a write to a process that has just died fails later on stdin (EPIPE); unheard, it would crash
-      // the main process. Its 'close' settles the requests.
-      proc.stdin.on('error', (error) => {
-        // An EPIPE says only that the process is gone; keep the traceback stderr left, if any.
-        lastError = lastError || error.message
-      })
-      proc.stderr.on('data', (chunk) => {
-        const text = chunk.toString().trim()
-        if (text) lastError = text
-      })
-      proc.on('error', (error) => {
-        lastError = error.message
-        child = null
-      })
-      proc.on('close', () => {
-        for (const entry of pending.values()) {
-          clearTimeout(entry.timer)
-          entry.reject(new Error('Speech recognition process exited unexpectedly'))
-        }
-        pending.clear()
-        child = null
-      })
-
-      child = proc
-      resolve()
-    }).finally(() => {
-      startPromise = null
-    })
-
-    return startPromise
-  }
-
-  async function transcribe(audioPath, opts = {}) {
-    await ensureStarted()
-    if (!child) {
-      throw new Error(lastError || 'Speech recognition process is not running')
+    const modelDir = resolveModel()
+    if (!modelDir) {
+      throw new Error('No speech recognition model installed. Install one from Settings > Speech Recognition.')
     }
 
+    const pythonCmd = resolvePythonCommand(repoRoot)
+    stderrTail = ''
+    const proc = spawnFn(pythonCmd, [scriptPath], {
+      env: { ...process.env, SPEECH_MODEL_DIR: modelDir },
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+
+    proc.stdout.on('data', (chunk) => handleStdoutData(proc, chunk))
+    // a write to a process that has just died fails later on stdin (EPIPE); unheard, it would crash
+    // the main process. Its 'close' settles the requests.
+    proc.stdin.on('error', (error) => {
+      lastError = lastError || error.message
+    })
+    proc.stderr.on('data', (chunk) => {
+      if (child !== proc) return
+      const text = chunk.toString().trim()
+      if (!text) return
+      stderrTail = `${stderrTail}${stderrTail ? '\n' : ''}${text}`.slice(-4000)
+    })
+    proc.on('error', (error) => {
+      lastError = error.message
+      if (child === proc) {
+        child = null
+        childHasResponded = false
+      }
+      rejectPendingFor(proc, new Error(`Speech recognition failed to start: ${error.message}`))
+    })
+    proc.on('close', () => {
+      const tail = child === proc ? stderrTail : ''
+      if (child === proc) {
+        child = null
+        stdoutBuffer = ''
+        childHasResponded = false
+      }
+      rejectPendingFor(proc, new Error(
+        `Speech recognition process exited unexpectedly${tail ? `: ${tail}` : ''}`,
+      ))
+    })
+
+    child = proc
+  }
+
+  function sendRequest(audioPath, language) {
+    ensureStarted()
+    const proc = child
     const id = nextRequestId++
-    const request = { id, audio_path: audioPath, language: opts.language || 'ja' }
+    const timeoutMs = childHasResponded ? requestTimeoutMs : coldRequestTimeoutMs
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        pending.delete(id)
-        reject(new Error('Speech recognition timed out'))
-      }, REQUEST_TIMEOUT_MS)
-      pending.set(id, { resolve, reject, timer })
-      child.stdin.write(`${JSON.stringify(request)}\n`)
+        if (!pending || pending.id !== id) return
+        pending = null
+        lastError = `Speech recognition timed out after ${timeoutMs}ms`
+        // The server is single-threaded and still working on this clip, so a surviving
+        // process would start the next request's clock against a busy engine. Kill it;
+        // the next call spawns a fresh one.
+        stopChild()
+        reject(new Error(lastError))
+      }, timeoutMs)
+
+      pending = { id, proc, resolve, reject, timer }
+
+      try {
+        proc.stdin.write(`${JSON.stringify({ id, audio_path: audioPath, language })}\n`)
+      } catch (error) {
+        pending = null
+        clearTimeout(timer)
+        reject(error instanceof Error ? error : new Error(String(error)))
+      }
     })
   }
 
-  function getStatus() {
-    return {
-      available: resolveModelDir(repoRoot) !== null,
-      running: child !== null,
-      lastError,
-    }
-  }
+  return {
+    /**
+     * Transcribe one audio file. Calls are serialized: the Python server handles one request
+     * at a time, so queueing here keeps each request's timeout about its own clip instead of
+     * counting time spent waiting behind another.
+     */
+    async transcribe(audioPath, opts = {}) {
+      const language = typeof opts.language === 'string' && opts.language ? opts.language : 'ja'
 
-  function unload() {
-    if (child) {
-      try { child.kill() } catch { /* ignore */ }
-      child = null
-    }
-  }
+      clearUnloadTimer()
+      inFlightCount += 1
+      // queueTail never rejects, so the next request always gets its turn.
+      const run = queueTail.then(() => sendRequest(audioPath, language))
+      queueTail = run.then(() => undefined, () => undefined)
 
-  function restart() {
-    unload()
-    startPromise = null
-  }
+      try {
+        const result = await run
+        lastError = null
+        return result
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error)
+        throw error
+      } finally {
+        inFlightCount -= 1
+        scheduleInactivityUnload()
+      }
+    },
 
-  return { transcribe, getStatus, unload, restart }
+    getStatus() {
+      return {
+        available: resolveModel() !== null,
+        running: child !== null,
+        lastError,
+      }
+    },
+
+    unload() {
+      clearUnloadTimer()
+      stopChild()
+      return { ok: true }
+    },
+
+    // A new model was installed, chosen or removed: the next request spawns a process that
+    // loads the one now selected. Resolves once the old process has closed (or after a few
+    // seconds), so a caller about to delete its model files is not racing the kill on Windows.
+    restart() {
+      clearUnloadTimer()
+      const stopped = stopChild()
+      if (!stopped || stopped.exitCode !== null || stopped.signalCode != null) {
+        return Promise.resolve()
+      }
+      return new Promise((resolve) => {
+        const done = setTimeout(resolve, RESTART_CLOSE_WAIT_MS)
+        stopped.once('close', () => {
+          clearTimeout(done)
+          resolve()
+        })
+      })
+    },
+  }
 }
 
-module.exports = { createSpeechRuntime }
+module.exports = { createSpeechRuntime, SPEECH_TIERS }

@@ -212,21 +212,17 @@ describe('llm runtime', () => {
     expect(response.text.length).toBeLessThanOrEqual(700)
   })
 
-  it('uses unofficial-jisho-api translation before adapter inference', async () => {
+  it('answers a translation question from the offline dictionary, before adapter inference', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationJishoClient: {
-        async searchForPhrase() {
-          return {
-            data: [
-              {
-                japanese: [{ word: 'トイレ', reading: 'といれ' }],
-                senses: [{ english_definitions: ['bathroom'] }],
-              },
-            ],
-          }
+      translationOfflineEntries: [
+        {
+          id: 'offline-toilet',
+          kanji: [],
+          kana: [{ common: true, text: 'トイレ', tags: [], appliesToKanji: ['*'] }],
+          sense: [{ gloss: [{ lang: 'eng', text: 'bathroom' }] }],
         },
-      },
+      ],
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -242,8 +238,8 @@ describe('llm runtime', () => {
 
     const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
     expect(response.ok).toBe(true)
-    expect(response.provider).toBe('unofficial-jisho-api')
-    expect(response.text).toBe('トイレ (といれ)')
+    expect(response.provider).toBe('offline-jmdict')
+    expect(response.text).toBe('トイレ')
   })
 
   it('uses local glossary for profane single-word translation requests', async () => {
@@ -287,11 +283,6 @@ describe('llm runtime', () => {
           }
         },
       }),
-      translationJishoClient: {
-        async searchForPhrase() {
-          return { data: [] }
-        },
-      },
     })
 
     const response = await runtime.sendMessage('Translate "launch sequence" to Japanese.')
@@ -300,14 +291,9 @@ describe('llm runtime', () => {
     expect(response.text).toContain('文脈を教えてください')
   })
 
-  it('uses offline JMdict translation when online dictionary is unavailable', async () => {
+  it('uses offline JMdict translation', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationJishoClient: {
-        async searchForPhrase() {
-          throw new Error('network unreachable')
-        },
-      },
       translationOfflineEntries: [
         {
           id: 'offline-test-1',
@@ -366,11 +352,6 @@ describe('llm runtime', () => {
 
       const runtime = createTutorChatRuntime({
         provider: 'stub',
-        translationJishoClient: {
-          async searchForPhrase() {
-            throw new Error('network unreachable')
-          },
-        },
         translationOfflineDictionarySqlitePath: sqlitePath,
         adapterFactory: () => ({
           async load() {
@@ -487,7 +468,8 @@ describe('llm runtime', () => {
     const cancelPayload = await runtime.cancelActiveInference('test-cancel')
     expect(cancelPayload.ok).toBe(true)
     expect(cancelPayload.cancelled).toBe(true)
-    await expect(pending).resolves.toMatchObject({ ok: true, provider: 'scripted-fallback' })
+    /* a cancel that lands before inference starts is a cancel, not a scripted reply (audit 5 nit 1) */
+    await expect(pending).rejects.toThrow('Chat inference cancelled')
   })
 
   it('auto-selects translation adapter by intent', async () => {
@@ -496,11 +478,6 @@ describe('llm runtime', () => {
     }
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationJishoClient: {
-        async searchForPhrase() {
-          return { data: [] }
-        },
-      },
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -616,5 +593,114 @@ describe('extractCliResponseText', () => {
 
   it('returns empty string for empty output', () => {
     expect(extractCliResponseText('')).toBe('')
+  })
+})
+
+describe('what the tutor sends off the machine (audit 5, F1)', () => {
+  /* Hard line 2: what the learner asks the tutor stays local. The online dictionary looked up the
+     learner's English words on jisho.org before the offline one; it is gone, and stays gone. */
+  it('ships no online dictionary client', () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const source = fs.readFileSync(path.join(__dirname, 'llm_runtime.cjs'), 'utf8')
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'))
+    expect(source).not.toMatch(/jisho/i)
+    expect(Object.keys(pkg.dependencies ?? {})).not.toContain('unofficial-jisho-api')
+  })
+})
+
+describe('the tutor model server lifecycle (audit 5, F3/F7)', () => {
+  const { httpRequestJson, createLlamaServerAdapter } = require('./llm_runtime.cjs')
+
+  it('fails at once when the model server exits while starting', async () => {
+    /* Node stands in for llama-server: it rejects the server's flags and exits straight away, as a
+       bad model file or a missing DLL would. The load must say so, not poll port 0 for two minutes. */
+    const adapter = createLlamaServerAdapter({
+      executablePath: process.execPath,
+      modelPath: __filename,
+      startupTimeoutMs: 60000,
+    })
+    const started = Date.now()
+    await expect(adapter.load()).rejects.toThrow(/exited before becoming ready/)
+    expect(Date.now() - started).toBeLessThan(10000)
+    expect(adapter.isRunning()).toBe(false)
+  }, 20000)
+
+  it('ends a request that runs past its timeout instead of waiting on it', async () => {
+    const http = require('node:http')
+    const server = http.createServer(() => { /* never answers */ })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+    const port = (server.address() as { port: number }).port
+    try {
+      const started = Date.now()
+      await expect(
+        httpRequestJson({ host: '127.0.0.1', port, path: '/completion', method: 'POST', timeout: 200 }, { prompt: 'x' }),
+      ).rejects.toMatchObject({ code: 'ETIMEDOUT' })
+      expect(Date.now() - started).toBeLessThan(2000)
+    } finally {
+      server.closeAllConnections?.()
+      server.close()
+    }
+  })
+
+  function makeAdapter(state: { running: boolean, release?: () => void, hold?: boolean }) {
+    return {
+      async load() { state.running = true },
+      async unload() { state.running = false },
+      isRunning: () => state.running,
+      async infer() {
+        if (state.hold) await new Promise<void>((resolve) => { state.release = resolve })
+        return { text: 'こんにちは。', provider: 'llama.cpp', model: 'test' }
+      },
+    }
+  }
+
+  it('starts the model again when its server has stopped', async () => {
+    const state = { running: false }
+    const adapterFactory = vi.fn(() => makeAdapter(state))
+    const runtime = createTutorChatRuntime({ provider: 'stub', adapterFactory })
+
+    await runtime.sendMessage('hello there')
+    expect(adapterFactory).toHaveBeenCalledTimes(1)
+    state.running = false // llama-server crashed after loading
+    const reply = await runtime.sendMessage('hello again')
+    expect(adapterFactory).toHaveBeenCalledTimes(2)
+    expect(reply.provider).toBe('llama.cpp')
+  })
+
+  it('arms the inactivity unload only once a request has settled', async () => {
+    vi.useFakeTimers()
+    try {
+      const state: { running: boolean, release?: () => void, hold?: boolean } = { running: false, hold: true }
+      const runtime = createTutorChatRuntime({
+        provider: 'stub', inactivityUnloadMs: 15000, adapterFactory: () => makeAdapter(state),
+      })
+      const pending = runtime.sendMessage('a long question')
+      await vi.waitFor(() => expect(state.release).toBeTypeOf('function'))
+      await vi.advanceTimersByTimeAsync(20000) // longer than the unload window, mid-request
+      expect(runtime.getStatus().loaded).toBe(true)
+      state.release?.()
+      await expect(pending).resolves.toMatchObject({ ok: true })
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(runtime.getStatus().loaded).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('unloads a model loaded for crossword clues once it is idle', async () => {
+    vi.useFakeTimers()
+    try {
+      const state = { running: false }
+      const runtime = createTutorChatRuntime({
+        provider: 'llama.cpp', inactivityUnloadMs: 15000, adapterFactory: () => makeAdapter(state),
+      })
+      await runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }])
+      expect(runtime.getStatus().loaded).toBe(true)
+      await vi.advanceTimersByTimeAsync(15000)
+      expect(runtime.getStatus().loaded).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

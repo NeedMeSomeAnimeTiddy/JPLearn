@@ -11,13 +11,6 @@ try {
   NodeSqliteDatabaseSync = null
 }
 
-let JishoAPI = null
-try {
-  JishoAPI = require('unofficial-jisho-api')
-} catch {
-  JishoAPI = null
-}
-
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
 // Scenario Practice cannot wait on a slow judgement: past this the turn falls
@@ -28,7 +21,6 @@ const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
 const DEFAULT_MAX_PROMPT_CHARS = 3200
 const DEFAULT_TRANSLATION_OUTPUT_CHARS = 900
-const DEFAULT_DICTIONARY_HTTP_TIMEOUT_MS = 4500
 const DEFAULT_OFFLINE_DICTIONARY_FULL_PATH = path.resolve(
   __dirname,
   '..',
@@ -762,28 +754,6 @@ function normalizeDictionaryEntry(rawEntry) {
   }
 }
 
-function parseJishoEntry(rawResult) {
-  if (!rawResult || typeof rawResult !== 'object') {
-    return null
-  }
-  const jp = Array.isArray(rawResult.japanese) ? rawResult.japanese[0] : null
-  const japaneseWord = jp && typeof jp.word === 'string' ? jp.word.trim() : ''
-  const japaneseReading = jp && typeof jp.reading === 'string' ? jp.reading.trim() : ''
-  const primary = japaneseWord || japaneseReading
-  if (!primary) {
-    return null
-  }
-  const firstSense = Array.isArray(rawResult.senses) ? rawResult.senses[0] : null
-  const defs = firstSense && Array.isArray(firstSense.english_definitions)
-    ? firstSense.english_definitions.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean)
-    : []
-  return normalizeDictionaryEntry({
-    japanese: primary,
-    reading: japaneseReading,
-    gloss: defs[0] || '',
-  })
-}
-
 function formatDictionaryTranslation(entry) {
   if (!entry) {
     return ''
@@ -1019,13 +989,9 @@ function createOfflineDictionaryLookup(options = {}) {
   }
 }
 
+// Offline only (audit 5, F1; Robbie: "Offline only"). What the learner asks the tutor stays on the
+// machine, so a translation question is never looked up online; the bundled JMdict answers it.
 function createDictionaryResolver(options = {}) {
-  const onlineTimeoutMs = Number.isFinite(options.onlineTimeoutMs)
-    ? Math.max(1000, Math.floor(options.onlineTimeoutMs))
-    : DEFAULT_DICTIONARY_HTTP_TIMEOUT_MS
-  const jishoClient = typeof options.jishoClient === 'object' && options.jishoClient
-    ? options.jishoClient
-    : (JishoAPI ? new JishoAPI() : null)
   const resolveOfflineEntry = createOfflineDictionaryLookup({
     offlineDictionaryPath: options.offlineDictionaryPath,
     offlineDictionarySqlitePath: options.offlineDictionarySqlitePath,
@@ -1036,27 +1002,6 @@ function createDictionaryResolver(options = {}) {
     const key = normalizeAsciiToken(target)
     if (!key) {
       return null
-    }
-
-    try {
-      if (jishoClient && typeof jishoClient.searchForPhrase === 'function') {
-        const payload = await Promise.race([
-          jishoClient.searchForPhrase(key),
-          new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('dictionary lookup timed out')), onlineTimeoutMs)
-          }),
-        ])
-        const first = payload && Array.isArray(payload.data) ? payload.data[0] : null
-        const parsed = parseJishoEntry(first)
-        if (parsed) {
-          return {
-            ...parsed,
-            source: 'jisho-online',
-          }
-        }
-      }
-    } catch {
-      // Ignore online lookup failures and continue to offline fallback.
     }
 
     const offline = resolveOfflineEntry(key)
@@ -1093,6 +1038,15 @@ function httpRequestJson(requestOptions, payload, signal) {
       res.on('end', () => resolve({ status: res.statusCode || 0, body: raw }))
     })
     req.on('error', (error) => reject(error))
+    // The `timeout` option alone only reports an idle socket and never ends the request
+    // (audit 5, F3), so a request past it is destroyed here, as voice_runtime.cjs does.
+    if (Number.isFinite(requestOptions.timeout) && requestOptions.timeout > 0) {
+      req.setTimeout(requestOptions.timeout, () => {
+        const error = new Error(`request to ${requestOptions.path || '/'} timed out after ${requestOptions.timeout} ms`)
+        error.code = 'ETIMEDOUT'
+        req.destroy(error)
+      })
+    }
     if (signal && typeof signal.addEventListener === 'function') {
       const onAbort = () => req.destroy(new InferenceAbortError())
       if (signal.aborted) {
@@ -1210,6 +1164,19 @@ function isLowSignalAssistantReply(rawText) {
   return !/[\p{L}\p{N}\u3040-\u30ff\u3400-\u9fff]/u.test(withoutPunctuation)
 }
 
+// One process 'exit' listener for every adapter: a session that reloads the model many times
+// (idle unloads, a crash, a timeout) would otherwise add one each and reach Node's
+// MaxListenersExceededWarning.
+const serverStopsOnExit = new Set()
+function registerServerStopOnExit(stop) {
+  if (serverStopsOnExit.size === 0) {
+    process.once('exit', () => {
+      for (const stopServer of serverStopsOnExit) stopServer()
+    })
+  }
+  serverStopsOnExit.add(stop)
+}
+
 function createLlamaServerAdapter(config = {}) {
   const executablePath = typeof config.executablePath === 'string' ? config.executablePath.trim() : ''
   const modelPath = typeof config.modelPath === 'string' ? config.modelPath.trim() : ''
@@ -1245,10 +1212,24 @@ function createLlamaServerAdapter(config = {}) {
     }
   }
 
-  async function waitForHealth() {
+  // An inference request past its timeout leaves llama-server busy with it, so the server is
+  // stopped and the next request starts a fresh one (ARCHITECTURE §2: kill on timeout).
+  async function serverRequest(requestOptions, payload, signal) {
+    try {
+      return await httpRequestJson(requestOptions, payload, signal)
+    } catch (error) {
+      if (error && error.code === 'ETIMEDOUT') stopServer()
+      throw error
+    }
+  }
+
+  // Watches the process it started: its 'exit' listener clears `serverProcess` in the same tick
+  // Node sets the exit code, so checking `serverProcess` would never see a server that died while
+  // starting and would poll port 0 until the startup timeout (audit 5 review).
+  async function waitForHealth(startedProcess) {
     const deadline = Date.now() + startupTimeoutMs
     while (Date.now() < deadline) {
-      if (serverProcess && serverProcess.exitCode !== null) {
+      if (startedProcess.exitCode !== null || startedProcess.signalCode !== null || serverProcess !== startedProcess) {
         throw new Error('llama-server exited before becoming ready')
       }
       try {
@@ -1324,13 +1305,26 @@ function createLlamaServerAdapter(config = {}) {
           port,
         }
         serverProcess.on('error', () => stopServer())
+        // A server that dies after loading is noticed, so the next message starts a fresh one
+        // instead of failing against it until the inactivity unload (audit 5, F3).
+        const startedProcess = serverProcess
+        startedProcess.on('exit', () => {
+          if (serverProcess === startedProcess) stopServer()
+        })
 
         if (!exitHandlerRegistered) {
           exitHandlerRegistered = true
-          process.once('exit', stopServer)
+          registerServerStopOnExit(stopServer)
         }
 
-        await waitForHealth()
+        try {
+          await waitForHealth(startedProcess)
+        } catch (error) {
+          // A server that never became ready is stopped: left running, it would keep the one-server
+          // guard and every later load would refuse to start another (audit 5 review).
+          if (serverProcess === startedProcess) stopServer()
+          throw error
+        }
       })()
 
       try {
@@ -1338,6 +1332,10 @@ function createLlamaServerAdapter(config = {}) {
       } finally {
         startPromise = null
       }
+    },
+
+    isRunning() {
+      return Boolean(serverProcess && serverProcess.exitCode === null)
     },
 
     async unload() {
@@ -1439,7 +1437,7 @@ function createLlamaServerAdapter(config = {}) {
         if (Array.isArray(runtimeOptions.stopSequences) && runtimeOptions.stopSequences.length > 0) {
           completionPayload.stop = runtimeOptions.stopSequences
         }
-        const completionResponse = await httpRequestJson(
+        const completionResponse = await serverRequest(
           { host, port, path: '/completion', method: 'POST', timeout: requestTimeoutMs },
           completionPayload,
           runtimeOptions.signal,
@@ -1459,7 +1457,7 @@ function createLlamaServerAdapter(config = {}) {
           throw new Error('llama-server returned malformed JSON')
         }
       } else {
-        const response = await httpRequestJson(
+        const response = await serverRequest(
           { host, port, path: '/v1/chat/completions', method: 'POST', timeout: requestTimeoutMs },
           payload,
           runtimeOptions.signal,
@@ -1497,7 +1495,7 @@ function createLlamaServerAdapter(config = {}) {
           completionPayload.stop = runtimeOptions.stopSequences
         }
 
-        const completionResponse = await httpRequestJson(
+        const completionResponse = await serverRequest(
           { host, port, path: '/completion', method: 'POST', timeout: requestTimeoutMs },
           completionPayload,
           runtimeOptions.signal,
@@ -1643,8 +1641,6 @@ function createTutorChatRuntime(options = {}) {
   })
 
   const resolveDictionaryEntry = createDictionaryResolver({
-    onlineTimeoutMs: options.translationDictionaryTimeoutMs,
-    jishoClient: options.translationJishoClient,
     offlineDictionaryPath: options.translationOfflineDictionaryPath,
     offlineDictionarySqlitePath: options.translationOfflineDictionarySqlitePath,
     offlineEntries: options.translationOfflineEntries,
@@ -1697,10 +1693,14 @@ function createTutorChatRuntime(options = {}) {
     }, inactivityUnloadMs)
   }
 
+  /* The inactivity unload is armed only once a request has settled and is held off while one
+     runs (ARCHITECTURE §2; audit 5 F3/F7). Every path that can load the model takes a lease, so
+     crossword clues and scenario judging are covered as well as chat and translation. */
   function acquireInferenceLease() {
     if (isInferenceActive) {
       return null
     }
+    clearUnloadTimer()
     const lease = {
       controller: new AbortController(),
     }
@@ -1717,11 +1717,19 @@ function createTutorChatRuntime(options = {}) {
     activeInferenceLease = null
     activeInferenceController = null
     isInferenceActive = false
+    if (loaded) {
+      scheduleInactivityUnload()
+    }
   }
 
   async function ensureLoaded() {
     if (loaded && adapter) {
-      return false
+      if (typeof adapter.isRunning !== 'function' || adapter.isRunning()) {
+        return false
+      }
+      // the model server stopped (a crash, or a request that timed out): load it again
+      loaded = false
+      adapter = null
     }
 
     if (loadPromise) {
@@ -1790,13 +1798,10 @@ function createTutorChatRuntime(options = {}) {
         if (dictionaryHit) {
           const dictionaryText = formatDictionaryTranslation(dictionaryHit)
           const dictionarySource = String(dictionaryHit.source || 'dictionary')
-          const dictionaryProvider = dictionarySource === 'jisho-online'
-            ? 'unofficial-jisho-api'
-            : 'offline-jmdict'
           return {
             ok: true,
             text: clipText(dictionaryText, maxOutputChars),
-            provider: dictionaryProvider,
+            provider: 'offline-jmdict',
             model: dictionarySource,
             coldStart: false,
             elapsedMs: 0,
@@ -1829,12 +1834,11 @@ function createTutorChatRuntime(options = {}) {
       try {
         const coldStart = await ensureLoaded()
         lastUsedAtUtc = new Date().toISOString()
-        scheduleInactivityUnload()
 
         const startedAt = Date.now()
         try {
           if (inferenceLease.controller.signal.aborted) {
-            throw new Error('aborted')
+            throw new InferenceAbortError()
           }
           let inference = null
           let cleanedText = ''
@@ -1930,7 +1934,6 @@ function createTutorChatRuntime(options = {}) {
       try {
         const coldStart = await ensureLoaded()
         lastUsedAtUtc = new Date().toISOString()
-        scheduleInactivityUnload()
 
         const startedAt = Date.now()
         try {
@@ -2139,7 +2142,6 @@ function createTutorChatRuntime(options = {}) {
           return { ok: false, text: '' }
         }
         lastUsedAtUtc = new Date().toISOString()
-        scheduleInactivityUnload()
         return { ok: true, text: String(inference?.text || ''), coldStart }
       } catch {
         return { ok: false, text: '' }
@@ -2173,6 +2175,8 @@ function createTutorChatRuntime(options = {}) {
     },
 
     async preload(reason = 'startup-preload') {
+      // an unload timer armed by an earlier request must not fire into this (re)load
+      clearUnloadTimer()
       const coldStart = await ensureLoaded()
       lastUsedAtUtc = new Date().toISOString()
       scheduleInactivityUnload()
@@ -2240,4 +2244,6 @@ module.exports = {
   createTutorChatRuntime,
   createAdapterRegistry,
   extractCliResponseText,
+  httpRequestJson,
+  createLlamaServerAdapter,
 }

@@ -446,6 +446,29 @@ describe('ipc runtime contract', () => {
     expect(options.localTutorRuntime.generateCrosswordClues).not.toHaveBeenCalled()
   })
 
+  it('reaches the tutor runtime setup put in place, not the one it was registered with (audit 5, F2)', async () => {
+    const makeRuntime = (name: string) => ({
+      getStatus: vi.fn(() => ({ name })),
+      preload: vi.fn(async () => ({ ok: true })),
+      sendMessage: vi.fn(async () => ({ ok: true, text: name, provider: name })),
+      unload: vi.fn(async () => ({ ok: true })),
+      cancelActiveInference: vi.fn(async () => ({ ok: true, cancelled: false })),
+      generateCrosswordClues: vi.fn(async () => ({ ok: true, text: name })),
+      evaluateScenarioResponse: vi.fn(async () => ({ ok: true, text: name })),
+    })
+    const first = makeRuntime('first')
+    const second = makeRuntime('second')
+    let current = first
+    const { handlers } = createRegisteredHandlers({ getLocalTutorRuntime: () => current })
+
+    expect(handlers.get('assistant-chat:status')(createValidEvent())).toEqual({ name: 'first' })
+    current = second // what refreshTutorRuntimeAfterSetup does after an install
+    expect(handlers.get('assistant-chat:status')(createValidEvent())).toEqual({ name: 'second' })
+    await handlers.get('assistant-chat:send-message')(createValidEvent(), { message: 'hello' })
+    expect(second.sendMessage).toHaveBeenCalled()
+    expect(first.sendMessage).not.toHaveBeenCalled()
+  })
+
   it('forwards the renderer crossword generation contract to the tutor runtime', async () => {
     const generated = { ok: true, text: '[{"poolPosition":0,"clue":"a place for learning"}]' }
     const { handlers, options } = createRegisteredHandlers()

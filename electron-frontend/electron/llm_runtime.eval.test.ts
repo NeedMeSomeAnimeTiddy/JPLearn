@@ -9,11 +9,6 @@ describe('llm runtime quality evals', () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
       translationOfflineEntries: [],
-      translationJishoClient: {
-        async searchForPhrase() {
-          return { data: [] }
-        },
-      },
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -52,11 +47,6 @@ describe('llm runtime quality evals', () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
       translationOfflineEntries: [],
-      translationJishoClient: {
-        async searchForPhrase() {
-          return { data: [] }
-        },
-      },
       adapterFactory: () => ({
         async load() {
           return undefined
