@@ -4284,7 +4284,7 @@ def _cmd_analytics_import_json(argv: list[str]) -> tuple[int, dict[str, object]]
         with open(file_path, "r", encoding="utf-8") as f:
             snapshot = _json.load(f)
         result = deck_portability.import_progress_snapshot(snapshot, conflict_mode=conflict_mode)
-        return 0, {"ok": True, "imported": result, "conflict_mode": conflict_mode}
+        return 0, {"ok": True, "imported": asdict(result), "conflict_mode": conflict_mode}
     except Exception as exc:
         return 2, {"error": str(exc)}
 

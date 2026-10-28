@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 import re
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from collections.abc import Generator
 from typing import Any
 
-from data import database
+from data import database, db_backups
+from data.category_identity_migration import _rank_leech, _rank_review_state, build_card_remap
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
 from domain.block_mapping import parent_slug_for_category
 from domain.daily_games import DEFAULT_DAILY_POOL_LIMIT, MAX_MONTHLY_FREEZES
@@ -357,35 +360,277 @@ def export_progress_snapshot() -> dict[str, Any]:
     }
 
 
-def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "merge") -> dict[str, int]:
-    """Import progress snapshot with merge or overwrite conflict handling."""
+@dataclass(frozen=True)
+class ProgressFileSummary:
+    """What a progress file holds, shown before the learner agrees to import it."""
+
+    format_version: int
+    exported_at_utc: str | None
+    cards: int
+    reviews: int
+
+
+@dataclass(frozen=True)
+class ProgressImportResult:
+    """What an import changed (audit 10, F2/F5).
+
+    Counts are rows written, not rows in the file: a card the learner has studied further keeps
+    their copy and is counted in ``cards_kept_current`` instead.
+    """
+
+    cards_updated: int
+    cards_kept_current: int
+    reviews_added: int
+    stages_updated: int
+    problem_cards_updated: int
+    counters_updated: int
+    session_goals_added: int
+    topic_rows_moved: int
+    daily_games_attempts_added: int
+    daily_games_days_kept_current: list[str]
+    safety_copy: str | None
+
+
+def _check_format_version(snapshot: dict[str, Any]) -> int:
+    version = snapshot.get("format_version")
+    if not isinstance(version, int) or isinstance(version, bool) or version not in _READABLE_FORMAT_VERSIONS:
+        if isinstance(version, int) and not isinstance(version, bool) and version > FORMAT_VERSION:
+            raise ValueError(f"newer format: this file is format {version}; this version of JPLearn reads up to {FORMAT_VERSION}")
+        raise ValueError(
+            f"not a progress file: unsupported snapshot format_version {version!r}; "
+            f"expected one of {sorted(_READABLE_FORMAT_VERSIONS)}"
+        )
+    return version
+
+
+def inspect_progress_snapshot(snapshot: object) -> ProgressFileSummary:
+    """Summarise a progress file without writing anything."""
+    if not isinstance(snapshot, dict):
+        raise ValueError("not a progress file: the file does not hold a JSON object")
+    version = _check_format_version(snapshot)
+    progress = snapshot.get("progress")
+    if not isinstance(progress, dict):
+        raise ValueError("not a progress file: snapshot field 'progress' must be an object")
+    exported_at = snapshot.get("exported_at_utc")
+    return ProgressFileSummary(
+        format_version=version,
+        exported_at_utc=exported_at if isinstance(exported_at, str) and exported_at else None,
+        cards=len(_normalize_row_list(progress, "review_states")),
+        reviews=len(_normalize_row_list(progress, "review_events")),
+    )
+
+
+def _required_number(value: object, field: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or value < 0:
+        raise ValueError(f"{field} must be a non-negative number")
+    return float(value)
+
+
+def _optional_number(value: object, field: str) -> float | None:
+    return None if value is None else _required_number(value, field)
+
+
+def _optional_text(value: object, field: str) -> str:
+    """Text the app has been known to store empty (an old review's time, say)."""
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    return normalize_storage_text(value)
+
+
+def _optional_int(value: object, field: str) -> int | None:
+    return None if value is None else _required_nonnegative_int(value, field)
+
+
+def _row_error(table: str, index: int, error: ValueError) -> ValueError:
+    return ValueError(f"damaged file: {table} row {index + 1}: {error}")
+
+
+_DeckCard = tuple[str, int]
+
+
+def _remapped(remap: dict[_DeckCard, _DeckCard], deck: str, card_id: int) -> tuple[_DeckCard, bool]:
+    """A topic deck's row from before #78 lands on its parent card (audit 10, F6)."""
+    target = remap.get((deck, card_id))
+    return (target, True) if target is not None else ((deck, card_id), False)
+
+
+def _validated_review_states(
+    rows: list[dict[str, Any]], remap: dict[_DeckCard, _DeckCard]
+) -> tuple[dict[_DeckCard, dict[str, Any]], int]:
+    """Validate every schedule row before anything is written; two rows for one card keep the
+    further-along one. Returns the rows by card and how many were moved off a topic deck."""
+    states: dict[_DeckCard, dict[str, Any]] = {}
+    moved = 0
+    for index, row in enumerate(rows):
+        try:
+            deck = _required_text(row.get("deck"), "deck")
+            card_id = _required_nonnegative_int(row.get("card_id"), "card_id")
+            record = {
+                "ease_factor": _required_number(row.get("ease_factor"), "ease_factor"),
+                "interval": _required_nonnegative_int(row.get("interval"), "interval"),
+                "repetitions": _required_nonnegative_int(row.get("repetitions"), "repetitions"),
+                "next_review": _required_date_only(row.get("next_review"), "next_review"),
+                # Missing from files exported before 2026-07-03 (format 1 then).
+                "stability": _optional_number(row.get("stability"), "stability"),
+                "difficulty": _optional_number(row.get("difficulty"), "difficulty"),
+                "last_review": _required_date_only(row.get("last_review") or None, "last_review", allow_none=True),
+            }
+        except ValueError as error:
+            raise _row_error("review_states", index, error) from error
+        key, was_moved = _remapped(remap, deck, card_id)
+        moved += was_moved
+        current = states.get(key)
+        if current is None or _rank_review_state(record) > _rank_review_state(current):
+            states[key] = record
+    return states, moved
+
+
+def _validated_leech_items(
+    rows: list[dict[str, Any]], remap: dict[_DeckCard, _DeckCard]
+) -> tuple[dict[_DeckCard, dict[str, Any]], int]:
+    items: dict[_DeckCard, dict[str, Any]] = {}
+    moved = 0
+    for index, row in enumerate(rows):
+        try:
+            deck = _required_text(row.get("deck"), "deck")
+            card_id = _required_nonnegative_int(row.get("card_id"), "card_id")
+            is_active = row.get("is_active")
+            if not (isinstance(is_active, bool) or type(is_active) is int and is_active in (0, 1)):
+                raise ValueError("is_active must be a boolean")
+            record = {
+                "is_active": int(bool(is_active)),
+                "attempts_recent": _required_nonnegative_int(row.get("attempts_recent"), "attempts_recent"),
+                "failures_recent": _required_nonnegative_int(row.get("failures_recent"), "failures_recent"),
+                "last_evaluated_utc": _optional_text(row.get("last_evaluated_utc"), "last_evaluated_utc"),
+            }
+        except ValueError as error:
+            raise _row_error("leech_items", index, error) from error
+        key, was_moved = _remapped(remap, deck, card_id)
+        moved += was_moved
+        current = items.get(key)
+        if current is None or _rank_leech(record) > _rank_leech(current):
+            items[key] = record
+    return items, moved
+
+
+def _validated_curriculum_stages(
+    rows: list[dict[str, Any]], remap: dict[_DeckCard, _DeckCard]
+) -> tuple[dict[tuple[str, int, str], dict[str, Any]], int]:
+    stages: dict[tuple[str, int, str], dict[str, Any]] = {}
+    moved = 0
+    for index, row in enumerate(rows):
+        try:
+            deck = _required_text(row.get("deck"), "deck")
+            card_id = _required_nonnegative_int(row.get("card_id"), "card_id")
+            mode = _required_text(row.get("mode"), "mode").lower()
+            record = {
+                "stage": max(1, min(3, _required_nonnegative_int(row.get("stage"), "stage"))),
+                "updated_at_utc": _optional_text(row.get("updated_at_utc"), "updated_at_utc"),
+            }
+        except ValueError as error:
+            raise _row_error("curriculum_stages", index, error) from error
+        (target_deck, target_id), was_moved = _remapped(remap, deck, card_id)
+        moved += was_moved
+        key = (target_deck, target_id, mode)
+        current = stages.get(key)
+        if current is None or record["stage"] > current["stage"]:
+            stages[key] = record
+    return stages, moved
+
+
+def _validated_review_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The review log is what happened at the time: validated, never remapped."""
+    events: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        try:
+            curriculum_stage = row.get("curriculum_stage")
+            confidence = row.get("confidence_score")
+            events.append(
+                {
+                    "deck": _required_text(row.get("deck"), "deck"),
+                    "card_id": _required_nonnegative_int(row.get("card_id"), "card_id"),
+                    "quality": _required_nonnegative_int(row.get("quality"), "quality"),
+                    "reviewed_on": _required_date_only(row.get("reviewed_on"), "reviewed_on"),
+                    "reviewed_at_utc": _optional_text(row.get("reviewed_at_utc"), "reviewed_at_utc"),
+                    "script_tag": _normalize_script_tag(_optional_text(row.get("script_tag"), "script_tag")),
+                    "curriculum_stage": _optional_int(curriculum_stage, "curriculum_stage"),
+                    "prompt_text": normalize_japanese_text(_optional_text(row.get("prompt_text"), "prompt_text")),
+                    "tags_csv": _optional_text(row.get("tags_csv"), "tags_csv"),
+                    "session_id": _optional_text(row.get("session_id"), "session_id"),
+                    "confidence_score": _optional_int(confidence, "confidence_score"),
+                }
+            )
+        except ValueError as error:
+            raise _row_error("review_events", index, error) from error
+    return events
+
+
+def _validated_session_goals(rows: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    goals: list[tuple[Any, ...]] = []
+    for index, row in enumerate(rows):
+        try:
+            goals.append(
+                (
+                    _required_text(row.get("session_id"), "session_id"),
+                    _required_nonnegative_int(row.get("target_items"), "target_items"),
+                    _optional_int(row.get("target_minutes"), "target_minutes"),
+                    _optional_int(row.get("target_accuracy"), "target_accuracy"),
+                    _optional_text(row.get("started_at_utc"), "started_at_utc"),
+                )
+            )
+        except ValueError as error:
+            raise _row_error("session_goals", index, error) from error
+    return goals
+
+
+def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "merge") -> ProgressImportResult:
+    """Import a progress file.
+
+    ``merge`` (the only mode the app offers) never moves a card backwards (audit 10, F2; Robbie's
+    ruling: the further-along copy wins). Per card:
+
+    - schedules: more repetitions wins, then the longer interval; a tie keeps the learner's copy. A
+      winning row with no FSRS stability (files before 2026-07-03) keeps the current stability and
+      difficulty, so the next answer is not treated as the card's first.
+    - problem-card records follow the copy whose schedule won; with no schedule on either side the
+      later evaluation wins.
+    - curriculum stages and progress counters: the higher wins.
+    - the review log is a union; session goals already present are kept.
+
+    Everything is validated before the transaction opens (F4), topic-deck rows from before #78 land
+    on their parent cards (F6), and a safety copy of the database is taken first; if that copy
+    fails, nothing is imported. ``overwrite`` (command line only) replaces the stores outright.
+    """
     if conflict_mode not in {"merge", "overwrite"}:
         raise ValueError("conflict_mode must be 'merge' or 'overwrite'")
 
-    if int(snapshot.get("format_version", 0)) not in _READABLE_FORMAT_VERSIONS:
-        raise ValueError(
-            f"unsupported snapshot format_version {snapshot.get('format_version')}; "
-            f"expected one of {sorted(_READABLE_FORMAT_VERSIONS)}"
-        )
+    _check_format_version(snapshot)
 
     progress = snapshot.get("progress")
     if not isinstance(progress, dict):
-        raise ValueError("snapshot field 'progress' must be an object")
+        raise ValueError("not a progress file: snapshot field 'progress' must be an object")
 
-    review_states = _normalize_row_list(progress, "review_states")
-    review_events = _normalize_row_list(progress, "review_events")
-    curriculum_stages = _normalize_row_list(progress, "curriculum_stages")
-    leech_items = _normalize_row_list(progress, "leech_items")
-    session_goals = _normalize_row_list(progress, "session_goals")
+    remap = build_card_remap()
+    review_states, states_moved = _validated_review_states(_normalize_row_list(progress, "review_states"), remap)
+    leech_items, leech_moved = _validated_leech_items(_normalize_row_list(progress, "leech_items"), remap)
+    curriculum_stages, stages_moved = _validated_curriculum_stages(
+        _normalize_row_list(progress, "curriculum_stages"), remap
+    )
+    review_events = _validated_review_events(_normalize_row_list(progress, "review_events"))
+    session_goals = _validated_session_goals(_normalize_row_list(progress, "session_goals"))
     mastery_scores = _normalize_mastery_scores(progress)
-    custom_decks = _normalize_row_list(snapshot, "custom_decks")
+    _normalize_row_list(snapshot, "custom_decks")
     daily_games = _normalize_daily_games_section(snapshot)
 
     database.init_db()
+    safety_copy = db_backups.make_safety_copy(database.DB_PATH, "before-import")
 
-    imported_events = 0
     with _connect() as conn:
         conn.execute("PRAGMA foreign_keys = ON")
+        # The merge reads the learner's rows to decide what wins: hold the write lock from the start.
+        conn.execute("BEGIN IMMEDIATE")
         if conflict_mode == "overwrite":
             conn.execute("DELETE FROM review_events")
             conn.execute("DELETE FROM review_states")
@@ -403,6 +648,46 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
                 conn.execute("DELETE FROM daily_word_pools")
                 conn.execute("DELETE FROM daily_games_streak_state")
 
+        merge = conflict_mode == "merge"
+
+        # ── Schedules ────────────────────────────────────────────────────────────────────
+        live_states = {
+            (str(row["deck"]), int(row["card_id"])): row
+            for row in conn.execute(
+                "SELECT deck, card_id, interval, repetitions, stability, difficulty, last_review FROM review_states"
+            ).fetchall()
+        }
+        incoming_schedule_won: set[_DeckCard] = set()
+        state_params: list[tuple[Any, ...]] = []
+        cards_kept_current = 0
+        for key, record in review_states.items():
+            live = live_states.get(key)
+            stability = record["stability"]
+            difficulty = record["difficulty"]
+            last_review = record["last_review"]
+            if live is not None and merge:
+                if _rank_review_state(record) <= _rank_review_state(live):
+                    cards_kept_current += 1
+                    continue
+                if stability is None or stability <= 0:
+                    stability = live["stability"]
+                    difficulty = live["difficulty"]
+                if last_review is None:
+                    last_review = live["last_review"]
+            incoming_schedule_won.add(key)
+            state_params.append(
+                (
+                    key[0],
+                    key[1],
+                    record["ease_factor"],
+                    record["interval"],
+                    record["repetitions"],
+                    record["next_review"],
+                    float(stability or 0.0),
+                    float(difficulty or 0.0),
+                    last_review,
+                )
+            )
         conn.executemany(
             """
             INSERT INTO review_states (
@@ -419,26 +704,19 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
                 difficulty=excluded.difficulty,
                 last_review=excluded.last_review
             """,
-            [
-                (
-                    _normalize_deck_name(str(row["deck"])),
-                    int(row["card_id"]),
-                    float(row["ease_factor"]),
-                    int(row["interval"]),
-                    int(row["repetitions"]),
-                    normalize_storage_text(str(row["next_review"])),
-                    float(row.get("stability", 0.0) or 0.0),
-                    float(row.get("difficulty", 0.0) or 0.0),
-                    (
-                        normalize_storage_text(str(row["last_review"]))
-                        if row.get("last_review")
-                        else None
-                    ),
-                )
-                for row in review_states
-            ],
+            state_params,
         )
 
+        # ── Curriculum stages: the higher stage wins ─────────────────────────────────────
+        live_stages = {
+            (str(row["deck"]), int(row["card_id"]), str(row["mode"])): int(row["stage"])
+            for row in conn.execute("SELECT deck, card_id, mode, stage FROM curriculum_stages").fetchall()
+        }
+        stage_params = [
+            (deck, card_id, mode, record["stage"], record["updated_at_utc"])
+            for (deck, card_id, mode), record in curriculum_stages.items()
+            if not merge or record["stage"] > live_stages.get((deck, card_id, mode), 0)
+        ]
         conn.executemany(
             """
             INSERT INTO curriculum_stages (deck, card_id, mode, stage, updated_at_utc)
@@ -447,18 +725,34 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
                 stage=excluded.stage,
                 updated_at_utc=excluded.updated_at_utc
             """,
-            [
-                (
-                    _normalize_deck_name(str(row["deck"])),
-                    int(row["card_id"]),
-                    normalize_storage_text(str(row["mode"])).lower(),
-                    max(1, min(3, int(row["stage"]))),
-                    normalize_storage_text(str(row["updated_at_utc"])),
-                )
-                for row in curriculum_stages
-            ],
+            stage_params,
         )
 
+        # ── Problem-card records follow the schedule that won ───────────────────────────
+        live_leeches = {
+            (str(row["deck"]), int(row["card_id"])): str(row["last_evaluated_utc"] or "")
+            for row in conn.execute("SELECT deck, card_id, last_evaluated_utc FROM leech_items").fetchall()
+        }
+        leech_params: list[tuple[Any, ...]] = []
+        for key, record in leech_items.items():
+            if merge:
+                if key in incoming_schedule_won:
+                    pass
+                elif key in review_states or key in live_states:
+                    # A schedule exists and the learner's won: their record is the current one.
+                    continue
+                elif key in live_leeches and record["last_evaluated_utc"] <= live_leeches[key]:
+                    continue
+            leech_params.append(
+                (
+                    key[0],
+                    key[1],
+                    record["is_active"],
+                    record["attempts_recent"],
+                    record["failures_recent"],
+                    record["last_evaluated_utc"],
+                )
+            )
         conn.executemany(
             """
             INSERT INTO leech_items (deck, card_id, is_active, attempts_recent, failures_recent, last_evaluated_utc)
@@ -469,70 +763,40 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
                 failures_recent=excluded.failures_recent,
                 last_evaluated_utc=excluded.last_evaluated_utc
             """,
-            [
-                (
-                    _normalize_deck_name(str(row["deck"])),
-                    int(row["card_id"]),
-                    1 if int(row["is_active"]) else 0,
-                    int(row["attempts_recent"]),
-                    int(row["failures_recent"]),
-                    normalize_storage_text(str(row["last_evaluated_utc"])),
-                )
-                for row in leech_items
-            ],
+            leech_params,
         )
 
+        # ── Session goals: a goal already stored is kept ────────────────────────────────
+        goals_before = conn.total_changes
         conn.executemany(
             """
             INSERT INTO session_goals (session_id, target_items, target_minutes, target_accuracy, started_at_utc)
             VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET
-                target_items=excluded.target_items,
-                target_minutes=excluded.target_minutes,
-                target_accuracy=excluded.target_accuracy,
-                started_at_utc=excluded.started_at_utc
+            ON CONFLICT(session_id) DO NOTHING
             """,
-            [
-                (
-                    normalize_storage_text(str(row["session_id"])),
-                    int(row["target_items"]),
-                    None if row["target_minutes"] is None else int(row["target_minutes"]),
-                    None if row["target_accuracy"] is None else int(row["target_accuracy"]),
-                    normalize_storage_text(str(row["started_at_utc"])),
-                )
-                for row in session_goals
-            ],
+            session_goals,
         )
+        session_goals_added = conn.total_changes - goals_before
 
+        # ── The review log: a union ─────────────────────────────────────────────────────
         existing_event_keys: set[tuple[Any, ...]] = set()
-        if conflict_mode == "merge":
-            existing_rows = conn.execute(
-                """
-                SELECT deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag,
-                       curriculum_stage, prompt_text, tags_csv, session_id, confidence_score
-                FROM review_events
-                """
-            ).fetchall()
-            existing_event_keys = {_event_key(row) for row in existing_rows}
-
-        event_params: list[tuple[Any, ...]] = []
-        for row in review_events:
-            record = {
-                "deck": _normalize_deck_name(str(row["deck"])),
-                "card_id": int(row["card_id"]),
-                "quality": int(row["quality"]),
-                "reviewed_on": normalize_storage_text(str(row["reviewed_on"])),
-                "reviewed_at_utc": normalize_storage_text(str(row["reviewed_at_utc"])),
-                "script_tag": _normalize_script_tag(str(row["script_tag"])),
-                "curriculum_stage": None if row["curriculum_stage"] is None else int(row["curriculum_stage"]),
-                "prompt_text": normalize_japanese_text(str(row["prompt_text"])),
-                "tags_csv": normalize_storage_text(str(row["tags_csv"])),
-                "session_id": normalize_storage_text(str(row["session_id"])),
-                "confidence_score": None if row["confidence_score"] is None else int(row["confidence_score"]),
+        if merge:
+            existing_event_keys = {
+                _event_key(row)
+                for row in conn.execute(
+                    """
+                    SELECT deck, card_id, quality, reviewed_on, reviewed_at_utc, script_tag,
+                           curriculum_stage, prompt_text, tags_csv, session_id, confidence_score
+                    FROM review_events
+                    """
+                ).fetchall()
             }
+        event_params: list[tuple[Any, ...]] = []
+        for record in review_events:
             signature = _event_key(record)
-            if conflict_mode == "merge" and signature in existing_event_keys:
+            if merge and signature in existing_event_keys:
                 continue
+            existing_event_keys.add(signature)
             event_params.append(
                 (
                     record["deck"],
@@ -548,54 +812,72 @@ def import_progress_snapshot(snapshot: dict[str, Any], conflict_mode: str = "mer
                     record["confidence_score"],
                 )
             )
-            if conflict_mode == "merge":
-                existing_event_keys.add(signature)
-
-        if event_params:
-            conn.executemany(
-                """
-                INSERT INTO review_events (
-                    deck, card_id, quality, reviewed_on, reviewed_at_utc,
-                    script_tag, curriculum_stage, prompt_text, tags_csv,
-                    session_id, confidence_score
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                event_params,
+        conn.executemany(
+            """
+            INSERT INTO review_events (
+                deck, card_id, quality, reviewed_on, reviewed_at_utc,
+                script_tag, curriculum_stage, prompt_text, tags_csv,
+                session_id, confidence_score
             )
-            imported_events = len(event_params)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            event_params,
+        )
 
+        # ── Progress counters: the higher wins ──────────────────────────────────────────
+        counters_updated = 0
         if mastery_scores is not None:
+            live_scores = {
+                (str(row["deck"]), int(row["card_id"])): int(row["score"])
+                for row in conn.execute("SELECT deck, card_id, score FROM card_mastery_scores").fetchall()
+            }
+            score_params = [
+                (deck_slug, card_id, score)
+                for (deck_slug, card_id), score in mastery_scores.items()
+                if not merge or score > live_scores.get((deck_slug, card_id), -1)
+            ]
             conn.executemany(
                 """
                 INSERT INTO card_mastery_scores (deck, card_id, score)
                 VALUES (?, ?, ?)
                 ON CONFLICT(deck, card_id) DO UPDATE SET score=excluded.score
                 """,
-                [(deck_slug, card_id, score) for (deck_slug, card_id), score in mastery_scores.items()],
+                score_params,
             )
+            counters_updated = len(score_params)
 
+        daily_attempts_added = 0
+        daily_days_kept: list[str] = []
         if daily_games is not None:
-            _import_daily_games(conn, daily_games, conflict_mode)
+            daily_attempts_added, daily_days_kept = _import_daily_games(conn, daily_games, conflict_mode)
 
-    return {
-        "review_states": len(review_states),
-        "review_events": imported_events,
-        "curriculum_stages": len(curriculum_stages),
-        "leech_items": len(leech_items),
-        "session_goals": len(session_goals),
-        "card_mastery_scores": 0 if mastery_scores is None else len(mastery_scores),
-        "custom_decks": len(custom_decks),
-        "daily_games": 0 if daily_games is None else len(daily_games["attempts"]),
-    }
-
+    return ProgressImportResult(
+        cards_updated=len(state_params),
+        cards_kept_current=cards_kept_current,
+        reviews_added=len(event_params),
+        stages_updated=len(stage_params),
+        problem_cards_updated=len(leech_params),
+        counters_updated=counters_updated,
+        session_goals_added=session_goals_added,
+        topic_rows_moved=states_moved + leech_moved + stages_moved,
+        daily_games_attempts_added=daily_attempts_added,
+        daily_games_days_kept_current=daily_days_kept,
+        safety_copy=None if safety_copy is None else str(safety_copy),
+    )
 
 def _import_daily_games(
     conn: sqlite3.Connection,
     daily_games: dict[str, Any],
     conflict_mode: str,
-) -> None:
-    """Restore Daily Games rows in foreign-key order without touching SRS rows."""
+) -> tuple[int, list[str]]:
+    """Restore Daily Games rows in foreign-key order without touching SRS rows.
+
+    A day whose saved pool differs from the file's keeps the learner's pool, and the file's attempts
+    and crossword clues for that day are skipped too: they point at pool positions, which would name
+    different words (audit 10, F5). Returns the attempts added and the days kept.
+    """
+    kept_days: set[str] = set()
+    attempts_added = 0
     for pool in daily_games["word_pools"]:
         pool_day = _required_date_only(
             pool.get("pool_day"), "daily_games.word_pools.pool_day"
@@ -692,11 +974,12 @@ def _import_daily_games(
                 ),
             )
             if existing_signature != imported_signature:
-                action = "merge" if conflict_mode == "merge" else "import"
-                raise ValueError(
-                    f"cannot {action} Daily Games pool for {pool_day}: "
-                    "the existing immutable pool differs from the imported pool"
-                )
+                if conflict_mode != "merge":
+                    raise ValueError(
+                        f"cannot import Daily Games pool for {pool_day}: "
+                        "the existing immutable pool differs from the imported pool"
+                    )
+                kept_days.add(pool_day)
             continue
         conn.execute(
             "INSERT INTO daily_word_pools (pool_day, algorithm_version) VALUES (?, ?)",
@@ -718,6 +1001,8 @@ def _import_daily_games(
         position = _required_nonnegative_int(
             clue.get("pool_position"), "daily_games.crossword_clues.pool_position"
         )
+        if pool_day in kept_days:
+            continue
         clue_key = (pool_day, position)
         if clue_key in seen_clues:
             raise ValueError("daily_games.crossword_clues must not repeat a pool position")
@@ -752,6 +1037,8 @@ def _import_daily_games(
             attempt.get("pool_day"), "daily_games.attempts.pool_day"
         )
         assert pool_day is not None
+        if pool_day in kept_days:
+            continue
         game_type = _required_supported_value(
             attempt.get("game_type"),
             "daily_games.attempts.game_type",
@@ -881,6 +1168,7 @@ def _import_daily_games(
             "INSERT INTO daily_game_attempt_word_outcomes (attempt_id, pool_position, outcome) VALUES (?, ?, ?)",
             [(saved_attempt_id, position, result) for position, result in outcome_params],
         )
+        attempts_added += 1
 
     streak_values = _normalize_daily_games_streak(daily_games["streak_state"])
     if streak_values is not None and conflict_mode == "overwrite":
@@ -904,6 +1192,7 @@ def _import_daily_games(
         )
 
     _rebuild_daily_game_miss_signals(conn)
+    return attempts_added, sorted(kept_days)
 
 
 def _normalize_daily_games_streak(

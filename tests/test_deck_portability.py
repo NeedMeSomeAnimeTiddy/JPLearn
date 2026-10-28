@@ -196,9 +196,8 @@ def test_import_progress_snapshot_merge_updates_and_dedupes_events(tmp_path: Pat
     }
 
     summary = import_progress_snapshot(payload, conflict_mode="merge")
-    assert summary["review_states"] == 1
-    assert summary["review_events"] == 1
-    assert summary["custom_decks"] == 1
+    assert summary.cards_updated == 1
+    assert summary.reviews_added == 1
 
     state = database.load_states("Hiragana", [1])[1]
     assert state.interval == 8
@@ -312,7 +311,7 @@ def test_progress_snapshot_round_trips_daily_games_data(tmp_path: Path, monkeypa
     summary = import_progress_snapshot(snapshot, conflict_mode="overwrite")
     restored = DailyGamesRepository()
 
-    assert summary["daily_games"] == 1
+    assert summary.daily_games_attempts_added == 1
     assert restored.load_word_pool(pool.day) == pool
     restored_attempt = restored.load_attempts(pool.day)[0]
     assert restored_attempt.attempt_id == saved_attempt.attempt_id
@@ -328,7 +327,7 @@ def test_progress_snapshot_round_trips_daily_games_data(tmp_path: Path, monkeypa
     assert restored.load_active_game_miss_card_ids("Vocabulary N4", pool.day) == {8}
 
 
-def test_merge_rejects_a_different_existing_immutable_daily_pool_transactionally(
+def test_merge_keeps_the_learners_daily_pool_when_the_files_differs(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -362,12 +361,18 @@ def test_merge_rejects_a_different_existing_immutable_daily_pool_transactionally
         }
     ]
 
-    with pytest.raises(ValueError, match="existing immutable pool differs"):
-        import_progress_snapshot(payload, conflict_mode="merge")
+    summary = import_progress_snapshot(payload, conflict_mode="merge")
 
+    # The day's pool, its clues and the file's games for that day stay as the learner had them
+    # (audit 10, F5): the file's attempts point at pool positions that would name other words.
+    assert summary.daily_games_days_kept_current == [pool_day.isoformat()]
+    assert summary.daily_games_attempts_added == 0
     after = export_progress_snapshot()
-    assert after["progress"] == before["progress"]
-    assert after["daily_games"] == before["daily_games"]
+    assert after["daily_games"]["word_pools"] == before["daily_games"]["word_pools"]
+    assert after["daily_games"]["crossword_clues"] == before["daily_games"]["crossword_clues"]
+    assert after["daily_games"]["attempts"] == before["daily_games"]["attempts"]
+    # The study rows in the file still come in.
+    assert database.load_states("Imported Deck", [10])[10].repetitions == 2
 
 
 def test_merge_identical_daily_pool_safely_imports_dependents_and_derives_completion_key(
@@ -393,7 +398,7 @@ def test_merge_identical_daily_pool_safely_imports_dependents_and_derives_comple
 
     summary = import_progress_snapshot(payload, conflict_mode="merge")
 
-    assert summary["daily_games"] == 1
+    assert summary.daily_games_attempts_added == 1
     assert repository.load_crossword_clues(pool_day) == (
         DailyCrosswordClue(pool_position=0, clue="Definition, with punctuation."),
     )
@@ -565,7 +570,7 @@ def test_import_legacy_progress_snapshot_leaves_daily_games_untouched(tmp_path: 
 
     summary = import_progress_snapshot(legacy_snapshot, conflict_mode="overwrite")
 
-    assert summary["daily_games"] == 0
+    assert summary.daily_games_attempts_added == 0
     assert repository.load_word_pool(pool.day) == pool
 
 
