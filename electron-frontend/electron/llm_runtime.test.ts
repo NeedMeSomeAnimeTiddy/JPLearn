@@ -212,21 +212,17 @@ describe('llm runtime', () => {
     expect(response.text.length).toBeLessThanOrEqual(700)
   })
 
-  it('uses unofficial-jisho-api translation before adapter inference', async () => {
+  it('answers a translation question from the offline dictionary, before adapter inference', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationJishoClient: {
-        async searchForPhrase() {
-          return {
-            data: [
-              {
-                japanese: [{ word: 'トイレ', reading: 'といれ' }],
-                senses: [{ english_definitions: ['bathroom'] }],
-              },
-            ],
-          }
+      translationOfflineEntries: [
+        {
+          id: 'offline-toilet',
+          kanji: [],
+          kana: [{ common: true, text: 'トイレ', tags: [], appliesToKanji: ['*'] }],
+          sense: [{ gloss: [{ lang: 'eng', text: 'bathroom' }] }],
         },
-      },
+      ],
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -242,8 +238,8 @@ describe('llm runtime', () => {
 
     const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
     expect(response.ok).toBe(true)
-    expect(response.provider).toBe('unofficial-jisho-api')
-    expect(response.text).toBe('トイレ (といれ)')
+    expect(response.provider).toBe('offline-jmdict')
+    expect(response.text).toBe('トイレ')
   })
 
   it('uses local glossary for profane single-word translation requests', async () => {
@@ -287,11 +283,6 @@ describe('llm runtime', () => {
           }
         },
       }),
-      translationJishoClient: {
-        async searchForPhrase() {
-          return { data: [] }
-        },
-      },
     })
 
     const response = await runtime.sendMessage('Translate "launch sequence" to Japanese.')
@@ -300,14 +291,9 @@ describe('llm runtime', () => {
     expect(response.text).toContain('文脈を教えてください')
   })
 
-  it('uses offline JMdict translation when online dictionary is unavailable', async () => {
+  it('uses offline JMdict translation', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationJishoClient: {
-        async searchForPhrase() {
-          throw new Error('network unreachable')
-        },
-      },
       translationOfflineEntries: [
         {
           id: 'offline-test-1',
@@ -366,11 +352,6 @@ describe('llm runtime', () => {
 
       const runtime = createTutorChatRuntime({
         provider: 'stub',
-        translationJishoClient: {
-          async searchForPhrase() {
-            throw new Error('network unreachable')
-          },
-        },
         translationOfflineDictionarySqlitePath: sqlitePath,
         adapterFactory: () => ({
           async load() {
@@ -496,11 +477,6 @@ describe('llm runtime', () => {
     }
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationJishoClient: {
-        async searchForPhrase() {
-          return { data: [] }
-        },
-      },
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -616,5 +592,18 @@ describe('extractCliResponseText', () => {
 
   it('returns empty string for empty output', () => {
     expect(extractCliResponseText('')).toBe('')
+  })
+})
+
+describe('what the tutor sends off the machine (audit 5, F1)', () => {
+  /* Hard line 2: what the learner asks the tutor stays local. The online dictionary looked up the
+     learner's English words on jisho.org before the offline one; it is gone, and stays gone. */
+  it('ships no online dictionary client', () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const source = fs.readFileSync(path.join(__dirname, 'llm_runtime.cjs'), 'utf8')
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'))
+    expect(source).not.toMatch(/jisho/i)
+    expect(Object.keys(pkg.dependencies ?? {})).not.toContain('unofficial-jisho-api')
   })
 })
