@@ -1138,14 +1138,15 @@ function getOrStartPythonBridgeWorker() {
   return bridgeWorker.start()
 }
 
-function runPythonBridgeWorkerRequest(args) {
-  return bridgeWorker.request(args)
+function runPythonBridgeWorkerRequest(args, requestOptions) {
+  return bridgeWorker.request(args, requestOptions)
 }
 
 // Answers are saved through the worker alone: the one-shot fallback below has no timeout and, before
 // answers carried ids, re-ran saves that had already committed (audit 1, F1). The answer queue retries.
-function runPythonBridgeWorkerOnly(args) {
-  return runPythonBridgeWorkerRequest(args)
+// requestOptions.timeoutMs: a whole-database job's own, longer limit (see bridge_worker.cjs).
+function runPythonBridgeWorkerOnly(args, requestOptions) {
+  return runPythonBridgeWorkerRequest(args, requestOptions)
 }
 
 const answerQueue = createAnswerQueue({

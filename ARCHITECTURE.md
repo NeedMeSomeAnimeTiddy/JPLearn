@@ -176,11 +176,13 @@ tuple if it's new), so the TS type is generated rather than hand-written.**
 
 ### `data/jplearn.db` — the real database
 
-`LATEST_SCHEMA_VERSION = 20`, forward-only migrations applied in `_apply_migrations`.
+`LATEST_SCHEMA_VERSION = 21`, forward-only migrations applied in `_apply_migrations`.
 32 tables, grouped:
 
 - **SRS core** — `review_states` (FSRS stability/difficulty/interval/ease/next_review),
-  `review_events` (full history with `session_id`, `confidence_score`), `leech_items`,
+  `review_events` (full history with `session_id`, `confidence_score`),
+  `review_answer_receipts` (one row per answer id, so a resent answer is answered from its
+  receipt instead of being graded twice), `leech_items`,
   `curriculum_stages`, `card_mastery_scores` (the 0..4 per-card counter behind the
   progress bars, keyed `(deck_slug, card_id)` — see §4)
 - **Progress/gamification** — `streak_state`, `user_xp`, `user_progression`,
@@ -190,6 +192,25 @@ tuple if it's new), so the TS type is generated rather than hand-written.**
   `assistant_event_interactions`, `tutor_reactions_seen`
 - **Content-adjacent** — `card_notes`, `scenario_sessions`, `scenario_srs_cards`,
   the 7 `daily_*` game tables, `user_settings`
+
+### Backups, imports and safety copies (audit 10)
+
+- **Safety copies** (`data/db_backups.py`): before a schema upgrade, an import or a restore,
+  the live database is copied to `data/backups/jplearn-before-<reason>-<UTC stamp>.db`
+  beside it; the newest 3 are kept. A failed copy blocks an import or restore, but not an
+  upgrade (which logs and carries on).
+- **"Back up everything" / "Restore from a backup"** (`data/whole_backup.py`): an exact
+  SQLite copy of the database, plus the four allowlisted window `localStorage` keys
+  (`BACKUP_WINDOW_STATE_KEYS`) in a `backup_window_state` table of the copy only. A restore
+  stages the file in the backups folder, checks and migrates the staged copy, takes a safety
+  copy, then writes it over the live database in one transaction; the renderer then writes
+  the window keys back and reloads.
+- **"Export / Import progress (JSON)"** (`data/deck_portability.py`): a merge, not a
+  replacement. Per card, the further-along schedule wins; review history is added, never
+  rewritten. Daily Games days already played locally keep the local pool.
+- In the main process, import, backup, restore and the scheduling optimizer refuse to run
+  over each other (`runDatabaseJob` in `ipc_handlers.cjs`), and the writes run inside the
+  answer queue's exclusive section.
 
 ### `data/app.db` — vestigial
 

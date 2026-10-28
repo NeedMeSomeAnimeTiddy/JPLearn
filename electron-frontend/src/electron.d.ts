@@ -1,6 +1,9 @@
 // Core payload types are generated from Python dataclasses in desktop_bridge.py.
 // Run: python scripts/generate_ts_types.py
 import type {
+  DatabaseFileSummary,
+  DatabaseRestoreResult,
+  ProgressImportResult,
   CardMasteryImportPayload,
   CardMasteryScoresPayload,
   CardNoteDeletePayload,
@@ -676,7 +679,12 @@ interface DesktopApi {
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
   exportAnalyticsJSON?: () => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
-  importAnalyticsJSON?: () => Promise<{ ok: boolean; cancelled?: boolean; imported?: Record<string, number>; conflict_mode?: string }>
+  importAnalyticsJSON?: () => Promise<{ ok: false; cancelled: true } | ({ ok: true } & ProgressImportResult)>
+  /** "Back up everything": the window state is the allowlisted localStorage keys (BACKUP_WINDOW_STATE_KEYS). */
+  backupDatabase?: (
+    windowState: Record<string, string>,
+  ) => Promise<{ ok: false; cancelled: true } | { ok: true; path: string; summary: DatabaseFileSummary }>
+  restoreDatabase?: () => Promise<{ ok: false; cancelled: true } | ({ ok: true } & DatabaseRestoreResult)>
   // ─ Debug / Dev Tools ─────────────────────────────────────────────────
   /** true in the installed app, where the debug routes refuse and the palette hides them */
   isPackagedApp?: () => Promise<boolean>

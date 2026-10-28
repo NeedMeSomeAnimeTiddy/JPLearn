@@ -303,7 +303,11 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 
 ### Import & Export
 - CSV import pipeline for external datasets (kanji, vocab, conversational content)
-- Progress snapshot export/import (JSON, with merge/overwrite conflict modes)
+- "Back up everything" and "Restore from a backup": an exact copy of the study database plus
+  the window's own settings; restore asks first and saves a safety copy
+- Progress export/import (JSON): merges into another copy of JPLearn; per card the
+  further-along schedule wins, and a safety copy is saved before importing
+- Automatic safety copies before schema upgrades, imports and restores (newest 3 kept)
 - CSV analytics exports (review history, accuracy trends, mastery snapshot)
 - External content module regeneration from CSV (`import_external_lists.py`)
 

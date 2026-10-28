@@ -36,12 +36,58 @@ const {
   validateDailyGamesCrosswordClues,
   validateConfigKey,
   validateConfigSetPayload,
+  validateBackupWindowState,
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
 const { SPEECH_TIERS } = require('./speech_runtime.cjs')
 
 const WINDOW_DRAG_INTERVAL_MS = 16
 const WINDOW_DRAG_MAX_DURATION_MS = 60_000
+// A progress file this big is not one JPLearn wrote; refused before Python reads it (audit 10, S8).
+const MAX_PROGRESS_FILE_BYTES = 256 * 1024 * 1024
+/* A whole-database job copies and checks the database several times; on a slow disk that can pass the
+   worker's usual 30 s, and a timed-out job would still finish in Python after the window was told it
+   failed (audit 10, review finding 2). */
+const DATABASE_JOB = Object.freeze({ timeoutMs: 10 * 60_000 })
+
+function assertBackupFileSize(filePath, maxBytes) {
+  const { size } = require('fs').statSync(filePath)
+  if (size > maxBytes) {
+    throw new Error('not a progress file: the file is far larger than any JPLearn progress file')
+  }
+}
+
+// Written beside the target and renamed over it, so a failed write never leaves half a file.
+function writeFileWhole(filePath, text) {
+  const fs = require('fs')
+  const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`
+  try {
+    fs.writeFileSync(temporary, text, 'utf-8')
+    fs.renameSync(temporary, filePath)
+  } finally {
+    if (fs.existsSync(temporary)) {
+      fs.unlinkSync(temporary)
+    }
+  }
+}
+
+// "2026-10-02" or an ISO timestamp, as "2 October 2026"; null for anything else.
+function formatBackupDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match) {
+    return null
+  }
+  const day = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  if (Number.isNaN(day.getTime())) {
+    return null
+  }
+  return day.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
+function countLabel(count, word) {
+  const n = Number.isInteger(count) && count >= 0 ? count : 0
+  return `${n.toLocaleString('en-GB')} ${word}${n === 1 ? '' : 's'}`
+}
 
 function isTransientSetupNetworkError(error) {
   const detail = error instanceof Error ? error.message : String(error)
@@ -105,6 +151,41 @@ function registerIpcHandlers(options) {
   const clearBridgeReadCaches = () => {
     if (typeof options.clearBridgeReadCaches === 'function') {
       options.clearBridgeReadCaches()
+    }
+  }
+  /* File dialogs and confirm boxes belong to the window that asked, so they stay in front of it
+     and block it (audit 10, S9). Tests pass their own dialog. */
+  const electronDialog = () => options.dialog || require('electron').dialog
+  const electronApp = () => options.app || require('electron').app
+  const dialogParent = (event) => {
+    const win = typeof options.getWindowFromSender === 'function' ? options.getWindowFromSender(event.sender) : null
+    return win && !win.isDestroyed() ? win : undefined
+  }
+  const confirmBackupAction = async (event, { message, detail, action }) => {
+    const { response } = await electronDialog().showMessageBox(dialogParent(event), {
+      type: 'question',
+      buttons: ['Cancel', action],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+      message,
+      detail,
+    })
+    return response === 1
+  }
+  /* One whole-database job at a time: import, backup, restore and the scheduling optimizer. A restore
+     landing while the optimizer runs in its own process would have the optimizer's saved weights
+     written over the restored ones, or the reverse (audit 10, S1). */
+  let databaseJob = null
+  const runDatabaseJob = async (name, job) => {
+    if (databaseJob) {
+      throw new Error(`busy: ${databaseJob} is still running`)
+    }
+    databaseJob = name
+    try {
+      return await job()
+    } finally {
+      databaseJob = null
     }
   }
   // Installing, switching, or removing an OCR model invalidates the warm
@@ -1339,9 +1420,10 @@ function registerIpcHandlers(options) {
       if (!response || typeof response.csv !== 'string') {
         throw new Error('Invalid analytics export response from bridge')
       }
-      const { dialog, app } = require('electron')
+      const dialog = electronDialog()
+      const app = electronApp()
       const defaultFilename = `jplearn-${validatedType}-${new Date().toISOString().slice(0, 10)}.csv`
-      const { canceled, filePath } = await dialog.showSaveDialog({
+      const { canceled, filePath } = await dialog.showSaveDialog(dialogParent(event), {
         defaultPath: require('path').join(app.getPath('downloads'), defaultFilename),
         filters: [{ name: 'CSV Files', extensions: ['csv'] }],
       })
@@ -1359,20 +1441,24 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('analytics:export-and-save-json', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      const response = await runPythonBridgeWithArgsRead(['analytics-export-json'])
+      // After any answer still waiting to save, so it is in the file (audit 10, nit 4).
+      const response = await options.answerQueue.runExclusive(
+        () => runPythonBridgeWithArgsRead(['analytics-export-json']),
+      )
       if (!response || typeof response.json !== 'object') {
         throw new Error('Invalid analytics JSON export response from bridge')
       }
-      const { dialog, app } = require('electron')
-      const defaultFilename = `jplearn-full-backup-${new Date().toISOString().slice(0, 10)}.json`
-      const { canceled, filePath } = await dialog.showSaveDialog({
+      const dialog = electronDialog()
+      const app = electronApp()
+      const defaultFilename = `jplearn-progress-${new Date().toISOString().slice(0, 10)}.json`
+      const { canceled, filePath } = await dialog.showSaveDialog(dialogParent(event), {
         defaultPath: require('path').join(app.getPath('downloads'), defaultFilename),
         filters: [{ name: 'JSON Files', extensions: ['json'] }],
       })
       if (canceled || !filePath) {
         return { ok: false, cancelled: true }
       }
-      require('fs').writeFileSync(filePath, JSON.stringify(response.json, null, 2), 'utf-8')
+      writeFileWhole(filePath, JSON.stringify(response.json, null, 2))
       return { ok: true, path: filePath }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
@@ -1383,9 +1469,10 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('analytics:import-from-json', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      const { dialog, app } = require('electron')
-      const { canceled, filePaths } = await dialog.showOpenDialog({
-        title: 'Import JPLearn Backup',
+      const dialog = electronDialog()
+      const app = electronApp()
+      const { canceled, filePaths } = await dialog.showOpenDialog(dialogParent(event), {
+        title: 'Import progress',
         defaultPath: app.getPath('downloads'),
         filters: [{ name: 'JSON Files', extensions: ['json'] }],
         properties: ['openFile'],
@@ -1393,19 +1480,115 @@ function registerIpcHandlers(options) {
       if (canceled || !filePaths || filePaths.length === 0) {
         return { ok: false, cancelled: true }
       }
+      const filePath = filePaths[0]
+      assertBackupFileSize(filePath, MAX_PROGRESS_FILE_BYTES)
+      // Read and summarised by Python, not here (audit 10, design S8); nothing is written yet.
+      const summary = await options.runPythonBridgeWorkerOnly(['analytics-inspect-json', filePath], DATABASE_JOB)
+      const exported = typeof summary.exported_at_utc === 'string' ? formatBackupDay(summary.exported_at_utc) : null
+      const confirmed = await confirmBackupAction(event, {
+        message: 'Import this progress file?',
+        detail: [
+          `${exported ? `Exported ${exported}. ` : ''}${countLabel(summary.cards, 'card')}, ${countLabel(summary.reviews, 'review')}.`,
+          'Cards you have studied further keep your current progress.',
+          'A safety copy of your data is saved first.',
+        ].join('\n'),
+        action: 'Import',
+      })
+      if (!confirmed) {
+        return { ok: false, cancelled: true }
+      }
       // Not while answers are waiting to save: the import would land between them. Worker only: a
       // one-shot fallback could still be writing after a reset that ran next on the worker.
-      const response = await options.answerQueue.runExclusive(
-        () => options.runPythonBridgeWorkerOnly(['analytics-import-json', filePaths[0], 'merge']),
-      )
+      const response = await runDatabaseJob('import', () => options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['analytics-import-json', filePath, 'merge'], DATABASE_JOB),
+      ))
       if (!response || typeof response !== 'object') {
         throw new Error('Invalid import response from bridge')
       }
       clearBridgeReadCaches()
-      return response
+      // The bridge nests the counts under `imported`; the window reads them at the top level.
+      if (!response.imported || typeof response.imported !== 'object') {
+        throw new Error('Invalid import response from bridge')
+      }
+      return { ok: true, ...response.imported }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to import analytics JSON: ${detail}`)
+    }
+  })
+
+  // "Back up everything": an exact copy of the database, with the window's own settings (audit 10, F3).
+  options.ipcMain.handle('backup:save-database', async (event, windowStatePayload) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const windowState = validateBackupWindowState(windowStatePayload)
+    try {
+      const dialog = electronDialog()
+      const app = electronApp()
+      const defaultFilename = `jplearn-backup-${new Date().toISOString().slice(0, 10)}.db`
+      const { canceled, filePath } = await dialog.showSaveDialog(dialogParent(event), {
+        title: 'Back up everything',
+        defaultPath: require('path').join(app.getPath('documents'), defaultFilename),
+        filters: [{ name: 'JPLearn backup', extensions: ['db'] }],
+      })
+      if (canceled || !filePath) {
+        return { ok: false, cancelled: true }
+      }
+      const summary = await runDatabaseJob('backup', () => options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['database-backup', filePath, JSON.stringify(windowState)], DATABASE_JOB),
+      ))
+      return { ok: true, path: filePath, summary }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to back up: ${detail}`)
+    }
+  })
+
+  // "Restore from a backup": replaces everything, after a safety copy (audit 10, F3).
+  options.ipcMain.handle('backup:restore-database', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      const dialog = electronDialog()
+      const app = electronApp()
+      const { canceled, filePaths } = await dialog.showOpenDialog(dialogParent(event), {
+        title: 'Restore from a backup',
+        defaultPath: app.getPath('documents'),
+        filters: [{ name: 'JPLearn backup', extensions: ['db'] }],
+        properties: ['openFile'],
+      })
+      if (canceled || !filePaths || filePaths.length === 0) {
+        return { ok: false, cancelled: true }
+      }
+      const filePath = filePaths[0]
+      const summary = await options.runPythonBridgeWorkerOnly(['database-inspect', filePath], DATABASE_JOB)
+      const lastReview = typeof summary.last_review_day === 'string' ? formatBackupDay(summary.last_review_day) : null
+      const confirmed = await confirmBackupAction(event, {
+        message: 'Replace all your current progress with this backup?',
+        detail: [
+          `${lastReview ? `Last review in the backup: ${lastReview}. ` : ''}${countLabel(summary.cards, 'card')}, ${countLabel(summary.reviews, 'review')}.`,
+          'Your current data is saved as a safety copy first.',
+        ].join('\n'),
+        action: 'Restore',
+      })
+      if (!confirmed) {
+        return { ok: false, cancelled: true }
+      }
+      const result = await runDatabaseJob('restore', () => options.answerQueue.runExclusive(
+        () => options.runPythonBridgeWorkerOnly(['database-restore', filePath], DATABASE_JOB),
+      ))
+      clearBridgeReadCaches()
+      // Only the allowlisted window keys go back to the window (audit 10, review nit).
+      const windowState = {}
+      for (const [key, value] of Object.entries(result && result.window_state ? result.window_state : {})) {
+        try {
+          Object.assign(windowState, validateBackupWindowState({ [key]: value }))
+        } catch {
+          // A key this build does not carry is left in the backup file.
+        }
+      }
+      return { ok: true, ...result, window_state: windowState }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to restore: ${detail}`)
     }
   })
   // ── Setup wizard ────────────────────────────────────────────────────────────────────
@@ -1857,19 +2040,21 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('fsrs:optimize', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    const result = await options.runPythonBridgeIsolated(['fsrs-optimize'])
-    if (result && result.ok === true) {
-      // The one-shot process saved the weights but only activated them in its own
-      // memory; tell the long-lived worker so reviews use them this session.
-      try {
-        // The worker's memory is the point; a one-shot would reload its own and report success.
-        await options.runPythonBridgeWorkerOnly(['fsrs-reload-weights'])
-      } catch (error) {
-        // The weights are saved either way; they apply on next launch.
-        console.error('fsrs:optimize: worker reload failed', error)
+    return await runDatabaseJob('optimize', async () => {
+      const result = await options.runPythonBridgeIsolated(['fsrs-optimize'])
+      if (result && result.ok === true) {
+        // The one-shot process saved the weights but only activated them in its own
+        // memory; tell the long-lived worker so reviews use them this session.
+        try {
+          // The worker's memory is the point; a one-shot would reload its own and report success.
+          await options.runPythonBridgeWorkerOnly(['fsrs-reload-weights'])
+        } catch (error) {
+          // The weights are saved either way; they apply on next launch.
+          console.error('fsrs:optimize: worker reload failed', error)
+        }
       }
-    }
-    return result
+      return result
+    })
   })
 
   options.ipcMain.handle('fsrs:reset-weights', async (event) => {

@@ -1,6 +1,7 @@
 const fs = require("node:fs")
 const path = require("node:path")
 const { verifyPackagedHandwritingAssets } = require("./scripts/verify-handwriting-assets.cjs")
+const { removeRuntimeOnlyData } = require("./scripts/remove-runtime-data.cjs")
 
 const extraResourceCandidates = ["../scripts", "../data", "../domain", "../python-bundle"]
 const extraResource = extraResourceCandidates.filter((relativePath) => {
@@ -28,20 +29,12 @@ module.exports = {
     ],
   },
   hooks: {
-    // Remove large runtime-only directories from bundled extraResources.
+    // Remove large runtime-only directories and learner databases from bundled extraResources.
     postPackage: async (_config, packageResult) => {
       for (const outputPath of packageResult.outputPaths) {
         const resourcesDir = path.join(outputPath, "resources")
-        const toRemove = [
-          path.join(resourcesDir, "data", "whisper"),
-          path.join(resourcesDir, "data", "translation"),
-          path.join(resourcesDir, "data", "external_sources", "offline_dictionary"),
-        ]
-        for (const dir of toRemove) {
-          if (fs.existsSync(dir)) {
-            fs.rmSync(dir, { recursive: true, force: true })
-            console.log("[forge hook] removed: " + dir)
-          }
+        for (const removed of removeRuntimeOnlyData(resourcesDir)) {
+          console.log("[forge hook] removed: " + removed)
         }
         verifyPackagedHandwritingAssets(path.join(resourcesDir, "app.asar"))
       }

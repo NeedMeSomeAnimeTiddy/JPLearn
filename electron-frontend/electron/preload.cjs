@@ -147,6 +147,8 @@ contextBridge.exposeInMainWorld('jplearnDesktop', {
   exportAnalyticsCSV: (type) => ipcRenderer.invoke('analytics:export-and-save-csv', type),
   exportAnalyticsJSON: () => ipcRenderer.invoke('analytics:export-and-save-json'),
   importAnalyticsJSON: () => ipcRenderer.invoke('analytics:import-from-json'),
+  backupDatabase: (windowState) => ipcRenderer.invoke('backup:save-database', windowState),
+  restoreDatabase: () => ipcRenderer.invoke('backup:restore-database'),
   // ─ Debug / Dev Tools ──────────────────────────────────────────────────
   // Packaged builds refuse every debug route; the palette hides its developer commands.
   isPackagedApp: () => ipcRenderer.invoke('app:is-packaged'),

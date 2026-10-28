@@ -1,6 +1,6 @@
 // AUTO-GENERATED — do not edit manually.
 // Run: python scripts/generate_ts_types.py
-// Source: scripts/desktop_bridge.py, data/dictionary_repository.py, data/conjugation_drill.py
+// Source: scripts/desktop_bridge.py, data/dictionary_repository.py, data/conjugation_drill.py, data/deck_portability.py, data/whole_backup.py
 //
 // These interfaces mirror the Python @dataclass types declared in the source
 // files above. Any field-type change in Python should result in a changed
@@ -386,4 +386,38 @@ export interface ConjugationDrillPayload {
   accepted: string[]
   rule_hint: string
   stage: number
+}
+
+export interface ProgressFileSummary {
+  format_version: number
+  exported_at_utc: string | null
+  cards: number
+  reviews: number
+}
+
+export interface ProgressImportResult {
+  cards_updated: number
+  cards_kept_current: number
+  reviews_added: number
+  stages_updated: number
+  problem_cards_updated: number
+  counters_updated: number
+  session_goals_added: number
+  topic_rows_moved: number
+  daily_games_attempts_added: number
+  daily_games_days_kept_current: string[]
+  safety_copy: string | null
+}
+
+export interface DatabaseFileSummary {
+  schema_version: number
+  cards: number
+  reviews: number
+  last_review_day: string | null
+}
+
+export interface DatabaseRestoreResult {
+  summary: DatabaseFileSummary
+  safety_copy: string | null
+  window_state: Record<string, string>
 }

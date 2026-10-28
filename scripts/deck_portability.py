@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import asdict
 import sys
 from pathlib import Path
 
@@ -53,16 +54,13 @@ def _run_import(input_path: Path, mode: str) -> int:
 
     try:
         summary = import_progress_snapshot(payload, conflict_mode=mode)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    print(
-        "imported snapshot "
-        f"(mode={mode}, review_states={summary['review_states']}, review_events={summary['review_events']}, "
-        f"curriculum_stages={summary['curriculum_stages']}, leech_items={summary['leech_items']}, "
-        f"session_goals={summary['session_goals']}, custom_decks={summary['custom_decks']})"
-    )
+    print(f"imported snapshot (mode={mode})")
+    for field, value in asdict(summary).items():
+        print(f"  {field}: {value}")
     return 0
 
 

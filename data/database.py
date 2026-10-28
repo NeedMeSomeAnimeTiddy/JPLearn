@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sqlite3
+import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
@@ -19,6 +20,7 @@ from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow, Session
 from domain.scheduler import ReviewState
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
+from data import db_backups
 from data.text_normalization import normalize_japanese_text, normalize_storage_text
 
 def _resolve_db_path() -> Path:
@@ -34,16 +36,15 @@ def _resolve_db_path() -> Path:
         db_dir = Path(docs_dir) / "data"
         db_dir.mkdir(parents=True, exist_ok=True)
         new_path = db_dir / "jplearn.db"
-        # One-time migration: copy existing DB on first launch of updated app
+        # One-time migration: copy the database from the app's former Documents location on the
+        # first launch of an updated app. Never from beside this file: in a package that is the copy
+        # the build shipped, and from source it is the developer's own, so a new learner (or one who
+        # removed their progress on uninstall) silently got someone else's history (audit 10, F1).
         if not new_path.exists():
-            legacy_candidates = [
-                Path.home() / "Documents" / "JPLearn" / "data" / "jplearn.db",
-                Path(__file__).parent.parent / "data" / "jplearn.db",
-            ]
-            for legacy in legacy_candidates:
-                if legacy.exists() and legacy != new_path:
-                    shutil.copy2(str(legacy), str(new_path))
-                    break
+            legacy = Path.home() / "Documents" / "JPLearn" / "data" / "jplearn.db"
+            if legacy.exists() and legacy != new_path:
+                shutil.copy2(str(legacy), str(new_path))
+                print(f"[database] copied the database from its former location {legacy}", file=sys.stderr)
         return new_path
     return Path(__file__).parent.parent / "data" / "jplearn.db"
 
@@ -924,10 +925,24 @@ def _validate_migration_plan() -> None:
         )
 
 
-def _apply_migrations(conn: sqlite3.Connection) -> None:
+def _apply_migrations(conn: sqlite3.Connection, *, take_safety_copy: bool = True) -> None:
+    """Bring ``conn``'s database to the latest schema.
+
+    An existing database due an upgrade is copied first (audit 10, F7), so a wrong migration has
+    something to go back to. A failed copy is reported and the upgrade goes ahead: a full disk must
+    not stop the app from starting. A restore migrates its staging copy with ``take_safety_copy``
+    off, having taken its own copy of the live database.
+    """
     _validate_migration_plan()
     _ensure_schema_version_table(conn)
     current_version = _load_schema_version(conn)
+    if take_safety_copy and 0 < current_version < LATEST_SCHEMA_VERSION:
+        database_file = db_backups.main_database_file(conn)
+        if database_file is not None:
+            try:
+                db_backups.make_safety_copy(database_file, "before-upgrade")
+            except (OSError, sqlite3.Error) as error:
+                print(f"[database] no safety copy before the upgrade: {error}", file=sys.stderr)
     for target_version in range(current_version + 1, LATEST_SCHEMA_VERSION + 1):
         migration = MIGRATIONS.get(target_version)
         if migration is None:

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { openGame } from './test-entry'
-import { PREFS_STORAGE_KEY } from './lib/appStorage'
+import {
+  BACKUP_WINDOW_STATE_KEYS, PREFS_STORAGE_KEY, SESSION_STORAGE_KEY, SETTINGS_STORAGE_KEY, STATS_STORAGE_KEY,
+  SUMMARY_SNAPSHOT_STORAGE_KEY,
+} from './lib/appStorage'
 import App from './App'
 import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
@@ -99,6 +102,15 @@ function selectDrill(title: string): void {
   }
   throw new Error(`The list never reached ${title}. It stopped on `
     + `${document.querySelector('.dr-hen')?.textContent}`)
+}
+
+/** Settings -> System -> Backup & Restore. */
+async function openBackupSettings(): Promise<void> {
+  await screen.findByRole('button', { name: /open shortcuts/i })
+  const settingsButtons = screen.getAllByRole('button', { name: /open settings/i })
+  fireEvent.click(settingsButtons[settingsButtons.length - 1])
+  fireEvent.click(await screen.findByRole('tab', { name: /system/i }))
+  fireEvent.click(await screen.findByRole('button', { name: /backup & restore/i }))
 }
 
 async function openHandwritingRound(): Promise<void> {
@@ -570,23 +582,144 @@ describe('what each deck offers', () => {
       exportAnalyticsJSON: vi.fn(async () => ({ ok: true })),
       importAnalyticsJSON: vi.fn(async () => {
         stored = { katakana: { 7: 2 } }
-        return { ok: true, imported: { card_mastery_scores: 1 } }
+        return {
+          ok: true,
+          cards_updated: 12,
+          cards_kept_current: 3,
+          reviews_added: 340,
+          stages_updated: 0,
+          problem_cards_updated: 0,
+          counters_updated: 1,
+          session_goals_added: 0,
+          topic_rows_moved: 0,
+          daily_games_attempts_added: 0,
+          daily_games_days_kept_current: [],
+          safety_copy: null,
+        }
       }),
     } as unknown as typeof window.jplearnDesktop
 
     render(<App />)
-    await screen.findByRole('button', { name: /open shortcuts/i })
-    const settingsButtons = screen.getAllByRole('button', { name: /open settings/i })
-    fireEvent.click(settingsButtons[settingsButtons.length - 1])
-    fireEvent.click(await screen.findByRole('tab', { name: /system/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /backup & restore/i }))
-    fireEvent.click(await screen.findByRole('button', { name: /import backup from json file/i }))
+    await openBackupSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Import progress (JSON)' }))
 
     await waitFor(() => {
       const scores = JSON.parse(window.localStorage.getItem('jplearn-card-scores-v2') ?? '{}')
       expect(scores.katakana?.[7]).toBe(2)
       expect(scores.hiragana?.[1]).toBeUndefined()
     })
+    expect(await screen.findByText(
+      'Imported: 12 cards updated, 340 reviews added. 3 cards you had studied further kept your progress.',
+    )).toBeTruthy()
+  })
+
+  it('shows a plain sentence when an import is refused', async () => {
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      exportAnalyticsJSON: vi.fn(async () => ({ ok: true })),
+      importAnalyticsJSON: vi.fn(async () => {
+        throw new Error("Error invoking remote method 'analytics:import-from-json': Error: newer format: format 9")
+      }),
+    } as unknown as typeof window.jplearnDesktop
+
+    render(<App />)
+    await openBackupSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Import progress (JSON)' }))
+    expect(await screen.findByText('This file is from a newer version of JPLearn.')).toBeTruthy()
+  })
+
+  it('backs up everything with only the allowlisted window storage', async () => {
+    window.localStorage.setItem('jplearn-progression-overrides-v1', '["n5-kana"]')
+    window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, '{"hiragana":{}}')
+    const backupDatabase = vi.fn(async (_windowState: Record<string, string>) => ({
+      ok: true as const, path: 'D:\\Backups\\jplearn.db', summary: { schema_version: 1, cards: 0, reviews: 0, last_review_day: null },
+    }))
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      exportAnalyticsJSON: vi.fn(async () => ({ ok: true })),
+      backupDatabase,
+      restoreDatabase: vi.fn(),
+    } as unknown as typeof window.jplearnDesktop
+
+    render(<App />)
+    await openBackupSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Back up everything' }))
+
+    expect(await screen.findByText('Saved: D:\\Backups\\jplearn.db')).toBeTruthy()
+    const sent = backupDatabase.mock.calls[0][0]
+    expect(sent['jplearn-progression-overrides-v1']).toBe(window.localStorage.getItem('jplearn-progression-overrides-v1'))
+    // App writes its stats on load, so what was sent is whatever is stored now.
+    expect(sent[STATS_STORAGE_KEY]).toBe(window.localStorage.getItem(STATS_STORAGE_KEY))
+    expect(Object.keys(sent).every((key) => BACKUP_WINDOW_STATE_KEYS.includes(key))).toBe(true)
+    expect(sent[CARD_SCORES_STORAGE_KEY]).toBeUndefined()
+  })
+
+  it('restoring a backup drops the window copies, writes back the backed-up keys, then reloads', async () => {
+    window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify({ hiragana: { 1: 4 } }))
+    window.localStorage.setItem(SUMMARY_SNAPSHOT_STORAGE_KEY, '{"capturedAtUtc":"x"}')
+    window.localStorage.setItem(SESSION_STORAGE_KEY, '{"s":1}')
+    const writes: string[] = []
+    const reload = vi.fn(() => {
+      writes.push('reload')
+    })
+    const originalLocation = window.location
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...originalLocation, reload } })
+    const originalSetItem = Storage.prototype.setItem
+    const originalRemoveItem = Storage.prototype.removeItem
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    const removeItem = vi.spyOn(Storage.prototype, 'removeItem')
+    window.jplearnDesktop = {
+      ...baseDesktopApi,
+      exportAnalyticsJSON: vi.fn(async () => ({ ok: true })),
+      backupDatabase: vi.fn(),
+      restoreDatabase: vi.fn(async () => {
+        setItem.mockClear()
+        removeItem.mockClear()
+        setItem.mockImplementation(function (this: Storage, key: string, value: string) {
+          writes.push(`set ${key}`)
+          return Reflect.apply(originalSetItem, this, [key, value])
+        })
+        removeItem.mockImplementation(function (this: Storage, key: string) {
+          writes.push(`remove ${key}`)
+          return Reflect.apply(originalRemoveItem, this, [key])
+        })
+        return {
+          ok: true,
+          summary: { schema_version: 1, cards: 5, reviews: 9, last_review_day: '2026-10-01' },
+          safety_copy: null,
+          window_state: {
+            [STATS_STORAGE_KEY]: '{"restored":true}',
+            [SETTINGS_STORAGE_KEY]: '{"fontSize":"large"}',
+            'jplearn-card-scores-v2': '{"sneaky":true}',
+          },
+        }
+      }),
+    } as unknown as typeof window.jplearnDesktop
+
+    try {
+      render(<App />)
+      await openBackupSettings()
+      fireEvent.click(await screen.findByRole('button', { name: 'Restore from a backup' }))
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+
+      expect(writes).toEqual([
+        `set ${CARD_SCORES_STORAGE_KEY}`,
+        `set ${STATS_STORAGE_KEY}`,
+        `remove ${SUMMARY_SNAPSHOT_STORAGE_KEY}`,
+        `remove ${SESSION_STORAGE_KEY}`,
+        `set ${STATS_STORAGE_KEY}`,
+        `set ${SETTINGS_STORAGE_KEY}`,
+        'reload',
+      ])
+      expect(JSON.parse(window.localStorage.getItem(CARD_SCORES_STORAGE_KEY) ?? '{}').hiragana).toEqual({})
+      expect(window.localStorage.getItem(STATS_STORAGE_KEY)).toBe('{"restored":true}')
+      expect(window.localStorage.getItem(SUMMARY_SNAPSHOT_STORAGE_KEY)).toBeNull()
+      expect(window.localStorage.getItem(SESSION_STORAGE_KEY)).toBeNull()
+    } finally {
+      setItem.mockRestore()
+      removeItem.mockRestore()
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+    }
   })
 
   it('supports typed recall and forwards confidence score to record payload', async () => {

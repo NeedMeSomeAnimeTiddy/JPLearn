@@ -187,7 +187,23 @@ function createBridgeWorker(options) {
     return child
   }
 
-  function request(args) {
+  /* A whole-database job (backup, restore, import) passes its own, longer timeoutMs (audit 10, review
+     finding 2). While one is in flight the worker is busy, not wedged: a timeout on it, or on a
+     request queued behind it, does not count toward restarting the worker. */
+  function longJobInFlight(child) {
+    for (const request of state.pending.values()) {
+      if (request.child === child && request.longJob) {
+        return true
+      }
+    }
+    return false
+  }
+
+  function request(args, requestOptions = {}) {
+    const timeoutMs = Number.isFinite(requestOptions.timeoutMs) && requestOptions.timeoutMs > 0
+      ? requestOptions.timeoutMs
+      : options.requestTimeoutMs
+    const longJob = timeoutMs !== options.requestTimeoutMs
     return new Promise((resolve, reject) => {
       telemetry.workerRequestCount += 1
 
@@ -209,28 +225,29 @@ function createBridgeWorker(options) {
         }
         telemetry.workerTimeoutCount += 1
         telemetry.workerFailureCount += 1
-        telemetry.lastWorkerError = `Bridge worker request timed out after ${options.requestTimeoutMs}ms`
+        telemetry.lastWorkerError = `Bridge worker request timed out after ${timeoutMs}ms`
         state.pending.delete(requestId)
-        pending.reject(new Error(`Bridge worker request timed out after ${options.requestTimeoutMs}ms`))
+        pending.reject(new Error(`Bridge worker request timed out after ${timeoutMs}ms`))
 
         // Only tear down the shared worker -- which rejects every other
         // unrelated in-flight request via the 'close' handler -- once it looks
         // genuinely unresponsive rather than just slow on this one request.
         // A timeout on a worker that has already been replaced counts for nothing.
-        if (pending.child !== state.child) {
+        if (pending.child !== state.child || pending.longJob || longJobInFlight(pending.child)) {
           return
         }
         state.consecutiveTimeouts += 1
         if (state.consecutiveTimeouts >= options.maxConsecutiveTimeouts) {
           stop()
         }
-      }, options.requestTimeoutMs)
+      }, timeoutMs)
 
       state.pending.set(requestId, {
         resolve,
         reject,
         timeoutId,
         child,
+        longJob,
       })
 
       try {
