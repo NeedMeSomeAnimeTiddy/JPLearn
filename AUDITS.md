@@ -21,26 +21,41 @@ not through the app. Check 5 is deferred to the F3 repair; check 11 (real voice 
 run. Report and census: `Z:/Projects/JPLearn/audits/AUDIT-answer-checking-and-grading-2026-10-28-1(-r2).md`.
 
 ### Where each finding went
-- F1 near-miss passes a wrong kana or word in Dictation and Speech Recall (P1, confirmed by check 1):
-  reported; Robbie decides; fix with F8.
-- F3 nine kanji readings no romaji can match (8 in Kanji N5, 込 "crowded" in N3; check 4) (P1):
-  reported. The repair fires DEBT #5; the collision list covers the word lists and Kanji N4.
-- F2 Speech Recall accepts the displayed Japanese word (P2; r1's "the meaning cannot pass" refuted
-  by check 3): reported.
-- F8 Dictation marks a loanword's long-vowel spelling wrong (P2, check 2; check 10 counts 238 vocab
-  cards with a long-vowel mark across N5-N1): reported; fix with F1.
-- F4 a revealed hint answer still saves as correct (P2): reported; Robbie decides.
-- F5 the drill asks the "can do" form of "to exist" (ある) (P2, check 6): reported.
-- F6 Romaji Sprint takes one spelling for ぢ, づ, を (P3): reported; Robbie picks the spellings.
-- N1 Speech Recall graded twice, N2 the Python grader orphaned since the Tkinter removal: nits.
-- Typed Recall tolerance on short English words: asked of Robbie (FEATURES.md:40).
-- Stale: the profile and repo-map name domain/answer_check.py as the checker; FEATURES.md:41 names
-  VOICEVOX.
+Repairs merged at 927c38c (branch audit9-repairs). Robbie's rulings: a one-kana slip is "Wrong,
+shown as close"; an answer after the hint's full reveal is wrong, and the clue step hides anything
+the grader would accept; English typo tolerance only from 4 letters; keep "· counts as a miss".
+- F1 near-miss passed a wrong kana or word in Dictation and Speech Recall (P1, check 1): fixed in
+  16b60eb. Japanese answers are graded exactly after a kana fold; one kana off is a new "close"
+  outcome, saved as wrong with the right spelling shown.
+- F3 nine kanji readings no romaji could match (P1, check 4): fixed by the lead in d17f140 and
+  521d74e. New readings avoid every keep-first collision; regeneration changed exactly those nine
+  fields (check 5), so no card id moved. New test: every kanji card has a plain romaji reading.
+- F2 Speech Recall accepted the displayed Japanese word (P2): fixed in 16b60eb and ce455a8; it
+  grades the English meanings only and transcribes in English (allowlist ja + en, 74c9665).
+- F8 Dictation marked a loanword's long-vowel spelling wrong (P2, check 2): fixed in 16b60eb by the
+  same fold (katakana to hiragana, ー to the previous vowel, う after an o-row kana as お; the last
+  is deliberate, since Dictation grades what is heard).
+- F4 a revealed hint answer saved as correct (P2): fixed in 16b60eb and c54d7ef; hintStep reaches
+  submitAnswer, and lib/hintClue.ts keeps accepted answers (including romaji spellings, ce455a8)
+  out of the clue step.
+- F5 the drill asked the "can do" form of "to exist" (ある) (P2): fixed in 16b60eb.
+- F6 Romaji Sprint took one spelling for ぢ, づ, を (P3): fixed in 41b0e6a (ji/di, zu/du, o/wo).
+  Built-in card-note keys hash the reading; the live database holds no card notes, so none moved.
+- N1 Speech Recall graded twice: fixed (one grader). N2 the Python grader: kept as a test-only
+  mirror with a case table shared with the TypeScript tests.
+- Typed Recall tolerance on short English words: Robbie chose 4+ letters; fixed in 16b60eb.
+- Stale records fixed: audit profile, repo-map, .opencode/agents/domain.md and FEATURES.md:40-41.
 - Dropped: Sentence Assembly duplicate chunks (check 7: 0 of 152); a double-submit race (no
   interleaving found).
+- Known limits, not fixed: Speech Recall on the kana decks grades the romaji in English mode, so a
+  spoken を may transcribe as "Oh" and fail (not run with a real voice); a clue gloss written with
+  macrons ("tōfu") or a near-spelling ("sumo") can still guide the learner to the answer.
+- Checks at 927c38c's branch tip: lint and build clean; vitest 1,888 passed; pytest 1,848 passed.
+  Not run in the app.
 
 ### Triggers checked
-- DEBT #5: not fired at 3649b63; the F3 repair fires it.
+- DEBT #5: fired by the F3 repair and handled as the row asks (regeneration diff limited to the
+  nine fields; check 5).
 
 ### Inspected and found sound — do not re-derive these
 - One review write path, one transaction; the flag is boolean-validated, sent as '1' or '0',
