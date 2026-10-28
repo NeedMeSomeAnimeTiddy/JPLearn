@@ -246,9 +246,10 @@ function createBridgeWorker(options) {
   return { state, start, stop, request }
 }
 
-// True when the worker answered with a non-zero code: the command ran and refused, so running it
-// again in a one-shot would refuse the same way after a cold Python start, and a write that a
-// timeout cut short could save twice. Only a crash or a timeout is worth a one-shot (audit 7 F2).
+// True when the worker answered with a non-zero code: the command ran and failed. By policy that is
+// not replayed in a one-shot (audit 7 F2): most failures would repeat after a cold Python start, and
+// a replay is how a write could save twice. A transient one (a locked database) now reaches the
+// caller instead of being retried. Only a crash or a timeout falls back.
 function isWorkerRefusal(error) {
   return Boolean(error) && typeof error.bridgeCode === 'number'
 }

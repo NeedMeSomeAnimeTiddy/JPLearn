@@ -2600,11 +2600,19 @@ def test_worker_survives_a_reply_utf8_cannot_carry(tmp_path: Path, monkeypatch, 
     # A lone surrogate echoed back in a reply used to raise inside the write and end the worker,
     # taking every queued request with it (audit 7 F1).
     _use_temp_db(tmp_path, monkeypatch)
+    real_run_command = desktop_bridge._run_command
+
+    def echo_or_run(argv: list[str]) -> tuple[int, dict[str, object]]:
+        if argv[0] == "echo":
+            return 0, {"query": argv[1]}
+        return real_run_command(argv)
+
+    monkeypatch.setattr(desktop_bridge, "_run_command", echo_or_run)
     monkeypatch.setattr(
         desktop_bridge.sys,
         "stdin",
         io.StringIO(
-            '{"id":1,"args":["dictionary-search","\udc81x"]}\n'
+            '{"id":1,"args":["echo","\udc81x"]}\n'
             '{"id":2,"args":["xp-progress"]}\n'
         ),
     )
@@ -2615,4 +2623,5 @@ def test_worker_survives_a_reply_utf8_cannot_carry(tmp_path: Path, monkeypatch, 
     assert code == 0
     assert [json.loads(line)["id"] for line in lines] == [1, 2]
     lines[0].encode("utf-8")
+    assert json.loads(lines[0])["payload"]["query"] == "\udc81x"
     assert json.loads(lines[1])["ok"] is True

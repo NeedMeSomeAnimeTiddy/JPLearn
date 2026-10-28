@@ -64,7 +64,8 @@ off stdout and matched back through a `pending` Map.
 Fallback path: if the worker crashes or a request times out, `runPythonBridgeWithArgs`
 retries as a **one-shot process spawn** (`runPythonBridgeWithArgsOneShot`), which pays
 full interpreter + import cost. A command the worker answered with a failure code is not
-retried (audit 7 F2: it would refuse again). Writes that must not run twice go through
+replayed (audit 7 F2, a policy: most such failures repeat, and a replay can save a write twice;
+a transient one such as a locked database now reaches the caller). Writes that must not run twice go through
 `runPythonBridgeWorkerOnly` and never fall back: answers, reset, the legacy import, expertise
 seeding, the backup import, Daily Games attempts, JLPT results, assistant event tracking and
 the FSRS weight reload/reset.
