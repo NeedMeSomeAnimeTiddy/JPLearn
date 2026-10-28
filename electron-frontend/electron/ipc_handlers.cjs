@@ -88,6 +88,7 @@ function registerIpcHandlers(options) {
 
   const trustedSenderOptions = () => ({
     isDev: options.isDev,
+    appPageUrl: options.appPageUrl,
     getWindowFromSender: options.getWindowFromSender,
   })
   const runPythonBridgeRead = (command) =>
@@ -788,10 +789,14 @@ function registerIpcHandlers(options) {
     try {
       let assembledContext = {}
       try {
-        const requestedSessionId =
-          typeof validatedPayload.context?.session_id === 'string'
-            ? validatedPayload.context.session_id.trim()
-            : ''
+        let requestedSessionId = ''
+        if (typeof validatedPayload.context?.session_id === 'string' && validatedPayload.context.session_id.trim()) {
+          try {
+            requestedSessionId = validateSessionId(validatedPayload.context.session_id)
+          } catch {
+            // An unusable id only loses the session's context; the chat itself goes on (audit 8 F3).
+          }
+        }
         // Prefer the embedding-aware context (ranks assistant memory facts/
         // summaries by similarity to the message); fall back to the plain
         // keyword-matched context if the v2 path errors for any reason.

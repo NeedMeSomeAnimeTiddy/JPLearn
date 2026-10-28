@@ -51,16 +51,45 @@ const VALID_DECK_SLUGS = new Set([
   'sentence_examples',
 ])
 
-function isAllowedRendererUrl(rawUrl, isDev) {
+function normalizedFilePath(fileUrl) {
+  return decodeURIComponent(fileUrl.pathname).toLowerCase()
+}
+
+// In production only the app's own page passes, whatever its query or hash: a check for any local
+// file would hand the whole API to any page the main frame was moved to (audit 8 F1). Windows paths
+// compare without case. With no app page given, nothing passes.
+function isAllowedRendererUrl(rawUrl, isDev, appPageUrl) {
   try {
     const parsed = new URL(rawUrl)
     if (isDev) {
       return parsed.protocol === 'http:' && parsed.hostname === 'localhost' && parsed.port === '5173'
     }
-    return parsed.protocol === 'file:'
+    if (parsed.protocol !== 'file:' || !appPageUrl) {
+      return false
+    }
+    const expected = new URL(appPageUrl)
+    return expected.protocol === 'file:'
+      && parsed.host === expected.host
+      && normalizedFilePath(parsed) === normalizedFilePath(expected)
   } catch {
     return false
   }
+}
+
+// What the app's page may use, and nothing else (audit 8 F2). With no handler Electron grants every
+// request. The microphone is speaking practice (audio only), fullscreen is the minigames, and the
+// clipboard is copy buttons and theme import. A page other than the app's own gets nothing.
+const RENDERER_PERMISSIONS = new Set(['media', 'fullscreen', 'clipboard-read', 'clipboard-sanitized-write'])
+
+function isRendererPermissionAllowed({ permission, url, mediaTypes, isDev, appPageUrl }) {
+  if (!RENDERER_PERMISSIONS.has(permission) || !isAllowedRendererUrl(url, isDev, appPageUrl)) {
+    return false
+  }
+  if (permission === 'media') {
+    const types = Array.isArray(mediaTypes) ? mediaTypes : []
+    return types.length > 0 && types.every((type) => type === 'audio')
+  }
+  return true
 }
 
 function assertTrustedIpcSender(event, options) {
@@ -80,7 +109,7 @@ function assertTrustedIpcSender(event, options) {
   }
 
   const senderUrl = senderFrame.url
-  if (!isAllowedRendererUrl(senderUrl, options.isDev)) {
+  if (!isAllowedRendererUrl(senderUrl, options.isDev, options.appPageUrl)) {
     throw new Error(`Rejected IPC request from untrusted URL: ${senderUrl || '(empty)'}`)
   }
 
@@ -191,6 +220,20 @@ function validateAnswerIdentity(payload, nowMs) {
   return { answerId, answeredAtUtc, answeredLocalDate }
 }
 
+// Session ids are UUIDs from the bridge; the bound only stops an oversized or control-character
+// value being stored with every answer (audit 8 F3).
+const MAX_SESSION_ID_LENGTH = 128
+
+function hasControlCharacter(value) {
+  for (const character of value) {
+    const code = character.charCodeAt(0)
+    if (code < 0x20 || code === 0x7f) {
+      return true
+    }
+  }
+  return false
+}
+
 function validateSessionId(value) {
   if (typeof value !== 'string') {
     throw new Error(`Invalid session id: ${String(value)}`)
@@ -198,6 +241,9 @@ function validateSessionId(value) {
   const normalized = value.trim()
   if (!normalized) {
     throw new Error('Invalid session id: value must not be empty')
+  }
+  if (normalized.length > MAX_SESSION_ID_LENGTH || hasControlCharacter(normalized)) {
+    throw new Error('Invalid session id: too long or contains control characters')
   }
   return normalized
 }
@@ -258,11 +304,15 @@ function validatePositiveLimit(value, fallback) {
   return value
 }
 
+// Robbie's cap (audit 8 F3): longer input is cut, as sentence lookup is, so a pasted passage
+// cannot hold the serial bridge for seconds.
+const MAX_DICTIONARY_SEARCH_QUERY_LENGTH = 200
+
 function validateDictionarySearchQuery(value) {
   if (typeof value !== 'string') {
     throw new Error(`Invalid dictionary search query: ${String(value)}`)
   }
-  const normalized = value.trim()
+  const normalized = value.trim().slice(0, MAX_DICTIONARY_SEARCH_QUERY_LENGTH).trim()
   if (!normalized) {
     throw new Error('Invalid dictionary search query: value must not be empty')
   }
@@ -512,6 +562,9 @@ function validateLookupSentencePayload(payload) {
   return { query }
 }
 
+// Far above any example sentence in the decks; a bound, not a product limit (audit 8 F3).
+const MAX_GRAMMAR_MINIGAME_SENTENCE_LENGTH = 1000
+
 function validateGrammarMinigameRequest(payload) {
   const allowedGameTypes = new Set(['sentence_assembly', 'particle_cloze', 'vibe_check', 'imposter'])
 
@@ -529,6 +582,9 @@ function validateGrammarMinigameRequest(payload) {
       throw new Error(`Invalid grammar minigame sentence: ${String(payload.sentence)}`)
     }
     const normalizedSentence = payload.sentence.trim()
+    if (normalizedSentence.length > MAX_GRAMMAR_MINIGAME_SENTENCE_LENGTH) {
+      throw new Error('Invalid grammar minigame sentence: too long')
+    }
     if (normalizedSentence.length > 0) {
       sentence = normalizedSentence
     }
@@ -1011,6 +1067,7 @@ function validateJLPTSaveResultPayload(payload) {
 module.exports = {
   assertTrustedIpcSender,
   isAllowedRendererUrl,
+  isRendererPermissionAllowed,
   validateDeckSlug,
   validateExpertiseLevelInput,
   validateSessionGoalPayload,

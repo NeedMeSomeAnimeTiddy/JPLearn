@@ -42,6 +42,7 @@ function createRegisteredHandlers(overrides = {}) {
       },
     },
     isDev: false,
+    appPageUrl: 'file:///index.html',
     getWindowFromSender: () => windowMock,
     runPythonBridge: vi.fn(),
     runPythonBridgeWithArgs: vi.fn(),
