@@ -1349,7 +1349,7 @@ registerIpcHandlers({
   isWindowExpanded,
   getSafeRestoreBounds,
   windowRestoreBoundsById,
-  localTutorRuntime,
+  getLocalTutorRuntime: () => localTutorRuntime,
   localVoiceRuntime,
   speechRuntime: localSpeechRuntime,
   ocrRuntime: localOcrRuntime,

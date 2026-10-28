@@ -61,6 +61,14 @@ async function runWithTransientRetry(fn) {
 }
 
 function registerIpcHandlers(options) {
+  /* The tutor runtime is replaced when setup installs, selects or removes a model
+     (main.cjs refreshTutorRuntimeAfterSetup), so every route asks for the current one
+     rather than keeping the object it was registered with (audit 5, F2). */
+  const tutorRuntime = () => (
+    typeof options.getLocalTutorRuntime === 'function'
+      ? options.getLocalTutorRuntime()
+      : options.localTutorRuntime
+  )
   const transientAssistantChatTurns = []
   const appendTransientAssistantChatTurn = (role, content) => {
     transientAssistantChatTurns.push({
@@ -402,7 +410,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedRequest = validateScenarioEvaluationRequest(payload)
     try {
-      return await options.localTutorRuntime.evaluateScenarioResponse(validatedRequest)
+      return await tutorRuntime().evaluateScenarioResponse(validatedRequest)
     } catch {
       // A failed judgement is never an error the learner has to deal with —
       // the scenario falls back to its authored recovery line.
@@ -554,7 +562,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedEntries = validateDailyGamesCrosswordClues(entries, true)
     try {
-      return await options.localTutorRuntime.generateCrosswordClues(validatedEntries)
+      return await tutorRuntime().generateCrosswordClues(validatedEntries)
     } catch {
       return { ok: false, text: '' }
     }
@@ -756,13 +764,13 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('assistant-chat:status', (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    return options.localTutorRuntime.getStatus()
+    return tutorRuntime().getStatus()
   })
 
   options.ipcMain.handle('assistant-chat:preload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.localTutorRuntime.preload('renderer-startup')
+      return await tutorRuntime().preload('renderer-startup')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to preload assistant chat runtime: ${detail}`)
@@ -809,7 +817,7 @@ function registerIpcHandlers(options) {
         ...assembledContext,
         ...validatedPayload.context,
       }
-      const response = await options.localTutorRuntime.sendMessage(validatedPayload.message, runtimeContext)
+      const response = await tutorRuntime().sendMessage(validatedPayload.message, runtimeContext)
       appendTransientAssistantChatTurn('assistant', response.text)
       return response
     } catch (error) {
@@ -872,14 +880,14 @@ function registerIpcHandlers(options) {
     const targetLang = typeof payload?.targetLang === 'string' ? payload.targetLang.trim().toLowerCase() : 'en'
     try {
       if (
-        typeof options.localTutorRuntime.translateText !== 'function'
+        typeof tutorRuntime().translateText !== 'function'
         || sourceLang !== 'ja'
         || targetLang !== 'en'
       ) {
         throw new Error('OCR translation is unavailable: no translation runtime found.')
       }
 
-      return await options.localTutorRuntime.translateText(text, {
+      return await tutorRuntime().translateText(text, {
         sourceLang,
         targetLang,
         maxOutputTokens: 240,
@@ -893,7 +901,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:unload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.localTutorRuntime.unload('manual')
+      return await tutorRuntime().unload('manual')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to unload assistant chat runtime: ${detail}`)
@@ -903,7 +911,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:cancel', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await options.localTutorRuntime.cancelActiveInference('renderer-cancel')
+      return await tutorRuntime().cancelActiveInference('renderer-cancel')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to cancel assistant chat inference: ${detail}`)

@@ -1038,6 +1038,15 @@ function httpRequestJson(requestOptions, payload, signal) {
       res.on('end', () => resolve({ status: res.statusCode || 0, body: raw }))
     })
     req.on('error', (error) => reject(error))
+    // The `timeout` option alone only reports an idle socket and never ends the request
+    // (audit 5, F3), so a request past it is destroyed here, as voice_runtime.cjs does.
+    if (Number.isFinite(requestOptions.timeout) && requestOptions.timeout > 0) {
+      req.setTimeout(requestOptions.timeout, () => {
+        const error = new Error(`request to ${requestOptions.path || '/'} timed out after ${requestOptions.timeout} ms`)
+        error.code = 'ETIMEDOUT'
+        req.destroy(error)
+      })
+    }
     if (signal && typeof signal.addEventListener === 'function') {
       const onAbort = () => req.destroy(new InferenceAbortError())
       if (signal.aborted) {
@@ -1190,6 +1199,17 @@ function createLlamaServerAdapter(config = {}) {
     }
   }
 
+  // An inference request past its timeout leaves llama-server busy with it, so the server is
+  // stopped and the next request starts a fresh one (ARCHITECTURE §2: kill on timeout).
+  async function serverRequest(requestOptions, payload, signal) {
+    try {
+      return await httpRequestJson(requestOptions, payload, signal)
+    } catch (error) {
+      if (error && error.code === 'ETIMEDOUT') stopServer()
+      throw error
+    }
+  }
+
   async function waitForHealth() {
     const deadline = Date.now() + startupTimeoutMs
     while (Date.now() < deadline) {
@@ -1269,6 +1289,12 @@ function createLlamaServerAdapter(config = {}) {
           port,
         }
         serverProcess.on('error', () => stopServer())
+        // A server that dies after loading is noticed, so the next message starts a fresh one
+        // instead of failing against it until the inactivity unload (audit 5, F3).
+        const startedProcess = serverProcess
+        startedProcess.on('exit', () => {
+          if (serverProcess === startedProcess) stopServer()
+        })
 
         if (!exitHandlerRegistered) {
           exitHandlerRegistered = true
@@ -1283,6 +1309,10 @@ function createLlamaServerAdapter(config = {}) {
       } finally {
         startPromise = null
       }
+    },
+
+    isRunning() {
+      return Boolean(serverProcess && serverProcess.exitCode === null)
     },
 
     async unload() {
@@ -1384,7 +1414,7 @@ function createLlamaServerAdapter(config = {}) {
         if (Array.isArray(runtimeOptions.stopSequences) && runtimeOptions.stopSequences.length > 0) {
           completionPayload.stop = runtimeOptions.stopSequences
         }
-        const completionResponse = await httpRequestJson(
+        const completionResponse = await serverRequest(
           { host, port, path: '/completion', method: 'POST', timeout: requestTimeoutMs },
           completionPayload,
           runtimeOptions.signal,
@@ -1404,7 +1434,7 @@ function createLlamaServerAdapter(config = {}) {
           throw new Error('llama-server returned malformed JSON')
         }
       } else {
-        const response = await httpRequestJson(
+        const response = await serverRequest(
           { host, port, path: '/v1/chat/completions', method: 'POST', timeout: requestTimeoutMs },
           payload,
           runtimeOptions.signal,
@@ -1442,7 +1472,7 @@ function createLlamaServerAdapter(config = {}) {
           completionPayload.stop = runtimeOptions.stopSequences
         }
 
-        const completionResponse = await httpRequestJson(
+        const completionResponse = await serverRequest(
           { host, port, path: '/completion', method: 'POST', timeout: requestTimeoutMs },
           completionPayload,
           runtimeOptions.signal,
@@ -1640,10 +1670,14 @@ function createTutorChatRuntime(options = {}) {
     }, inactivityUnloadMs)
   }
 
+  /* The inactivity unload is armed only once a request has settled and is held off while one
+     runs (ARCHITECTURE §2; audit 5 F3/F7). Every path that can load the model takes a lease, so
+     crossword clues and scenario judging are covered as well as chat and translation. */
   function acquireInferenceLease() {
     if (isInferenceActive) {
       return null
     }
+    clearUnloadTimer()
     const lease = {
       controller: new AbortController(),
     }
@@ -1660,11 +1694,19 @@ function createTutorChatRuntime(options = {}) {
     activeInferenceLease = null
     activeInferenceController = null
     isInferenceActive = false
+    if (loaded) {
+      scheduleInactivityUnload()
+    }
   }
 
   async function ensureLoaded() {
     if (loaded && adapter) {
-      return false
+      if (typeof adapter.isRunning !== 'function' || adapter.isRunning()) {
+        return false
+      }
+      // the model server stopped (a crash, or a request that timed out): load it again
+      loaded = false
+      adapter = null
     }
 
     if (loadPromise) {
@@ -1769,12 +1811,11 @@ function createTutorChatRuntime(options = {}) {
       try {
         const coldStart = await ensureLoaded()
         lastUsedAtUtc = new Date().toISOString()
-        scheduleInactivityUnload()
 
         const startedAt = Date.now()
         try {
           if (inferenceLease.controller.signal.aborted) {
-            throw new Error('aborted')
+            throw new InferenceAbortError()
           }
           let inference = null
           let cleanedText = ''
@@ -1870,7 +1911,6 @@ function createTutorChatRuntime(options = {}) {
       try {
         const coldStart = await ensureLoaded()
         lastUsedAtUtc = new Date().toISOString()
-        scheduleInactivityUnload()
 
         const startedAt = Date.now()
         try {
@@ -2079,7 +2119,6 @@ function createTutorChatRuntime(options = {}) {
           return { ok: false, text: '' }
         }
         lastUsedAtUtc = new Date().toISOString()
-        scheduleInactivityUnload()
         return { ok: true, text: String(inference?.text || ''), coldStart }
       } catch {
         return { ok: false, text: '' }
@@ -2180,4 +2219,5 @@ module.exports = {
   createTutorChatRuntime,
   createAdapterRegistry,
   extractCliResponseText,
+  httpRequestJson,
 }
