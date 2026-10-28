@@ -36,6 +36,30 @@ valley-models asset release), so no public installer carried the database. Repor
 - Nits 1-4: reported.
 - Stale: ARCHITECTURE §3 schema version 20 vs 21; the "everything" comments; issue #8's "Implemented".
 
+### Outcome (branch `audit10-repairs`, merged bb43943, pushed 2026-10-28)
+- F1 fixed (e538f20): packaging strips every `*.db` file and `data/backups`; the repo-relative
+  legacy copy is no longer a candidate, so nothing is adopted on a first launch.
+- F7 fixed (c326cd1): a safety copy before a schema upgrade, import or restore, newest 3 kept
+  (`data/db_backups.py`); a failed copy blocks an import or restore, not an upgrade.
+- F2, F4, F5, F6 fixed (388e6df, Robbie: "Further-along wins"): per card the further-along schedule
+  wins; rows are validated before any write; damaged and newer files are refused by name; pre-#78
+  topic-deck rows are remapped to their level decks. Import asks first, with a summary.
+- F3 fixed (214e1f3, 7bb5767, f0a79ca; Robbie: "Add a whole-database backup", "Include them"):
+  "Back up everything" / "Restore from a backup" copy the whole database plus four allowlisted
+  window keys. Import, backup, restore and the scheduling optimizer refuse to run over each other.
+- Nits 3 and 4 fixed: files are written whole or not at all; export waits for queued answers.
+- Stale docs fixed (8ff3c5c). Issue #8 not yet updated.
+- Review (5X Opus Reviewer, two rounds, approve with nits at 94453ba) found a successful import shown
+  as "Import failed." (the bridge nests counts under `imported`), and database jobs bound by the
+  worker's 30 s timeout; both fixed in 94453ba, with pruning that could drop the copy just made.
+- Accepted: undoing a restore from its safety copy brings the database back but not the four window
+  keys (the copy holds only the database). Reads queued behind a long database job still time out at
+  30 s and fall back to one-shot processes, as before this branch.
+- Checks: full pytest 1,898 passed locally (Linux VM: 1,886 passed, 1 failed in
+  `test_conjugation_index` with fugashi 1.5.2 against the local 1.3.0; requirements.txt does
+  not pin fugashi; unrelated to this branch); vitest 1,925
+  passed; lint and build clean. Not tried in the running app.
+
 ### Triggers checked
 - DEBT #3: not fired (merge of 107,842 events 0.65 s, Check 8, without the bridge).
 - DEBT #6: unchanged; relevant to F6.
