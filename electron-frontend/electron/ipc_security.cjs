@@ -51,17 +51,22 @@ const VALID_DECK_SLUGS = new Set([
   'sentence_examples',
 ])
 
-// Electron's loadFile leaves a '%' in a folder name as it is, while pathToFileURL writes '%25', so
-// both sides are decoded; a path whose escapes do not decode (a folder named "100%") is compared
-// as written instead of throwing and refusing every request.
+// Electron's loadFile leaves a '%' in a folder name as it is, while pathToFileURL writes '%25'.
+// Each run of valid %XX escapes is decoded on its own, so a bare '%' (a folder named "100%") next
+// to an escaped space still compares equal instead of making the whole path undecodable. A folder
+// whose name itself looks like an escape ("%41") stays ambiguous; that is a known limit.
+const PERCENT_ESCAPE_RUN = /(?:%[0-9a-fA-F]{2})+/g
+
 function normalizedFilePath(fileUrl) {
-  let pathname = fileUrl.pathname
-  try {
-    pathname = decodeURIComponent(pathname)
-  } catch {
-    // Not decodable: compare as written.
-  }
-  return pathname.toLowerCase()
+  return fileUrl.pathname
+    .replace(PERCENT_ESCAPE_RUN, (run) => {
+      try {
+        return decodeURIComponent(run)
+      } catch {
+        return run
+      }
+    })
+    .toLowerCase()
 }
 
 // In production only the app's own page passes, whatever its query or hash: a check for any local

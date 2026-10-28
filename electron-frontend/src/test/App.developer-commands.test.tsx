@@ -2,7 +2,7 @@
    palette leaves out Developer Dashboard, Inspect Element, the three checks, Restart Bridge and
    Clear Caches. Running from source, they stay. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from '../App'
 import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from '../test-fixtures/answerQueue'
 
@@ -138,19 +138,26 @@ describe('developer commands in the command palette', () => {
 })
 
 describe('developer tools in the titlebar shortcut menu (audit 8 review)', () => {
-  async function developerSubmenuShown(): Promise<boolean> {
-    fireEvent.click(await screen.findByRole('button', { name: 'Open shortcuts' }))
-    return screen.queryAllByRole('menuitem').some((item) => (item.textContent ?? '').includes('Developer Tools'))
-      || screen.queryAllByRole('button').some((item) => (item.textContent ?? '').trim() === 'Developer Tools')
-  }
+  const developerSubmenuShown = () =>
+    screen.queryAllByRole('menuitem').some((item) => (item.textContent ?? '').includes('Developer Tools'))
+    || screen.queryAllByRole('button').some((item) => (item.textContent ?? '').trim() === 'Developer Tools')
 
   it('leaves the Developer Tools submenu out of the installed app', async () => {
-    const isPackagedApp = vi.fn(async () => true)
+    let answered = false
+    const isPackagedApp = vi.fn(async () => {
+      answered = true
+      return true
+    })
     window.jplearnDesktop = makeApi(isPackagedApp)
     render(<App />)
-    await waitFor(() => expect(isPackagedApp).toHaveBeenCalled())
+    await waitFor(() => expect(answered).toBe(true))
+    // Let the answer reach the hook before looking, so a gate that opens late is caught too.
+    await act(async () => {
+      await Promise.resolve()
+    })
 
-    expect(await developerSubmenuShown()).toBe(false)
+    fireEvent.click(await screen.findByRole('button', { name: 'Open shortcuts' }))
+    expect(developerSubmenuShown()).toBe(false)
   })
 
   it('shows it when running from source', async () => {
@@ -159,6 +166,7 @@ describe('developer tools in the titlebar shortcut menu (audit 8 review)', () =>
     render(<App />)
     await waitFor(() => expect(isPackagedApp).toHaveBeenCalled())
 
-    await waitFor(async () => expect(await developerSubmenuShown()).toBe(true))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open shortcuts' }))
+    await waitFor(() => expect(developerSubmenuShown()).toBe(true))
   })
 })

@@ -64,6 +64,8 @@ describe('ipc_security', () => {
     expect(isAllowedRendererUrl('file:///C:/Users/Ana/100%/JPLearn/dist/index.html', false, expected)).toBe(true)
     expect(isAllowedRendererUrl(expected, false, expected)).toBe(true)
     expect(isAllowedRendererUrl('file:///C:/Users/Ana/100%/Other/index.html', false, expected)).toBe(false)
+    const spaced = 'file:///C:/Users/Ana%20Smith/100%25/JPLearn/dist/index.html'
+    expect(isAllowedRendererUrl('file:///C:/Users/Ana%20Smith/100%/JPLearn/dist/index.html', false, spaced)).toBe(true)
   })
 
   it('rejects untrusted renderer URLs', () => {
