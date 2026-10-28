@@ -6,8 +6,6 @@ const {
   validateOptionalSessionId,
   validatePositiveLimit,
   validateAssistantEventIdsPayload,
-  validateAssistantEventInteractionPayload,
-  validateAssistantChatAppendPayload,
   validateAssistantChatRuntimePayload,
   validateAssistantChatImagePayload,
   validateStartupThemeInput,
@@ -61,6 +59,20 @@ async function runWithTransientRetry(fn) {
   }
 }
 
+function readElectronIsPackaged() {
+  // Outside Electron (the tests) there is no app to ask, and requiring 'electron' from plain Node
+  // can start a download of its binary.
+  if (!process.versions.electron) {
+    return true
+  }
+  try {
+    const flag = require('electron').app?.isPackaged
+    return typeof flag === 'boolean' ? flag : true
+  } catch {
+    return true
+  }
+}
+
 function registerIpcHandlers(options) {
   /* The tutor runtime is replaced when setup installs, selects or removes a model
      (main.cjs refreshTutorRuntimeAfterSetup), so every route asks for the current one
@@ -91,6 +103,16 @@ function registerIpcHandlers(options) {
     appPageUrl: options.appPageUrl,
     getWindowFromSender: options.getWindowFromSender,
   })
+  /* Developer routes (Inspect Element, the developer dashboard, the checks, restart bridge, clear
+     caches) answer only when running from source; the installed app refuses them (audit 8 F4).
+     main.cjs may pass isPackaged; otherwise Electron's own flag is read. If neither can be read the
+     app counts as installed. */
+  const isPackagedApp = typeof options.isPackaged === 'boolean' ? options.isPackaged : readElectronIsPackaged()
+  const assertDeveloperRoute = () => {
+    if (isPackagedApp) {
+      throw new Error('Rejected IPC request: developer tools are not available in the installed app')
+    }
+  }
   const runPythonBridgeRead = (command) =>
     (options.runPythonBridgeCached || options.runPythonBridge)(command)
   const runPythonBridgeWithArgsRead = (args) =>
@@ -340,17 +362,6 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to list scenario sessions: ${detail}`)
-    }
-  })
-
-  options.ipcMain.handle('scenario:get-session', async (event, sessionId) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    const validatedId = validateScenarioSessionId(sessionId)
-    try {
-      return await options.runPythonBridgeWithArgs(['scenario-session-get', validatedId])
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to fetch scenario session: ${detail}`)
     }
   })
 
@@ -716,29 +727,6 @@ function registerIpcHandlers(options) {
     }
   })
 
-  options.ipcMain.handle('assistant:track-event', async (event, payload) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    const validatedPayload = validateAssistantEventInteractionPayload(payload)
-    try {
-      return await options.runPythonBridgeWorkerOnly([
-        'assistant-events-track',
-        String(validatedPayload.eventId),
-        validatedPayload.interactionType,
-        JSON.stringify(validatedPayload.metadata),
-      ])
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to track assistant event interaction: ${detail}`)
-    }
-  })
-
-  options.ipcMain.handle('assistant:append-chat-turn', async (event, payload) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    const validatedPayload = validateAssistantChatAppendPayload(payload)
-    appendTransientAssistantChatTurn(validatedPayload.role, validatedPayload.content)
-    return { ok: true }
-  })
-
   options.ipcMain.handle('assistant:get-chat-history', async (event, limit) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     return {
@@ -929,15 +917,6 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('audio:voice-status', (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     return options.localVoiceRuntime.getStatus()
-  })
-
-  options.ipcMain.handle('audio:list-voices', (event) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    try {
-      return options.localVoiceRuntime.listVoices?.() ?? []
-    } catch {
-      return []
-    }
   })
 
   options.ipcMain.handle('audio:preload', async (event, speaker) => {
@@ -1188,6 +1167,7 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('ui:inspect-element', (event) => {
     const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     if (!win || win.isDestroyed()) {
       return { ok: false }
     }
@@ -1275,28 +1255,6 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch recommendations: ${detail}`)
-    }
-  })
-
-  options.ipcMain.handle('tutor:get-reactions', async (event) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    try {
-      return await runPythonBridgeRead('tutor-reactions')
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to fetch tutor reactions: ${detail}`)
-    }
-  })
-
-  options.ipcMain.handle('tutor:dismiss-reaction', async (event, dedupKey) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    const safeKey = typeof dedupKey === 'string' ? dedupKey.slice(0, 256) : ''
-    if (!safeKey) return { ok: false, error: 'Invalid dedup key' }
-    try {
-      return await options.runPythonBridgeWithArgs(['tutor-dismiss', safeKey])
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to dismiss tutor reaction: ${detail}`)
     }
   })
 
@@ -1465,37 +1423,6 @@ function registerIpcHandlers(options) {
       throw new Error(`Failed to import analytics JSON: ${detail}`)
     }
   })
-  // ── Daily goal ───────────────────────────────────────────────────────────────────
-  options.ipcMain.handle('study:get-daily-goal', async (event) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    const payload = await runPythonBridgeWithArgsRead(['daily-goal'])
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('Invalid daily goal response from bridge')
-    }
-    return payload
-  })
-
-  options.ipcMain.handle('study:set-daily-goal', async (event, target) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    if (typeof target !== 'number' || target < 1) {
-      throw new Error('Invalid daily goal target')
-    }
-    const payload = await runPythonBridgeWithArgsRead(['daily-goal-set', String(target)])
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('Invalid daily goal response from bridge')
-    }
-    return payload
-  })
-
-  options.ipcMain.handle('study:get-word-of-the-day', async (event) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    const payload = await runPythonBridgeWithArgsRead(['word-of-the-day'])
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('Invalid word-of-the-day response from bridge')
-    }
-    return payload
-  })
-
   // ── Setup wizard ────────────────────────────────────────────────────────────────────
   const setupRuntime = options.setupRuntime
   if (setupRuntime) {
@@ -1865,8 +1792,14 @@ function registerIpcHandlers(options) {
     return { ok: true, key, value }
   })
 
+  options.ipcMain.handle('app:is-packaged', (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    return isPackagedApp
+  })
+
   options.ipcMain.handle('debug:bridge-telemetry', (event) => {
     const win = assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     if (!win || win.isDestroyed()) {
       return { ok: false, error: 'Window unavailable' }
     }
@@ -1881,6 +1814,7 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('debug:restart-bridge', (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     if (typeof options.stopPythonBridgeWorker === 'function') {
       options.stopPythonBridgeWorker()
     }
@@ -1889,23 +1823,14 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('debug:clear-caches', (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     clearBridgeReadCaches()
     return { ok: true }
   })
 
-  options.ipcMain.handle('debug:reload-fonts', async (event) => {
-    const win = assertTrustedIpcSender(event, trustedSenderOptions())
-    if (!win || win.isDestroyed()) {
-      return { ok: false }
-    }
-    if (typeof options.reloadLocalFontsForContents === 'function') {
-      return await options.reloadLocalFontsForContents(win.webContents)
-    }
-    return { ok: false }
-  })
-
   options.ipcMain.handle('debug:diagnostics', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     try {
       return await runPythonBridgeRead('diagnostics')
     } catch (error) {
@@ -1916,6 +1841,7 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('debug:snapshot', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     try {
       return await runPythonBridgeRead('snapshot')
     } catch (error) {
@@ -1924,25 +1850,9 @@ function registerIpcHandlers(options) {
     }
   })
 
-  options.ipcMain.handle('debug:test-notification', async (event) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    try {
-      const { Notification } = require('electron')
-      const n = new Notification({
-        title: 'JPLearn',
-        body: 'Test notification — notifications are working!',
-        silent: false,
-      })
-      n.show()
-      return { ok: true }
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      return { ok: false, error: detail }
-    }
-  })
-
   options.ipcMain.handle('debug:run-check', async (event, checkName) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
+    assertDeveloperRoute()
     const validChecks = ['arch', 'db', 'srs']
     if (!validChecks.includes(checkName)) {
       throw new Error(`Invalid check name: ${checkName}. Must be one of: ${validChecks.join(', ')}`)

@@ -26,7 +26,6 @@ describe('ipc main contract', () => {
       'study:delete-card-note',
       'scenario:save-session',
       'scenario:list-sessions',
-      'scenario:get-session',
       'scenario:delete-session',
       'scenario:clear-sessions',
       'scenario:save-srs-card',
@@ -47,8 +46,6 @@ describe('ipc main contract', () => {
       'assistant:get-snapshot',
       'assistant:get-events',
       'assistant:consume-events',
-      'assistant:track-event',
-      'assistant:append-chat-turn',
       'assistant:get-chat-history',
       'assistant:get-chat-history-preloaded',
       'assistant:clear-chat-history',
@@ -73,6 +70,13 @@ describe('ipc main contract', () => {
       'ui:startup-ready',
       'ui:first-summary',
       'ui:inspect-element',
+      'app:is-packaged',
+      'debug:bridge-telemetry',
+      'debug:restart-bridge',
+      'debug:clear-caches',
+      'debug:diagnostics',
+      'debug:snapshot',
+      'debug:run-check',
       'learning-path:complete-onboarding',
     ]
 
@@ -96,7 +100,6 @@ describe('ipc main contract', () => {
       'study:delete-card-note',
       'scenario:save-session',
       'scenario:list-sessions',
-      'scenario:get-session',
       'scenario:delete-session',
       'scenario:clear-sessions',
       'scenario:save-srs-card',
@@ -117,8 +120,6 @@ describe('ipc main contract', () => {
       'assistant:get-snapshot',
       'assistant:get-events',
       'assistant:consume-events',
-      'assistant:track-event',
-      'assistant:append-chat-turn',
       'assistant:get-chat-history',
       'assistant:get-chat-history-preloaded',
       'assistant:clear-chat-history',
@@ -143,6 +144,13 @@ describe('ipc main contract', () => {
       'ui:startup-ready',
       'ui:first-summary',
       'ui:inspect-element',
+      'app:is-packaged',
+      'debug:bridge-telemetry',
+      'debug:restart-bridge',
+      'debug:clear-caches',
+      'debug:diagnostics',
+      'debug:snapshot',
+      'debug:run-check',
       'learning-path:complete-onboarding',
     ]
 
@@ -153,6 +161,33 @@ describe('ipc main contract', () => {
 
       const localWindow = handlersSource.slice(startIndex, startIndex + 900)
       expect(localWindow, `Expected assertTrustedIpcSender in handler for ${channel}`).toContain('assertTrustedIpcSender(event')
+    }
+  })
+
+  it('registers none of the routes removed because no preload method reached them (audit 8)', () => {
+    const removedChannels = [
+      'scenario:get-session',
+      'assistant:track-event',
+      'assistant:append-chat-turn',
+      'audio:list-voices',
+      'tutor:get-reactions',
+      'tutor:dismiss-reaction',
+      'study:get-daily-goal',
+      'study:set-daily-goal',
+      'study:get-word-of-the-day',
+      'debug:test-notification',
+      'debug:reload-fonts',
+    ]
+    for (const channel of removedChannels) {
+      expect(handlersSource, `${channel} should not be registered`).not.toContain(`'${channel}'`)
+    }
+  })
+
+  it('refuses every developer route in the installed app', () => {
+    for (const channel of ['ui:inspect-element', 'debug:bridge-telemetry', 'debug:restart-bridge', 'debug:clear-caches', 'debug:diagnostics', 'debug:snapshot', 'debug:run-check']) {
+      const startIndex = handlersSource.indexOf(`ipcMain.handle('${channel}'`)
+      expect(startIndex, `Missing handler marker for ${channel}`).toBeGreaterThanOrEqual(0)
+      expect(handlersSource.slice(startIndex, startIndex + 300), `Expected assertDeveloperRoute in ${channel}`).toContain('assertDeveloperRoute()')
     }
   })
 
