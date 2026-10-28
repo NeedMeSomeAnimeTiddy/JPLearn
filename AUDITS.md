@@ -6,6 +6,69 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-28 — The Python bridge
+
+**Scope:** Audit 7. Robbie ran `/crew-audit` with no target and chose "The Python bridge
+(Recommended)" over the IPC trust boundary, answer checking, and import/export.
+Covered: bridge_worker.cjs; the bridge start-up, preload and first summary in main.cjs; the
+worker, fallback and isolated runners; the 73 commands in desktop_bridge.py and their IPC routes;
+the payload dataclasses and generate_ts_types.py; the open items (command counts in the docs,
+DEBT #8). Out: answer queue internals (audit 1), dedicated runtimes (audit 5), setup routes
+(audit 6).
+**Commit audited:** 324cded on main, tree clean.
+**Method:** The Auditor (5X was out; it ran on 20X) read source, the census and records census,
+and the app's telemetry in AppData (older builds), and ran nothing. Two Explore helpers (payload
+types; per-command cost table), their claims re-read. Known-answers Part 2 was seen at Orient by
+accident. The lead ran Checks 1, 2, 4-7, 10 and 11 at 324cded (scratch documents folder; the live
+database opened read-only for Check 4). The lead's own shell sets
+`PYTHONIOENCODING=utf-8:surrogateescape`, which hid F1 until it was cleared. Not run: Check 3
+(packaged runtime), 8 and 9 (they launch the app). Reports: `AUDIT-the-python-bridge-2026-10-28-1(-r2).md`.
+
+### Where each finding went
+- F1 bridge stdin decoded as cp1252 (the machine's ANSI code page); Japanese arrives garbled, and a
+  reply echoing hiragana kills the worker (P0, confirmed by Check 2; Check 4 found no card notes,
+  so nothing was damaged): pending.
+- F5 deck-cards vocab_n5 2.46 s warm on the shared worker (P1, Check 7): pending.
+- F2 non-answer writes re-run in a one-shot after any worker failure, timeouts included (P2): pending.
+- F4 no single-instance lock; a relaunch from the tray starts a second bridge (P2): pending.
+- F3 the startup preload discards five reads, about 0.46 s; tutor-reactions has no consumer (P3):
+  pending.
+- F7 Daily Games state loads every attempt ever played (P3): debt row drafted; pending.
+- Nits 1-5: tray summary uncached; weight reset/reload via fallback; dev-tools commands on the
+  worker; hand-copied StudyQueuePayload; one-shots untracked at quit: pending.
+- STALE RECORD: command counts (73, not 68/67) in CLAUDE.md, ARCHITECTURE.md:36 and E3; "bridge
+  worker pool"; ARCHITECTURE.md:59 line reference; the section 2 fallback paragraph; B1 and roadmap
+  item 2; DEBT #8's "12 s": pending.
+- Dropped: the quadratic stdout parser (refuted by Check 10: 5 MB 893 ms, 20 MB 819 ms).
+
+### Triggers checked
+- DEBT #4: warm summary 0.284 s on a nearly empty database, so not fired; the first-summary half
+  was not checked.
+- DEBT #8: not measured in the app; F5's 2.46 s call is a way it fires.
+- DEBT #3: unchanged, not timed. DEBT #1: not checked.
+
+### Inspected and found sound — do not re-derive these
+- Single-flight worker start; per-child buffers, stderr and pending; late close/error isolation;
+  stdin EPIPE listener; a write that throws rejects only its request.
+- Junk stdout lines skipped; no command path prints to stdout.
+- A timeout rejects only its own request; the three-in-a-row restart counts only the current child.
+- Worker stopped at quit after the answers guard; the Python loop ends on stdin EOF.
+- The worker spawns after the documents and assets folders are set; skipped on Squirrel runs.
+- The Python envelope turns handler exceptions into code 2 (except the reply write, F1).
+- Answers and the four long writes are worker-only.
+- 30 plain-dict payloads match their TypeScript types; generate_ts_types --check passes.
+- The stdout parser is linear (Check 10). buildQueueCycle maps by card id.
+
+### What this pass could not establish
+- The packaged runtime's stdin (Check 3); startup preload timing in the built app (Check 8);
+  two-instance behaviour (Check 9); timings on a database with real history; what each screen
+  shows when a read and its one-shot both fail.
+
+### Coverage, not a finding
+- None of the last three passes (setup, runtimes, study session) covered IPC, startup beyond the
+  bridge, the tutor, JLPT, minigames, dictionary/OCR content, the menu, renderer state, answer
+  checking, progression, passages, handwriting or packaging.
+
 ## 2026-10-28 — Setup and downloads (offline, #36)
 
 **Scope:** Audit 6, Robbie's choice "Setup and downloads (offline, #36)": setup_runtime.cjs, the
