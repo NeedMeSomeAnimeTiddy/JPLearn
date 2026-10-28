@@ -401,16 +401,6 @@ function createVoiceRuntime() {
       return { ok: true }
     },
 
-    listVoices() {
-      return VOICE_CATALOG.map(({ voiceId, displayName, description, gender, searchTerms }) => ({
-        voiceId,
-        displayName,
-        description,
-        gender,
-        searchTerms,
-      }))
-    },
-
     async speak(text, speakOptions = {}) {
       const safeText = sanitizeSpeechText(text)
       if (!safeText) {

@@ -1348,6 +1348,7 @@ registerIpcHandlers({
   runPythonBridgeWorkerOnly,
   screen,
   isDev: process.env.ELECTRON_DEV === '1',
+  isPackaged: app.isPackaged,
   appPageUrl: APP_PAGE_URL,
   getWindowFromSender: BrowserWindow.fromWebContents,
   runPythonBridge,

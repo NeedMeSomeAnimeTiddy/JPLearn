@@ -799,27 +799,6 @@ function validateAssistantEventIdsPayload(payload) {
   return uniqueIds
 }
 
-function validateAssistantChatAppendPayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Invalid assistant chat append payload: expected object')
-  }
-  const role = typeof payload.role === 'string' ? payload.role.trim().toLowerCase() : ''
-  if (role !== 'user' && role !== 'assistant') {
-    throw new Error(`Invalid assistant chat role: ${String(payload.role)}`)
-  }
-  const content = typeof payload.content === 'string' ? payload.content.trim() : ''
-  if (!content) {
-    throw new Error('Invalid assistant chat content: value must not be empty')
-  }
-  if (content.length > 4000) {
-    throw new Error('Invalid assistant chat content: maximum length exceeded')
-  }
-  return {
-    role,
-    content,
-  }
-}
-
 function validateAssistantChatRuntimePayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid assistant chat runtime payload: expected object')
@@ -880,47 +859,6 @@ function validateAssistantChatImagePayload(payload) {
     imageBase64,
     mimeType,
     minConfidence,
-  }
-}
-
-function validateAssistantEventInteractionPayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Invalid assistant event interaction payload: expected object')
-  }
-
-  const eventId = payload.eventId
-  if (!Number.isInteger(eventId) || eventId <= 0) {
-    throw new Error(`Invalid assistant event id: ${String(eventId)}`)
-  }
-
-  const interactionType =
-    typeof payload.interactionType === 'string'
-      ? payload.interactionType.trim().toLowerCase()
-      : ''
-  if (!new Set(['clicked', 'ignored', 'expired']).has(interactionType)) {
-    throw new Error(`Invalid assistant interaction type: ${String(payload.interactionType)}`)
-  }
-
-  let metadata = {}
-  if (payload.metadata != null) {
-    if (typeof payload.metadata !== 'object' || Array.isArray(payload.metadata)) {
-      throw new Error('Invalid assistant interaction metadata: expected object')
-    }
-    const normalized = {}
-    for (const [key, value] of Object.entries(payload.metadata)) {
-      const normalizedKey = String(key).trim()
-      if (!normalizedKey) {
-        continue
-      }
-      normalized[normalizedKey] = String(value)
-    }
-    metadata = normalized
-  }
-
-  return {
-    eventId,
-    interactionType,
-    metadata,
   }
 }
 
@@ -1094,8 +1032,6 @@ module.exports = {
   validateDailyGamesAttemptPayload,
   validateDailyGamesCrosswordClues,
   validateAssistantEventIdsPayload,
-  validateAssistantEventInteractionPayload,
-  validateAssistantChatAppendPayload,
   validateAssistantChatRuntimePayload,
   validateAssistantChatImagePayload,
   validateStartupThemeInput,

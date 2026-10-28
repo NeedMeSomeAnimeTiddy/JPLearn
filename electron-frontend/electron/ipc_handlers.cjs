@@ -59,20 +59,6 @@ async function runWithTransientRetry(fn) {
   }
 }
 
-function readElectronIsPackaged() {
-  // Outside Electron (the tests) there is no app to ask, and requiring 'electron' from plain Node
-  // can start a download of its binary.
-  if (!process.versions.electron) {
-    return true
-  }
-  try {
-    const flag = require('electron').app?.isPackaged
-    return typeof flag === 'boolean' ? flag : true
-  } catch {
-    return true
-  }
-}
-
 function registerIpcHandlers(options) {
   /* The tutor runtime is replaced when setup installs, selects or removes a model
      (main.cjs refreshTutorRuntimeAfterSetup), so every route asks for the current one
@@ -105,9 +91,8 @@ function registerIpcHandlers(options) {
   })
   /* Developer routes (Inspect Element, the developer dashboard, the checks, restart bridge, clear
      caches) answer only when running from source; the installed app refuses them (audit 8 F4).
-     main.cjs may pass isPackaged; otherwise Electron's own flag is read. If neither can be read the
-     app counts as installed. */
-  const isPackagedApp = typeof options.isPackaged === 'boolean' ? options.isPackaged : readElectronIsPackaged()
+     main.cjs passes Electron's isPackaged; without it the app counts as installed. */
+  const isPackagedApp = options.isPackaged !== false
   const assertDeveloperRoute = () => {
     if (isPackagedApp) {
       throw new Error('Rejected IPC request: developer tools are not available in the installed app')

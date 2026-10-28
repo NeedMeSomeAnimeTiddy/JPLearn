@@ -164,6 +164,25 @@ describe('ipc main contract', () => {
     }
   })
 
+  it('checks the sender first in every registered handler, not only the listed ones (audit 8 nit 1)', () => {
+    const handlerStart = /ipcMain\.handle\('([^']+)',\s*(?:async\s*)?\(([^)]*)\)\s*=>\s*\{/g
+    const channels: string[] = []
+    for (const match of handlersSource.matchAll(handlerStart)) {
+      const [, channel, params] = match
+      channels.push(channel)
+      const eventName = params.split(',')[0].trim()
+      const body = handlersSource.slice((match.index ?? 0) + match[0].length)
+      const firstStatement = body.split(String.fromCharCode(10)).map((line) => line.trim()).find((line) => line && !line.startsWith('//'))
+        ?.replace(/^const [A-Za-z]+ = /, '')
+      expect(
+        firstStatement?.startsWith(`assertTrustedIpcSender(${eventName},`) || firstStatement?.startsWith(`assertTrustedIpcSender(${eventName})`),
+        `First statement of ${channel}: ${firstStatement}`,
+      ).toBe(true)
+    }
+    expect(channels.length).toBe((handlersSource.match(/ipcMain\.handle\(/g) ?? []).length)
+    expect(channels.length).toBeGreaterThan(100)
+  })
+
   it('registers none of the routes removed because no preload method reached them (audit 8)', () => {
     const removedChannels = [
       'scenario:get-session',
