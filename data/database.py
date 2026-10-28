@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sqlite3
+import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
@@ -34,16 +35,15 @@ def _resolve_db_path() -> Path:
         db_dir = Path(docs_dir) / "data"
         db_dir.mkdir(parents=True, exist_ok=True)
         new_path = db_dir / "jplearn.db"
-        # One-time migration: copy existing DB on first launch of updated app
+        # One-time migration: copy the database from the app's former Documents location on the
+        # first launch of an updated app. Never from beside this file: in a package that is the copy
+        # the build shipped, and from source it is the developer's own, so a new learner (or one who
+        # removed their progress on uninstall) silently got someone else's history (audit 10, F1).
         if not new_path.exists():
-            legacy_candidates = [
-                Path.home() / "Documents" / "JPLearn" / "data" / "jplearn.db",
-                Path(__file__).parent.parent / "data" / "jplearn.db",
-            ]
-            for legacy in legacy_candidates:
-                if legacy.exists() and legacy != new_path:
-                    shutil.copy2(str(legacy), str(new_path))
-                    break
+            legacy = Path.home() / "Documents" / "JPLearn" / "data" / "jplearn.db"
+            if legacy.exists() and legacy != new_path:
+                shutil.copy2(str(legacy), str(new_path))
+                print(f"[database] copied the database from its former location {legacy}", file=sys.stderr)
         return new_path
     return Path(__file__).parent.parent / "data" / "jplearn.db"
 

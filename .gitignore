@@ -299,3 +299,7 @@ nul
 # Codebase Memory MCP — local knowledge-graph index + ADR cache.
 # Regenerated via `codebase-memory-mcp cli index_repository`, not version-controlled.
 .codebase-memory/
+
+# Automatic safety copies and old hand-made copies of the learner database (audit 10)
+data/backups/
+data/*.db.backup-*
