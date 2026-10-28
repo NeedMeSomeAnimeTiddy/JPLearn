@@ -25,21 +25,40 @@ database opened read-only for Check 4). The lead's own shell sets
 (packaged runtime), 8 and 9 (they launch the app). Reports: `AUDIT-the-python-bridge-2026-10-28-1(-r2).md`.
 
 ### Where each finding went
-- F1 bridge stdin decoded as cp1252 (the machine's ANSI code page); Japanese arrives garbled, and a
-  reply echoing hiragana kills the worker (P0, confirmed by Check 2; Check 4 found no card notes,
-  so nothing was damaged): pending.
-- F5 deck-cards vocab_n5 2.46 s warm on the shared worker (P1, Check 7): pending.
-- F2 non-answer writes re-run in a one-shot after any worker failure, timeouts included (P2): pending.
-- F4 no single-instance lock; a relaunch from the tray starts a second bridge (P2): pending.
-- F3 the startup preload discards five reads, about 0.46 s; tutor-reactions has no consumer (P3):
-  pending.
-- F7 Daily Games state loads every attempt ever played (P3): debt row drafted; pending.
-- Nits 1-5: tray summary uncached; weight reset/reload via fallback; dev-tools commands on the
-  worker; hand-copied StudyQueuePayload; one-shots untracked at quit: pending.
-- STALE RECORD: command counts (73, not 68/67) in CLAUDE.md, ARCHITECTURE.md:36 and E3; "bridge
-  worker pool"; ARCHITECTURE.md:59 line reference; the section 2 fallback paragraph; B1 and roadmap
-  item 2; DEBT #8's "12 s": pending.
-- Dropped: the quadratic stdout parser (refuted by Check 10: 5 MB 893 ms, 20 MB 819 ms).
+Repairs on branch audit7-repairs (edb51c9, 4bf6108, 5cc60ba; merged 33dd492), implemented by the
+lead (a Codex coding worker for F5 was refused by its sandbox before reading anything); reviewed by
+an Astra reviewer (5X was out): approve with nits, both fixed.
+- F1 bridge stdin decoded as cp1252 (P0, confirmed by Check 2; Check 4 found no card notes, so
+  nothing was damaged): fixed. The bridge, ocr_server.py and speech_recognition_server.py reconfigure
+  stdin to UTF-8; a reply UTF-8 cannot carry is written as escaped JSON instead of ending the worker.
+  Tests: a real pipe with PYTHONIOENCODING/PYTHONUTF8 removed (fails without the fix), and a
+  surrogate echo through `_run_server` (fails without the reply fix). The same real-pipe probe now
+  answers kanji-detail 日, dictionary-search たべる and xp-progress.
+- F5 deck-cards vocab_n5 2.46 s warm on the shared worker (P1): fixed. `_heavy_deck_enrichment`
+  caches each heavy deck's dictionary summaries and distractor ids per process, keyed on
+  `dictionary_cache_key()` (path, size, mtime_ns; setup replaces the file from another process) and
+  a fingerprint of the deck's cards; leech and curriculum stage are read every call. Warm repeat
+  0.037 s; the first open per run still costs about 2.5 s.
+- F2 non-answer writes re-run in a one-shot after any worker failure (P2): fixed. A worker refusal
+  (`isWorkerRefusal`, bridge_worker.cjs) is not replayed, by policy; a transient refusal such as a
+  locked database now reaches the caller. Daily Games attempts, JLPT results, assistant event
+  tracking and the FSRS weight reload/reset run worker-only (nit 2 with it).
+- F4 no single-instance lock (P2): fixed. Robbie chose "Show the open window": the lock is taken
+  before the module-load bridge spawn, a losing launch exits 0, and the running window is restored,
+  shown and focused. Checked under the launch gate (scratch documents and user-data folders): the
+  second launch exited 0 and one bridge ran. Whether the window visibly came forward was not looked at.
+- F3 startup preload discards five reads (P3): tutor-reactions removed from the preload (nothing
+  reads it); the other four left, since they warm Python caches.
+- F7 Daily Games state loads every attempt ever played (P3): DEBT #9.
+- Nits: 1 fixed (tray due count uses the cached summary); 2 fixed with F2; 4 fixed (electron.d.ts
+  imports the generated StudyQueuePayload); 3 (dev-tools commands on the worker) and 5 (one-shots
+  untracked at quit) left: dev-only or rare.
+- STALE RECORD: fixed in CLAUDE.md (command count, "bridge worker pool"), ARCHITECTURE.md (diagram,
+  §2 transport and fallback, the "67 branches" note, B1, E3, roadmap item 2) and DEBT #8 (30 s
+  allowance; 12 s is the cache lifetime).
+- Dropped: the quadratic stdout parser (refuted by Check 10).
+- Checks on the merged code: pytest 1829 passed; arch_check OK; lint clean; build OK; vitest 1806,
+  one failure on the first run that passed on rerun (not identified; likely the known flaky test).
 
 ### Triggers checked
 - DEBT #4: warm summary 0.284 s on a nearly empty database, so not fired; the first-summary half
