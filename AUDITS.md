@@ -22,25 +22,43 @@ Check 2 (dragging a file onto the built app). Reports:
 `AUDIT-ipc-and-the-trust-boundary-2026-10-28-1(-r2).md`.
 
 ### Where each finding went
-- F1 the production sender and navigation check accepts any `file:` URL, not the app's own page
-  (P3): pending.
-- F2 no permission request/check handler, so every permission a page asks for is granted (P3):
-  pending.
-- F3 dictionary search unbounded (21,000 characters about 2.2 s over baseline, Check 1), plus
-  smaller unbounded fields (session id, assistant metadata, grammar sentence) (P3): pending. Robbie
-  chose a 200-character cap over the recommended 64.
-- F4 ten preload methods with no renderer caller, four writing; word of the day and the daily goal
-  lost their callers when the old home screen retired, tutor reactions never had one (P3): pending.
-  Robbie chose "Remove them".
-- Nits: the sender-guard contract test uses a hand list; the dev-server address is in the
-  production content security policy: pending.
-- Asked of Robbie: developer palette commands are offered in every build (audit 7 had called them
-  dev-only). He chose "Hide in installed app": pending.
-- STALE RECORD: ARCH §8 E2 (closed by #72; 163 main-process tests), §7 test-gap text, §9 item 9,
-  known-answers E2 row; §2 point 3 partly (some validation is inline in `ipc_handlers.cjs`): pending.
-- Dropped: drop-to-navigate as a live path (Electron default, Check 2 not run);
-  `setup:download-speech-model` options (only `force` is read); JLPT result integers (the renderer
-  rounds).
+Repairs on branch audit8-repairs (merged 8894550). F1-F3, the nits and the records by the lead
+(security); F4 and the developer-tool gating by a 5X feature-coding worker, merged and finished by
+the lead. Reviewed by a 5X Opus reviewer: changes requested (the titlebar's Developer Tools menu
+still showed), fixed, then approve with nits, fixed.
+- F1 the production sender and navigation check accepted any `file:` URL (P3): fixed. Only the app's
+  own page passes (`appPageUrl` = `pathToFileURL(dist/index.html)`), any query or hash, path compared
+  without case and with each valid %XX run decoded on its own, so a bare '%' in a folder name works.
+  Known limit: a folder named like an escape ("%41") is ambiguous. Checked live: moving the window to
+  another local file was blocked.
+- F2 no permission handlers (P3): fixed. Request and check handlers grant only the microphone (audio
+  only), fullscreen, clipboard read and sanitized write, and only to the app page. Checked live on the
+  final build (DevTools protocol, launch gate): microphone and getUserMedia audio granted; camera,
+  geolocation and notifications denied; getUserMedia video refused; clipboard write/read and
+  fullscreen work. Not checked in a packaged installer.
+- F3 dictionary search unbounded (P3): fixed. Cut at 200 characters (Robbie's choice over the
+  recommended 64), counted by character; session ids bounded (128, no control characters; the tutor
+  chat context drops an unusable one); grammar sentences over 1,000 refused. Live: a 5,000-character
+  search returned a 200-character query. Assistant metadata went with its route (F4).
+- F4 ten preload methods with no caller (P3): fixed. Robbie chose "Remove them": the ten methods, their
+  routes, `debug:reload-fonts`, their types, two orphaned validators and the voice runtime's
+  `listVoices` removed; the Python commands stay. FEATURES.md marks tutor reactions, word of the day
+  and the daily goal as backend only.
+- Developer commands in released builds (asked): Robbie chose "Hide in installed app". `ui:inspect-
+  element` and `debug:*` refuse when `isPackaged` (main.cjs passes `app.isPackaged`; without it the app
+  counts as installed); the palette, the Developer Dashboard and the titlebar's Developer Tools submenu
+  are hidden until the main process says it is running from source. Not checked in a packaged
+  installer.
+- Nit 1 (hand-listed sender-guard test): fixed; every handler's first statement is checked (120
+  routes), and the test fails when one guard is removed. Nit 2 (dev server in the production CSP):
+  fixed; the build strips it and fails if the policy no longer lists it.
+- STALE RECORD: fixed. ARCH §8 E2 struck (#72; 174 main-process tests), §7 and §9 item 9 corrected,
+  §2 point 3 says where validation lives, known-answers no longer lists E2.
+- Dropped: drop-to-navigate as a live path (Check 2 not run; the navigation guard now refuses any
+  other page anyway); `setup:download-speech-model` options; JLPT result integers.
+- Checks on the merged code: lint clean; build OK; vitest 1823 passed (electron suite 176). The tool
+  layer turned typed backslash escapes into raw characters twice during the repairs; both were
+  caught and rewritten without escapes, and no file changed in audits 7-8 holds a control character.
 
 ### Triggers checked
 - No DEBT entry concerns IPC; none checked.
