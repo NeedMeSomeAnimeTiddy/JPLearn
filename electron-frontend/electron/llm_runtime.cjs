@@ -1164,6 +1164,19 @@ function isLowSignalAssistantReply(rawText) {
   return !/[\p{L}\p{N}\u3040-\u30ff\u3400-\u9fff]/u.test(withoutPunctuation)
 }
 
+// One process 'exit' listener for every adapter: a session that reloads the model many times
+// (idle unloads, a crash, a timeout) would otherwise add one each and reach Node's
+// MaxListenersExceededWarning.
+const serverStopsOnExit = new Set()
+function registerServerStopOnExit(stop) {
+  if (serverStopsOnExit.size === 0) {
+    process.once('exit', () => {
+      for (const stopServer of serverStopsOnExit) stopServer()
+    })
+  }
+  serverStopsOnExit.add(stop)
+}
+
 function createLlamaServerAdapter(config = {}) {
   const executablePath = typeof config.executablePath === 'string' ? config.executablePath.trim() : ''
   const modelPath = typeof config.modelPath === 'string' ? config.modelPath.trim() : ''
@@ -1210,10 +1223,13 @@ function createLlamaServerAdapter(config = {}) {
     }
   }
 
-  async function waitForHealth() {
+  // Watches the process it started: its 'exit' listener clears `serverProcess` in the same tick
+  // Node sets the exit code, so checking `serverProcess` would never see a server that died while
+  // starting and would poll port 0 until the startup timeout (audit 5 review).
+  async function waitForHealth(startedProcess) {
     const deadline = Date.now() + startupTimeoutMs
     while (Date.now() < deadline) {
-      if (serverProcess && serverProcess.exitCode !== null) {
+      if (startedProcess.exitCode !== null || startedProcess.signalCode !== null || serverProcess !== startedProcess) {
         throw new Error('llama-server exited before becoming ready')
       }
       try {
@@ -1298,10 +1314,10 @@ function createLlamaServerAdapter(config = {}) {
 
         if (!exitHandlerRegistered) {
           exitHandlerRegistered = true
-          process.once('exit', stopServer)
+          registerServerStopOnExit(stopServer)
         }
 
-        await waitForHealth()
+        await waitForHealth(startedProcess)
       })()
 
       try {
@@ -2152,6 +2168,8 @@ function createTutorChatRuntime(options = {}) {
     },
 
     async preload(reason = 'startup-preload') {
+      // an unload timer armed by an earlier request must not fire into this (re)load
+      clearUnloadTimer()
       const coldStart = await ensureLoaded()
       lastUsedAtUtc = new Date().toISOString()
       scheduleInactivityUnload()
@@ -2220,4 +2238,5 @@ module.exports = {
   createAdapterRegistry,
   extractCliResponseText,
   httpRequestJson,
+  createLlamaServerAdapter,
 }

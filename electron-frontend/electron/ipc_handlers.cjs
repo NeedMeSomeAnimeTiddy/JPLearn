@@ -1683,14 +1683,15 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:uninstall-speech-model', (event, tier) => {
+    options.ipcMain.handle('setup:uninstall-speech-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !SPEECH_TIERS.includes(tier)) {
         throw new Error('Invalid speech model tier')
       }
       try {
-        // stop first: a running server holds the model file open, and it may be this one (audit 5, F8)
-        options.speechRuntime?.restart()
+        // stop first, and wait for it to close: a running server holds the model file open, and
+        // it may be this one (audit 5, F8)
+        await options.speechRuntime?.restart()
         return setupRuntime.uninstallSpeechModel(tier)
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)

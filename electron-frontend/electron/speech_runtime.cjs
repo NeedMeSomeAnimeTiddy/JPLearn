@@ -25,6 +25,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 20000
 // this is generous. It stops a wedged process, not honest work.
 const DEFAULT_COLD_REQUEST_TIMEOUT_MS = 3 * 60 * 1000
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
+const RESTART_CLOSE_WAIT_MS = 5000
 const SPEECH_TIERS = ['fast', 'balanced', 'high', 'ultra']
 
 function resolveAssetsBaseDir() {
@@ -141,12 +142,13 @@ function createSpeechRuntime(options = {}) {
     child = null
     stdoutBuffer = ''
     childHasResponded = false
-    if (!current) return
+    if (!current) return null
     try {
       current.kill()
     } catch {
       // Process may already be gone.
     }
+    return current
   }
 
   function handleStdoutData(proc, chunk) {
@@ -309,10 +311,21 @@ function createSpeechRuntime(options = {}) {
     },
 
     // A new model was installed, chosen or removed: the next request spawns a process that
-    // loads the one now selected.
+    // loads the one now selected. Resolves once the old process has closed (or after a few
+    // seconds), so a caller about to delete its model files is not racing the kill on Windows.
     restart() {
       clearUnloadTimer()
-      stopChild()
+      const stopped = stopChild()
+      if (!stopped || stopped.exitCode !== null || stopped.signalCode != null) {
+        return Promise.resolve()
+      }
+      return new Promise((resolve) => {
+        const done = setTimeout(resolve, RESTART_CLOSE_WAIT_MS)
+        stopped.once('close', () => {
+          clearTimeout(done)
+          resolve()
+        })
+      })
     },
   }
 }

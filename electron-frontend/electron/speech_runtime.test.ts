@@ -13,6 +13,8 @@ type Request = { id: number, audio_path: string, language: string }
 class FakeSpeechProcess extends EventEmitter {
   readonly requests: Request[] = []
   killed = false
+  exitCode: number | null = null
+  signalCode: string | null = null
   readonly stdout = new EventEmitter()
   readonly stderr = new EventEmitter()
   readonly stdin = Object.assign(new EventEmitter(), {
@@ -31,6 +33,7 @@ class FakeSpeechProcess extends EventEmitter {
   }
 
   exit() {
+    this.exitCode = 0
     this.emit('close', 0)
   }
 }
@@ -160,5 +163,21 @@ describe('speech runtime', () => {
     await vi.waitFor(() => expect(spawned).toHaveLength(2))
     spawned[1].respondText(spawned[1].requests[0].id, 'b')
     await expect(next).resolves.toMatchObject({ text: 'b' })
+  })
+
+  it('restart waits for the old process to close, so an uninstall does not delete files it holds', async () => {
+    const { runtime, spawned } = createHarness()
+    const first = runtime.transcribe('a.wav')
+    await vi.waitFor(() => expect(spawned[0]?.requests).toHaveLength(1))
+    spawned[0].respondText(spawned[0].requests[0].id, 'a')
+    await first
+
+    let closed = false
+    const restarted = runtime.restart().then(() => { closed = true })
+    await Promise.resolve()
+    expect(closed).toBe(false)
+    spawned[0].exit()
+    await restarted
+    expect(closed).toBe(true)
   })
 })

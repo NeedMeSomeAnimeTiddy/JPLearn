@@ -610,7 +610,21 @@ describe('what the tutor sends off the machine (audit 5, F1)', () => {
 })
 
 describe('the tutor model server lifecycle (audit 5, F3/F7)', () => {
-  const { httpRequestJson } = require('./llm_runtime.cjs')
+  const { httpRequestJson, createLlamaServerAdapter } = require('./llm_runtime.cjs')
+
+  it('fails at once when the model server exits while starting', async () => {
+    /* Node stands in for llama-server: it rejects the server's flags and exits straight away, as a
+       bad model file or a missing DLL would. The load must say so, not poll port 0 for two minutes. */
+    const adapter = createLlamaServerAdapter({
+      executablePath: process.execPath,
+      modelPath: __filename,
+      startupTimeoutMs: 60000,
+    })
+    const started = Date.now()
+    await expect(adapter.load()).rejects.toThrow(/exited before becoming ready/)
+    expect(Date.now() - started).toBeLessThan(10000)
+    expect(adapter.isRunning()).toBe(false)
+  }, 20000)
 
   it('ends a request that runs past its timeout instead of waiting on it', async () => {
     const http = require('node:http')

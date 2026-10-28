@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -40,10 +39,10 @@ def _detect_gpu() -> tuple[str, str]:
     Falls back to CPU if the GPU is present but CUDA libraries are missing.
     """
     # A machine without the NVIDIA driver tools has no nvidia-smi at all, and running a missing
-    # executable raises rather than failing with a code (audit 5, F4).
-    nvidia_smi = shutil.which("nvidia-smi")
+    # executable raises rather than failing with a code (audit 5, F4). The plain name keeps
+    # Windows' own search, which also looks in System32 when PATH does not.
     try:
-        has_gpu = nvidia_smi is not None and subprocess.run([nvidia_smi], capture_output=True).returncode == 0
+        has_gpu = subprocess.run(["nvidia-smi"], capture_output=True).returncode == 0
     except OSError:
         has_gpu = False
     if not has_gpu:
