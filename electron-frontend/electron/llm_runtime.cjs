@@ -1317,7 +1317,14 @@ function createLlamaServerAdapter(config = {}) {
           registerServerStopOnExit(stopServer)
         }
 
-        await waitForHealth(startedProcess)
+        try {
+          await waitForHealth(startedProcess)
+        } catch (error) {
+          // A server that never became ready is stopped: left running, it would keep the one-server
+          // guard and every later load would refuse to start another (audit 5 review).
+          if (serverProcess === startedProcess) stopServer()
+          throw error
+        }
       })()
 
       try {

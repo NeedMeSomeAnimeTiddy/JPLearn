@@ -27,20 +27,37 @@ the IPC trust boundary in general, startup, dictionary/OCR content.
   and CPU were not measured because none is installed.
 
 ### Where each finding went
-- F1 tutor translation questions go to jisho.org first (P1, hard line 2): reported; asked of Robbie
-  (removal or opt-in). Robbie chose "Offline only"; repair in progress.
-- F2 IPC routes keep the old tutor runtime after setup (P1): repair in progress.
+- F1 tutor translation questions go to jisho.org first (P1, hard line 2): Robbie chose "Offline
+  only". Fixed: the online client, its 4.5 s race and the `unofficial-jisho-api` dependency are
+  removed; translations come from the bundled JMdict, and a test fails if the client comes back.
+- F2 IPC routes keep the old tutor runtime after setup (P1): fixed. The routes call
+  `getLocalTutorRuntime()` (main.cjs passes a getter); a contract test swaps the runtime.
 - F3 tutor HTTP timeouts never fire (confirmed by the Node probe); crash not detected; unload timer
-  armed when a request starts (P2): repair in progress.
-- F4 speech recognition fails without nvidia-smi (P2; not Robbie's machine): repair in progress.
+  armed when a request starts (P2): fixed. `httpRequestJson` destroys a request past its timeout;
+  an inference timeout stops llama-server; an exit listener and `isRunning()` reload a dead server
+  on the next message; the unload timer is held off while a lease is held and armed when it is
+  released. The review found the exit listener hid a server dying during start (a 120 s hang):
+  `waitForHealth` now watches the process it started, a server that never becomes ready is
+  stopped, and preload clears an earlier timer. Cancel before inference reports "cancelled" (nit 1).
+- F4 speech recognition fails without nvidia-smi (P2; not Robbie's machine): fixed; `OSError`
+  from running it means CPU.
 - F5 speech runtime follows none of the §2 rules (P2; the `fast` tier's cold load fits the 20 s
-  budget): repair in progress.
-- F6 OCR queued request rejected by a late close (P3): reported; repair in progress (debt row not
-  filed).
-- F7 a model loaded for crossword clues is never unloaded (P3): repair in progress.
-- F8 choosing a speech model does not restart the server (P3): repair in progress.
+  budget): fixed. Rebuilt in `ocr_runtime.cjs`'s shape: queue, kill on timeout, 20 s warm and
+  3 min cold budgets, 5 min idle unload, close and error settle only their own request. First
+  test file for it (8 cases).
+- F6 OCR queued request rejected by a late close (P3): fixed; requests carry their process and
+  the stderr tail resets per spawn. Debt row not filed.
+- F7 a model loaded for crossword clues is never unloaded (P3): fixed with F3 (every lease arms
+  the unload).
+- F8 choosing a speech model does not restart the server (P3): fixed. Selecting restarts it;
+  uninstalling stops it and waits for it to close before deleting.
+- Nit 2: one `resolvePythonCommand` (`electron/python_command.cjs`) and one `SPEECH_TIERS`.
 - STALE RECORD: jplearn-backend-invariants SKILL.md:28-32 (all four runtimes "share" the rules):
-  fix in progress.
+  fixed, naming `ocr_runtime.cjs` and `speech_runtime.cjs` as the templates; its card-id line now
+  names `tests/test_deck_id_uniqueness.py`.
+- Left, from the review: with `JPLEARN_LLAMA_SERVER_PORT` set (dev only), a respawn can lose the
+  port race; a speech clip queued while an uninstall waits for the process to close could start a
+  server on the tier being deleted.
 - Dropped: none.
 
 ### Triggers checked
