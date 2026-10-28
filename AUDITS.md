@@ -6,6 +6,58 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-28 — Import, export and backups
+
+**Scope:** Audit 10. Robbie ran `/crew-audit` with no target and chose "Import, export, backups
+(Recommended)" over startup, progression and onboarding, and renderer state. Covered: data/ and
+scripts/deck_portability.py; the analytics export, import and legacy-score bridge commands and IPC
+routes; the Settings Backup & Restore section; every copy of jplearn.db (topic-deck migration backup,
+legacy-location copy, packaged copies). Out: IPC sender checks (audit 8), uninstall (audit 6), each
+schema migration's own correctness.
+**Commit audited:** 3f87340 on main, clean.
+**Method:** The Auditor read source, history, the census and directory listings, and ran nothing; no
+helpers. The lead ran Checks 1-6, 8 and 9 at 3f87340 on scratch folders (Check 2 read-only on the
+packaged copy); Check 7 not run. Check 10: `gh release list` shows no published app release (only the
+valley-models asset release), so no public installer carried the database. Report and census:
+`Z:/Projects/JPLearn/audits/AUDIT-import-export-and-backups-2026-10-28-1(-r2).md`.
+
+### Where each finding went
+- F1 local installers (2026-09-07) ship the repo's jplearn.db (112 schedules, 15,406 reviews) and
+  app.db, and a first launch with no live database adopts it; from source the same happens with the
+  repo copy (P1, Checks 1-3): reported.
+- F2 merge import lets an older backup overwrite schedules, stages, problem-card records and counters;
+  version 1 files zero FSRS stability (P1, Check 4): reported; merge policy asked of Robbie (Q1).
+- F3 the "full backup" omits notes, study streak, XP, unlocks, badges, JLPT results, conversation
+  cards, tutor history and settings; issue #8 asked for a whole-database backup (P1): reported.
+- F4 study rows are not validated; a bad date is stored and the deck then fails to load (P2, Check 5): reported.
+- F5 every import failure shows only "Import failed." (P2): reported.
+- F6 pre-#78 backups restore onto topic-deck names (P3, Check 6): reported; debt row drafted.
+- F7 no copy before schema upgrades (P3): reported, as Robbie's design call.
+- Nits 1-4: reported.
+- Stale: ARCHITECTURE §3 schema version 20 vs 21; the "everything" comments; issue #8's "Implemented".
+
+### Triggers checked
+- DEBT #3: not fired (merge of 107,842 events 0.65 s, Check 8, without the bridge).
+- DEBT #6: unchanged; relevant to F6.
+
+### Inspected and found sound — do not re-derive these
+- Import is one transaction with full rollback; versions 1-2 read, newer refused before writes.
+- Event merge removes duplicates and is idempotent; topic counters map to parents; Daily Games are validated first.
+- The import path comes only from the main-process dialog; import is worker-only after the answer queue; export is uncached.
+- Export and import take well under 1 s at 100,000+ events.
+- Legacy counter adoption only into an empty table; a reset clears the snapshot.
+- The topic-deck migration plans, backs up, writes update before delete, and keeps orphans.
+
+### What this pass could not establish
+- Whose data the repo database holds; the screens affected
+  by F4; counter rollback (Check 4b); the UI's look.
+- From source, a new JPLEARN_DOCUMENTS_DIR receives a copy of the repo's data/jplearn.db (Check 3),
+  so earlier "empty scratch database" measurements may not have been empty.
+
+### Coverage, not a finding
+- None of the last three passes covered tutor, JLPT, minigames/daily games, dictionary/OCR,
+  menu/valley, renderer state, progression, passages, handwriting, packaging or startup.
+
 ## 2026-10-28 — Answer checking and grading
 
 **Scope:** Audit 9. Robbie ran `/crew-audit` with no target and chose "Answer checking (Recommended)"
