@@ -6,6 +6,64 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-28 — IPC and the trust boundary
+
+**Scope:** Audit 8. Robbie ran `/crew-audit` with no target and chose "IPC and trust boundary
+(Recommended)" over answer checking, import/export, and startup. Covered: every `ipcMain.handle`
+route (130; no `ipcMain.on`), every validator in `ipc_security.cjs`, the preload surface, window
+settings, navigation, window-open, permissions and the content security policy in `main.cjs` and
+`index.html`, and payloads followed into the voice, tutor and setup runtimes and the bridge
+handlers. Out: bridge internals (audit 7), runtime lifecycles (audit 5), setup installs (audit 6).
+**Commit audited:** a7f4c8f on main, tree clean.
+**Method:** The Auditor (5X was out; it ran on 20X) read source, the census and the records census,
+and ran nothing; no helpers. The lead ran Checks 1 and 3-5 at a7f4c8f (Check 1 one-shot with a
+scratch documents folder, the offline dictionary read from the default assets folder). Not run:
+Check 2 (dragging a file onto the built app). Reports:
+`AUDIT-ipc-and-the-trust-boundary-2026-10-28-1(-r2).md`.
+
+### Where each finding went
+- F1 the production sender and navigation check accepts any `file:` URL, not the app's own page
+  (P3): pending.
+- F2 no permission request/check handler, so every permission a page asks for is granted (P3):
+  pending.
+- F3 dictionary search unbounded (21,000 characters about 2.2 s over baseline, Check 1), plus
+  smaller unbounded fields (session id, assistant metadata, grammar sentence) (P3): pending. Robbie
+  chose a 200-character cap over the recommended 64.
+- F4 ten preload methods with no renderer caller, four writing; word of the day and the daily goal
+  lost their callers when the old home screen retired, tutor reactions never had one (P3): pending.
+  Robbie chose "Remove them".
+- Nits: the sender-guard contract test uses a hand list; the dev-server address is in the
+  production content security policy: pending.
+- Asked of Robbie: developer palette commands are offered in every build (audit 7 had called them
+  dev-only). He chose "Hide in installed app": pending.
+- STALE RECORD: ARCH §8 E2 (closed by #72; 163 main-process tests), §7 test-gap text, §9 item 9,
+  known-answers E2 row; §2 point 3 partly (some validation is inline in `ipc_handlers.cjs`): pending.
+- Dropped: drop-to-navigate as a live path (Electron default, Check 2 not run);
+  `setup:download-speech-model` options (only `force` is read); JLPT result integers (the renderer
+  rounds).
+
+### Triggers checked
+- No DEBT entry concerns IPC; none checked.
+
+### Inspected and found sound — do not re-derive these
+- All 130 routes call `assertTrustedIpcSender` first; the splash window can never pass it.
+- Window isolation settings, window-open denied, `will-navigate` guarded, content security policy
+  without inline or eval script, no HTML rendered from data, no `shell.openExternal`, protocol
+  handlers or webview.
+- No route carries a renderer-chosen path, argv, URL or bridge command; temp files are named by
+  main; import and export paths come from OS dialogs.
+- Tiers, speakers, adapters and themes are allowlisted or normalised; voice text capped at 400.
+- Main-to-renderer channels carry nothing sensitive; deck-slug allowlist parity is tested.
+
+### What this pass could not establish
+- Drop navigation in the built app; the worker-side cost of a long query; packaged menu
+  accelerators; other worktrees.
+
+### Coverage, not a finding
+- None of the last three passes (bridge, setup, runtimes) covered startup beyond the bridge, the
+  tutor, JLPT, minigames, dictionary/OCR content, the menu, renderer state, answer checking,
+  progression, passages, handwriting or packaging.
+
 ## 2026-10-28 — The Python bridge
 
 **Scope:** Audit 7. Robbie ran `/crew-audit` with no target and chose "The Python bridge
