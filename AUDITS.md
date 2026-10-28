@@ -6,6 +6,56 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-28 — Answer checking and grading
+
+**Scope:** Audit 9. Robbie ran `/crew-audit` with no target and chose "Answer checking (Recommended)"
+over startup, import/export and backups, and renderer state. Covered: domain/answer_check.py,
+domain/conjugation.py, features/round/, and everything that decides right/wrong and the grade, up
+to the bridge's record_game_result. Not covered: scheduling, mastery and the queue (audits 1, 3
+and 4), Daily Games grading, the tutor, passages.
+**Commit audited:** 3649b63 on main, clean.
+**Method:** The Auditor read only; no helpers; one follow-up with check results (report r2). The
+lead ran checks 1-4, 6-10 at 3649b63 in the main checkout (one temp vitest file, recycled): check 3
+fed Windows-voice English clips straight to scripts/speech_recognition_server.py (fast tier, CUDA),
+not through the app. Check 5 is deferred to the F3 repair; check 11 (real voice in the app) not
+run. Report and census: `Z:/Projects/JPLearn/audits/AUDIT-answer-checking-and-grading-2026-10-28-1(-r2).md`.
+
+### Where each finding went
+- F1 near-miss passes a wrong kana or word in Dictation and Speech Recall (P1, confirmed by check 1):
+  reported; Robbie decides; fix with F8.
+- F3 nine kanji readings no romaji can match (8 in Kanji N5, 込 "crowded" in N3; check 4) (P1):
+  reported. The repair fires DEBT #5; the collision list covers the word lists and Kanji N4.
+- F2 Speech Recall accepts the displayed Japanese word (P2; r1's "the meaning cannot pass" refuted
+  by check 3): reported.
+- F8 Dictation marks a loanword's long-vowel spelling wrong (P2, check 2; check 10 counts 238 vocab
+  cards with a long-vowel mark across N5-N1): reported; fix with F1.
+- F4 a revealed hint answer still saves as correct (P2): reported; Robbie decides.
+- F5 the drill asks the "can do" form of "to exist" (ある) (P2, check 6): reported.
+- F6 Romaji Sprint takes one spelling for ぢ, づ, を (P3): reported; Robbie picks the spellings.
+- N1 Speech Recall graded twice, N2 the Python grader orphaned since the Tkinter removal: nits.
+- Typed Recall tolerance on short English words: asked of Robbie (FEATURES.md:40).
+- Stale: the profile and repo-map name domain/answer_check.py as the checker; FEATURES.md:41 names
+  VOICEVOX.
+- Dropped: Sentence Assembly duplicate chunks (check 7: 0 of 152); a double-submit race (no
+  interleaving found).
+
+### Triggers checked
+- DEBT #5: not fired at 3649b63; the F3 repair fires it.
+
+### Inspected and found sound — do not re-derive these
+- One review write path, one transaction; the flag is boolean-validated, sent as '1' or '0',
+  parsed strictly, and part of the replay fingerprint.
+- Conjugation Drill exact grading; the conjugation tables are correct apart from F5.
+- The Python and TypeScript typed-answer rules agree; the JLPT exam grades once per question.
+- Sentence Assembly content gives no duplicate chunks today (check 7; kana templates read).
+
+### What this pass could not establish
+- Speech Recall with a real voice and the larger models; how often hints are used.
+
+### Coverage, not a finding
+- None of the last three passes covered tutor, JLPT, minigames/daily games, dictionary/OCR,
+  menu/valley, renderer state, progression, passages, handwriting, import/export, packaging.
+
 ## 2026-10-28 — IPC and the trust boundary
 
 **Scope:** Audit 8. Robbie ran `/crew-audit` with no target and chose "IPC and trust boundary
