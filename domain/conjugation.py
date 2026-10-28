@@ -320,6 +320,10 @@ def applicable_forms(word_class: WordClass, reading: str) -> frozenset[Conjugati
         forms -= {"imperative", "passive", "causative", "causative_passive", "volitional"}
         if normalized in {"できる", "わかる", "みえる", "きこえる"}:
             forms.discard("potential")  # already potential in meaning
+        if normalized == "ある":
+            # あれる is not standard Japanese; "can exist" is ありうる/ありえる. Covers 有る too,
+            # which shares the reading (audit 9, F5).
+            forms.discard("potential")
     return frozenset(forms)  # type: ignore[arg-type]
 
 

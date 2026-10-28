@@ -53,6 +53,22 @@ export function buildRoundCoachToast(
     typedAssessment: TypedAnswerState | null
   },
 ): AssistantToast | null {
+  // A Japanese answer one kana off: saved as a miss, but the learner hears it was close.
+  if (!payload.isCorrect && payload.typedAssessment === 'close') {
+    return {
+      id,
+      priority: 'coaching',
+      eventType: 'round_feedback',
+      messageKey: 'coach.round_close',
+      title: 'So close',
+      body: 'Only one kana was off. It counts as a miss this time.',
+      targetMode: null,
+      focusArea: null,
+      actionType: null,
+      actionLabel: 'Got it',
+    }
+  }
+
   if (!payload.isCorrect) {
     return {
       id,

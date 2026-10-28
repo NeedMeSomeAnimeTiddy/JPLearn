@@ -28,6 +28,17 @@ interface SessionLengthPreset {
 
 export type RoundPerformanceLabel = 'PERFECT' | 'GOOD' | 'SLOW' | 'MISS'
 
+/** The hint ladder: 0 = nothing shown, 1 = a clue, 2 = the full answer printed. */
+export type HintStep = 0 | 1 | 2
+
+/** The hint step that prints the answer; an answer given after it is saved as wrong (audit 9, F4). */
+export const HINT_STEP_FULL_ANSWER: HintStep = 2
+
+export interface SubmitAnswerOptions {
+  /** How far the hint ladder had gone when the answer was given. */
+  hintStep?: HintStep
+}
+
 // ── Context shape ─────────────────────────────────────────────────────────────
 
 export interface SessionContextValue {
@@ -99,7 +110,7 @@ export interface SessionContextValue {
 
   // Actions
   startSession: (game?: MinigameKey, customCards?: GameCard[], customTargetItems?: number) => void
-  submitAnswer: (answer: string) => void
+  submitAnswer: (answer: string, options?: SubmitAnswerOptions) => void
   continueLastSession: () => void
   skipFeedback: () => void
   setRoundInput: (value: string) => void

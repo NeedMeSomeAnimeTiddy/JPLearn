@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   PERFORMANCE_GOOD_MS,
   PERFORMANCE_PERFECT_MS,
+  buildRoundCoachToast,
   calculateAwardedPoints,
   classifyRoundPerformance,
   getRoundRecoveryTip,
@@ -44,6 +45,24 @@ describe('classifyRoundPerformance', () => {
     expect(classifyRoundPerformance(true, PERFORMANCE_PERFECT_MS + 1)).toBe('GOOD')
     expect(classifyRoundPerformance(true, PERFORMANCE_GOOD_MS)).toBe('GOOD')
     expect(classifyRoundPerformance(true, PERFORMANCE_GOOD_MS + 1)).toBe('SLOW')
+  })
+})
+
+describe('buildRoundCoachToast', () => {
+  const base = {
+    mode: 'dictation' as const, nextStreak: 0, answer: 'がき',
+    completedRoundsAfterAnswer: 1, targetRounds: 10,
+  }
+
+  it('tells the learner a one-kana miss was close, under its own message key', () => {
+    const toast = buildRoundCoachToast(1, { ...base, isCorrect: false, typedAssessment: 'close' })
+    expect(toast?.messageKey).toBe('coach.round_close')
+    expect(toast?.body).toMatch(/counts as a miss/i)
+  })
+
+  it('keeps the plain recovery toast for an ordinary miss', () => {
+    const toast = buildRoundCoachToast(1, { ...base, isCorrect: false, typedAssessment: 'incorrect' })
+    expect(toast?.messageKey).toBe('coach.round_recovery')
   })
 })
 

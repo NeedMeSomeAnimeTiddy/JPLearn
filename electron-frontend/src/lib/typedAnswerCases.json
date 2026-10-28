@@ -1,0 +1,17 @@
+[
+  { "expected": "shi", "given": " ShI ", "state": "exact" },
+  { "expected": "kyo-u", "given": "kyo u", "state": "exact" },
+  { "expected": "go", "given": "go", "state": "exact" },
+  { "expected": "sakura", "given": "sakur", "state": "near_miss" },
+  { "expected": "kana", "given": "knaa", "state": "near_miss" },
+  { "expected": "water", "given": "watr", "state": "near_miss" },
+  { "expected": "house", "given": "huose", "state": "near_miss" },
+  { "expected": "elephant", "given": "elefant", "state": "near_miss" },
+  { "expected": "arigatou", "given": "neko", "state": "incorrect" },
+  { "expected": "to go", "given": "do", "state": "incorrect" },
+  { "expected": "go", "given": "do", "state": "incorrect" },
+  { "expected": "dog", "given": "dgo", "state": "incorrect" },
+  { "expected": "eat", "given": "eats", "state": "incorrect" },
+  { "expected": "cat", "given": "", "state": "incorrect" },
+  { "expected": "食べて", "given": "食べた", "state": "incorrect" }
+]

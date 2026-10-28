@@ -67,4 +67,10 @@ describe('assessTypedRecallAnswer', () => {
 
     expect(result).toBe('near_miss')
   })
+
+  it('wants a word of under four letters typed exactly (audit 9: "do" is not "to go")', () => {
+    const asked = { script: 'vocab_n5' as const, expectedAnswer: 'to go', dictionaryNote: null }
+    expect(assessTypedRecallAnswer({ ...asked, givenAnswer: 'do' })).toBe('incorrect')
+    expect(assessTypedRecallAnswer({ ...asked, givenAnswer: 'go' })).toBe('exact')
+  })
 })
