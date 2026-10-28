@@ -24,9 +24,10 @@ const { resolvePythonCommand } = require('./python_command.cjs')
 // "something is wrong" rather than "this is a big image".
 const DEFAULT_REQUEST_TIMEOUT_MS = 120000
 // The first request on a freshly spawned process also pays interpreter startup,
-// the paddleocr import, and engine init -- and engine init can reach out to BOS
-// for PP-OCRv6 weights that are not in the paddlex cache yet, which is a
-// download, not a computation. The old one-shot path had no timeout at all, so
+// the paddleocr import, and engine init -- and, once after an update from an
+// install made before audit 6, a copy of the weights from ~/.paddlex into the
+// assets folder. It never downloads: missing weights fail the request
+// (scripts/ocr_model_cache.py). The old one-shot path had no timeout at all, so
 // this budget is deliberately generous; it exists to stop a wedged process from
 // hanging forever, not to bound honest work.
 const DEFAULT_COLD_REQUEST_TIMEOUT_MS = 15 * 60 * 1000

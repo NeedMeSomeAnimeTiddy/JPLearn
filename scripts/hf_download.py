@@ -188,6 +188,10 @@ def _download_sequential(url: str, dest: Path, report: ReportFn | None) -> None:
                 done += len(chunk)
                 if report:
                     report(done, total)
+    # Python's HTTP client reads an early close as end of file, not an error; without this a
+    # cut-short model was renamed into place and counted as installed (audit 6 F9).
+    if total and done != total:
+        raise OSError(f"download of {url} ended after {done} of {total} bytes")
 
 
 def _download_range_worker(
@@ -204,12 +208,16 @@ def _download_range_worker(
         try:
             req = _request(url, {"Range": f"bytes={pos}-{end}"})
             with urllib.request.urlopen(req, timeout=30) as resp:
+                # A 200 would be the whole file, written here from `pos` on (audit 6 F9).
+                if resp.status != 206:
+                    raise OSError(f"expected 206 for range {pos}-{end}, got {resp.status}")
                 with open(dest, "r+b") as f:
                     f.seek(pos)
-                    while True:
-                        chunk = resp.read(CHUNK_READ_SIZE)
+                    while pos <= end:
+                        chunk = resp.read(min(CHUNK_READ_SIZE, end - pos + 1))
                         if not chunk:
-                            break
+                            # An early close reads as end of file; retry from where it stopped.
+                            raise OSError(f"range {start}-{end} closed early at {pos}")
                         f.write(chunk)
                         pos += len(chunk)
                         progress_cb(len(chunk))

@@ -21,6 +21,8 @@ import os
 import re
 from pathlib import Path
 
+from scripts.ocr_model_cache import forbid_downloads, prepare_offline_runtime
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 _assets_dir = os.environ.get("JPLEARN_ASSETS_DIR", "").strip() or os.environ.get("JPLEARN_USER_DATA_DIR", "").strip()
@@ -260,6 +262,10 @@ def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: floa
         rec_model_dir = _resolve_infer_dir(model_root, "rec")
         cls_model_dir = _resolve_infer_dir(model_root, "cls")
 
+    # The weights come from the app's own folder and are never downloaded while OCR is in use
+    # (audit 6 F7). This has to run before PaddleOCR is imported.
+    prepare_offline_runtime()
+
     try:
         # PaddleOCR/PaddlePaddle 3.3.x has a known PIR+oneDNN regression on CPU
         # (ConvertPirAttribute2RuntimeAttribute...). Disable those paths before
@@ -268,6 +274,8 @@ def extract_assistant_chat_ocr_payload(image_path_raw: str, min_confidence: floa
         os.environ.setdefault("FLAGS_use_mkldnn", "0")
         paddleocr_module = importlib.import_module("paddleocr")
         PaddleOCR = getattr(paddleocr_module, "PaddleOCR")
+        if os.environ.get("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"):
+            forbid_downloads()
     except Exception as exc:  # pragma: no cover - environment-dependent
         raise RuntimeError(
             "PaddleOCR runtime is unavailable in this environment. Install Python package 'paddleocr'."

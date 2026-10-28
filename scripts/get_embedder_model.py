@@ -20,8 +20,8 @@ checkpoints) means the embedder can run with the lightweight `onnxruntime`
 package instead of `torch`/`transformers` (roughly 15-20 MB vs. 1+ GB), and
 the download itself is 3-4x smaller than the full-precision weights.
 
-Files are saved to Documents\\JPLearn\\models\\embedders\\<tier>\\ when run
-from the installed app, or to models/embedders/<tier>/ when run directly from
+Files are saved to <assets>\\models\\embedders\\<tier>\\ (by default
+%LOCALAPPDATA%\\JPLearn Assets) when run from the installed app, or to models/embedders/<tier>/ when run directly from
 the repository.
 
 Usage:

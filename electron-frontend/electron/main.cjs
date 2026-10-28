@@ -87,6 +87,7 @@ function launchUninstallCleanupHelper() {
   }
 
   const docsDir = process.env.JPLEARN_DOCUMENTS_DIR || path.join(os.homedir(), 'Documents', 'JPLearn Progress')
+  // Downloads live apart from progress; the dialog offers both (audit 6 F2).
   const args = [
     '-NoProfile',
     '-ExecutionPolicy',
@@ -95,6 +96,8 @@ function launchUninstallCleanupHelper() {
     scriptPath,
     '-JPLearnDir',
     docsDir,
+    '-AssetsDir',
+    resolveAssetsDataDir(),
   ]
 
   try {
@@ -1356,6 +1359,13 @@ registerIpcHandlers({
   setupRuntime: localSetupRuntime,
   repoRoot,
   refreshTutorChatRuntime: refreshTutorRuntimeAfterSetup,
+  unloadTutorChatRuntime: async () => {
+    try {
+      await localTutorRuntime.unload('model-uninstall')
+    } catch {
+      // Best effort: the delete then reports whatever is still holding the file.
+    }
+  },
   refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
   refreshOcrRuntime: refreshOcrRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,

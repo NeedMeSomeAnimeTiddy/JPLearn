@@ -119,9 +119,15 @@ once per app session instead of per request. Two shapes:
   `setup:apply-translation-profile` — the `ocr_qwen_local` profile installs the OCR model as one
   of its steps.
 - The **first** request on a fresh process gets a much larger timeout budget than later ones
-  (15 min vs 2 min), because engine init can involve downloading PP-OCRv6 weights from BOS when
-  the paddlex cache is cold. The old one-shot path had no timeout at all; the budget exists to
-  stop a wedged process, not to bound honest work.
+  (15 min vs 2 min) for interpreter start, the paddleocr import and engine init. The old one-shot
+  path had no timeout at all; the budget exists to stop a wedged process, not to bound honest work.
+- **Using OCR never downloads** (audit 6 F7, Robbie's ruling "offline only"). PaddleX's cache is
+  pointed inside the assets folder (`ocr/paddlex`, `scripts/ocr_model_cache.py`); the weights
+  arrive only when the learner installs OCR, "installed" means they are there, and uninstall
+  removes them. With weights missing the server fails the request rather than asking PaddleX,
+  which would otherwise try four model hosts and download. Installs made before audit 6 left the
+  weights in `~/.paddlex`; the installer and the server copy them across rather than downloading
+  again, and leave the originals.
 - Path resolution in the packaged app: `forge.config.cjs` ships `../scripts` as an `extraResource`
   directory, and `repoRoot` (`path.join(__dirname, '..', '..')` from inside `app.asar`) lands on
   `resources/`, so `resources/scripts/ocr_server.py` resolves. `ocr_server.py`'s
@@ -572,7 +578,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 | B1 | Bridge worker is strictly serial; anything slow blocks every study query behind it. Largely defused: OCR translation never used the bridge, OCR now has its own persistent runtime (#74), and `fsrs-optimize` runs one-shot off-worker. The serial property itself still stands as a constraint on new work. | #74 (OCR) |
 | B2 | ~~A single request timeout calls `stopPythonBridgeWorker()`, which rejects **all** pending unrelated requests and forces a cold restart.~~ Partly fixed: a timeout now rejects only its own request, and the worker restarts after `BRIDGE_MAX_CONSECUTIVE_TIMEOUTS` (3) in a row; a restart settles only that child's requests (`electron/bridge_worker.cjs`). What remains: a restart still rejects everything queued on the wedged child. | none |
 | B3 | Worker-failure fallback re-spawns a one-shot Python process per request — full interpreter + import cost on the degraded path. | none |
-| ~~B4~~ | ~~`setup:system-info` served install flags from behind two network probes~~ — a 10 MB throughput measurement and untimed `huggingface.co` size probes. The renderer gates features on those flags (`ocrInstalled` decides whether an image drop is accepted), so for ~9s after launch Image Translation reported itself uninstalled, and indefinitely if a probe socket hung. Probes are now deferred (`createDeferredValue`): flags return in ~600ms, and only the setup wizard — which shows a spinner and actually needs download estimates — opts into waiting. **Rule this establishes: nothing that reports what is installed may sit behind a network call.** | #74 follow-up |
+| ~~B4~~ | ~~`setup:system-info` served install flags from behind two network probes~~ — a 10 MB throughput measurement and untimed `huggingface.co` size probes. The renderer gates features on those flags (`ocrInstalled` decides whether an image drop is accepted), so for ~9s after launch Image Translation reported itself uninstalled, and indefinitely if a probe socket hung. Probes are now deferred (`createDeferredValue`): flags return in ~600ms, and only the setup wizard — which shows a spinner and actually needs download estimates — opts into waiting. **Rule this establishes: nothing that reports what is installed may sit behind a network call.** Audit 6 (F1) added: a non-waiting read starts no probe at all, so only the wizard contacts the network, and the speed test reads the start of a model from Hugging Face instead of a third-party test file. | #74 follow-up |
 
 ### Content
 

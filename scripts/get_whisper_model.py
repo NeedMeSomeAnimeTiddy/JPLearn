@@ -6,8 +6,9 @@ Three tiers are available:
     high      distil-whisper/distil-large-v3    (~1.9 GB)   near-ultra quality, faster
     ultra     Systran/faster-whisper-large-v3   (~3.1 GB)   slowest, best accuracy
 
-Files are saved to Documents\\JPLearn\\whisper\\<tier>\\ when run from the
-installed app, or to data/whisper/<tier>/ when run directly from the repository.
+Files are saved to <assets>\\whisper\\<tier>\\ (by default %LOCALAPPDATA%\\JPLearn
+Assets) when run from the installed app, or to data/whisper/<tier>/ when run
+directly from the repository.
 
 Usage:
     python scripts/get_whisper_model.py               # downloads default "fast" tier
@@ -15,6 +16,7 @@ Usage:
     python scripts/get_whisper_model.py --tier balanced
     python scripts/get_whisper_model.py --tier high
     python scripts/get_whisper_model.py --tier ultra
+    python scripts/get_whisper_model.py --tier fast --force   # replace every file
 
 Override download target:
     set JPLEARN_DOCUMENTS_DIR=C:\\path\\to\\dir
@@ -85,6 +87,11 @@ def download_file(url: str, dest: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tier", choices=sorted(MODELS.keys()), default="fast")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="download every file again, replacing the ones present (a damaged model.bin included)",
+    )
     args = parser.parse_args()
 
     model = MODELS[args.tier]
@@ -95,7 +102,7 @@ def main() -> int:
     total_files = len(filenames)
     for index, filename in enumerate(filenames, start=1):
         dest = target_dir / filename
-        if dest.exists():
+        if dest.exists() and not args.force:
             print(f"PHASE {index}/{total_files}: {filename} already present, skipping")
             continue
         print(f"PHASE {index}/{total_files}: downloading {filename}")
