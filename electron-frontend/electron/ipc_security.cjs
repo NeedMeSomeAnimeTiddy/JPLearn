@@ -1062,6 +1062,42 @@ module.exports = {
   validateAnalyticsExportType,
   validateConfigKey,
   validateConfigSetPayload,
+  validateBackupWindowState,
+}
+
+/* The window's own storage that "Back up everything" carries (audit 10, F3): per-section stats,
+   progression overrides, block selections and settings. Card scores, the summary snapshot and the
+   open session are rebuilt from the database after a restore, so they are not carried. */
+const BACKUP_WINDOW_STATE_KEYS = Object.freeze([
+  'jplearn-desktop-script-stats-v1',
+  'jplearn-progression-overrides-v1',
+  'jplearn-desktop-session-prefs-v1',
+  'jplearn-desktop-settings-v1',
+])
+module.exports.BACKUP_WINDOW_STATE_KEYS = BACKUP_WINDOW_STATE_KEYS
+// Matches MAX_WINDOW_STATE_CHARACTERS in data/whole_backup.py.
+const MAX_BACKUP_WINDOW_STATE_CHARACTERS = 2_000_000
+
+function validateBackupWindowState(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Invalid backup window state: expected an object')
+  }
+  const state = {}
+  let total = 0
+  for (const [key, value] of Object.entries(payload)) {
+    if (!BACKUP_WINDOW_STATE_KEYS.includes(key)) {
+      throw new Error(`Invalid backup window state: unexpected key ${JSON.stringify(key.slice(0, 64))}`)
+    }
+    if (typeof value !== 'string') {
+      throw new Error(`Invalid backup window state: ${key} must be text`)
+    }
+    total += key.length + value.length
+    state[key] = value
+  }
+  if (total > MAX_BACKUP_WINDOW_STATE_CHARACTERS) {
+    throw new Error('Invalid backup window state: too large')
+  }
+  return state
 }
 
 const VALID_ANALYTICS_EXPORT_TYPES = new Set(['review_history', 'accuracy_trends', 'mastery_snapshot'])
