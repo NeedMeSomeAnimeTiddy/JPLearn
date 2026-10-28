@@ -27,6 +27,7 @@ import type {
   StudyBlockPayload,
   SessionGoalPayload,
   SessionSummaryPayload,
+  StudyQueuePayload,
   TutorReactionPayload,
   VocabFeedPayload,
   XPProgressPayload,
@@ -225,16 +226,6 @@ interface ScriptDeckPayload {
   slug: string
   name: string
   cards: GameCard[]
-}
-
-interface StudyQueuePayload {
-  slug: string
-  card_ids: number[]
-  indices: number[]
-  buckets_due: number
-  buckets_leech: number
-  buckets_new: number
-  buckets_review: number
 }
 
 interface StudyQueueResponse {

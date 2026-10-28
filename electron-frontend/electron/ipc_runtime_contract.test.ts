@@ -148,7 +148,7 @@ describe('ipc runtime contract', () => {
   it('maps valid Daily Games attempts to bridge arguments and clears read caches', async () => {
     const result = { pool: {}, streak: {}, attempts: [], progress: {} }
     const { handlers, options } = createRegisteredHandlers({
-      runPythonBridgeWithArgs: vi.fn().mockResolvedValue(result),
+      runPythonBridgeWorkerOnly: vi.fn().mockResolvedValue(result),
     })
     const handler = handlers.get('daily-games:record-attempt')
 
@@ -165,7 +165,7 @@ describe('ipc runtime contract', () => {
       ],
     })).resolves.toBe(result)
 
-    expect(options.runPythonBridgeWithArgs).toHaveBeenCalledWith([
+    expect(options.runPythonBridgeWorkerOnly).toHaveBeenCalledWith([
       'daily-games-record-attempt',
       '2026-07-15',
       'typing_blitz',

@@ -182,6 +182,22 @@ def _dictionary_db_path() -> Path | None:
     return None
 
 
+def dictionary_cache_key() -> tuple[str, int, int] | None:
+    """Identify the installed offline dictionary file: path, size and modification time.
+
+    Setup installs and removes the dictionary from another process, so a cache built from
+    lookups compares this key instead of being told; None means no dictionary is installed.
+    """
+    db_path = _dictionary_db_path()
+    if db_path is None:
+        return None
+    try:
+        stat = db_path.stat()
+    except OSError:
+        return None
+    return (str(db_path), stat.st_size, stat.st_mtime_ns)
+
+
 def _dictionary_query_terms(query: str) -> list[str]:
     normalized = _normalize_dictionary_query(query)
     if not normalized:

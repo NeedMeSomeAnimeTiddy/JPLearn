@@ -3,7 +3,7 @@ const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { createBridgeWorker } = require('./bridge_worker.cjs')
+const { createBridgeWorker, isWorkerRefusal } = require('./bridge_worker.cjs')
 const { createAnswerQueue, createUnsavedAnswersQuitGuard } = require('./answer_queue.cjs')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
@@ -1157,6 +1157,9 @@ const answerQueue = createAnswerQueue({
 
 function runPythonBridge(command) {
   return runPythonBridgeWorkerRequest([command]).catch((error) => {
+    if (isWorkerRefusal(error)) {
+      throw error
+    }
     bridgeTelemetry.fallbackCount += 1
     bridgeTelemetry.lastFallbackAtUtc = new Date().toISOString()
     bridgeTelemetry.lastWorkerError = error instanceof Error ? error.message : String(error)
@@ -1167,6 +1170,9 @@ function runPythonBridge(command) {
 
 function runPythonBridgeWithArgs(args) {
   return runPythonBridgeWorkerRequest(args).catch((error) => {
+    if (isWorkerRefusal(error)) {
+      throw error
+    }
     bridgeTelemetry.fallbackCount += 1
     bridgeTelemetry.lastFallbackAtUtc = new Date().toISOString()
     bridgeTelemetry.lastWorkerError = error instanceof Error ? error.message : String(error)
@@ -1459,7 +1465,9 @@ function createTray(mainWindowRef) {
 
   async function refreshDueCount() {
     try {
-      const summary = await runPythonBridge('summary')
+      // The cached read: it is cleared after every answer save and lives 30 s, so the due count is
+      // at most that old, and a refresh no longer rebuilds every deck on the worker (audit 7 nit 1).
+      const summary = await runPythonBridgeCached('summary')
       const totalDue = remainingDue(summary)
       tray.setToolTip(totalDue > 0 ? `JPLearn — ${totalDue} cards due` : 'JPLearn')
       tray.setContextMenu(buildContextMenu(totalDue))
@@ -2109,11 +2117,6 @@ async function preloadStartupBridgeData(splash) {
       run: () => runPythonBridgeCached('recommendations'),
     },
     {
-      key: 'tutor-reactions',
-      label: 'Tutor reactions',
-      run: () => runPythonBridgeCached('tutor-reactions'),
-    },
-    {
       key: 'learning-path-status',
       label: 'Learning path status',
       run: () => runPythonBridgeCached('learning-path-status'),
@@ -2357,13 +2360,34 @@ async function createWindowWithSplash() {
   return win
 }
 
+/* ONE COPY AT A TIME (audit 7 F4). Closing the window only hides it in the tray, so a launch from
+   the Start menu started a second copy: a second tray icon, duplicate notifications and a second
+   Python bridge on the same database. Robbie's call: the new launch quits and the running copy
+   comes forward. The lock is taken before the bridge spawn below, so a losing copy starts none. */
+const hasSingleInstanceLock = _squirrelArg ? true : app.requestSingleInstanceLock()
+if (!hasSingleInstanceLock) {
+  app.exit(0)
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows().find((candidate) => !candidate.isDestroyed())
+    if (!win) {
+      return
+    }
+    if (win.isMinimized()) {
+      win.restore()
+    }
+    win.show()
+    win.focus()
+  })
+}
+
 /* THE PYTHON BRIDGE STARTS NOW, NOT WHEN THE FIRST SCREEN ASKS FOR IT. Its first answer costs a
    Python start and about a second of imports before any command runs, and the first command is the
    study summary every screen waits on. Spawned from the preload it began 1-3 s into the launch,
    after Electron's own start, so the two costs queued; started here they overlap. The worker only
    reads stdin, so it sits idle until asked, and JPLEARN_DOCUMENTS_DIR is already set above. Not on
    a Squirrel install/update/uninstall run, which exits without a window. */
-if (!_squirrelArg) {
+if (!_squirrelArg && hasSingleInstanceLock) {
   try {
     getOrStartPythonBridgeWorker()
   } catch {

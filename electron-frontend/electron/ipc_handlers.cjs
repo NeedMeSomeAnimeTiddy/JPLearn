@@ -503,7 +503,9 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateDailyGamesAttemptPayload(payload)
     try {
-      const response = await options.runPythonBridgeWithArgs([
+      // Plain inserts go through the worker alone: a fallback after a timeout could save twice
+      // (audit 7 F2).
+      const response = await options.runPythonBridgeWorkerOnly([
         'daily-games-record-attempt',
         validatedPayload.day,
         validatedPayload.gameType,
@@ -717,7 +719,7 @@ function registerIpcHandlers(options) {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateAssistantEventInteractionPayload(payload)
     try {
-      return await options.runPythonBridgeWithArgs([
+      return await options.runPythonBridgeWorkerOnly([
         'assistant-events-track',
         String(validatedPayload.eventId),
         validatedPayload.interactionType,
@@ -1333,7 +1335,7 @@ function registerIpcHandlers(options) {
         String(p.accuracy),
       ]
       if (p.projectedScore !== null) args.push(String(p.projectedScore))
-      const response = await options.runPythonBridgeWithArgs(args)
+      const response = await options.runPythonBridgeWorkerOnly(args)
       clearBridgeReadCaches()
       return response
     } catch (error) {
@@ -1960,7 +1962,8 @@ function registerIpcHandlers(options) {
       // The one-shot process saved the weights but only activated them in its own
       // memory; tell the long-lived worker so reviews use them this session.
       try {
-        await options.runPythonBridgeWithArgs(['fsrs-reload-weights'])
+        // The worker's memory is the point; a one-shot would reload its own and report success.
+        await options.runPythonBridgeWorkerOnly(['fsrs-reload-weights'])
       } catch (error) {
         // The weights are saved either way; they apply on next launch.
         console.error('fsrs:optimize: worker reload failed', error)
@@ -1971,7 +1974,7 @@ function registerIpcHandlers(options) {
 
   options.ipcMain.handle('fsrs:reset-weights', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    return await options.runPythonBridgeWithArgs(['fsrs-reset-weights'])
+    return await options.runPythonBridgeWorkerOnly(['fsrs-reset-weights'])
   })
 }
 

@@ -33,7 +33,7 @@ future feature design — not a task list.
 └──────── stdin/stdout JSON-lines (single child process) ──────┘
 ┌──────────────────────────────────────────────────────────────┐
 │ Python backend                                               │
-│   scripts/desktop_bridge.py   68-command dispatcher (6.1k LOC)│
+│   scripts/desktop_bridge.py   73-command dispatcher (4.5k LOC)│
 │   domain/    pure logic, no I/O          (24 modules)        │
 │   data/      SQLite persistence + normalization              │
 └──────────────────────────────────────────────────────────────┘
@@ -56,14 +56,23 @@ into `scripts/ocr_extraction.py` behind its own process — see §2.
 
 ### Transport
 
-`main.cjs:1092 getOrStartPythonBridgeWorker()` spawns exactly one
+`getOrStartPythonBridgeWorker()` in `main.cjs` (through `bridge_worker.cjs`) spawns exactly one
 `python scripts/desktop_bridge.py --server` child. Requests are newline-delimited JSON
 envelopes (`{id, args}`) written to stdin; responses (`{id, ok, code, payload}`) are read
 off stdout and matched back through a `pending` Map.
 
-Fallback path: if a worker request rejects for any reason, `runPythonBridgeWithArgs`
+Fallback path: if the worker crashes or a request times out, `runPythonBridgeWithArgs`
 retries as a **one-shot process spawn** (`runPythonBridgeWithArgsOneShot`), which pays
-full interpreter + import cost.
+full interpreter + import cost. A command the worker answered with a failure code is not
+replayed (audit 7 F2, a policy: most such failures repeat, and a replay can save a write twice;
+a transient one such as a locked database now reaches the caller). Writes that must not run twice go through
+`runPythonBridgeWorkerOnly` and never fall back: answers, reset, the legacy import, expertise
+seeding, the backup import, Daily Games attempts, JLPT results, assistant event tracking and
+the FSRS weight reload/reset.
+
+The worker reads stdin as UTF-8 (`desktop_bridge.py` reconfigures it): Python's default for a
+pipe on Windows is the ANSI code page, which garbled Japanese arguments and crashed the worker
+(audit 7 F1). A reply UTF-8 cannot carry is sent with escaped JSON instead of ending the worker.
 
 ### Structural consequences to design around
 
@@ -150,7 +159,7 @@ Status per concern:
 | Offline dictionary + kanji detail + pitch accent (FTS5 queries) | **Moved** to `data/dictionary_repository.py`, including its 7 payload dataclasses. Semantic reranking is dependency-injected: the repo's `build_dictionary_search_payload(query, semantic_embed=...)` defaults to a pure hashed embedder (`domain.retrieval`); the bridge injects the real ONNX embedder when `embedder_runtime` + an active tier are available, else passes nothing and the default applies — behavior-preserving either way. Note-key builders (`build_builtin_note_key`, `build_offline_note_key`, `canonical_jmdict_source_id`) went to `data/card_notes_repository.py` instead (they're used for every card, not just dictionary-enriched ones, and the repository already owns the matching key validators); the shared Japanese-script predicate they both need went to `data/text_normalization.py` to keep the two repositories acyclic. |
 | Deck/JLPT/progression assembly | **Not moved — the original framing was wrong.** These `build_*` functions (`build_deck_cards`, `build_progression_status`, `build_jlpt_readiness_payload`, etc.) are impure orchestrators: they call `data.database`/`data.study_pipeline` loaders and, for progression, write to the DB. The *pure* logic they delegate to already lives in `domain/` (`blocks`, `jlpt_readiness`, `jlpt_sessions`, `progression_service`). Moving the orchestrators themselves into `domain/` would violate the no-I/O rule; they stay in `scripts/`. |
 | Dataclasses (the TS type source) | Split: the 7 dictionary/kanji/pitch payloads moved with their query code to `data/dictionary_repository.py`; the rest (deck/progression/XP/daily-games/etc.) stay in `desktop_bridge.py`. `scripts/generate_ts_types.py` now walks both files (`SOURCE_FILES`) — see below. |
-| Command dispatch (`_run_command`) | **Done.** Each of the 67 `if command == "...":` branches became its own `_cmd_*(argv)` handler function (verified AST-identical to the original branch body — zero semantic diffs across all 67), registered in a `_COMMAND_HANDLERS: dict[str, CommandHandler]` table. `_run_command` is now a five-line lookup + call. |
+| Command dispatch (`_run_command`) | **Done.** Each of the 67 `if command == "...":` branches (the count at the conversion; 73 today) became its own `_cmd_*(argv)` handler function (verified AST-identical to the original branch body — zero semantic diffs across all 67), registered in a `_COMMAND_HANDLERS: dict[str, CommandHandler]` table. `_run_command` is now a five-line lookup + call. |
 
 `scripts/generate_ts_types.py` AST-walks every file in its `SOURCE_FILES` tuple
 (`desktop_bridge.py`, `data/dictionary_repository.py`) and emits one TS interface per
@@ -575,7 +584,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| B1 | Bridge worker is strictly serial; anything slow blocks every study query behind it. Largely defused: OCR translation never used the bridge, OCR now has its own persistent runtime (#74), and `fsrs-optimize` runs one-shot off-worker. The serial property itself still stands as a constraint on new work. | #74 (OCR) |
+| B1 | Bridge worker is strictly serial; anything slow blocks every study query behind it. Largely defused: OCR translation never used the bridge, OCR now has its own persistent runtime (#74), and `fsrs-optimize` runs one-shot off-worker. Audit 7 measured `deck-cards` for Vocabulary N5 at 2.5 s on the worker; its dictionary summaries and distractors are now cached per process (F5), so only the first open per run pays it. The serial property itself still stands as a constraint on new work. | #74 (OCR); audit 7 F5 |
 | B2 | ~~A single request timeout calls `stopPythonBridgeWorker()`, which rejects **all** pending unrelated requests and forces a cold restart.~~ Partly fixed: a timeout now rejects only its own request, and the worker restarts after `BRIDGE_MAX_CONSECUTIVE_TIMEOUTS` (3) in a row; a restart settles only that child's requests (`electron/bridge_worker.cjs`). What remains: a restart still rejects everything queued on the wedged child. | none |
 | B3 | Worker-failure fallback re-spawns a one-shot Python process per request — full interpreter + import cost on the degraded path. | none |
 | ~~B4~~ | ~~`setup:system-info` served install flags from behind two network probes~~ — a 10 MB throughput measurement and untimed `huggingface.co` size probes. The renderer gates features on those flags (`ocrInstalled` decides whether an image drop is accepted), so for ~9s after launch Image Translation reported itself uninstalled, and indefinitely if a probe socket hung. Probes are now deferred (`createDeferredValue`): flags return in ~600ms, and only the setup wizard — which shows a spinner and actually needs download estimates — opts into waiting. **Rule this establishes: nothing that reports what is installed may sit behind a network call.** Audit 6 (F1) added: a non-waiting read starts no probe at all, so only the wizard contacts the network, and the speed test reads the start of a model from Hugging Face instead of a third-party test file. | #74 follow-up |
@@ -604,7 +613,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 |---|---|---|
 | E1 | No unit tests for any of the 6 view components (2,800+ lines total). | none |
 | E2 | No tests for the Electron main process, including `ipc_security.cjs` — the trust boundary. | none |
-| E3 | `test_desktop_bridge.py` cannot meaningfully cover 68 commands. | none |
+| E3 | `test_desktop_bridge.py` cannot meaningfully cover 73 commands. | none |
 
 ### Stale documentation
 
@@ -627,9 +636,10 @@ None of the following duplicate them.
 
 1. **Card-id collision guard** (A1) — a `tests/test_deck_id_uniqueness.py` asserting every
    id across `ALL_DECKS` is unique per family. Cheap, prevents silent corruption.
-2. **Unblock the bridge worker** (B1/B2) — every known-slow command is now off the shared
-   worker (OCR via its own persistent runtime, #74; `fsrs-optimize` one-shot). What remains
-   is B2: stop rejecting unrelated pending requests on timeout.
+2. **Unblock the bridge worker** (B1/B2) — OCR has its own persistent runtime (#74) and
+   `fsrs-optimize` runs one-shot. Audit 7 found `deck-cards` for Vocabulary N5 at 2.5 s on the
+   worker; its static part is now cached per process (F5), so only the first open per run pays
+   it. What remains of B2 is that a restart after three timeouts rejects everything queued.
 3. ~~**Unify mastery on SQLite** (A2/A4) — make `cardScores` a cache derived from
    `review_states` rather than a parallel truth. Blocks clean multi-profile (#51) too.~~
    Superseded: the counter lives in `card_mastery_scores` and is deliberately not derived

@@ -2,7 +2,7 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { createBridgeWorker } = require('./bridge_worker.cjs')
+const { createBridgeWorker, isWorkerRefusal } = require('./bridge_worker.cjs')
 
 type Request = { id: number, args: string[] }
 
@@ -169,5 +169,28 @@ describe('bridge worker', () => {
     vi.advanceTimersByTime(1000)
     await again
     expect(spawned[1].killed).toBe(true)
+  })
+})
+
+describe('isWorkerRefusal (audit 7 F2)', () => {
+  it('marks a command the worker answered with a failure code, not a crash or a timeout', async () => {
+    vi.useFakeTimers()
+    const { bridge, spawned } = createHarness()
+    const refused = bridge.request(['jlpt-save-result'])
+    const crashed = bridge.request(['summary'])
+    const [first] = spawned[0].requests
+    spawned[0].write(`${JSON.stringify({ id: first.id, ok: false, code: 2, payload: { error: 'no' } })}
+`)
+    const refusal = await refused.catch((error: unknown) => error)
+    expect(isWorkerRefusal(refusal)).toBe(true)
+
+    spawned[0].close(1)
+    const crash = await crashed.catch((error: unknown) => error)
+    expect(isWorkerRefusal(crash)).toBe(false)
+
+    const timedOut = bridge.request(['summary']).catch((error: unknown) => error)
+    await vi.advanceTimersByTimeAsync(1001)
+    expect(isWorkerRefusal(await timedOut)).toBe(false)
+    expect(isWorkerRefusal(undefined)).toBe(false)
   })
 })

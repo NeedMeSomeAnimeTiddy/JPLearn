@@ -15,7 +15,6 @@ import sys
 import csv
 import subprocess
 import secrets
-from contextlib import nullcontext
 from time import perf_counter
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
@@ -74,6 +73,7 @@ from data.dictionary_repository import (  # noqa: E402
     DictionaryCardSummary,
     build_dictionary_search_payload as _repo_build_dictionary_search_payload,
     build_kanji_detail_payload,
+    dictionary_cache_key,
     open_enrichment_session,
 )
 from data.scenario_repository import (  # noqa: E402
@@ -248,6 +248,10 @@ def _apply_persisted_fsrs_weights() -> None:
         pass
 
 
+# Node writes requests as UTF-8. A piped stdin otherwise decodes with the Windows ANSI code page
+# (cp1252 on English Windows), which garbles Japanese text or kills the process (audit 7 F1).
+if hasattr(sys.stdin, "reconfigure"):
+    sys.stdin.reconfigure(encoding="utf-8")
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -1489,6 +1493,39 @@ def _build_summary() -> dict[str, object]:
     }
 
 
+# The heavy path's per-card dictionary summary and distractor ids depend only on the deck's module
+# data and the offline dictionary file, yet cost 2.5 s for Vocabulary N5 on the shared worker
+# (audit 7 F5). Kept per slug for the life of the process; an entry is rebuilt when the dictionary
+# file (installed or removed by setup in another process) or the deck's cards differ from the ones
+# it was built from. The learner-dependent fields (leech, curriculum stage) are read on every call.
+_HeavyCardEnrichment = tuple[DictionaryCardSummary | None, list[int], list[int]]
+_HEAVY_DECK_ENRICHMENT_CACHE: dict[str, tuple[object, dict[int, _HeavyCardEnrichment]]] = {}
+
+
+def _heavy_deck_enrichment(slug: str, cards: list[Card]) -> dict[int, _HeavyCardEnrichment]:
+    cache_key = (
+        dictionary_cache_key(),
+        tuple((card.id, card.character, card.romaji, card.meaning, tuple(card.tags)) for card in cards),
+    )
+    cached = _HEAVY_DECK_ENRICHMENT_CACHE.get(slug)
+    if cached is not None and cached[0] == cache_key:
+        return cached[1]
+
+    with open_enrichment_session() as lookup_dictionary_summary:
+        enrichment = {
+            card.id: (
+                None
+                if lookup_dictionary_summary is None
+                else lookup_dictionary_summary(character=card.character, meaning=card.meaning, tags=card.tags),
+                rank_distractor_ids(cards, card, mode="meaning")[:8],
+                rank_distractor_ids(cards, card, mode="character")[:8],
+            )
+            for card in cards
+        }
+    _HEAVY_DECK_ENRICHMENT_CACHE[slug] = (cache_key, enrichment)
+    return enrichment
+
+
 def build_deck_cards(slug: str) -> dict[str, object]:
     init_study_db()
     factory = ALL_DECKS.get(slug)
@@ -1511,11 +1548,16 @@ def build_deck_cards(slug: str) -> dict[str, object]:
     )
     id_to_index = {card_id: index for index, card_id in enumerate(card_ids)}
 
-    enrichment_session = (
-        nullcontext(None) if use_lightweight_enrichment else open_enrichment_session()
-    )
-    with enrichment_session as lookup_dictionary_summary:
-        cards = [
+    heavy_enrichment = None if use_lightweight_enrichment else _heavy_deck_enrichment(slug, deck.cards)
+    cards = []
+    for card in shipped_cards:
+        if heavy_enrichment is None:
+            dictionary_summary = None
+            meaning_distractor_ids = _lightweight_distractor_ids(card_ids, id_to_index, card.id, limit=8)
+            character_distractor_ids = _lightweight_distractor_ids(card_ids, id_to_index, card.id, limit=8)
+        else:
+            dictionary_summary, meaning_distractor_ids, character_distractor_ids = heavy_enrichment[card.id]
+        cards.append(
             GameCard(
                 id=card.id,
                 note_key=build_builtin_note_key(card.character, card.romaji),
@@ -1524,30 +1566,13 @@ def build_deck_cards(slug: str) -> dict[str, object]:
                 meaning=card.meaning,
                 tags=card.tags,
                 example_sentence=card.example_sentence,
-                dictionary_summary=(
-                    None
-                    if lookup_dictionary_summary is None
-                    else lookup_dictionary_summary(
-                        character=card.character,
-                        meaning=card.meaning,
-                        tags=card.tags,
-                    )
-                ),
+                dictionary_summary=dictionary_summary,
                 is_leech=card.id in active_leech_ids,
                 curriculum_stage=curriculum_stages.get(card.id, 1),
-                meaning_distractor_ids=(
-                    _lightweight_distractor_ids(card_ids, id_to_index, card.id, limit=8)
-                    if use_lightweight_enrichment
-                    else rank_distractor_ids(deck.cards, card, mode="meaning")[:8]
-                ),
-                character_distractor_ids=(
-                    _lightweight_distractor_ids(card_ids, id_to_index, card.id, limit=8)
-                    if use_lightweight_enrichment
-                    else rank_distractor_ids(deck.cards, card, mode="character")[:8]
-                ),
+                meaning_distractor_ids=list(meaning_distractor_ids),
+                character_distractor_ids=list(character_distractor_ids),
             )
-            for card in shipped_cards
-        ]
+        )
 
     return {
         "slug": slug,
@@ -4487,7 +4512,19 @@ def _run_server() -> int:
             "code": code,
             "payload": payload,
         }
-        sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+        try:
+            line_out = json.dumps(response, ensure_ascii=False)
+            line_out.encode("utf-8")
+        except (UnicodeEncodeError, TypeError, ValueError):
+            # A lone surrogate (or anything else UTF-8 cannot carry) used to end the worker here,
+            # rejecting every other request in flight (audit 7 F1). Escaped JSON carries any string.
+            try:
+                line_out = json.dumps(response, ensure_ascii=True)
+            except (TypeError, ValueError) as exc:
+                line_out = json.dumps(
+                    {"id": request_id, "ok": False, "code": 2, "payload": {"error": f"Reply could not be encoded: {exc}"}}
+                )
+        sys.stdout.write(line_out + "\n")
         sys.stdout.flush()
 
     return 0
