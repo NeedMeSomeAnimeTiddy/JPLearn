@@ -173,7 +173,7 @@ historical fixes (a regression is a finding). The tables are snapshots; the reco
 
 ## Sweep questions
 
-1. **Answer to record.** Trace one answer end to end: answer checking (`domain/answer_check.py`),
+1. **Answer to record.** Trace one answer end to end: answer checking (`lib/answerAssessment.ts`, `lib/typedRecallAssessment.ts`, `useStudySession.ts::submitAnswer`),
    grade, the bridge review call, `review_states` and `review_events`, the mastery score, leech
    state, then the block unlock and the counts the learner sees. At each step: can it run twice, be
    skipped, or disagree with the next? Keep the three mastery notions in `domain/mastery.py` apart.

@@ -13,6 +13,18 @@ vi.mock('react-type-animation', () => ({
   TypeAnimation: ({ sequence }: { sequence: (string | number)[] }) => <>{String(sequence[0] ?? '')}</>,
 }))
 
+/* Stand-in for useMicRecorder (jsdom has no MediaRecorder): a test delivers a recording by calling
+   the onComplete the hook registered, as the recorder does once the learner stops. */
+const mic = vi.hoisted(() => ({
+  onComplete: null as null | ((result: { blob: Blob; mimeType: string }) => void),
+}))
+vi.mock('../hooks/useMicRecorder', () => ({
+  useMicRecorder: (options: { onComplete: (result: { blob: Blob; mimeType: string }) => void }) => {
+    mic.onComplete = options.onComplete
+    return { state: 'idle', errorReason: null, elapsedMs: 0, start: async () => {}, stop: () => {}, reset: () => {} }
+  },
+}))
+
 if (typeof document.documentElement.requestFullscreen !== 'function') {
   document.documentElement.requestFullscreen = vi.fn(() => Promise.resolve())
 }
@@ -218,7 +230,7 @@ describe('MinigameView — asking', () => {
     await waitFor(() => expect(screen.getByText('WHAT DOES THIS MEAN?')).toBeTruthy())
     expect(screen.getByText('一')).toBeTruthy()
     fireEvent.click(slip('two'))
-    expect(submitAnswer).toHaveBeenCalledWith('two')
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 0 })
   })
 
   it('selects and submits a slip via the number-key shortcut', () => {
@@ -226,7 +238,7 @@ describe('MinigameView — asking', () => {
     renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
 
     fireEvent.keyDown(window, { key: '2' })
-    expect(submitAnswer).toHaveBeenCalledWith('two')
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 0 })
   })
 
   it('walks the slips with the arrows and takes the one under the cursor on Enter', () => {
@@ -234,7 +246,7 @@ describe('MinigameView — asking', () => {
     renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(submitAnswer).toHaveBeenCalledWith('two')
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 0 })
   })
 
   it('solves the prompt’s size from its own length', () => {
@@ -267,7 +279,87 @@ describe('MinigameView — asking', () => {
     const input = screen.getByLabelText('Enter romaji') as HTMLInputElement
     expect(input.value).toBe('ichi')
     fireEvent.submit(input.closest('form') as HTMLFormElement)
-    expect(submitAnswer).toHaveBeenCalledWith('ichi')
+    expect(submitAnswer).toHaveBeenCalledWith('ichi', { hintStep: 0 })
+  })
+
+  it('tells the session how far the hint went, so a revealed answer is saved as a miss', () => {
+    const submitAnswer = vi.fn()
+    const { container } = renderView({
+      sessionActive: true, roundState: roundState({ mode: 'romaji_sprint' }), roundInput: 'ichi', submitAnswer,
+    })
+    /* H twice: the clue, then the answer printed */
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.submit(container.querySelector('form.rd-type') as HTMLFormElement)
+    expect(submitAnswer).toHaveBeenCalledWith('ichi', { hintStep: 2 })
+  })
+
+  it('starts a retry of the same card with no hint shown', () => {
+    const submitAnswer = vi.fn()
+    const first = roundState({ mode: 'romaji_sprint' })
+    const { container, rerender } = renderView({ sessionActive: true, roundState: first, roundInput: 'ichi', submitAnswer })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.keyDown(window, { key: 'h' })
+    /* the same card dealt again is a new round */
+    const retry = roundState({ mode: 'romaji_sprint' })
+    rerender(
+      <SessionProvider value={sessionValue({ sessionActive: true, roundState: retry, roundInput: 'ichi', submitAnswer })}>
+        <MinigameView {...baseProps} />
+      </SessionProvider>,
+    )
+    fireEvent.submit(container.querySelector('form.rd-type') as HTMLFormElement)
+    expect(submitAnswer).toHaveBeenCalledWith('ichi', { hintStep: 0 })
+  })
+
+  it('sends a spoken answer for English transcription with the hint step it was given at', async () => {
+    const transcribeSpeech = vi.fn(async () => ({ text: 'one', confidence: 0.9, durationMs: 400 }))
+    window.jplearnDesktop = { ...window.jplearnDesktop, transcribeSpeech } as unknown as typeof window.jplearnDesktop
+    const submitAnswer = vi.fn()
+    renderView({ sessionActive: true, roundState: roundState({ mode: 'speech_recall' }), submitAnswer })
+    fireEvent.keyDown(window, { key: 'h' })
+    /* jsdom's Blob has no arrayBuffer(), which the encoder needs; Chromium's does */
+    const blob = { type: 'audio/webm', arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer } as unknown as Blob
+    mic.onComplete?.({ blob, mimeType: 'audio/webm' })
+    await waitFor(() => expect(submitAnswer).toHaveBeenCalledWith('one', { hintStep: 1 }), { timeout: 3000 })
+    expect(transcribeSpeech).toHaveBeenCalledWith(expect.objectContaining({ language: 'en' }))
+  })
+
+  it('does not say the answer was revealed where the popover only shows the clue', async () => {
+    renderView({ sessionActive: true, roundState: roundState() })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.keyDown(window, { key: 'h' })
+    await waitFor(() => expect(document.querySelector('.minigame-hint-popover-footer')).toBeTruthy())
+    expect(document.querySelector('.minigame-hint-popover-footer')?.textContent).not.toContain('Answer revealed')
+  })
+
+  it('leaves the accepted meanings out of the clue at step 1', async () => {
+    const dictionaryNote = {
+      title: '', copy: '', character: '一', reading: 'いち', primaryGloss: 'one', secondaryGlosses: ['single'], source: 'test',
+    }
+    renderView({ sessionActive: true, roundState: roundState({ mode: 'typed_recall', dictionaryNote }) })
+    fireEvent.keyDown(window, { key: 'h' })
+    await waitFor(() => expect(document.querySelector('.minigame-hint-dict-inline')).toBeTruthy())
+    const chips = document.querySelector('.minigame-hint-dict-inline') as HTMLElement
+    expect(chips.textContent).toContain('いち')
+    expect(chips.querySelector('.minigame-hint-dict-gloss')).toBeNull()
+  })
+
+  it('never counts a full reveal where the popover only shows the clue', () => {
+    const submitAnswer = vi.fn()
+    renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
+    /* meaning match shows its clue at once and never prints the answer */
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.click(slip('two'))
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 1 })
+  })
+
+  it('passes the clue step alone through, which can still be right', () => {
+    const submitAnswer = vi.fn()
+    renderView({ sessionActive: true, roundState: roundState(), submitAnswer })
+    fireEvent.keyDown(window, { key: 'h' })
+    fireEvent.click(slip('two'))
+    expect(submitAnswer).toHaveBeenCalledWith('two', { hintStep: 1 })
   })
 
   it('knocks rather than submitting nothing at all', () => {

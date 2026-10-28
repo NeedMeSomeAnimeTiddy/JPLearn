@@ -936,7 +936,8 @@ const SPEECH_MIME_EXTENSIONS = {
 // Base64 length cap (~6 MB decoded). Generous for a short spoken answer clip
 // while bounding memory/disk use per transcription request.
 const MAX_SPEECH_AUDIO_BASE64_LENGTH = 8 * 1024 * 1024
-const VALID_SPEECH_LANGUAGES = new Set(['ja'])
+// 'en' for Speech Recall, which asks for the English meaning and grades only that (audit 9, F2).
+const VALID_SPEECH_LANGUAGES = new Set(['ja', 'en'])
 
 function validateTranscribeSpeechPayload(payload) {
   if (!payload || typeof payload !== 'object') {

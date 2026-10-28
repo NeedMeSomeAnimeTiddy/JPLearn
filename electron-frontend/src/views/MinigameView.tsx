@@ -19,7 +19,8 @@ import {
 import { formatTagLabel } from '../utils'
 import { lookupGrammarExplanation } from '../lib/grammarExplanations'
 import { isGrammarCurriculumMode, sanitizeRomajiInput } from '../utils'
-import { useSession } from '../context/SessionContext'
+import { useSession, type HintStep } from '../context/SessionContext'
+import { usesHintLadder } from '../lib/hintClue'
 
 /* ==================================================================================================
    THE ROUND — the last screen in the app still drawn in the old language, and the most used one.
@@ -124,7 +125,7 @@ export function MinigameView({
     voiceUnavailable,
     answerInputRef,
     startSession,
-    submitAnswer,
+    submitAnswer: submitSessionAnswer,
     setRoundInput,
     playAudio,
     skipFeedback,
@@ -147,7 +148,7 @@ export function MinigameView({
 
   // ── Phase 7: Progressive hint ladder ────────────────────────────────────────
   // 0 = no hint shown, 1 = clue, 2 = full answer giveaway
-  const [hintStep, setHintStep] = useState<0 | 1 | 2>(0)
+  const [hintStep, setHintStep] = useState<HintStep>(0)
   const [activeChoiceIndex, setActiveChoiceIndex] = useState(0)
   const [speechFallbackToTyped, setSpeechFallbackToTyped] = useState(false)
   const [hintRevealCount, setHintRevealCount] = useState(0)
@@ -200,19 +201,29 @@ export function MinigameView({
     setHintStep((current) => {
       if (current >= 2) return current
       setHintRevealCount((value) => value + 1)
-      return (current + 1) as 0 | 1 | 2
+      return (current + 1) as HintStep
     })
     setHintPopoverOpen(true)
     if (roundState?.mode === 'handwriting') setHandwritingHintUsed(true)
   }, [roundState?.mode])
 
-  // Reset hint when a new round starts.
+  /* EVERY ANSWER CARRIES HOW FAR THE HINT WENT: once it has printed the answer, the session saves
+     the answer as wrong (audit 9, F4). A mode whose popover only ever shows the clue never prints
+     the answer, so pressing H past the clue there is still only the clue. */
+  const answerHintStep: HintStep = roundState && !usesHintLadder(roundState.mode) ? Math.min(hintStep, 1) as HintStep : hintStep
+  const submitAnswer = useCallback(
+    (answer: string) => submitSessionAnswer(answer, { hintStep: answerHintStep }),
+    [submitSessionAnswer, answerHintStep],
+  )
+
+  // Reset hint when a new round starts. Keyed on the round itself, not its card, so a retry of the
+  // same card starts with no hint shown.
   useEffect(() => {
     setHintStep(0)
     setHintPopoverOpen(false)
     setHandwritingHintUsed(false)
     setChose(null)
-  }, [roundState?.cardId])
+  }, [roundState])
 
   useEffect(() => {
     const previouslyActive = previousSessionActiveRef.current
@@ -778,7 +789,8 @@ export function MinigameView({
       : roundState.mode === 'stroke_order'
         ? { text: chosen, face: 'jp' as const, label: 'YOU BUILT' }
         : roundState.mode === 'speech_recall'
-          ? { text: chosen, face: 'jp' as const, label: 'YOU SAID' }
+          /* transcribed in English: the round asks for the meaning (audit 9) */
+          ? { text: chosen, face: 'lat' as const, label: 'YOU SAID' }
           : null
 
   const nextReview = said && roundSrsResult ? roundSrsResult.interval : null
@@ -949,7 +961,6 @@ export function MinigameView({
                   />
                 ) : (
                   <RoundSpeak
-                    expected={roundState.answer}
                     disabled={isRoundResolving}
                     onResult={({ transcript }) => { setChose(transcript); submitAnswer(transcript) }}
                     onFallback={() => setSpeechFallbackToTyped(true)}

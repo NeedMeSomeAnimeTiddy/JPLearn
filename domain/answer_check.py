@@ -8,6 +8,10 @@ import unicodedata
 
 AnswerState = Literal["exact", "near_miss", "incorrect"]
 
+# Words shorter than this must be typed exactly: "do" is not a typo of "go".
+# Mirrors NEAR_MISS_MIN_LENGTH in electron-frontend/src/lib/answerAssessment.ts.
+NEAR_MISS_MIN_LENGTH = 4
+
 
 @dataclass(frozen=True)
 class TypedAnswerAssessment:
@@ -72,9 +76,9 @@ def assess_typed_answer(expected: str, given: str) -> TypedAnswerAssessment:
             normalized_given=normalized_given,
         )
 
-    distance = _levenshtein_distance(normalized_expected, normalized_given)
     min_length = min(len(normalized_expected), len(normalized_given))
-    near_miss = (
+    distance = _levenshtein_distance(normalized_expected, normalized_given)
+    near_miss = min_length >= NEAR_MISS_MIN_LENGTH and (
         distance <= 1
         or _is_transposition(normalized_expected, normalized_given)
         or (distance == 2 and min_length >= 6)

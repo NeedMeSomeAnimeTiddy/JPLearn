@@ -22,6 +22,7 @@ const {
   validateCardNoteText,
   validateRecordGameResultPayload,
   validateSpeakPayload,
+  validateTranscribeSpeechPayload,
   validateScenarioSessionId,
   validateScenarioId,
   validateScenarioLearnerLevel,
@@ -522,5 +523,13 @@ describe('payload bounds (audit 8 F3)', () => {
   it('refuses an oversized grammar minigame sentence', () => {
     expect(() => validateGrammarMinigameRequest({ gameType: 'particle_cloze', sentence: 'あ'.repeat(1001) })).toThrow(/too long/)
     expect(validateGrammarMinigameRequest({ gameType: 'particle_cloze', sentence: '私は学生です。' }).sentence).toBe('私は学生です。')
+  })
+
+  it('lets speech transcription ask for Japanese or English only (audit 9, F2)', () => {
+    const base = { audioBase64: 'AAAA', mimeType: 'audio/webm' }
+    expect(validateTranscribeSpeechPayload({ ...base, language: 'en' }).language).toBe('en')
+    expect(validateTranscribeSpeechPayload({ ...base, language: 'ja' }).language).toBe('ja')
+    expect(validateTranscribeSpeechPayload({ ...base, language: 'fr' }).language).toBe('ja')
+    expect(validateTranscribeSpeechPayload({ ...base }).language).toBe('ja')
   })
 })

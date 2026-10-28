@@ -67,4 +67,18 @@ describe('assessTypedRecallAnswer', () => {
 
     expect(result).toBe('near_miss')
   })
+
+  it('wants a word of under four letters typed exactly (audit 9: "do" is not "to go")', () => {
+    const asked = { script: 'vocab_n5' as const, expectedAnswer: 'to go', dictionaryNote: null }
+    expect(assessTypedRecallAnswer({ ...asked, givenAnswer: 'do' })).toBe('incorrect')
+    expect(assessTypedRecallAnswer({ ...asked, givenAnswer: 'go' })).toBe('exact')
+  })
+
+  it('accepts a one-letter meaning, which is how a kana card stores its romaji (を, ん)', () => {
+    const kana = { script: 'hiragana' as const, dictionaryNote: null }
+    expect(assessTypedRecallAnswer({ ...kana, expectedAnswer: 'o/wo', givenAnswer: 'o' })).toBe('exact')
+    expect(assessTypedRecallAnswer({ ...kana, expectedAnswer: 'o/wo', givenAnswer: 'wo' })).toBe('exact')
+    expect(assessTypedRecallAnswer({ ...kana, expectedAnswer: 'n', givenAnswer: 'n' })).toBe('exact')
+    expect(assessTypedRecallAnswer({ ...kana, expectedAnswer: 'n', givenAnswer: 'm' })).toBe('incorrect')
+  })
 })

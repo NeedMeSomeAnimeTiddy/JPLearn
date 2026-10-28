@@ -10,9 +10,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Mic, Square } from 'lucide-react'
 import { useCallback, useMemo, useState, type RefObject } from 'react'
 import { useMicRecorder } from '../../../hooks/useMicRecorder'
-import { assessTypedAnswer } from '../../../lib/answerAssessment'
 import { blobToBase64, normalizeSpeechMimeType } from '../../../lib/audioEncoding'
-import type { TypedAnswerState } from '../../../lib/answerAssessment'
 import type { RoundOption } from '../../../types'
 import { getStrokeOrderCandidates, sanitizeRomajiInput } from '../../../utils'
 import { HANDWRITING_MISS_THRESHOLD, useHandwritingQuiz } from '../../handwriting'
@@ -271,15 +269,15 @@ export function RoundDraw({ character, disabled, hintUsed, errorCopy, onComplete
    than quoted inside a status message. The typed answer's escape hatch is kept: a microphone the
    machine cannot open is a dead round, and the way out has to be on the screen. */
 export interface SpeakProps {
-  expected: string
   disabled: boolean
   maxDurationMs?: number
-  onResult: (result: { transcript: string; confidence: number; assessment: TypedAnswerState }) => void
+  /* the transcript only: the session grades it, once (audit 9, N1) */
+  onResult: (result: { transcript: string; confidence: number }) => void
   onFallback: () => void
 }
 
 export function RoundSpeak({
-  expected, disabled, maxDurationMs = 8000, onResult, onFallback,
+  disabled, maxDurationMs = 8000, onResult, onFallback,
 }: SpeakProps) {
   const [failure, setFailure] = useState<string | null>(null)
   const [heard, setHeard] = useState<string | null>(null)
@@ -291,17 +289,17 @@ export function RoundSpeak({
     try {
       const audioBase64 = await blobToBase64(blob)
       const result = await transcribe({
-        audioBase64, mimeType: normalizeSpeechMimeType(mimeType), language: 'ja',
+        /* the round asks for the meaning and is graded on English only (audit 9, F2) */
+        audioBase64, mimeType: normalizeSpeechMimeType(mimeType), language: 'en',
       })
       setHeard(result.text)
-      const assessment = assessTypedAnswer(expected, result.text)
       /* a beat to read what it heard before the verdict lands on top of it */
       await new Promise((resolve) => { setTimeout(resolve, 900) })
-      onResult({ transcript: result.text, confidence: result.confidence, assessment })
+      onResult({ transcript: result.text, confidence: result.confidence })
     } catch (error) {
       setFailure(error instanceof Error ? error.message : String(error))
     }
-  }, [expected, onResult])
+  }, [onResult])
 
   const { state, errorReason, elapsedMs, start, stop } = useMicRecorder({
     maxDurationMs, onComplete: (result) => { void onRecorded(result) },
@@ -337,7 +335,7 @@ export function RoundSpeak({
         <em>{recording ? 'STOP' : 'SPEAK'}</em>
       </button>
       <p className={stuck ? 'rd-speak-line is-bad' : 'rd-speak-line'} aria-live="polite">{line}</p>
-      {heard && !failure ? <p className="rd-heard" lang="ja">{heard}</p> : null}
+      {heard && !failure ? <p className="rd-heard" lang="en">{heard}</p> : null}
       {stuck ? (
         <button type="button" className="rd-instead" onClick={onFallback}>
           TYPE IT INSTEAD

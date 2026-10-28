@@ -808,7 +808,8 @@ interface SetupTranslationProfileOption {
 interface SpeechTranscribePayload {
   audioBase64: string
   mimeType: 'audio/webm' | 'audio/ogg' | 'audio/wav' | 'audio/wave' | 'audio/x-wav'
-  language?: 'ja'
+  /** 'en' for Speech Recall, which asks for the meaning (audit 9); the main process allowlists both */
+  language?: 'ja' | 'en'
 }
 
 interface SpeechTranscriptionResult {

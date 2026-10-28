@@ -13,7 +13,7 @@ You own all learning logic. Deterministic functions only — no hidden state, no
 ## Core domain modules
 - `cards.py` — Card/Deck dataclasses (id, character, romaji, meaning, tags)
 - `decks.py` — built-in decks (Hiragana–JLPT N1, ~1191 lines static data)
-- `answer_check.py` — `assess_typed_answer() → exact|near_miss|incorrect`
+- `answer_check.py` — `assess_typed_answer() → exact|near_miss|incorrect`; a test-only mirror of the renderer grader (`electron-frontend/src/lib/answerAssessment.ts`), which is what the app runs
 - `blocks.py` — block-based progressive unlocking (UNLOCK_THRESHOLD=0.8)
 - `session.py` — SessionGoal/SessionSummary for per-session targets
 - `curriculum.py` — stage promotion/demotion (stages 1-3, deterministic)
