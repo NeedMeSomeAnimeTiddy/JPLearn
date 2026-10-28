@@ -61,6 +61,34 @@ function Test-IsInside {
   return ($p -eq $f -or $p.StartsWith("$f\", [System.StringComparison]::OrdinalIgnoreCase))
 }
 
+# True when a folder between one of the roots (exclusive) and $Path (exclusive) is a junction or
+# symbolic link, or when no root holds $Path. A path reached through a link may sit anywhere,
+# progress included, so it is never removed. The roots themselves may be links (a relocated
+# AppData or Documents folder); only what lies inside them is checked.
+function Test-ReachedThroughLink {
+  param([string]$Path, [string[]]$Roots)
+
+  $root = $null
+  foreach ($candidate in $Roots) {
+    $full = Get-FullPath $candidate
+    if ((Test-IsInside -Path $Path -Folder $candidate) -and (-not $root -or $full.Length -gt $root.Length)) {
+      $root = $full
+    }
+  }
+  if (-not $root) {
+    return $true
+  }
+  $current = [System.IO.Path]::GetDirectoryName((Get-FullPath $Path))
+  while ($current -and $current.Length -gt $root.Length) {
+    $folder = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
+    if ($folder -and ($folder.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+      return $true
+    }
+    $current = [System.IO.Path]::GetDirectoryName($current)
+  }
+  return $false
+}
+
 # Moves $Path to the Recycle Bin, except anything a kept item owns inside it: the translation
 # model lives in the tutor models folder, so unticking tutor models must not take it along.
 function Remove-PathKeeping {
@@ -135,7 +163,7 @@ function Format-Size {
 # Carries out the choices: each is @{ Option = @{ Label; Paths }; Keep = $bool }. A function so the
 # keep rules can be exercised on scratch folders without the dialog.
 function Invoke-CleanupChoices {
-  param([object[]]$Choices, [string]$ProgressPath, [string]$LogPath)
+  param([object[]]$Choices, [string]$ProgressPath, [string]$LogPath, [string[]]$Roots)
 
   $choices = $Choices
   $progressPath = $ProgressPath
@@ -175,6 +203,10 @@ function Invoke-CleanupChoices {
         $containsThisPath = ((Test-IsInside -Path $path -Folder $_) -and ((Get-FullPath $_) -ne (Get-FullPath $path)))
         -not $isProgressOfThisItem -and -not $containsThisPath
       })
+      if (Test-ReachedThroughLink -Path $path -Roots $Roots) {
+        Write-CleanupLog -LogPath $logPath -Message "Left alone (reached through a link): $path"
+        continue
+      }
       try {
         if (Remove-PathKeeping -Path $path -Kept $keptHere) {
           $removedAny = $true
@@ -343,7 +375,7 @@ for ($i = 0; $i -lt $learningOptions.Count; $i++) {
   $choices += @{ Option = $learningOptions[$i]; Keep = $learningList.GetItemChecked($i) }
 }
 
-$outcome = Invoke-CleanupChoices -Choices $choices -ProgressPath $progressPath -LogPath $logPath
+$outcome = Invoke-CleanupChoices -Choices $choices -ProgressPath $progressPath -LogPath $logPath -Roots @($assetsDir, $targetDir)
 $removed = @($outcome.Removed)
 $failed = @($outcome.Failed)
 
