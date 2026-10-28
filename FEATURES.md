@@ -202,7 +202,7 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 ### LLM Tutor Integration
 - llama.cpp runtime (local CPU inference, no cloud dependency)
 - Tutor chat UI with status, preload, send, cancel, unload controls
-- Tutor reaction system: converts progression/feature/level/recommendation events into structured messages (congratulation, encouragement, guidance, acknowledgement)
+- Tutor reaction system: converts progression/feature/level/recommendation events into structured messages (congratulation, encouragement, guidance, acknowledgement). Not surfaced: backend only (bridge `tutor-reactions` / `tutor-dismiss`); no screen shows it and the window has no route to it since audit 8. The daily goal (`daily-goal`, `daily-goal-set`) and word of the day (`word-of-the-day`) bridge commands are likewise backend only.
 - Automatic model selection: GGUF model auto-detected by RAM (low/medium/high/ultra tiers)
 - Setup wizard for optional model download
 

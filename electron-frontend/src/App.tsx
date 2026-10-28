@@ -121,7 +121,7 @@ import { Conversation, useScenarioTutor } from './features/scenario-tutor'
 import { useCursor, CursorFollower, type CursorSettings } from './features/cursor'
 import { useWindowDrag } from './features/window-drag'
 import { usePomodoro, BreakOverlay, type PomodoroSettingsFields } from './features/pomodoro'
-import { DevDashboard } from './features/devtools'
+import { DevDashboard, useDeveloperToolsAvailable } from './features/devtools'
 import {
   MINIGAMES,
   SCRIPT_MINIGAMES,
@@ -315,6 +315,9 @@ function App() {
     restartBridge: () => void | Promise<void>
     clearCaches: () => void | Promise<void>
   } | null>(null)
+  /* THE DEVELOPER COMMANDS ARE FOR RUNNING FROM SOURCE: the installed app refuses their routes
+     (audit 8 F4), so it does not offer them. */
+  const developerToolsAvailable = useDeveloperToolsAvailable()
 
   useEffect(() => {
     const scripts: ScriptKey[] = ['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'grammar_patterns', 'sentence_examples']
@@ -335,14 +338,18 @@ function App() {
       { id: 'tutor-open-scenarios', label: 'Scenario Practice', category: 'navigation', keywords: ['tutor', 'scenario', 'roleplay', 'conversation'], action: () => openScenesRef.current() },
       { id: 'tutor-open-ocr', label: 'Image Translation', category: 'navigation', keywords: ['tutor', 'ocr', 'image', 'translate', 'screenshot'], action: () => lookupRef.current.open('', 'ocr') },
       { id: 'refresh-data', label: 'Refresh Data', category: 'settings', keywords: ['reload', 'summary'], action: () => { titlebarToolsRef.current?.refreshData() } },
-      { id: 'dev-dashboard', label: 'Developer Dashboard', category: 'debug', keywords: ['developer', 'dev', 'tools'], action: () => { titlebarToolsRef.current?.openDevDashboard() } },
-      { id: 'dev-inspect-element', label: 'Inspect Element', category: 'debug', keywords: ['developer', 'devtools'], action: () => { void titlebarToolsRef.current?.inspectElement() } },
-      { id: 'dev-check-arch', label: 'Architecture Check', category: 'debug', keywords: ['run', 'checks', 'developer'], action: () => { titlebarToolsRef.current?.runCheck('arch') } },
-      { id: 'dev-check-db', label: 'DB Schema Check', category: 'debug', keywords: ['run', 'checks', 'developer', 'database'], action: () => { titlebarToolsRef.current?.runCheck('db') } },
-      { id: 'dev-check-srs', label: 'SRS Integrity Check', category: 'debug', keywords: ['run', 'checks', 'developer'], action: () => { titlebarToolsRef.current?.runCheck('srs') } },
-      { id: 'dev-restart-bridge', label: 'Restart Bridge', category: 'debug', keywords: ['developer', 'python'], action: () => { void titlebarToolsRef.current?.restartBridge() } },
-      { id: 'dev-clear-caches', label: 'Clear Caches', category: 'debug', keywords: ['developer', 'bridge'], action: () => { void titlebarToolsRef.current?.clearCaches() } },
     ]
+    if (developerToolsAvailable) {
+      commands.push(
+        { id: 'dev-dashboard', label: 'Developer Dashboard', category: 'debug', keywords: ['developer', 'dev', 'tools'], action: () => { titlebarToolsRef.current?.openDevDashboard() } },
+        { id: 'dev-inspect-element', label: 'Inspect Element', category: 'debug', keywords: ['developer', 'devtools'], action: () => { void titlebarToolsRef.current?.inspectElement() } },
+        { id: 'dev-check-arch', label: 'Architecture Check', category: 'debug', keywords: ['run', 'checks', 'developer'], action: () => { titlebarToolsRef.current?.runCheck('arch') } },
+        { id: 'dev-check-db', label: 'DB Schema Check', category: 'debug', keywords: ['run', 'checks', 'developer', 'database'], action: () => { titlebarToolsRef.current?.runCheck('db') } },
+        { id: 'dev-check-srs', label: 'SRS Integrity Check', category: 'debug', keywords: ['run', 'checks', 'developer'], action: () => { titlebarToolsRef.current?.runCheck('srs') } },
+        { id: 'dev-restart-bridge', label: 'Restart Bridge', category: 'debug', keywords: ['developer', 'python'], action: () => { void titlebarToolsRef.current?.restartBridge() } },
+        { id: 'dev-clear-caches', label: 'Clear Caches', category: 'debug', keywords: ['developer', 'bridge'], action: () => { void titlebarToolsRef.current?.clearCaches() } },
+      )
+    }
     /* THE TIMER IS OFFERED ONLY WHILE IT IS ENABLED, as its titlebar chip was: with the setting off
        nothing draws the countdown, so starting one would run a timer nobody can see. */
     if (settings.pomodoroEnabled) {
@@ -380,7 +387,7 @@ function App() {
 
     commandPalette.registerCommands(commands)
     // oxlint-disable-next-line react-hooks/exhaustive-deps — registerCommands is stable, other deps are stable setters
-  }, [commandPalette.registerCommands, activeScript, settings.pomodoroEnabled])
+  }, [commandPalette.registerCommands, activeScript, settings.pomodoroEnabled, developerToolsAvailable])
 
   useEffect(() => {
     const cleanup = window.jplearnDesktop?.onTrayAction?.((action: string) => {
@@ -3382,7 +3389,7 @@ function App() {
         />
       ) : null}
 
-      {devDashboardOpen ? (
+      {devDashboardOpen && developerToolsAvailable ? (
         <DevDashboard
           pendingCheck={pendingDevCheck}
           onClose={() => { setDevDashboardOpen(false); setPendingDevCheck(null) }}

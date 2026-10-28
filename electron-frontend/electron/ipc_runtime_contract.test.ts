@@ -89,6 +89,35 @@ function createRegisteredHandlers(overrides = {}) {
 }
 
 describe('ipc runtime contract', () => {
+  it('refuses the developer routes in the installed app and serves them from source (audit 8 F4)', async () => {
+    const packaged = createRegisteredHandlers({ isPackaged: true, stopPythonBridgeWorker: vi.fn() })
+    expect(await packaged.handlers.get('app:is-packaged')(createValidEvent())).toBe(true)
+    expect(() => packaged.handlers.get('debug:restart-bridge')(createValidEvent())).toThrow(/not available in the installed app/)
+    expect(() => packaged.handlers.get('debug:clear-caches')(createValidEvent())).toThrow(/not available in the installed app/)
+    await expect(packaged.handlers.get('debug:run-check')(createValidEvent(), 'arch')).rejects.toThrow(/not available in the installed app/)
+    await expect(packaged.handlers.get('debug:snapshot')(createValidEvent())).rejects.toThrow(/not available in the installed app/)
+    expect(packaged.options.stopPythonBridgeWorker).not.toHaveBeenCalled()
+    expect(packaged.options.clearBridgeReadCaches).not.toHaveBeenCalled()
+    expect(packaged.options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
+
+    const fromSource = createRegisteredHandlers({
+      isPackaged: false,
+      stopPythonBridgeWorker: vi.fn(),
+      runPythonBridgeWithArgs: vi.fn(async () => ({ ok: true, output: '' })),
+    })
+    expect(await fromSource.handlers.get('app:is-packaged')(createValidEvent())).toBe(false)
+    expect(fromSource.handlers.get('debug:restart-bridge')(createValidEvent())).toEqual({ ok: true })
+    expect(fromSource.options.stopPythonBridgeWorker).toHaveBeenCalledTimes(1)
+    await expect(fromSource.handlers.get('debug:run-check')(createValidEvent(), 'arch')).resolves.toEqual({ ok: true, output: '' })
+    expect(fromSource.options.runPythonBridgeWithArgs).toHaveBeenCalledWith(['run-check', 'arch'])
+  })
+
+  it('counts the app as installed when nothing says otherwise', () => {
+    const { handlers } = createRegisteredHandlers()
+    expect(handlers.get('app:is-packaged')(createValidEvent())).toBe(true)
+    expect(() => handlers.get('debug:clear-caches')(createValidEvent())).toThrow(/not available in the installed app/)
+  })
+
   it('hands the first summary time to main on its own channel, for the sending window', () => {
     const recordFirstSummary = vi.fn()
     const { handlers } = createRegisteredHandlers({ recordFirstSummary })
@@ -325,19 +354,15 @@ describe('ipc runtime contract', () => {
     expect(options.runPythonBridgeWithArgs).not.toHaveBeenCalled()
   })
 
-  it('lists, fetches, deletes, and clears scenario sessions', async () => {
+  it('lists, deletes, and clears scenario sessions', async () => {
     const { handlers, options } = createRegisteredHandlers({
       runPythonBridgeWithArgs: vi.fn()
         .mockResolvedValueOnce({ sessions: [] })
-        .mockResolvedValueOnce({ session: null })
         .mockResolvedValueOnce({ id: '11111111-1111-1111-1111-111111111111', deleted: true })
         .mockResolvedValueOnce({ cleared: 2 }),
     })
 
     await expect(handlers.get('scenario:list-sessions')(createValidEvent())).resolves.toEqual({ sessions: [] })
-    await expect(
-      handlers.get('scenario:get-session')(createValidEvent(), '11111111-1111-1111-1111-111111111111'),
-    ).resolves.toEqual({ session: null })
     await expect(
       handlers.get('scenario:delete-session')(createValidEvent(), '11111111-1111-1111-1111-111111111111'),
     ).resolves.toEqual({ id: '11111111-1111-1111-1111-111111111111', deleted: true })
@@ -345,12 +370,9 @@ describe('ipc runtime contract', () => {
 
     expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(1, ['scenario-session-list'])
     expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(2, [
-      'scenario-session-get', '11111111-1111-1111-1111-111111111111',
-    ])
-    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(3, [
       'scenario-session-delete', '11111111-1111-1111-1111-111111111111',
     ])
-    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(4, ['scenario-sessions-clear'])
+    expect(options.runPythonBridgeWithArgs).toHaveBeenNthCalledWith(3, ['scenario-sessions-clear'])
   })
 
   it('saves a scenario SRS card via a temp-file handoff and wraps bridge failures', async () => {

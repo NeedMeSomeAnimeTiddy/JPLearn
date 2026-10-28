@@ -10,7 +10,6 @@ import type {
   ConjugationDrillPayload,
   ScenarioSessionPayload,
   ScenarioSessionListPayload,
-  ScenarioSessionLookupPayload,
   ScenarioSessionDeletePayload,
   ScenarioSessionsClearPayload,
   ScenarioSrsCardPayload,
@@ -28,7 +27,6 @@ import type {
   SessionGoalPayload,
   SessionSummaryPayload,
   StudyQueuePayload,
-  TutorReactionPayload,
   VocabFeedPayload,
   XPProgressPayload,
 } from './generated/types'
@@ -619,11 +617,6 @@ interface DesktopApi {
   getAssistantSnapshot?: (sessionId?: string) => Promise<AssistantSnapshotResponse>
   getAssistantEvents?: (limit?: number) => Promise<AssistantEventsResponse>
   consumeAssistantEvents?: (eventIds: number[]) => Promise<{ ok: boolean; consumed: number }>
-  trackAssistantEvent?: (payload: {
-    eventId: number
-    interactionType: 'clicked' | 'ignored' | 'expired'
-    metadata?: Record<string, string>
-  }) => Promise<{ ok: boolean }>
   trackAssistantToastInteraction?: (payload: {
     id: number
     priority: string
@@ -634,10 +627,6 @@ interface DesktopApi {
     actionKind?: string
     interactionType?: 'clicked' | 'ignored' | 'expired'
     metadata?: Record<string, string>
-  }) => Promise<{ ok: boolean }>
-  appendAssistantChatTurn?: (payload: {
-    role: 'user' | 'assistant'
-    content: string
   }) => Promise<{ ok: boolean }>
   getAssistantChatHistory?: (limit?: number) => Promise<AssistantChatHistoryResponse>
   getPreloadedAssistantChatHistory?: () => Promise<AssistantPreloadedChatHistoryResponse>
@@ -658,7 +647,6 @@ interface DesktopApi {
     speed?: number
   }) => Promise<VoiceSpeakResponse>
   getVoiceStatus?: () => Promise<VoiceStatus>
-  listVoices?: () => Promise<VoiceOption[]>
   preloadVoice?: (speaker?: string | number) => Promise<{ ok: boolean; ready: boolean }>
   resetStudyDb: () => Promise<{ ok: boolean }>
   minimizeWindow: () => Promise<{ ok: boolean }>
@@ -678,30 +666,26 @@ interface DesktopApi {
   getPassages?: () => Promise<PassagesPayload>
   getXpProgress?: () => Promise<XPProgress>
   getRecommendations?: () => Promise<RecommendationsPayload>
-  getTutorReactions?: () => Promise<TutorReactionsPayload>
-  dismissTutorReaction?: (dedupKey: string) => Promise<{ ok: boolean }>
   getJLPTReadiness?: () => Promise<JLPTReadinessPayload>
   buildJLPTExamQueue?: (level: JLPTLevel, mode: JLPTExamMode, count?: number) => Promise<JLPTExamQueuePayload>
   saveJLPTExamResult?: (payload: JLPTSaveResultPayload) => Promise<{ ok: boolean; id: number }>
   getJLPTExamHistory?: (level?: JLPTLevel | '', mode?: JLPTExamMode | '') => Promise<JLPTExamHistoryPayload>
   getLearningPathStatus?: () => Promise<LearningPathStatusPayload>
   completeOnboarding?: (payload: OnboardingCompletionPayload) => Promise<LearningPathStatusPayload>
-  getDailyGoal?: () => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
-  setDailyGoal?: (target: number) => Promise<{ target: number; current: number; goal_met: boolean; presets: number[] }>
-  getWordOfDay?: () => Promise<WordOfDayPayload>
   exportAnalyticsCSV?: (
     type: 'review_history' | 'accuracy_trends' | 'mastery_snapshot',
   ) => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
   exportAnalyticsJSON?: () => Promise<{ ok: boolean; cancelled?: boolean; path?: string }>
   importAnalyticsJSON?: () => Promise<{ ok: boolean; cancelled?: boolean; imported?: Record<string, number>; conflict_mode?: string }>
   // ─ Debug / Dev Tools ─────────────────────────────────────────────────
+  /** true in the installed app, where the debug routes refuse and the palette hides them */
+  isPackagedApp?: () => Promise<boolean>
   getBridgeTelemetry?: () => Promise<BridgeTelemetry | { ok: false; error: string }>
   restartBridge?: () => Promise<{ ok: boolean }>
   clearBridgeCaches?: () => Promise<{ ok: boolean }>
   runDiagnostics?: () => Promise<DiagnosticsReport>
   getSnapshot?: () => Promise<SnapshotData>
   runCheck?: (name: 'arch' | 'db' | 'srs') => Promise<CheckResult>
-  testNotification?: () => Promise<{ ok: boolean; error?: string }>
   // ─ FSRS Optimization ─────────────────────────────────────────────────
   getFSRSWeights?: () => Promise<{ weights: number[]; is_custom: boolean }>
   optimizeFSRS?: () => Promise<OptimizeFSRSResult>
@@ -713,7 +697,6 @@ interface DesktopApi {
   // ─ Scenario Conversation Tutor persistence ───────────────────────────
   saveScenarioSession?: (payload: ScenarioSessionSaveRequest) => Promise<ScenarioSessionPayload>
   listScenarioSessions?: () => Promise<ScenarioSessionListPayload>
-  getScenarioSession?: (sessionId: string) => Promise<ScenarioSessionLookupPayload>
   deleteScenarioSession?: (sessionId: string) => Promise<ScenarioSessionDeletePayload>
   clearScenarioSessions?: () => Promise<ScenarioSessionsClearPayload>
   saveScenarioSrsCard?: (payload: ScenarioSrsCardSaveRequest) => Promise<ScenarioSrsCardPayload>
@@ -917,14 +900,6 @@ interface VoiceSpeakResponse {
   }
 }
 
-interface VoiceOption {
-  voiceId: string
-  displayName: string
-  description: string
-  gender?: string
-  searchTerms: string[]
-}
-
 // ---- JLPT preparation types ----
 type JLPTLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
 type JLPTExamMode = 'mock_exam' | 'diagnostic' | 'adaptive_review' | 'weak_area_drill'
@@ -1034,27 +1009,8 @@ interface AchievementMilestonesPayload {
   node_mastery_badges: NodeMasteryBadgeStatus[]
 }
 
-interface WordOfDayPayload {
-  character: string
-  romaji: string
-  meaning: string
-  deck_name: string
-  reason: string
-  example_sentence: string | null
-}
-
 // The Home "Up next" block: ranked rows plus the session they add up to.
 type RecommendationsPayload = StudyBlockPayload
-
-// TutorReactionItem keeps narrow priority/message_type unions; the generated type uses string.
-interface TutorReactionItem extends Omit<TutorReactionPayload, 'priority' | 'message_type'> {
-  priority: 'low' | 'normal' | 'high'
-  message_type: 'congratulation' | 'encouragement' | 'guidance' | 'acknowledgement'
-}
-
-interface TutorReactionsPayload {
-  reactions: TutorReactionItem[]
-}
 
 // ---- Guided learning path types ----
 type SectionReadiness =
