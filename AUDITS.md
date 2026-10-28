@@ -6,6 +6,66 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-28 — Dedicated runtimes
+
+**Scope:** Audit 5, Robbie's choice "Dedicated runtimes": the separate processes for the tutor model,
+speech recognition, voice and OCR — how they start, queue requests, time out, unload and shut down,
+and what the learner sees when one fails. Out: tutor behaviour and prompts, setup and downloads (#36),
+the IPC trust boundary in general, startup, dictionary/OCR content.
+**Commit audited:** 208e78e on main, tree clean.
+**Method:**
+- Read: the four `*_runtime.cjs` files, `ocr_server.py`, `speech_recognition_server.py`, their wiring
+  in `main.cjs`, the IPC routes in `ipc_handlers.cjs`, `useTutor.ts`, and the OCR tests. No helpers.
+- The verifier ran, at 208e78e in the main checkout:
+  - vitest on the OCR, llm and IPC runtime-contract tests: 3 files, 68 passed;
+  - a Node probe: the http `timeout` option does not abort a request;
+  - Python: a missing executable raises `FileNotFoundError`; Robbie's machine has nvidia-smi;
+  - `git log -S` and `gh issue list` for jisho: only 8296e87, no issues;
+  - a cold Whisper load of the `fast` tier on CUDA: 12.25 s then 5.79 s;
+  - `git log -S` for the runtime swap: 9c8fa09, 6663cbb.
+- Not run: the OCR late-close test (it becomes the repair's failing-first test). Larger Whisper tiers
+  and CPU were not measured because none is installed.
+
+### Where each finding went
+- F1 tutor translation questions go to jisho.org first (P1, hard line 2): reported; asked of Robbie
+  (removal or opt-in). Robbie chose "Offline only"; repair in progress.
+- F2 IPC routes keep the old tutor runtime after setup (P1): repair in progress.
+- F3 tutor HTTP timeouts never fire (confirmed by the Node probe); crash not detected; unload timer
+  armed when a request starts (P2): repair in progress.
+- F4 speech recognition fails without nvidia-smi (P2; not Robbie's machine): repair in progress.
+- F5 speech runtime follows none of the §2 rules (P2; the `fast` tier's cold load fits the 20 s
+  budget): repair in progress.
+- F6 OCR queued request rejected by a late close (P3): reported; repair in progress (debt row not
+  filed).
+- F7 a model loaded for crossword clues is never unloaded (P3): repair in progress.
+- F8 choosing a speech model does not restart the server (P3): repair in progress.
+- STALE RECORD: jplearn-backend-invariants SKILL.md:28-32 (all four runtimes "share" the rules):
+  fix in progress.
+- Dropped: none.
+
+### Triggers checked
+- No DEBT.md row covers the runtimes. ARCH §8 B1 is unchanged by this scope.
+
+### Inspected and found sound — do not re-derive these
+- ocr_runtime.cjs: queue, kill on timeout, cold/warm budgets, unload only once nothing is in flight,
+  stdin error listener, setup refresh.
+- ocr_server.py never dies on a request.
+- Temp image and audio files are deleted in `finally`.
+- Voice runtime: HTTP timeouts destroy the request, loopback host, process-tree kill of a VOICEVOX it
+  started.
+- llama-server bound to 127.0.0.1 and limited to one instance, stopped on exit.
+- before-quit unloads all four runtimes after the unsaved-answers guard.
+
+### What this pass could not establish
+- Cold-load times for tiers other than `fast`, for CPU, and for the GGUF models; the speech
+  minigame's error display; OCR's possible weight download on first load (for the setup/offline
+  audit).
+
+### Coverage, not a finding
+- None of the last three passes covered setup and offline, IPC, startup, tutor, JLPT, minigames,
+  dictionary/OCR, menu, renderer state, answer checking, progression, passages, handwriting or
+  packaging.
+
 ## 2026-10-27 — Study session and queue
 
 **Scope:** Audit 4, Robbie's words: "the study session and its queue: how a session is built, how
