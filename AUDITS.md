@@ -6,6 +6,74 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-29 — Startup
+
+**Scope:** Audit 11. Robbie chose "Startup (Recommended)" and ran `/crew-audit startup`.
+- Covered:
+  - `main.cjs` from module load to the window showing: the single-instance lock, the early bridge spawn, `whenReady`, the splash, the startup preload, the voice and tutor warmups, and the startup telemetry and budgets.
+  - The bridge's first start and its first summary.
+  - The renderer from first render to the home screen: the first-run gate, `loadSummary`, the `localStorage` loaders and the summary snapshot, and the loading, error and retry paths.
+  - The setup wizard's first-run check and its exits.
+  - Launch with Python, the bundled Python, fugashi or the database missing or broken.
+- Out: bridge command semantics (audit 7), IPC sender checks (audit 8), setup downloads (audit 6), and import, export and backups (audit 10).
+
+**Commit audited:** bf764f8 on main, tree clean.
+
+**Method:**
+- The Auditor read the source, the census and, at Reconcile, ARCHITECTURE §2 and §8, DEBT.md and AUDITS.md. It ran nothing and used no helpers.
+- The lead ran Checks 4, 5, 6 and 9 at bf764f8 and supplied the raw results. Check 9: 190 main-process tests passed.
+- Not run: Checks 1, 2, 3, 7 and 8, which need interactive app launches.
+- Report and census: `Z:/Projects/JPLearn/audits/AUDIT-startup-2026-10-29-1-r2.md`, `census-startup-2026-10-28-1.txt`.
+
+### Where each finding went
+- F1, a failed backend shown as "nothing due" (P1): reported.
+- F2, the setup wizard cannot be left when the backend has failed (P2): reported.
+- F3, the tutor model loads on every launch, including with the chat off (P2): reported. Check 6 showed the only warmup that honoured the setting was removed in 6a9e82d.
+- F4, the splash waits on the preload with no overall limit (P3): reported; debt row drafted.
+- F5, XP, recommendations and path status fetched twice by the renderer (P3): reported; debt row drafted.
+- F6, the first-summary budget measures neither the summary nor the visible window (P3): reported.
+- F7, first run decided by the downloads folder alone (P3): reported.
+- Nits 1 to 4: reported.
+- Asked of Robbie:
+  - Q1, audit 7 F3's four kept preload reads. Check 5 found no recorded reason.
+  - Q2, whether the tutor should warm up at launch. Check 6 narrowed it but did not settle it.
+- STALE RECORD:
+  - the tutor comment at `App.tsx:1144-1145`;
+  - the `App.tsx` line counts in `electron.instructions.md:21` and `electron-frontend/CLAUDE.md:12`.
+- RECORDED:
+  - ARCH §8 B3, whose scope has grown into startup;
+  - ARCH §8 B1;
+  - DEBT #4, whose trigger metric is the one F6 describes;
+  - DEBT #3.
+- Dropped: none.
+
+### Triggers checked
+- DEBT #4: not checked (Check 2 not run). Its first-summary figure under-measures (F6).
+- DEBT #3: not timed.
+- ARCH §8 B3: still open, and it now reaches the startup path.
+
+### Inspected and found sound — do not re-derive these
+- The single-instance lock is taken after the user-data folder is fixed and before the bridge spawn.
+- The early spawn happens after the folders are set and is skipped on Squirrel runs.
+- The renderer's first summary and the hiragana and katakana warmup reuse the preload's cached reads.
+- The voice warmup runs beside the bridge tasks, with its own budget.
+- Speech recognition and OCR start only when first used.
+- The `localStorage` loaders fall back to defaults; the snapshot is checked for age and shape; a top-level ErrorBoundary is present.
+- The startup theme file falls back to the default.
+- A corrupt database gets a code 2 reply and does not end the worker.
+- Expertise seeding never overwrites a card that has history.
+- Telemetry writes are best-effort.
+- The main-process tests passed at bf764f8 (190).
+
+### What this pass could not establish
+- Every check that needs a launch: what the screens look like, startup timings, the tutor's memory use, which window a second launch brings forward, and electron-store's handling of a corrupt config.
+- A realistic bridge hang longer than 30 s.
+- No test reaches the setup wizard, `setup:complete` or `setup:skip`, a failed summary, or `createWindowWithSplash`.
+
+### Coverage, not a finding
+- The last three passes (import and export, answer checking, IPC) did not cover tutor and assistant, JLPT, minigames and Daily Games, dictionary, lookup and OCR, the menu and valley, renderer state and settings, progression and onboarding, reading passages, handwriting, or packaging and updates.
+- No pass so far has covered any of those ten systems.
+
 ## 2026-10-28 — Import, export and backups
 
 **Scope:** Audit 10. Robbie ran `/crew-audit` with no target and chose "Import, export, backups
