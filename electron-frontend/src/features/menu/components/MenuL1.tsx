@@ -5,7 +5,7 @@ import { burstPetals } from '../petalBurst'
 import { refuse } from '../refuse'
 import { Brand, Stats } from './Chrome'
 import type {
-  MenuController, MenuCrown, MenuHero, MenuRow, MenuSection, MenuSectionKey,
+  MenuController, MenuCrown, MenuEngineFailure, MenuHero, MenuRow, MenuSection, MenuSectionKey,
 } from '../types'
 import { screenClass, useEntered, useFrameFit } from '../useScreen'
 import '../../../styles/stage.css'
@@ -18,6 +18,8 @@ export interface MenuL1Props {
   rows: Record<MenuSectionKey, MenuRow>
   onOpenSection: (key: MenuSectionKey) => void
   onRunHero: () => void
+  /** the study engine has not answered since launch: the hero says so instead of "nothing due" */
+  engineFailure?: MenuEngineFailure | null
 }
 
 /* ==================================================================================================
@@ -46,7 +48,7 @@ const ST_TOP = 192 + Math.round((384 - ST_STACK) / 2)
 /** twelve segments, because that is what the gauge is made of */
 const SEGMENTS = Array.from({ length: 12 }, (_, k) => k)
 
-export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero }: MenuL1Props) {
+export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero, engineFailure }: MenuL1Props) {
   const entered = useEntered()
   const { active, setActive, step, isLocked, gateOf } = controller
   /* opening a row pushes every row below it down past a stationary pointer, whose `mouseenter`
@@ -105,7 +107,10 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
      row is under the cursor, so the current answer is kept where a stable listener can read it. */
   const confirmRef = useRef<() => void>(() => {})
   confirmRef.current = () => {
-    if (active === HERO_INDEX) { onRunHero(); return }
+    if (active === HERO_INDEX) {
+      if (engineFailure) { if (!engineFailure.retrying) engineFailure.onRetry(); return }
+      onRunHero(); return
+    }
     const section = ordered[active]
     if (!section) return
     /* AND IT SAYS NO OUT LOUD. Pressing Enter on a locked row did nothing whatsoever -- no flash,
@@ -128,6 +133,8 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
          container rather than on a row's <button>, so the native activation a button would give
          never had anything to fire on. The menu was mouse-only to enter a section. */
       else if (event.key === 'Enter' || event.key === ' ') {
+        /* Retry is a real button: a key on it is its own click, whichever row the cursor is on */
+        if (event.target instanceof Element && event.target.closest('.sh-retry')) return
         event.preventDefault()
         confirmRef.current()
       }
@@ -192,24 +199,49 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
             and the frame it is applied in; see `useEntered`. */}
         <div className={entered ? 'mn-standing enter' : 'mn-standing'}>
 
-          <button
-            type="button"
-            className={heroOn ? 'st-hero on' : 'st-hero'}
-            onMouseEnter={() => hover.pick(HERO_INDEX)}
-            onFocus={() => hover.pick(HERO_INDEX)}
-            onClick={() => (heroOn ? onRunHero() : setActive(HERO_INDEX))}
-          >
-            <span className="sh-cap"><b>{hero.cap}</b><i>{hero.capJp}</i></span>
-            <span className="sh-body">
-              <span className="sh-fig">
-                <b>{hero.fig}</b>
-                <span><em>{hero.figEm}</em><i>{hero.figLab}</i></span>
+          {/* A STUDY ENGINE THAT NEVER ANSWERED IS SAID, NOT DRAWN AS A CLEAR DAY (audit 11, F1;
+              Robbie: "Plain error + Retry"). Without a summary the recommendations read failed too,
+              and the card below would have read "nothing due" to a learner with cards waiting. */}
+          {engineFailure ? (
+            <div
+              className={heroOn ? 'st-hero is-failed on' : 'st-hero is-failed'}
+              role="alert"
+              onMouseEnter={() => hover.pick(HERO_INDEX)}
+            >
+              <span className="sh-body">
+                <span className="sh-fail">JPLearn couldn&apos;t start its study engine.</span>
+                <span className="sh-fail-detail">{engineFailure.message}</span>
               </span>
-              <span className="sh-why">{hero.why}</span>
-            </span>
-            <span className="sh-meta"><s>{hero.metaLeft}</s><span>{hero.metaRight}</span></span>
-            <span className="sh-slab">{heroOn ? `${hero.act} · ENTER ▸` : hero.act}</span>
-          </button>
+              <button
+                type="button"
+                className="sh-slab sh-retry"
+                aria-disabled={engineFailure.retrying}
+                onFocus={() => hover.pick(HERO_INDEX)}
+                onClick={() => { if (!engineFailure.retrying) engineFailure.onRetry() }}
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={heroOn ? 'st-hero on' : 'st-hero'}
+              onMouseEnter={() => hover.pick(HERO_INDEX)}
+              onFocus={() => hover.pick(HERO_INDEX)}
+              onClick={() => (heroOn ? onRunHero() : setActive(HERO_INDEX))}
+            >
+              <span className="sh-cap"><b>{hero.cap}</b><i>{hero.capJp}</i></span>
+              <span className="sh-body">
+                <span className="sh-fig">
+                  <b>{hero.fig}</b>
+                  <span><em>{hero.figEm}</em><i>{hero.figLab}</i></span>
+                </span>
+                <span className="sh-why">{hero.why}</span>
+              </span>
+              <span className="sh-meta"><s>{hero.metaLeft}</s><span>{hero.metaRight}</span></span>
+              <span className="sh-slab">{heroOn ? `${hero.act} · ENTER ▸` : hero.act}</span>
+            </button>
+          )}
 
           {placed.map(({ section, index, open, top, height }) => {
             const row = rows[section.key]

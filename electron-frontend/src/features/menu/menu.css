@@ -384,6 +384,18 @@
   font-family: var(--lat-ui); font-weight: 700; font-size: 11px; letter-spacing: 0.14em;
   color: #ffd9a1; white-space: nowrap; }
 
+/* THE ENGINE THAT NEVER ANSWERED (audit 11, F1): the same card, saying so plainly, with Retry as its
+   slab. The card itself is not a button here -- Retry is, so it can be reached and pressed alone. */
+.st-hero.is-failed { cursor: default; }
+.sh-fail { display: block; font-family: var(--lat); font-style: italic; font-weight: 900;
+  font-size: 16px; line-height: 1.2; color: var(--ink); }
+.sh-fail-detail { display: block; margin-top: 8px; font-family: var(--lat-ui); font-weight: 600;
+  font-size: 10.5px; line-height: 1.5; letter-spacing: 0.03em; color: rgba(20, 17, 13, 0.66);
+  overflow-wrap: anywhere; }
+.sh-retry { margin-top: 14px; width: 100%; border: 0; padding: 0; cursor: pointer; }
+.sh-retry[aria-disabled='true'] { cursor: progress; opacity: 0.6; }
+.sh-retry:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
 /* ---- the row: position, size and the lean everything else inherits ---- */
 /* 166 RATHER THAN 104, WHICH IS THE MOAT. The row is skewed about its left-middle, so a
    40-tall one paints 2.8px left of where it is authored and the open one 8.9 -- at 104 the

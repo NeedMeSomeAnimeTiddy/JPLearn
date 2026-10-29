@@ -281,8 +281,26 @@ export function SetupWizard({ onComplete }: Props) {
     }
   }, [selectedTier, selectedLlamaBackend, selectedVoiceTier, installFonts, installDictionary, selectedSpeechTier, selectedTranslationProfileTier, sysInfo, createDesktop, createStartMenu, appendProgressLog])
 
+  /* LEAVING THE WIZARD SAYS WHY IT COULD NOT (audit 11, F2). A rejected skip or finish used to be
+     dropped, leaving buttons that did nothing; now the reason shows and the same button retries.
+     One attempt at a time: the ref holds back a second press before the re-render can. */
+  const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState<string | null>(null)
+  const finishingRef = useRef(false)
   const handleFinish = useCallback(async () => {
-    if (!downloadDone) await window.jplearnDesktop.skipSetup?.()
+    if (finishingRef.current) return
+    finishingRef.current = true
+    setFinishing(true)
+    setFinishError(null)
+    try {
+      if (!downloadDone) await window.jplearnDesktop.skipSetup?.()
+    } catch (err) {
+      setFinishError(err instanceof Error ? err.message : String(err))
+      return
+    } finally {
+      finishingRef.current = false
+      setFinishing(false)
+    }
     onComplete()
   }, [downloadDone, onComplete])
 
@@ -338,7 +356,7 @@ export function SetupWizard({ onComplete }: Props) {
           : 'Next'
         }
         skipLabel="Skip setup"
-        nextDisabled={page === 3 ? !sysInfo : false}
+        nextDisabled={page === 3 ? !sysInfo : page === 9 ? finishing : false}
         hideNav={page === 8}
         hideBack={page === 1 || page === 8 || page === 9}
       >
@@ -351,6 +369,11 @@ export function SetupWizard({ onComplete }: Props) {
         {page === 7 && <DownloadSummaryPage {...summaryProps} />}
         {page === 8 && <DownloadProgressPage sysInfo={sysInfo} selectedTier={selectedTier} selectedVoiceTier={selectedVoiceTier} installFonts={installFonts} installDictionary={installDictionary} selectedSpeechTier={selectedSpeechTier} selectedTranslationProfileTier={selectedTranslationProfileTier} modelProgress={modelProgress} llamaProgress={llamaProgress} voiceProgress={voiceProgress} fontsProgress={fontsProgress} dictionaryProgress={dictionaryProgress} speechProgress={speechProgress} translationProfileProgress={translationProfileProgress} modelMb={modelMb} llamaMb={llamaMb} voiceMb={voiceMb} fontsMb={fontsMb} fontsFiles={fontsFiles} modelEta={modelEta} downloadMethods={downloadMethods} downloadError={downloadError} progressLogs={progressLogs} onRetry={() => { void startDownloads() }} />}
         {page === 9 && <SetupCompletePage />}
+        {finishError && (page === 1 || page === 9) && (
+          <div className="setup-error" role="alert">
+            <span className="setup-error-text">Couldn&apos;t finish setup: {finishError}</span>
+          </div>
+        )}
       </StepLayout>
     </WizardShell>
   )

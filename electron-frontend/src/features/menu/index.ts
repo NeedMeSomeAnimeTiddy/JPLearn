@@ -69,5 +69,5 @@ export { useMenuL1 } from './useMenuL1'
 export { MENU_SECTIONS, HERO_INDEX } from './constants'
 export { heroFromStudyBlock, crownFrom, reasonSentence, rowsFrom } from './utils'
 export type {
-  MenuController, MenuCrown, MenuGate, MenuHero, MenuSection, MenuSectionKey,
+  MenuController, MenuCrown, MenuEngineFailure, MenuGate, MenuHero, MenuSection, MenuSectionKey,
 } from './types'

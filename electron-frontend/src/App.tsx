@@ -124,6 +124,7 @@ import { useCursor, CursorFollower, type CursorSettings } from './features/curso
 import { useWindowDrag } from './features/window-drag'
 import { usePomodoro, BreakOverlay, type PomodoroSettingsFields } from './features/pomodoro'
 import { DevDashboard, useDeveloperToolsAvailable } from './features/devtools'
+import { useHomeData, useStartupReady, useStudyEngineStatus } from './features/startup'
 import {
   MINIGAMES,
   SCRIPT_MINIGAMES,
@@ -169,9 +170,12 @@ function App() {
 
   const nav = useAppNavigation()
   const { view, navDirection, navigate } = nav
-  const [summary, setSummary] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
+  // the snapshot is parsed once; `loading` starts from the same read
+  const [initialSummarySnapshot] = useState<StudySummaryPayload | null>(() => loadSummarySnapshot())
+  const [summary, setSummary] = useState<StudySummaryPayload | null>(initialSummarySnapshot)
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState<boolean>(() => loadSummarySnapshot() === null)
+  const [loading, setLoading] = useState<boolean>(initialSummarySnapshot === null)
+  const studyEngine = useStudyEngineStatus()
 
   const [activeScript, setActiveScript] = useState<ScriptKey>(() => loadSessionPrefs()?.script ?? 'hiragana')
   const [activeGame, setActiveGame] = useState<MinigameKey>(() => loadSessionPrefs()?.game ?? 'romaji_sprint')
@@ -424,7 +428,6 @@ function App() {
   const lastLoadedScriptRef = useRef<ScriptKey>('hiragana')
   const startupBootMarkRef = useRef<number>(performance.now())
   const startupFirstSummaryMsRef = useRef<number | null>(null)
-  const startupReadySentRef = useRef(false)
   const xpDetailsRef = useRef<HTMLDivElement | null>(null)
   const streakDetailsRef = useRef<HTMLDivElement | null>(null)
   const vocabCategoryDeckCacheRef = useRef<Partial<Record<VocabCategory, ScriptDeck['cards']>>>({})
@@ -765,6 +768,7 @@ function App() {
       },
     },
   )
+  const notifyStartupReady = useStartupReady(startupBootMarkRef, tutor.notifyTutorStartupReady)
 
   // Closes the one backwards edge in the wiring order above. Assigned during
   // render rather than in an effect: `tutor`'s functions are not stable, so an
@@ -1060,13 +1064,20 @@ function App() {
     }
   }, [])
 
+  // XP, recommendations and the learning path: fetched on mount, and again after a later summary.
+  const refreshHomeData = useHomeData({ setXpProgress, setStudyBlock, setLearningPathStatus })
+  const { recordSuccess: recordSummarySuccess, recordFailure: recordSummaryFailure } = studyEngine
+
   const loadSummary = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const payload = await window.jplearnDesktop?.getStudySummary()
+      // a missing bridge is not a summary (audit 11, F1)
+      if (!payload) throw new Error('The study engine is not available.')
       setSummary(payload)
       saveSummarySnapshot(payload)
+      if (recordSummarySuccess()) refreshHomeData()
       if (startupFirstSummaryMsRef.current === null) {
         const firstSummaryMs = Math.round(performance.now() - startupBootMarkRef.current)
         startupFirstSummaryMsRef.current = firstSummaryMs
@@ -1074,55 +1085,19 @@ function App() {
         void window.jplearnDesktop?.notifyFirstSummary?.({ firstSummaryMs })?.catch(() => undefined)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown desktop bridge error')
+      const message = err instanceof Error ? err.message : 'Unknown desktop bridge error'
+      setError(message)
+      // with no summary since launch, a saved snapshot is not shown as current data
+      if (recordSummaryFailure(message)) setSummary(null)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [recordSummaryFailure, recordSummarySuccess, refreshHomeData])
 
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
 
-  // Fetch XP progress, study recommendations, and learning path
-  // on mount and whenever the summary refreshes.
-  useEffect(() => {
-    let mounted = true
-    const getXp = window.jplearnDesktop?.getXpProgress
-    const getRecs = window.jplearnDesktop?.getRecommendations
-    const getPath = window.jplearnDesktop?.getLearningPathStatus
-
-    const safeResolve = async <T,>(fn: (() => Promise<T>) | undefined): Promise<T | null> => {
-      if (!fn) return null
-      try { return await fn() } catch { return null }
-    }
-
-    const doFetch = async () => {
-      const [xp, recs, path] = await Promise.all([
-        safeResolve(getXp),
-        safeResolve(getRecs),
-        safeResolve(getPath),
-      ])
-      if (!mounted) return
-      if (xp) setXpProgress(xp)
-      if (recs) setStudyBlock(recs)
-      if (path) setLearningPathStatus(path as LearningPathStatus)
-    }
-    void doFetch()
-
-    return () => { mounted = false }
-  }, [summary])
-
-  const notifyStartupReady = useCallback((deferredLoadsQueuedAtMs?: number) => {
-    if (startupReadySentRef.current) return
-    startupReadySentRef.current = true
-
-    const startupReadyMs = Math.round(performance.now() - startupBootMarkRef.current)
-    void window.jplearnDesktop?.notifyStartupReady({
-      startupReadyMs,
-      deferredLoadsQueuedAtMs,
-    }).catch(() => undefined)
-  }, [])
 
 
 
@@ -1140,9 +1115,8 @@ function App() {
 
 
 
-
-  // Avoid background tutor runtime warmup on startup.
-  // Runtime loads lazily when the user sends a chat request.
+  // The tutor warms only while the chat is switched on: useTutor asks for it once startup-ready
+  // has been sent, and again when the chat is turned back on (audit 11, F3).
 
 
 
@@ -2973,6 +2947,11 @@ function App() {
           })}
           onOpenSection={enterMenuSection}
           onRunHero={runMenuHero}
+          engineFailure={studyEngine.failure === null ? null : {
+            message: studyEngine.failure,
+            retrying: loading,
+            onRetry: () => { void loadSummary() },
+          }}
         />
       ) : null}
 
