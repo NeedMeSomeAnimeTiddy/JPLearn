@@ -233,7 +233,7 @@ _RULE_HINTS: dict[WordClass, str] = {
     "godan": "Godan verb: the final kana shifts row before the ending attaches.",
     "ichidan": "Ichidan verb: drop る, then attach the ending.",
     "suru": "する verb: する becomes し- (or で- in the potential).",
-    "kuru": "来る is irregular — the kanji stays put while the reading shifts.",
+    "kuru": "来る is irregular: the kanji stays put while the reading shifts.",
     "i_adjective": "i-adjective: drop い, then attach the ending.",
     "na_adjective": "na-adjective: the ending attaches straight to the stem.",
 }

@@ -64,9 +64,9 @@ class TestSentenceExamplesBlocks:
     def test_blocks_are_numbered_sets_in_order(self) -> None:
         blocks = blocks_for_slug("sentence_examples")
         assert [b.index for b in blocks] == list(range(60))
-        assert blocks[0].name == "Sentences 1–20"
-        assert blocks[1].name == "Sentences 21–40"
-        assert blocks[-1].name == "Sentences 1181–1200"
+        assert blocks[0].name == "Sentences 1-20"
+        assert blocks[1].name == "Sentences 21-40"
+        assert blocks[-1].name == "Sentences 1181-1200"
 
     def test_no_sentence_block_reuses_a_grammar_name(self) -> None:
         grammar = {b.name for b in blocks_for_slug("grammar_patterns")}

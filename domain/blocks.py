@@ -135,7 +135,7 @@ SENTENCE_EXAMPLES_BLOCK_COUNT = 60  # x BLOCK_SIZE = the bridge's 1,200-card cap
 _SENTENCE_EXAMPLES_BLOCKS: list[Block] = [
     Block(
         index,
-        f"Sentences {index * SENTENCE_EXAMPLES_BLOCK_SIZE + 1}–"
+        f"Sentences {index * SENTENCE_EXAMPLES_BLOCK_SIZE + 1}-"
         f"{(index + 1) * SENTENCE_EXAMPLES_BLOCK_SIZE}",
         list(range(index * SENTENCE_EXAMPLES_BLOCK_SIZE, (index + 1) * SENTENCE_EXAMPLES_BLOCK_SIZE)),
         [],
