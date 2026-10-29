@@ -741,7 +741,9 @@ the IPC trust boundary in general, startup, dictionary/OCR content.
 ### Where each finding went
 - F1 tutor translation questions go to jisho.org first (P1, hard line 2): Robbie chose "Offline
   only". Fixed: the online client, its 4.5 s race and the `unofficial-jisho-api` dependency are
-  removed; translations come from the bundled JMdict, and a test fails if the client comes back.
+  removed; translations come from the offline dictionary, and a test fails if the client comes back.
+  (Corrected by audit 14: the dictionary is installed from Settings, not bundled, and until audit 14
+  F3 the tutor read an index file that does not exist, so it never answered.)
 - F2 IPC routes keep the old tutor runtime after setup (P1): fixed. The routes call
   `getLocalTutorRuntime()` (main.cjs passes a getter); a contract test swaps the runtime.
 - F3 tutor HTTP timeouts never fire (confirmed by the Node probe); crash not detected; unload timer

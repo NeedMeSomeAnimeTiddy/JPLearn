@@ -56,6 +56,7 @@ export interface TutorInstallInfo {
   recommendedOcrTier?: 'standard'
   activeOcrModelTier?: 'standard' | null
   ocrInstalled?: boolean
+  translationReady?: boolean
   translationModels?: Array<{
     tier: 'qwen_ja_en'
     label: string

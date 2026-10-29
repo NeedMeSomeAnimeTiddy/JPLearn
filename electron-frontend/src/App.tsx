@@ -286,7 +286,11 @@ function App() {
   )
   const { isOpen: keyboardCheatsheetOpen, close: closeKeyboardCheatsheet } = useKeyboardCheatsheet()
   const commandPalette = useCommandPalette()
-  const lookup = useLookup()
+  const dictionaryCards = useMemo(() => {
+    return dedupeDictionaryCards([...deckCards, ...overviewKanjiDeck])
+  }, [deckCards, overviewKanjiDeck])
+
+  const lookup = useLookup(dictionaryCards)
   /* the palette registers once, so the lookup it opens is read at press time */
   const lookupRef = useRef(lookup)
   lookupRef.current = lookup
@@ -438,10 +442,6 @@ function App() {
   const studyQueueInFlightRef = useRef<Map<string, Promise<StudyQueueResponse>>>(new Map())
   const studyQueueCacheRef = useRef<Map<string, { payload: StudyQueueResponse; cachedAtMs: number }>>(new Map())
   const availableMinigames = useMemo(() => SCRIPT_MINIGAMES[activeScript], [activeScript])
-
-  const dictionaryCards = useMemo(() => {
-    return dedupeDictionaryCards([...deckCards, ...overviewKanjiDeck])
-  }, [deckCards, overviewKanjiDeck])
 
   // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
   const openDictionary = useCallback((seedQuery = '') => {
@@ -744,6 +744,7 @@ function App() {
       activeSessionId,
       activeScript,
       ocrInstalled: models.tutorInstallInfo?.ocrInstalled ?? false,
+      translationReady: models.tutorInstallInfo?.translationReady ?? false,
       lookupChatVisible: lookup.isOpen && lookup.activeRoute === 'tutor',
       onToastNavigate: (script, game, differentScript) => {
         const minigame = resolveScriptMinigame(script, game)

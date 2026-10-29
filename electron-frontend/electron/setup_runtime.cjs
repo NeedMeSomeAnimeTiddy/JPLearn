@@ -14,6 +14,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { execFile, spawn } = require('node:child_process')
 const { resolvePythonCommand, bundledPythonCommand } = require('./python_command.cjs')
+const { isLocalTranslationReady } = require('./llm_runtime.cjs')
 const {
   featurePackagesReady,
   envWithFeaturePackages,
@@ -186,7 +187,8 @@ const TRANSLATION_PROFILES = {
   ocr_qwen_local: {
     label: 'OCR + Qwen3.5-0.8B-JP',
     badge: 'Recommended',
-    description: 'Installs OCR Standard + local Qwen3.5-0.8B-JP GGUF translation model.',
+    // sizeMb leaves out llama.cpp, which is downloaded only when missing and varies by backend
+    description: 'Installs OCR Standard + local Qwen3.5-0.8B-JP GGUF translation model, and the llama.cpp runner if it is missing.',
     sizeMb: 748,
   },
 }
@@ -1030,7 +1032,8 @@ function setActiveTranslationModelTier(tier) {
   }
   fs.writeFileSync(
     getActiveTranslationModelStatePath(base),
-    JSON.stringify({ tier, updatedAtUtc: new Date().toISOString() }, null, 2),
+    // filename: the tutor runtime picks this model when no tutor model is active (llm_runtime.cjs)
+    JSON.stringify({ tier, filename: TRANSLATION_MODELS[tier].filename, updatedAtUtc: new Date().toISOString() }, null, 2),
     'utf8',
   )
   return { ok: true, tier }
@@ -1058,9 +1061,17 @@ function uninstallTranslationModel(tier) {
   return { ok: true, tier }
 }
 
+function isLlamaCppInstalled(base) {
+  return fs.existsSync(path.join(base, 'tools', 'llama.cpp', 'build', 'bin', 'Release', 'llama-server.exe'))
+}
+
+// Image Translation is OCR, a translation model and the runner that runs it (audit 14, F4; Robbie:
+// "Install the runner too"): without llama.cpp the screen would open and every translation fail.
 function isTranslationProfileInstalled(base, profile) {
   if (profile === 'ocr_qwen_local') {
-    return isOcrModelInstalled(base, 'standard') && isTranslationModelInstalled(base, 'qwen_ja_en')
+    return isOcrModelInstalled(base, 'standard')
+      && isTranslationModelInstalled(base, 'qwen_ja_en')
+      && isLlamaCppInstalled(base)
   }
   return false
 }
@@ -1580,6 +1591,8 @@ async function getSystemInfo(options = {}) {
     recommendedTranslationTier: 'qwen_ja_en',
     activeTranslationModelTier: resolveActiveTranslationTier(base),
     translationInstalled: translationModels.some((model) => model.installed),
+    // what the screenshot route needs: the tutor runtime would run a real model (audit 14, F4)
+    translationReady: isLocalTranslationReady(),
     translationProfiles,
     activeTranslationProfileTier: resolveActiveTranslationProfile(base),
     isPackaged,
@@ -2896,7 +2909,18 @@ async function applyTranslationProfile(profile, sender, scriptRoot, options = {}
 
   await downloadTranslationModel('qwen_ja_en', sender, scriptRoot, { force })
   setActiveTranslationModelTier('qwen_ja_en')
-  return { ok: true, profile }
+  // last, so a runner failure leaves OCR and the model installed and says what is missing
+  let llamaCppDownloaded = false
+  if (!isLlamaCppInstalled(base)) {
+    try {
+      const runner = await downloadLlamaCpp(sender, scriptRoot)
+      llamaCppDownloaded = !runner?.alreadyInstalled
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`OCR and the translation model are installed, but the model runner (llama.cpp) is not: ${detail}`)
+    }
+  }
+  return { ok: true, profile, llamaCppDownloaded }
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

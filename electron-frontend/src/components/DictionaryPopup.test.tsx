@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import axe from 'axe-core'
 import type { CardNotePayload } from '../generated/types'
 import { DictionaryPopup } from './DictionaryPopup'
+import { MISSING_DICTIONARY } from '../features/lookup/constants'
 
 const originalGetComputedStyle = window.getComputedStyle
 
@@ -569,5 +570,64 @@ describe('DictionaryPopup pitch accent', () => {
 
     expect(await screen.findByText('today')).toBeTruthy()
     expect(screen.queryByLabelText('Tokyo Japanese pitch accent')).toBeNull()
+  })
+})
+
+describe('DictionaryPopup when the dictionary cannot answer', () => {
+  const missing = () => vi.fn(async () => {
+    throw new Error("Error invoking remote method 'study:search-dictionary': Error: Offline dictionary index is not installed")
+  })
+
+  it('says the offline dictionary is not installed, rather than that the lookup failed', async () => {
+    installNoteApi({ searchDictionary: missing() })
+    render(
+      <DictionaryPopup
+        open
+        openSignal={1}
+        seedQuery="taberu"
+        cards={[]}
+        onClose={() => undefined}
+        onOpenKanjiDetail={() => undefined}
+      />,
+    )
+
+    expect(await screen.findByText(MISSING_DICTIONARY)).toBeTruthy()
+    expect(screen.queryByText('Dictionary lookup failed.')).toBeNull()
+  })
+
+  it('says so above the cards that still matched', async () => {
+    installNoteApi({ searchDictionary: missing() })
+    render(
+      <DictionaryPopup
+        open
+        openSignal={1}
+        seedQuery="school"
+        cards={[{ id: 1, character: '学校', romaji: 'gakkou', meaning: 'school' }]}
+        onClose={() => undefined}
+        onOpenKanjiDetail={() => undefined}
+      />,
+    )
+
+    const line = await screen.findByText(MISSING_DICTIONARY)
+    const card = screen.getByText('学校')
+    expect(line.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps the failure and the retry hint for a real error', async () => {
+    installNoteApi({ searchDictionary: vi.fn(async () => { throw new Error('database is locked') }) })
+    render(
+      <DictionaryPopup
+        open
+        openSignal={1}
+        seedQuery="taberu"
+        cards={[]}
+        onClose={() => undefined}
+        onOpenKanjiDetail={() => undefined}
+      />,
+    )
+
+    expect(await screen.findByText('Dictionary lookup failed.')).toBeTruthy()
+    expect(screen.getByText('Try a different spelling, a romaji reading, or an English meaning.')).toBeTruthy()
+    expect(screen.queryByText(MISSING_DICTIONARY)).toBeNull()
   })
 })

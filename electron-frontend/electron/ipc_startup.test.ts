@@ -90,3 +90,35 @@ describe('reads that save progress (design critic M1)', () => {
     expect(order).toEqual(['clear:xp-progress,recommendations,learning-path-status'])
   })
 })
+
+// Audit 14 review, finding 4: a setup route recreates the tutor runtime (cancelling a reply or a
+// translation in progress) only when the provider, server or model it would use changed.
+describe('recreating the tutor runtime after setup (audit 14)', () => {
+  it('leaves the runtime alone when the selection changes nothing it uses', async () => {
+    const { handlers, options } = register({
+      setupRuntime: { setActiveTranslationModelTier: vi.fn(() => ({ ok: true, tier: 'qwen_ja_en' })) },
+    })
+    await handlers.get('setup:set-active-translation-model')(createValidEvent(), 'qwen_ja_en')
+    expect(options.refreshTutorChatRuntime).not.toHaveBeenCalled()
+  })
+
+  it('recreates it when what it would use changed', async () => {
+    const previous = process.env.JPLEARN_TUTOR_PROVIDER
+    try {
+      process.env.JPLEARN_TUTOR_PROVIDER = 'stub'
+      const { handlers, options } = register({
+        setupRuntime: {
+          setActiveTranslationModelTier: vi.fn(() => {
+            process.env.JPLEARN_TUTOR_PROVIDER = 'llama.cpp'
+            return { ok: true, tier: 'qwen_ja_en' }
+          }),
+        },
+      })
+      await handlers.get('setup:set-active-translation-model')(createValidEvent(), 'qwen_ja_en')
+      expect(options.refreshTutorChatRuntime).toHaveBeenCalledTimes(1)
+    } finally {
+      if (previous === undefined) delete process.env.JPLEARN_TUTOR_PROVIDER
+      else process.env.JPLEARN_TUTOR_PROVIDER = previous
+    }
+  })
+})

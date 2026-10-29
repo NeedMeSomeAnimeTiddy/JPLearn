@@ -41,6 +41,7 @@ const {
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
 const { SPEECH_TIERS } = require('./speech_runtime.cjs')
+const { resolveTutorRuntimeFiles } = require('./llm_runtime.cjs')
 
 const WINDOW_DRAG_INTERVAL_MS = 16
 const WINDOW_DRAG_MAX_DURATION_MS = 60_000
@@ -203,6 +204,22 @@ function registerIpcHandlers(options) {
       databaseJob = null
     }
   }
+  // The tutor runtime, which also translates OCR text, picks its server and model when it is
+  // created, so a route that changes either recreates it (audit 14, F4). Only when they changed:
+  // recreating it cancels a chat reply or translation in progress (review, finding 4).
+  const tutorRuntimeFiles = () => {
+    const { provider, serverPath, modelPath } = resolveTutorRuntimeFiles()
+    return `${provider}\n${serverPath}\n${modelPath}`
+  }
+  const refreshTranslationRuntime = async (filesBefore = null) => {
+    if (filesBefore !== null && filesBefore === tutorRuntimeFiles()) {
+      return
+    }
+    if (typeof options.refreshTutorChatRuntime === 'function') {
+      await options.refreshTutorChatRuntime()
+    }
+  }
+
   // Installing, switching, or removing an OCR model invalidates the warm
   // PaddleOCR engine held by the persistent OCR process.
   const refreshOcrRuntime = () => {
@@ -1696,7 +1713,10 @@ function registerIpcHandlers(options) {
         ? backend
         : undefined
       try {
-        return await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot, safeBackend)
+        const filesBefore = tutorRuntimeFiles()
+        const result = await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot, safeBackend)
+        await refreshTranslationRuntime(filesBefore)
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`llama.cpp download failed: ${detail}`)
@@ -1879,20 +1899,26 @@ function registerIpcHandlers(options) {
       }
       const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
       try {
-        return await setupRuntime.downloadTranslationModel(tier, event.sender, options.repoRoot, { force })
+        const filesBefore = tutorRuntimeFiles()
+        const result = await setupRuntime.downloadTranslationModel(tier, event.sender, options.repoRoot, { force })
+        await refreshTranslationRuntime(filesBefore)
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Translation model download failed: ${detail}`)
       }
     })
 
-    options.ipcMain.handle('setup:set-active-translation-model', (event, tier) => {
+    options.ipcMain.handle('setup:set-active-translation-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['qwen_ja_en'].includes(tier)) {
         throw new Error('Invalid translation model tier')
       }
       try {
-        return setupRuntime.setActiveTranslationModelTier(tier)
+        const filesBefore = tutorRuntimeFiles()
+        const result = setupRuntime.setActiveTranslationModelTier(tier)
+        await refreshTranslationRuntime(filesBefore)
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to select translation model: ${detail}`)
@@ -1909,7 +1935,10 @@ function registerIpcHandlers(options) {
         if (typeof options.unloadTutorChatRuntime === 'function') {
           await options.unloadTutorChatRuntime()
         }
-        return setupRuntime.uninstallTranslationModel(tier)
+        const result = setupRuntime.uninstallTranslationModel(tier)
+        // recreated, so it no longer holds the removed model's path
+        await refreshTranslationRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to uninstall translation model: ${detail}`)
@@ -1926,8 +1955,10 @@ function registerIpcHandlers(options) {
         // The ocr_qwen_local profile installs the standard OCR model as one of
         // its steps, so it invalidates a warm engine just like the dedicated
         // OCR handlers above.
+        const filesBefore = tutorRuntimeFiles()
         const result = await setupRuntime.applyTranslationProfile(tier, event.sender, options.repoRoot, { force })
         refreshOcrRuntime()
+        await refreshTranslationRuntime(filesBefore)
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)

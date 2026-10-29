@@ -1472,7 +1472,9 @@ def _heavy_deck_enrichment(slug: str, cards: list[Card]) -> dict[int, _HeavyCard
             card.id: (
                 None
                 if lookup_dictionary_summary is None
-                else lookup_dictionary_summary(character=card.character, meaning=card.meaning, tags=card.tags),
+                else lookup_dictionary_summary(
+                    character=card.character, meaning=card.meaning, tags=card.tags, romaji=card.romaji
+                ),
                 rank_distractor_ids(cards, card, mode="meaning")[:8],
                 rank_distractor_ids(cards, card, mode="character")[:8],
             )

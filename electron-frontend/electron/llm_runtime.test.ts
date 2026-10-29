@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { createTutorChatRuntime, createAdapterRegistry, extractCliResponseText } = require('./llm_runtime.cjs')
 
@@ -215,14 +215,7 @@ describe('llm runtime', () => {
   it('answers a translation question from the offline dictionary, before adapter inference', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationOfflineEntries: [
-        {
-          id: 'offline-toilet',
-          kanji: [],
-          kana: [{ common: true, text: 'トイレ', tags: [], appliesToKanji: ['*'] }],
-          sense: [{ gloss: [{ lang: 'eng', text: 'bathroom' }] }],
-        },
-      ],
+      translationOfflineEntries: [{ japanese: 'トイレ', reading: 'トイレ', gloss: 'toilet; bathroom', is_common: 1 }],
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -294,14 +287,7 @@ describe('llm runtime', () => {
   it('uses offline JMdict translation', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
-      translationOfflineEntries: [
-        {
-          id: 'offline-test-1',
-          kanji: [{ common: true, text: 'お手洗い', tags: [] }],
-          kana: [{ common: true, text: 'おてあらい', tags: [], appliesToKanji: ['*'] }],
-          sense: [{ gloss: [{ lang: 'eng', text: 'bathroom' }] }],
-        },
-      ],
+      translationOfflineEntries: [{ japanese: 'お手洗い', reading: 'おてあらい', gloss: 'bathroom', is_common: 1 }],
       adapterFactory: () => ({
         async load() {
           return undefined
@@ -322,62 +308,184 @@ describe('llm runtime', () => {
     expect(response.text).toBe('お手洗い (おてあらい)')
   })
 
-  it('uses offline JMdict SQLite lookup when available', async () => {
+  // Audit 14, F4: "translation is ready" is decided by the same resolver the runtime uses.
+  describe('translation readiness', () => {
     const fs = require('node:fs')
     const os = require('node:os')
     const path = require('node:path')
-    let DatabaseSync = null
+    const { resolveTutorRuntimeFiles, isLocalTranslationReady } = require('./llm_runtime.cjs')
+    const saved: Record<string, string | undefined> = {}
+    const keys = ['JPLEARN_ASSETS_DIR', 'JPLEARN_TUTOR_PROVIDER', 'JPLEARN_LLAMA_SERVER_PATH', 'JPLEARN_LLAMA_MODEL_PATH']
+    let assets = ''
+
+    beforeEach(() => {
+      for (const key of keys) {
+        saved[key] = process.env[key]
+        delete process.env[key]
+      }
+      assets = fs.mkdtempSync(path.join(os.tmpdir(), 'jplearn-assets-'))
+      process.env.JPLEARN_ASSETS_DIR = assets
+      const bin = path.join(assets, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
+      fs.mkdirSync(bin, { recursive: true })
+      fs.writeFileSync(path.join(bin, 'llama-server.exe'), '')
+      fs.mkdirSync(path.join(assets, 'models', 'llama'), { recursive: true })
+    })
+
+    afterEach(() => {
+      for (const key of keys) {
+        if (saved[key] === undefined) delete process.env[key]
+        else process.env[key] = saved[key]
+      }
+      fs.rmSync(assets, { recursive: true, force: true })
+    })
+
+    it('is ready with a runner and a model on disk, and not without the model', () => {
+      expect(isLocalTranslationReady()).toBe(false)
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'translate.gguf'), '')
+      expect(isLocalTranslationReady()).toBe(true)
+    })
+
+    it('is not ready when the tutor is forced onto the stub', () => {
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'translate.gguf'), '')
+      process.env.JPLEARN_TUTOR_PROVIDER = 'stub'
+      expect(isLocalTranslationReady()).toBe(false)
+    })
+
+    it('uses the selected translation model when no tutor model is active', () => {
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'a-other.gguf'), '')
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'z-selected.gguf'), '')
+      fs.mkdirSync(path.join(assets, 'translation'), { recursive: true })
+      fs.writeFileSync(
+        path.join(assets, 'translation', 'active-translation-model.json'),
+        JSON.stringify({ tier: 'qwen_ja_en', filename: 'z-selected.gguf' }),
+      )
+      expect(path.basename(resolveTutorRuntimeFiles().modelPath)).toBe('z-selected.gguf')
+    })
+  })
+
+  // Audit 14, F3: the tutor reads the index the build makes (dictionary_entries + dictionary_fts).
+  // Each test builds a SQLite index on disk; the Windows build VM took 10-12 s for the first ones.
+  describe('offline dictionary index', { timeout: 30_000 }, () => {
+    const fs = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+    let DatabaseSync: (new (file: string) => { exec(sql: string): void, close(): void }) | null = null
     try {
       ;({ DatabaseSync } = require('node:sqlite'))
     } catch {
       DatabaseSync = null
     }
+    const sqliteIt = DatabaseSync ? it : it.skip
 
-    if (!DatabaseSync) {
-      return
+    function buildIndex(dir: string, rows: Array<[string, string, string, number]>, withFts = true) {
+      const sqlitePath = path.join(dir, 'jmdict_lookup.sqlite')
+      const db = new DatabaseSync!(sqlitePath)
+      db.exec([
+        'CREATE TABLE dictionary_entries (entry_id INTEGER PRIMARY KEY, source_id TEXT, japanese TEXT NOT NULL, reading TEXT NOT NULL, gloss TEXT NOT NULL, is_common INTEGER NOT NULL DEFAULT 0);',
+        withFts
+          ? "CREATE VIRTUAL TABLE dictionary_fts USING fts5(gloss, content='dictionary_entries', content_rowid='entry_id', tokenize='porter unicode61');"
+          : '',
+      ].join('\n'))
+      rows.forEach(([japanese, reading, gloss, common], index) => {
+        const escape = (value: string) => value.replace(/'/g, "''")
+        db.exec(`INSERT INTO dictionary_entries (entry_id, source_id, japanese, reading, gloss, is_common) VALUES (${index + 1}, 'jmdict:${index + 1}', '${escape(japanese)}', '${escape(reading)}', '${escape(gloss)}', ${common});`)
+      })
+      if (withFts) {
+        db.exec("INSERT INTO dictionary_fts(dictionary_fts) VALUES('rebuild');")
+      }
+      db.close()
+      return sqlitePath
     }
 
-    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'jplearn-dict-'))
-    const sqlitePath = path.join(tmpRoot, 'jmdict_lookup.sqlite')
-
-    try {
-      const db = new DatabaseSync(sqlitePath)
-      db.exec(
-        [
-          'CREATE TABLE dictionary_lookup (lookup_key TEXT PRIMARY KEY, japanese TEXT NOT NULL, reading TEXT NOT NULL, gloss TEXT NOT NULL, entry_id TEXT);',
-          "INSERT INTO dictionary_lookup (lookup_key, japanese, reading, gloss, entry_id) VALUES ('bathroom', 'お手洗い', 'おてあらい', 'bathroom', 'sqlite-test-1');",
-        ].join('\n'),
-      )
-      db.close()
-
-      const runtime = createTutorChatRuntime({
+    function runtimeAt(sqlitePath: string, infer = async () => ({ text: 'モデル', provider: 'stub', model: 'stub-model' })) {
+      return createTutorChatRuntime({
         provider: 'stub',
         translationOfflineDictionarySqlitePath: sqlitePath,
         adapterFactory: () => ({
-          async load() {
-            return undefined
-          },
-          async unload() {
-            return undefined
-          },
-          async infer() {
-            throw new Error('infer should not be called for sqlite dictionary hit')
-          },
+          async load() { return undefined },
+          async unload() { return undefined },
+          infer,
         }),
       })
+    }
 
-      const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
-      expect(response.ok).toBe(true)
-      expect(response.provider).toBe('offline-jmdict')
-      expect(response.model).toBe('jmdict-offline-sqlite')
-      expect(response.text).toBe('お手洗い (おてあらい)')
-    } finally {
+    async function withDir(run: (dir: string) => Promise<void>) {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jplearn-dict-'))
       try {
-        fs.rmSync(tmpRoot, { recursive: true, force: true })
-      } catch {
-        // Windows can hold a read lock briefly for SQLite handles in CI/dev.
+        await run(dir)
+      } finally {
+        try {
+          fs.rmSync(dir, { recursive: true, force: true })
+        } catch {
+          // Windows can hold a read lock briefly for SQLite handles.
+        }
       }
     }
+
+    sqliteIt('answers from an exact gloss', async () => {
+      await withDir(async (dir) => {
+        const runtime = runtimeAt(buildIndex(dir, [['お手洗い', 'おてあらい', 'toilet; bathroom', 1]]))
+        const response = await runtime.sendMessage('How do you say "bathroom" in Japanese?')
+        expect(response.provider).toBe('offline-jmdict')
+        expect(response.model).toBe('jmdict-offline-sqlite')
+        expect(response.text).toBe('お手洗い (おてあらい)')
+        await runtime.unload()
+      })
+    })
+
+    sqliteIt('finds a rare exact gloss behind many common partial matches', async () => {
+      await withDir(async (dir) => {
+        const partial: Array<[string, string, string, number]> = Array.from({ length: 40 }, (_, i) => [`水${i}`, 'みず', `water tank number ${i}`, 1])
+        const runtime = runtimeAt(buildIndex(dir, [...partial, ['水', 'みず', 'water; fluid', 0]]))
+        const response = await runtime.sendMessage('How do you say "water" in Japanese?')
+        expect(response.text).toBe('水 (みず)')
+        await runtime.unload()
+      })
+    })
+
+    sqliteIt('never answers with the cut-off end of a gloss list', async () => {
+      await withDir(async (dir) => {
+        // the index keeps 240 characters, so this common entry's "caravan" survives as "car"
+        const cut = `${'wagon train; '.repeat(17)}travelling party; car`.slice(-240)
+        expect(cut).toHaveLength(240)
+        const runtime = runtimeAt(buildIndex(dir, [['隊商', 'たいしょう', cut, 1], ['車', 'くるま', 'automobile; car', 0]]))
+        expect((await runtime.sendMessage('How do you say "car" in Japanese?')).text).toBe('車 (くるま)')
+        await runtime.unload()
+      })
+    })
+
+    sqliteIt('normalises glosses as it normalises the question', async () => {
+      await withDir(async (dir) => {
+        const runtime = runtimeAt(buildIndex(dir, [
+          ['アイスクリーム', 'アイスクリーム', 'ice-cream', 1],
+          ['お茶', 'おちゃ', "tea  ( green );  someone's  tea", 1],
+        ]))
+        expect((await runtime.sendMessage('How do you say "ice cream" in Japanese?')).text).toBe('アイスクリーム')
+        expect((await runtime.sendMessage('How do you say "Ice-Cream!" in Japanese?')).text).toBe('アイスクリーム')
+        await runtime.unload()
+      })
+    })
+
+    sqliteIt('falls through to the model with no index, or an index without its tables', async () => {
+      await withDir(async (dir) => {
+        const missing = runtimeAt(path.join(dir, 'absent.sqlite'))
+        expect((await missing.sendMessage('How do you say "bathroom" in Japanese?')).provider).toBe('stub')
+        const bare = runtimeAt(buildIndex(dir, [['お手洗い', 'おてあらい', 'bathroom', 1]], false))
+        expect((await bare.sendMessage('How do you say "bathroom" in Japanese?')).provider).toBe('stub')
+        await bare.unload()
+      })
+    })
+
+    sqliteIt('finds an index installed after an earlier miss', async () => {
+      await withDir(async (dir) => {
+        const sqlitePath = path.join(dir, 'jmdict_lookup.sqlite')
+        const runtime = runtimeAt(sqlitePath)
+        expect((await runtime.sendMessage('How do you say "bathroom" in Japanese?')).provider).toBe('stub')
+        buildIndex(dir, [['お手洗い', 'おてあらい', 'bathroom', 1]])
+        expect((await runtime.sendMessage('How do you say "bathroom" in Japanese?')).provider).toBe('offline-jmdict')
+        await runtime.unload()
+      })
+    })
   })
 
   it('treats code 130 runtime text as cancellation instead of surfacing raw errors', async () => {

@@ -21,24 +21,6 @@ const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
 const DEFAULT_MAX_PROMPT_CHARS = 3200
 const DEFAULT_TRANSLATION_OUTPUT_CHARS = 900
-const DEFAULT_OFFLINE_DICTIONARY_FULL_PATH = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'external_sources',
-  'offline_dictionary',
-  'jmdict-eng-3.6.2.json',
-)
-const DEFAULT_OFFLINE_DICTIONARY_COMMON_PATH = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'external_sources',
-  'offline_dictionary',
-  'jmdict-eng-common-3.6.2.json',
-)
 const DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH = path.resolve(
   __dirname,
   '..',
@@ -369,6 +351,20 @@ function resolveBundledModelPath() {
   return ''
 }
 
+// The translation model setup selected (translation/active-translation-model.json, written by
+// setup_runtime.setActiveTranslationModelTier), as a file under models/llama; '' when none.
+function readActiveTranslationModelPath(assetsDir) {
+  try {
+    const raw = fs.readFileSync(path.join(assetsDir, 'translation', 'active-translation-model.json'), 'utf8')
+    const parsed = JSON.parse(raw)
+    const filename = parsed && typeof parsed.filename === 'string' ? path.basename(parsed.filename.trim()) : ''
+    const candidate = filename ? path.join(assetsDir, 'models', 'llama', filename) : ''
+    return candidate && fs.existsSync(candidate) ? candidate : ''
+  } catch {
+    return ''
+  }
+}
+
 function resolveDownloadedModelPath() {
   const assetsDir = resolveAssetsBaseDir()
   if (!assetsDir) {
@@ -392,6 +388,12 @@ function resolveDownloadedModelPath() {
         return activePath
       }
     }
+  }
+
+  // Then the selected translation model (audit 14, F4: the setting is read, not just written).
+  const translationModelPath = readActiveTranslationModelPath(assetsDir)
+  if (translationModelPath) {
+    return translationModelPath
   }
 
   // GGUF files placed directly in models/.
@@ -776,100 +778,15 @@ function resolveBuiltinTranslationEntry(target) {
   return normalizeDictionaryEntry(hit)
 }
 
-function extractFirstJmdictGloss(rawEntry) {
-  if (!rawEntry || typeof rawEntry !== 'object') {
-    return ''
-  }
-  const senses = Array.isArray(rawEntry.sense)
-    ? rawEntry.sense
-    : (Array.isArray(rawEntry.senses) ? rawEntry.senses : [])
-  for (const sense of senses) {
-    if (!sense || typeof sense !== 'object') {
-      continue
-    }
-    const glosses = Array.isArray(sense.gloss) ? sense.gloss : []
-    for (const gloss of glosses) {
-      if (typeof gloss === 'string' && gloss.trim()) {
-        return gloss.trim()
-      }
-      if (gloss && typeof gloss === 'object' && typeof gloss.text === 'string' && gloss.text.trim()) {
-        return gloss.text.trim()
-      }
-    }
-  }
-  return ''
-}
-
-function extractAllJmdictGlosses(rawEntry) {
-  if (!rawEntry || typeof rawEntry !== 'object') {
-    return []
-  }
-  const senses = Array.isArray(rawEntry.sense)
-    ? rawEntry.sense
-    : (Array.isArray(rawEntry.senses) ? rawEntry.senses : [])
-  const glosses = []
-  for (const sense of senses) {
-    if (!sense || typeof sense !== 'object') {
-      continue
-    }
-    const entries = Array.isArray(sense.gloss) ? sense.gloss : []
-    for (const entry of entries) {
-      if (typeof entry === 'string' && entry.trim()) {
-        glosses.push(entry.trim())
-      } else if (entry && typeof entry === 'object' && typeof entry.text === 'string' && entry.text.trim()) {
-        glosses.push(entry.text.trim())
-      }
-    }
-  }
-  return glosses
-}
-
-function parseJmdictWordEntry(rawEntry) {
-  if (!rawEntry || typeof rawEntry !== 'object') {
-    return null
-  }
-
-  const kanji = Array.isArray(rawEntry.kanji) ? rawEntry.kanji : []
-  const kana = Array.isArray(rawEntry.kana) ? rawEntry.kana : []
-
-  const preferredKanji = kanji.find((item) => item && item.common && typeof item.text === 'string' && item.text.trim())
-    || kanji.find((item) => item && typeof item.text === 'string' && item.text.trim())
-    || null
-  const preferredKana = kana.find((item) => item && item.common && typeof item.text === 'string' && item.text.trim())
-    || kana.find((item) => item && typeof item.text === 'string' && item.text.trim())
-    || null
-
-  const japanese = preferredKanji && preferredKanji.text
-    ? preferredKanji.text.trim()
-    : (preferredKana && preferredKana.text ? preferredKana.text.trim() : '')
-  const reading = preferredKana && preferredKana.text ? preferredKana.text.trim() : ''
-  const gloss = extractFirstJmdictGloss(rawEntry)
-
-  return normalizeDictionaryEntry({ japanese, reading, gloss })
-}
-
-function resolveOfflineDictionaryPath(configuredPath) {
-  const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
-  const assetsDir = resolveAssetsBaseDir()
-  const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
-  const candidates = [
-    preferred,
-    assetsDir ? path.join(assetsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
-    assetsDir ? path.join(assetsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
-    resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-3.6.2.json') : '',
-    resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict-eng-common-3.6.2.json') : '',
-    DEFAULT_OFFLINE_DICTIONARY_FULL_PATH,
-    DEFAULT_OFFLINE_DICTIONARY_COMMON_PATH,
-  ]
-  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || ''
-}
-
 function resolveOfflineDictionarySqlitePath(configuredPath) {
   const preferred = typeof configuredPath === 'string' ? configuredPath.trim() : ''
+  if (preferred) {
+    // a configured index is the only one: absent means none, not the next place along
+    return fs.existsSync(preferred) ? preferred : ''
+  }
   const assetsDir = resolveAssetsBaseDir()
   const resourcesPath = (typeof process.resourcesPath === 'string' ? process.resourcesPath : '').trim()
   const candidates = [
-    preferred,
     assetsDir ? path.join(assetsDir, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
     resourcesPath ? path.join(resourcesPath, 'data', 'external_sources', 'offline_dictionary', 'jmdict_lookup.sqlite') : '',
     DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH,
@@ -877,128 +794,144 @@ function resolveOfflineDictionarySqlitePath(configuredPath) {
   return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || ''
 }
 
+// How many entries whose glosses contain the asked-for words are read before choosing. Shortest
+// gloss first puts an entry whose gloss is exactly the word near the top; the cap only bounds the
+// read for a very common word ("water" is in a few hundred glosses).
+const OFFLINE_DICTIONARY_CANDIDATE_LIMIT = 2000
+// build_offline_dictionary_sqlite.py keeps the first 240 characters of an entry's joined glosses
+const OFFLINE_DICTIONARY_GLOSS_LIMIT = 240
+
+/**
+ * The entry a translation question asks for, from rows of { japanese, reading, gloss, is_common }:
+ * one whose gloss list has the key itself as a gloss, else (for a one-word key of 3+ letters) one
+ * with the key as a word of a gloss. Glosses are normalised exactly as the key is, so "ice-cream"
+ * is the gloss "ice cream". Common entries first, then the earliest; anything else is no answer.
+ */
+function selectOfflineDictionaryEntry(rows, key) {
+  // a note in brackets is not part of the meaning: "dog (Canis familiaris)" is the gloss "dog"
+  const withoutNotes = (gloss) => {
+    let text = gloss
+    for (let previous = ''; previous !== text;) {
+      previous = text
+      text = text.replace(/\([^()]*\)/g, ' ') // innermost first: "(Canis (lupus) familiaris)"
+    }
+    return text
+  }
+  const glossesOf = (row) => {
+    const pieces = String(row.gloss || '').split(';')
+    // a list the index cut at its limit ends in part of a gloss ("car" of "caravan"): not a meaning
+    if (pieces.length > 1 && String(row.gloss).length >= OFFLINE_DICTIONARY_GLOSS_LIMIT) {
+      pieces.pop()
+    }
+    return pieces.map((gloss) => normalizeAsciiToken(withoutNotes(gloss))).filter(Boolean)
+  }
+  // The index has no word frequency, so among matches: common words, then the one whose first
+  // meaning it is, then the shorter word (犬 before ワン子 for "dog"), then the one with more
+  // meanings (the general word: 先生 before 教諭 for "teacher"), then the index's own order.
+  const best = (matchIndex) => rows
+    .map((row, order) => {
+      const glosses = glossesOf(row)
+      return { row, order, at: matchIndex(glosses), senses: glosses.length }
+    })
+    .filter((candidate) => candidate.at >= 0)
+    .sort((a, b) => (Number(b.row.is_common) - Number(a.row.is_common))
+      || (a.at - b.at)
+      || (String(a.row.japanese).length - String(b.row.japanese).length)
+      || (b.senses - a.senses)
+      || (a.order - b.order))[0]?.row || null
+  const exact = best((glosses) => glosses.indexOf(key))
+  if (exact || key.includes(' ') || key.length < 3) {
+    return exact
+  }
+  return best((glosses) => glosses.findIndex((gloss) => gloss.split(' ').includes(key)))
+}
+
+/**
+ * The tutor's offline dictionary: the same index the Dictionary panel reads (dictionary_entries,
+ * with its English glosses in dictionary_fts), opened read-only. Until audit 14 this asked for a
+ * `dictionary_lookup` table the index stopped carrying in July 2026 (085cb63), then fell back to
+ * parsing a 117 MB JSON file in the main process (2.4 s). Now there is no fallback: no index, no
+ * answer, and the tutor goes on to its model. The index keeps the first 240 characters of each
+ * entry's glosses (build_offline_dictionary_sqlite.py), so a gloss past that is not found.
+ *
+ * `offlineEntries` (rows as above) stands in for the index in tests.
+ */
 function createOfflineDictionaryLookup(options = {}) {
-  const filePath = resolveOfflineDictionaryPath(options.offlineDictionaryPath)
-  const sqlitePath = resolveOfflineDictionarySqlitePath(options.offlineDictionarySqlitePath)
   const inlineEntries = Array.isArray(options.offlineEntries) ? options.offlineEntries : null
-  let index = null
   let sqliteDb = null
   let sqliteStatement = null
 
-  function buildIndex(entries) {
-    const byGloss = new Map()
-    for (const rawEntry of entries) {
-      const normalized = parseJmdictWordEntry(rawEntry)
-      if (!normalized) {
-        continue
-      }
-      const glosses = extractAllJmdictGlosses(rawEntry)
-      for (const gloss of glosses) {
-        const exactKey = normalizeAsciiToken(gloss)
-        if (exactKey && !byGloss.has(exactKey)) {
-          byGloss.set(exactKey, normalized)
-        }
-        const words = exactKey.split(' ').filter(Boolean)
-        for (const word of words) {
-          if (word.length < 3) {
-            continue
-          }
-          if (!byGloss.has(word)) {
-            byGloss.set(word, normalized)
-          }
-        }
+  function close() {
+    sqliteStatement = null
+    if (sqliteDb) {
+      try {
+        sqliteDb.close()
+      } catch {
+        // Already closed.
       }
     }
-    return byGloss
+    sqliteDb = null
   }
 
-  function ensureIndex() {
-    if (index) {
-      return index
+  // Not remembered as missing: an index installed after a miss is found on the next question.
+  function statement() {
+    if (sqliteStatement) {
+      return sqliteStatement
     }
-    try {
-      const rawEntries = inlineEntries
-        || (() => {
-          if (!filePath) {
-            return []
-          }
-          const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-          return Array.isArray(payload.words) ? payload.words : []
-        })()
-      index = buildIndex(rawEntries)
-    } catch {
-      index = new Map()
-    }
-    return index
-  }
-
-  function lookupFromSqlite(key) {
-    if (inlineEntries || !sqlitePath || !NodeSqliteDatabaseSync) {
+    const sqlitePath = resolveOfflineDictionarySqlitePath(options.offlineDictionarySqlitePath)
+    if (!sqlitePath || !NodeSqliteDatabaseSync) {
       return null
     }
     try {
-      if (!sqliteDb) {
-        sqliteDb = new NodeSqliteDatabaseSync(sqlitePath, { readOnly: true })
-      }
-      if (!sqliteStatement) {
-        sqliteStatement = sqliteDb.prepare(
-          'SELECT japanese, reading, gloss FROM dictionary_lookup WHERE lookup_key = ? LIMIT 1',
-        )
-      }
-      const row = sqliteStatement.get(key)
-      if (!row) {
-        return null
-      }
-      const normalized = normalizeDictionaryEntry({
-        japanese: typeof row.japanese === 'string' ? row.japanese : '',
-        reading: typeof row.reading === 'string' ? row.reading : '',
-        gloss: typeof row.gloss === 'string' ? row.gloss : '',
-      })
-      if (!normalized) {
-        return null
-      }
-      return {
-        ...normalized,
-        source: 'jmdict-offline-sqlite',
-      }
+      sqliteDb = new NodeSqliteDatabaseSync(sqlitePath, { readOnly: true })
+      sqliteStatement = sqliteDb.prepare(
+        'SELECT e.japanese AS japanese, e.reading AS reading, e.gloss AS gloss, e.is_common AS is_common '
+        + 'FROM dictionary_fts JOIN dictionary_entries e ON e.entry_id = dictionary_fts.rowid '
+        + 'WHERE dictionary_fts MATCH ? '
+        + 'ORDER BY e.is_common DESC, length(e.gloss), e.entry_id LIMIT ?',
+      )
+      return sqliteStatement
     } catch {
+      close()
       return null
     }
   }
 
-  return (target) => {
-    const key = normalizeAsciiToken(target)
-    if (!key) {
-      return null
+  function lookup(key) {
+    let rows = inlineEntries
+    let source = 'jmdict-offline'
+    if (!rows) {
+      const query = statement()
+      if (!query) {
+        return null
+      }
+      try {
+        // the key is letters and single spaces (normalizeAsciiToken), so it is a safe FTS5 phrase
+        rows = query.all(`"${key}"`, OFFLINE_DICTIONARY_CANDIDATE_LIMIT)
+      } catch {
+        close()
+        return null
+      }
+      source = 'jmdict-offline-sqlite'
     }
-
-    const sqliteHit = lookupFromSqlite(key)
-    if (sqliteHit) {
-      return sqliteHit
-    }
-
-    const table = ensureIndex()
-    const hit = table.get(key)
-    if (!hit) {
-      return null
-    }
-    return {
-      ...hit,
-      source: 'jmdict-offline',
-    }
+    const hit = normalizeDictionaryEntry(selectOfflineDictionaryEntry(rows, key))
+    return hit ? { ...hit, source } : null
   }
+
+  lookup.close = close
+  return lookup
 }
 
 // Offline only (audit 5, F1; Robbie: "Offline only"). What the learner asks the tutor stays on the
-// machine, so a translation question is never looked up online; the bundled JMdict answers it.
+// machine, so a translation question is never looked up online; the installed dictionary index
+// answers it (audit 14, F3), or nothing does.
 function createDictionaryResolver(options = {}) {
   const resolveOfflineEntry = createOfflineDictionaryLookup({
-    offlineDictionaryPath: options.offlineDictionaryPath,
     offlineDictionarySqlitePath: options.offlineDictionarySqlitePath,
     offlineEntries: options.offlineEntries,
   })
 
-  return async (target) => {
+  const resolve = async (target) => {
     const key = normalizeAsciiToken(target)
     if (!key) {
       return null
@@ -1011,6 +944,8 @@ function createDictionaryResolver(options = {}) {
 
     return null
   }
+  resolve.close = resolveOfflineEntry.close
+  return resolve
 }
 
 function findFreePort() {
@@ -1583,15 +1518,56 @@ function createAdapterRegistry() {
   }
 }
 
+// Ambient environment variables are honoured only when they point at a file that exists; explicit
+// options are honoured as-is (a stale variable would otherwise make the runtime fail to load and
+// silently drop to the stub).
+function preferExistingPath(preferredPath, fallbackPath) {
+  const trimmedPreferred = typeof preferredPath === 'string' ? preferredPath.trim() : ''
+  if (trimmedPreferred && fs.existsSync(trimmedPreferred)) {
+    return trimmedPreferred
+  }
+  return fallbackPath
+}
+
+/**
+ * Which provider, llama-server and model the tutor runtime would use, from files and environment
+ * only: nothing is spawned or loaded. createTutorChatRuntime uses it, and so does setup's install
+ * info, so "translation is ready" means exactly what the runtime will do (audit 14, F4).
+ */
+function resolveTutorRuntimeFiles(options = {}) {
+  const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
+  const autoModelPath = resolveDownloadedModelPath() || ''
+  const provider = normalizeProviderName(
+    options.provider
+    || process.env.JPLEARN_TUTOR_PROVIDER
+    || (discoveredLlamaServerPath && autoModelPath ? 'llama.cpp' : 'stub'),
+  )
+  return {
+    provider,
+    serverPath: options.llamaServerPath
+      || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
+    modelPath: options.llamaModelPath
+      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath),
+    autoModelPath,
+  }
+}
+
+/** OCR translation can run: the runtime would be llama.cpp with a server and a model on disk. */
+function isLocalTranslationReady() {
+  const files = resolveTutorRuntimeFiles()
+  return files.provider === 'llama.cpp'
+    && Boolean(files.serverPath && fs.existsSync(files.serverPath))
+    && Boolean(files.modelPath && fs.existsSync(files.modelPath))
+}
+
 function createTutorChatRuntime(options = {}) {
   const inactivityUnloadMs = Number.isFinite(options.inactivityUnloadMs)
     ? Math.max(15000, Math.floor(options.inactivityUnloadMs))
     : DEFAULT_INACTIVITY_UNLOAD_MS
 
-  const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
-  const downloadedModelPath = resolveDownloadedModelPath()
+  const runtimeFiles = resolveTutorRuntimeFiles(options)
   const discoveredModelPath = resolveBundledModelPath()
-  const autoModelPath = downloadedModelPath || ''
+  const autoModelPath = runtimeFiles.autoModelPath
   const docsDir = resolveAssetsBaseDir()
   const modelStateBases = [
     docsDir ? path.join(docsDir, 'models') : '',
@@ -1601,27 +1577,10 @@ function createTutorChatRuntime(options = {}) {
     .map((base) => (base && fs.existsSync(base) ? readActiveModelTier(base) : null))
     .find((tier) => typeof tier === 'string' && tier.trim())
     || null
-  const configuredProvider = normalizeProviderName(
-    options.provider
-    || process.env.JPLEARN_TUTOR_PROVIDER
-    || (discoveredLlamaServerPath && autoModelPath ? 'llama.cpp' : 'stub'),
-  )
-  // Explicit options are honored as-is. For ambient environment variables we
-  // fall back to the discovered on-disk model/server when the configured path
-  // is missing (e.g. a stale variable points at a model that no longer exists);
-  // otherwise the runtime would fail to load and silently drop to the stub.
-  const preferExistingPath = (preferredPath, fallbackPath) => {
-    const trimmedPreferred = typeof preferredPath === 'string' ? preferredPath.trim() : ''
-    if (trimmedPreferred && fs.existsSync(trimmedPreferred)) {
-      return trimmedPreferred
-    }
-    return fallbackPath
-  }
+  const configuredProvider = runtimeFiles.provider
   const llamaCppConfig = {
-    executablePath: options.llamaServerPath
-      || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
-    modelPath: options.llamaModelPath
-      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath),
+    executablePath: runtimeFiles.serverPath,
+    modelPath: runtimeFiles.modelPath,
     promptTuningProfile: detectPromptTuningProfile({
       activeTier: activeModelTier,
       modelPath: options.llamaModelPath
@@ -1654,7 +1613,6 @@ function createTutorChatRuntime(options = {}) {
   })
 
   const resolveDictionaryEntry = createDictionaryResolver({
-    offlineDictionaryPath: options.translationOfflineDictionaryPath,
     offlineDictionarySqlitePath: options.translationOfflineDictionarySqlitePath,
     offlineEntries: options.translationOfflineEntries,
   })
@@ -1935,10 +1893,10 @@ function createTutorChatRuntime(options = {}) {
       }
 
       const preparedText = preprocessOcrTextForTranslation(text)
-      const trimmedText = clipText(
-        preparedText,
-        Number.isFinite(params.maxInputChars) ? Number(params.maxInputChars) : 2400,
-      )
+      const maxInputChars = Number.isFinite(params.maxInputChars) ? Number(params.maxInputChars) : 2400
+      const trimmedText = clipText(preparedText, maxInputChars)
+      // the screen says "first part of the text" when this is true (audit 14, N2)
+      const clipped = String(preparedText || '').trim().length > trimmedText.length
       const inferenceLease = acquireInferenceLease()
       if (!inferenceLease) {
         throw new Error('Chat inference already active; cancel or wait for completion')
@@ -2011,6 +1969,7 @@ function createTutorChatRuntime(options = {}) {
           return {
             ok: true,
             text: clipText(cleanedText, translationOutputChars),
+            clipped,
             provider: String((inference && inference.provider) || 'unknown'),
             model: String((inference && inference.model) || 'unknown'),
             coldStart,
@@ -2234,6 +2193,8 @@ function createTutorChatRuntime(options = {}) {
       if (loaded && adapter && typeof adapter.unload === 'function') {
         await adapter.unload(reason)
       }
+      // the dictionary index reopens on the next question; a runtime being replaced lets it go
+      resolveDictionaryEntry.close?.()
       loaded = false
       adapter = null
       loadedAtUtc = null
@@ -2255,6 +2216,8 @@ function createTutorChatRuntime(options = {}) {
 
 module.exports = {
   createTutorChatRuntime,
+  resolveTutorRuntimeFiles,
+  isLocalTranslationReady,
   createAdapterRegistry,
   extractCliResponseText,
   httpRequestJson,

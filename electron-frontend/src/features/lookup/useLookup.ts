@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ANSWERABLE_ROUTES, LOOKUP_DEBOUNCE_MS } from './constants'
+import { ANSWERABLE_ROUTES, LOOKUP_DEBOUNCE_MS, MISSING_DICTIONARY } from './constants'
 import type {
-  KanjiAnswer, LookupAnswers, LookupController, LookupRouteKey, PhraseAnswer, WordAnswer,
+  KanjiAnswer, LookupAnswers, LookupController, LookupRouteKey, LookupWordItem, PhraseAnswer, WordAnswer,
 } from './types'
-import { inferRoute, isSingleKanji, loadLookupHistory, rememberLookup } from './utils'
+import { inferRoute, isMissingDictionary, isSingleKanji, loadLookupHistory, rememberLookup } from './utils'
 import { ipcErrorReason } from '../../lib/ipcErrorReason'
+import { guessKanaFromRomaji, searchCards } from '../../lib/dictionarySearch'
+import type { SearchableCard } from '../../lib/dictionarySearch'
+import { dedupeDictionaryCards } from '../card-notes/utils'
+import type { PitchAccent } from '../../generated/types'
 
 const IDLE: LookupAnswers = {
   kanji: { status: 'idle', detail: null, reason: null },
@@ -15,17 +19,31 @@ const IDLE: LookupAnswers = {
 /* the IPC wrapper is a sentence about Electron rather than about Japanese, so it is peeled off */
 const reason = ipcErrorReason
 
-/* The offline dictionary is an optional download, and the bridge says so by raising rather than
-   by returning nothing. That distinction is the whole point of the `unavailable` status, so it is
-   recognised here rather than flattened into a generic failure. */
-const isMissingDictionary = (message: string): boolean =>
-  /not installed|not available|no dictionary|index is missing/i.test(message)
+/** a card from the learner's decks, as the panel is handed them */
+export interface LookupCard extends SearchableCard {
+  id: number
+  note_key?: string
+  source_id?: string | null
+  pitch_accents?: PitchAccent[]
+  dictionary_summary?: { pitch_accents: PitchAccent[] } | null
+}
 
-/* and when it IS the missing download, the overlay says the useful thing rather than the raised
-   thing -- this is the fact that connects the two doors: `,` is where you fix it */
-const MISSING_DICTIONARY = 'The offline dictionary is not installed — add it from Settings (,)'
+function cardAsWordItem(card: LookupCard): LookupWordItem {
+  return {
+    id: card.id,
+    source_id: card.source_id ?? null,
+    note_key: card.note_key ?? '',
+    character: card.character,
+    romaji: card.romaji,
+    meaning: card.meaning,
+    tags: card.tags ?? [],
+    example_sentence: card.example_sentence ?? null,
+    pitch_accents: card.pitch_accents ?? card.dictionary_summary?.pitch_accents ?? [],
+  }
+}
 
-export function useLookup(): LookupController {
+/** `cards` is the collection the Dictionary panel searches, so A WORD finds what the panel finds */
+export function useLookup(cards: readonly LookupCard[] = []): LookupController {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [answers, setAnswers] = useState<LookupAnswers>(IDLE)
@@ -35,12 +53,20 @@ export function useLookup(): LookupController {
   /* every in-flight batch carries the id it was started with; a stale batch drops its results
      rather than overwriting the answers to a newer query */
   const requestIdRef = useRef(0)
+  /* read when a batch runs, not a reason to run one: a deck loading in the background does not
+     re-ask the bridge about what is already on screen */
+  const cardsRef = useRef(cards)
+  useEffect(() => { cardsRef.current = cards }, [cards])
 
   useEffect(() => {
     historyRef.current = loadLookupHistory()
   }, [])
 
   const activeRoute: LookupRouteKey = routeOverride ?? inferRoute(query)
+  /* THE DICTIONARY IS ASKED ONLY WHERE ITS ANSWER IS DRAWN. A question for the tutor or a screenshot
+     would otherwise put a dictionary search and a sentence search in the serial bridge ahead of
+     the next thing that matters. One kanji is still asked about on any route. */
+  const dictionaryRoute = activeRoute === 'word' || activeRoute === 'phrase'
 
   const open = useCallback((seed = '', route?: LookupRouteKey) => {
     setIsOpen(true)
@@ -70,33 +96,35 @@ export function useLookup(): LookupController {
   useEffect(() => {
     if (!isOpen) return
     const trimmed = query.trim()
-    if (!trimmed) {
+    /* any change drops the batch in flight, clearing the field included -- a dropped batch neither
+       draws its answers nor goes into the history */
+    const id = ++requestIdRef.current
+    const live = () => requestIdRef.current === id
+
+    /* SEQUENTIALLY, AND THAT IS NOT AN OVERSIGHT. The Python bridge handles one request at a time,
+       so firing three at once only queues them behind each other and makes the first answer wait
+       for all three. The route the query actually asked for goes first, so the answer that matters
+       arrives first. */
+    const order: LookupRouteKey[] = [
+      ...(isSingleKanji(trimmed) ? ['kanji' as const] : []),
+      ...(dictionaryRoute ? ['word' as const, 'phrase' as const] : []),
+    ]
+    if (!trimmed || order.length === 0) {
       setAnswers(IDLE)
       setBusy(false)
       return
     }
 
-    const id = ++requestIdRef.current
-    const live = () => requestIdRef.current === id
     const timer = window.setTimeout(() => {
       void (async () => {
         setBusy(true)
         setAnswers({
-          kanji: { status: isSingleKanji(trimmed) ? 'searching' : 'idle', detail: null, reason: null },
-          word: { status: 'searching', source: null, results: [], reason: null },
-          phrase: { status: 'searching', sentence: null, reason: null },
+          kanji: { status: order.includes('kanji') ? 'searching' : 'idle', detail: null, reason: null },
+          word: { status: order.includes('word') ? 'searching' : 'idle', source: null, results: [], reason: null },
+          phrase: { status: order.includes('phrase') ? 'searching' : 'idle', sentence: null, reason: null },
         })
 
         const api = window.jplearnDesktop
-
-        /* SEQUENTIALLY, AND THAT IS NOT AN OVERSIGHT. The Python bridge handles one request at a
-           time and a request that times out tears down and rejects every other one in flight, so
-           firing three at once would make a slow dictionary look like three broken routes. The
-           route the query actually asked for goes first, so the answer that matters arrives
-           first. */
-        const order: LookupRouteKey[] = isSingleKanji(trimmed)
-          ? ['kanji', 'word', 'phrase']
-          : ['word', 'phrase']
 
         for (const route of order) {
           if (!live()) return
@@ -127,23 +155,40 @@ export function useLookup(): LookupController {
           }
 
           if (route === 'word') {
+            /* THE DICTIONARY AND YOUR DECKS, as the empty state promises. The cards come first: a
+               word you are learning is the answer you meant. They are told apart by the panel's
+               identity, never by id alone -- two decks can number different cards the same. */
+            const cardResults = dedupeDictionaryCards(searchCards(cardsRef.current, trimmed).map(cardAsWordItem))
             let next: WordAnswer
             if (!api?.searchDictionary) {
-              next = { status: 'unavailable', source: null, results: [], reason: 'The desktop bridge is not available.' }
+              next = {
+                status: 'unavailable', source: cardResults.length ? 'loaded_cards' : null, results: cardResults,
+                reason: 'The desktop bridge is not available.',
+              }
             } else {
               try {
-                const payload = await api.searchDictionary(trimmed)
-                const results = payload?.results ?? []
-                next = results.length
+                let payload = await api.searchDictionary(trimmed)
+                let found = payload?.results ?? []
+                /* romaji reads as kana the second time, the way the panel reads it */
+                const kana = found.length ? null : guessKanaFromRomaji(trimmed)
+                if (kana) {
+                  if (!live()) return
+                  payload = await api.searchDictionary(kana)
+                  found = payload?.results ?? []
+                }
+                const results = dedupeDictionaryCards([...cardResults, ...found])
+                next = found.length
                   ? { status: 'ready', source: payload.source, results, reason: null }
-                  : { status: 'empty', source: payload?.source ?? null, results: [], reason: 'Nothing matched.' }
+                  : cardResults.length
+                    ? { status: 'ready', source: 'loaded_cards', results, reason: null }
+                    : { status: 'empty', source: payload?.source ?? null, results: [], reason: 'Nothing matched.' }
               } catch (error) {
                 const message = reason(error)
                 const missing = isMissingDictionary(message)
                 next = {
                   status: missing ? 'unavailable' : 'error',
-                  source: null,
-                  results: [],
+                  source: cardResults.length ? 'loaded_cards' : null,
+                  results: cardResults,
                   reason: missing ? MISSING_DICTIONARY : message,
                 }
               }
@@ -177,7 +222,7 @@ export function useLookup(): LookupController {
     }, LOOKUP_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timer)
-  }, [isOpen, query])
+  }, [isOpen, query, dictionaryRoute])
 
   return useMemo<LookupController>(() => ({
     isOpen, open, close, query, setQuery, activeRoute, routePinned: routeOverride !== null,

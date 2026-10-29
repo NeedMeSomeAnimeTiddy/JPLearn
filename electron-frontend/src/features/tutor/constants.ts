@@ -11,6 +11,10 @@ export const ASSISTANT_CHAT_IMAGE_MAX_DIMENSION = 2200
 export const ASSISTANT_CHAT_IMAGE_JPEG_QUALITY = 0.62
 export const ASSISTANT_MAX_TOASTS = 1
 
+/* the image was read but not translated: the lines stay on screen and this sits above them */
+export const OCR_TRANSLATION_FAILED_PREFIX = "Read the text, but couldn't translate it: "
+export const OCR_NO_TRANSLATION_REASON = 'no translation came back'
+
 export const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
   { value: 1, label: 'On' },

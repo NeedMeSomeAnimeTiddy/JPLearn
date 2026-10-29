@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { BookText, Check, ClipboardCopy, History, NotebookPen, ScanText, TriangleAlert, Volume2, X } from 'lucide-react'
-import { toHiragana } from 'wanakana'
 import type { PitchAccent } from '../generated/types'
 import {
   CardNoteEditor,
@@ -12,6 +11,11 @@ import {
 } from '../features/card-notes'
 import { extractKanjiCharacters } from '../features/kanji-detail'
 import { DictionaryPitchAccent } from './DictionaryPitchAccent'
+import { guessKanaFromRomaji, searchCards } from '../lib/dictionarySearch'
+import type { CardMatch } from '../lib/dictionarySearch'
+import { MISSING_DICTIONARY } from '../features/lookup/constants'
+import { isMissingDictionary } from '../features/lookup/utils'
+import { ipcErrorReason } from '../lib/ipcErrorReason'
 
 export interface DictionaryCard {
   id: number
@@ -38,10 +42,7 @@ interface DictionaryPopupProps {
   voiceUnavailable?: boolean
 }
 
-interface DictionaryResult extends DictionaryCard {
-  score: number
-  matchReason: string
-}
+type DictionaryResult = DictionaryCard & CardMatch
 
 type DictionaryLookupPayload = Awaited<ReturnType<NonNullable<typeof window.jplearnDesktop.searchDictionary>>>
 
@@ -49,18 +50,6 @@ const HISTORY_STORAGE_KEY = 'jplearn-dictionary-history-v1'
 const MAX_HISTORY = 8
 const INITIAL_VISIBLE_RESULTS = 12
 const RESULTS_PAGE_SIZE = 12
-
-function normalizeQuery(value: string): string {
-  return value.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ')
-}
-
-function compactQuery(value: string): string {
-  return normalizeQuery(value).replace(/[\s\-_.!?/\\'",:;()[\]{}]+/g, '')
-}
-
-function hasJapaneseText(value: string): boolean {
-  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(value)
-}
 
 function loadHistory(): string[] {
   if (typeof window === 'undefined') return []
@@ -81,53 +70,6 @@ function saveHistory(history: string[]): void {
   } catch {
     // Local history is convenience only.
   }
-}
-
-function scoreCard(card: DictionaryCard, query: string): DictionaryResult | null {
-  const normalized = normalizeQuery(query)
-  if (!normalized) return null
-  const compact = compactQuery(query)
-  const character = normalizeQuery(card.character)
-  const romaji = normalizeQuery(card.romaji)
-  const meaning = normalizeQuery(card.meaning)
-  const tagText = normalizeQuery((card.tags ?? []).join(' '))
-  const exampleText = normalizeQuery(card.example_sentence ?? '')
-  const searchable = `${character} ${romaji} ${meaning} ${tagText} ${exampleText}`.trim()
-
-  if (!searchable) return null
-
-  const exactCharacter = hasJapaneseText(query) && character === compact
-  const exactRomaji = romaji === normalized
-  const exactMeaning = meaning === normalized
-
-  if (exactCharacter) {
-    return { ...card, score: 0, matchReason: 'exact character' }
-  }
-  if (exactRomaji) {
-    return { ...card, score: 1, matchReason: 'exact reading' }
-  }
-  if (exactMeaning) {
-    return { ...card, score: 2, matchReason: 'exact meaning' }
-  }
-
-  if (hasJapaneseText(query)) {
-    if (character.startsWith(compact)) return { ...card, score: 3, matchReason: 'character prefix' }
-    if (character.includes(compact)) return { ...card, score: 4, matchReason: 'character match' }
-    if (romaji.includes(normalized)) return { ...card, score: 5, matchReason: 'reading match' }
-    if (meaning.includes(normalized)) return { ...card, score: 6, matchReason: 'meaning match' }
-  } else {
-    if (meaning.startsWith(normalized)) return { ...card, score: 3, matchReason: 'meaning prefix' }
-    if (romaji.startsWith(normalized)) return { ...card, score: 4, matchReason: 'reading prefix' }
-    if (meaning.includes(normalized)) return { ...card, score: 5, matchReason: 'meaning match' }
-    if (romaji.includes(normalized)) return { ...card, score: 6, matchReason: 'reading match' }
-    if (character.includes(compact)) return { ...card, score: 7, matchReason: 'character match' }
-  }
-
-  if (searchable.includes(normalized) || searchable.includes(compact)) {
-    return { ...card, score: 8, matchReason: 'text match' }
-  }
-
-  return null
 }
 
 function updateHistory(history: string[], query: string): string[] {
@@ -173,22 +115,6 @@ function mapLookupResult(
   }
 }
 
-// If the query looks like romaji (plain latin letters, no kana/kanji already),
-// try converting it to hiragana so it can also be matched against the offline
-// dictionary's kana readings - JMdict readings are stored in kana, not romaji.
-function guessKanaFromRomaji(query: string): string | null {
-  const trimmed = query.trim()
-  if (!trimmed || hasJapaneseText(trimmed)) return null
-  if (!/^[a-zA-Z\s'-]+$/.test(trimmed)) return null
-  const converted = toHiragana(trimmed, { passRomaji: false })
-  if (!converted || !hasJapaneseText(converted)) return null
-  if (converted.toLowerCase() === trimmed.toLowerCase()) return null
-  // Reject partial/garbled conversions (e.g. "hello" -> "へlぉ") - only trust
-  // conversions where every romaji character mapped cleanly to kana.
-  if (/[a-zA-Z]/.test(converted)) return null
-  return converted
-}
-
 async function copyText(value: string): Promise<void> {
   if (!value || typeof navigator === 'undefined' || !navigator.clipboard) return
   await navigator.clipboard.writeText(value)
@@ -202,7 +128,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
   const [history, setHistory] = useState<string[]>(() => loadHistory())
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [remoteResults, setRemoteResults] = useState<DictionaryResult[]>([])
-  const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'ready' | 'unavailable' | 'error'>('idle')
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'ready' | 'unavailable' | 'missing' | 'error'>('idle')
   const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_RESULTS)
   const [openCopyMenu, setOpenCopyMenu] = useState<string | null>(null)
   const openCopyMenuRef = useRef<string | null>(null)
@@ -331,10 +257,11 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
           )
           setRemoteResults([...primaryResults, ...fallbackResults])
           setSearchStatus('ready')
-        } catch {
+        } catch (error) {
           if (searchRequestIdRef.current !== currentRequestId) return
           setRemoteResults([])
-          setSearchStatus('error')
+          /* the dictionary is an optional download: not having it is not a failed lookup */
+          setSearchStatus(isMissingDictionary(ipcErrorReason(error)) ? 'missing' : 'error')
         }
       }
 
@@ -348,14 +275,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
 
   const results = useMemo(() => {
     if (!query.trim()) return []
-    const localResults = cards
-      .map((card) => scoreCard(card, query))
-      .filter((item): item is DictionaryResult => item !== null)
-      .sort((left, right) => {
-        if (left.score !== right.score) return left.score - right.score
-        if (left.character !== right.character) return left.character.localeCompare(right.character)
-        return left.romaji.localeCompare(right.romaji)
-      })
+    const localResults = searchCards(cards, query)
     const mergedResults = remoteResults.length > 0 ? [...remoteResults, ...localResults] : localResults
     return dedupeResults(mergedResults)
   }, [cards, query, remoteResults])
@@ -544,6 +464,11 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
               </div>
             ) : results.length > 0 ? (
               <div className="dictionary-result-list">
+                {searchStatus === 'missing' ? (
+                  <div className="dictionary-empty-state">
+                    <p>{MISSING_DICTIONARY}</p>
+                  </div>
+                ) : null}
                 {visibleResults.map((result) => {
                   const resultIdentity = dictionaryItemRenderKey(result)
                   const resultDomIdentity = encodeURIComponent(resultIdentity)
@@ -740,8 +665,14 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
               </div>
             ) : (
               <div className="dictionary-empty-state">
-                <p>{searchStatus === 'error' ? 'Dictionary lookup failed.' : 'No matching entries yet.'}</p>
-                <p>Try a different spelling, a romaji reading, or an English meaning.</p>
+                {searchStatus === 'missing' ? (
+                  <p>{MISSING_DICTIONARY}</p>
+                ) : (
+                  <>
+                    <p>{searchStatus === 'error' ? 'Dictionary lookup failed.' : 'No matching entries yet.'}</p>
+                    <p>Try a different spelling, a romaji reading, or an English meaning.</p>
+                  </>
+                )}
               </div>
             )}
           </section>

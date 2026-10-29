@@ -18,6 +18,14 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from data.card_notes_repository import build_offline_note_key, canonical_jmdict_source_id
+from data.dictionary_card_match import (
+    CardEntryCandidate,
+    card_forms,
+    card_readings,
+    choose_card_entry,
+    is_kana_only,
+    romaji_to_hiragana,
+)
 from data.text_normalization import contains_japanese_script
 from domain.blocks import themes_for_slug
 from domain.decks import ALL_DECKS
@@ -577,24 +585,50 @@ def _should_enrich_card_from_dictionary(tags: list[str]) -> bool:
     return "hiragana" not in normalized_tags and "katakana" not in normalized_tags
 
 
-def _select_dictionary_row(rows: list[tuple], character: str, meaning: str) -> tuple | None:
-    normalized_character = _normalize_dictionary_query(character)
-    normalized_meaning = _normalize_dictionary_query(meaning)
+_CARD_ENTRY_LIMIT = 50
+_CARD_ENTRY_SQL_BY_JAPANESE = (
+    "SELECT entry_id, japanese, reading, gloss, is_common FROM dictionary_entries "
+    "WHERE japanese = ? ORDER BY entry_id LIMIT ?"
+)
+_CARD_ENTRY_SQL_BY_READING = (
+    "SELECT entry_id, japanese, reading, gloss, is_common FROM dictionary_entries "
+    "WHERE reading = ? ORDER BY entry_id LIMIT ?"
+)
 
-    def _score(row: tuple) -> tuple[int, int, int]:
-        row_character = _normalize_dictionary_query(str(row[2]))
-        row_gloss = _normalize_dictionary_query(str(row[4]))
-        exact_character = 1 if row_character == normalized_character else 0
-        meaning_match = 1 if normalized_meaning and normalized_meaning in row_gloss else 0
-        starts_with_character = 1 if row_character.startswith(normalized_character) else 0
-        return (exact_character, meaning_match, starts_with_character)
 
-    ranked_rows = sorted(
-        rows,
-        key=lambda row: (_score(row), -len(str(row[2]))),
-        reverse=True,
-    )
-    return ranked_rows[0] if ranked_rows else None
+def _card_entry_candidates(conn: sqlite3.Connection, forms: list[str], romaji: str) -> list[CardEntryCandidate]:
+    """Exact matches only: a form as a headword; an all-kana form as a reading (in hiragana and
+    katakana, since loanwords are stored either way); and the card's romaji readings as readings,
+    since the index keeps one spelling per word and files some under another ("五日" as "５日"). No
+    prefixes, no parsed base forms. ``choose_card_entry`` decides which, if any, is the card's word."""
+    rows: list[tuple] = []
+    readings: list[str] = []
+    for form in forms:
+        rows.extend(conn.execute(_CARD_ENTRY_SQL_BY_JAPANESE, (form, _CARD_ENTRY_LIMIT)).fetchall())
+        if is_kana_only(form):
+            readings.append(_katakana_to_hiragana(form))
+    if romaji and len(readings) < len(forms):  # a kana-only card is found by its own spelling
+        for token in re.split(r"[\s/,;()~]+", romaji):
+            hiragana = romaji_to_hiragana(token)
+            if hiragana:
+                readings.append(hiragana)
+    for hiragana in dict.fromkeys(readings):
+        for reading in dict.fromkeys((hiragana, _hiragana_to_katakana(hiragana))):
+            rows.extend(conn.execute(_CARD_ENTRY_SQL_BY_READING, (reading, _CARD_ENTRY_LIMIT)).fetchall())
+    return [
+        CardEntryCandidate(
+            entry_id=int(row[0]),
+            japanese=str(row[1]),
+            reading=str(row[2]),
+            gloss=str(row[3]),
+            is_common=bool(row[4]),
+        )
+        for row in rows
+    ]
+
+
+def _hiragana_to_katakana(text: str) -> str:
+    return "".join(chr(ord(ch) + _KATAKANA_TO_HIRAGANA_SHIFT) if "ぁ" <= ch <= "ゖ" else ch for ch in text)
 
 
 def _lookup_card_dictionary_summary(
@@ -603,34 +637,40 @@ def _lookup_card_dictionary_summary(
     character: str,
     meaning: str,
     tags: list[str],
+    romaji: str = "",
     pitch_accent_available: bool | None = None,
 ) -> DictionaryCardSummary | None:
+    """The card's own dictionary entry, or None (data/dictionary_card_match.py; audit 14, F1)."""
     if conn is None or not _should_enrich_card_from_dictionary(tags):
         return None
 
-    normalized_character = _normalize_dictionary_query(character)
-    if not normalized_character or not contains_japanese_script(normalized_character):
+    forms = [form for form in card_forms(character) if contains_japanese_script(form)]
+    if not forms:
         return None
 
-    rows = _search_dictionary_japanese(conn, normalized_character)
-    match = _select_dictionary_row(rows, character, meaning)
+    match = choose_card_entry(
+        _card_entry_candidates(conn, forms, romaji),
+        forms=forms,
+        readings=card_readings(romaji),
+        meaning=meaning,
+    )
     if match is None:
         return None
 
-    glosses = _split_dictionary_glosses(str(match[4]))
+    glosses = _split_dictionary_glosses(match.gloss)
     if not glosses:
         return None
 
     return DictionaryCardSummary(
-        character=str(match[2]),
-        reading=str(match[3]),
+        character=match.japanese,
+        reading=match.reading,
         primary_gloss=glosses[0],
         glosses=glosses,
         source="offline_dictionary",
         pitch_accents=_lookup_pitch_accents(
             conn,
-            word=str(match[2]),
-            reading=str(match[3]),
+            word=match.japanese,
+            reading=match.reading,
             available=pitch_accent_available,
         ),
     )
@@ -654,9 +694,11 @@ _PREFIX_RANGE_SENTINEL = "￿"
 # keeps the planner off the low-cardinality index. The range subsumes the
 # equality case, so the `=` branches are gone.
 #
-# One deliberate narrowing: this is now case-sensitive where `LIKE` was not.
-# Callers reach here only for queries containing Japanese script, where case
-# does not apply; a mixed headword like "Tシャツ" now needs matching case.
+# One deliberate narrowing: this is case-sensitive where `LIKE` was not. Callers
+# reach here only for queries containing Japanese script, and those queries are
+# lowercased first (`_normalize_dictionary_query`), so a headword with capitals,
+# such as "Tシャツ", is never found by this search (audit 14, N4). Card enrichment
+# keeps the case (`dictionary_card_match.normalize_form`).
 _DICTIONARY_PREFIX_SQL = (
     "SELECT entry_id, source_id, japanese, reading, gloss FROM ("
     "SELECT entry_id, source_id, japanese, reading, gloss FROM dictionary_entries "
@@ -977,7 +1019,7 @@ def open_enrichment_session() -> Generator[
 ]:
     """Open one dictionary connection reused across many per-card lookups.
 
-    Yields a ``lookup(*, character, meaning, tags)`` callable, or None when
+    Yields a ``lookup(*, character, meaning, tags, romaji="")`` callable, or None when
     the offline dictionary isn't installed or has an unsupported schema.
     """
     conn: sqlite3.Connection | None = None
@@ -996,12 +1038,15 @@ def open_enrichment_session() -> Generator[
 
         pitch_accent_available = _dictionary_has_pitch_accent_data(conn)
 
-        def _lookup(*, character: str, meaning: str, tags: list[str]) -> DictionaryCardSummary | None:
+        def _lookup(
+            *, character: str, meaning: str, tags: list[str], romaji: str = ""
+        ) -> DictionaryCardSummary | None:
             return _lookup_card_dictionary_summary(
                 conn,
                 character=character,
                 meaning=meaning,
                 tags=tags,
+                romaji=romaji,
                 pitch_accent_available=pitch_accent_available,
             )
 
