@@ -2073,6 +2073,12 @@ async function preloadStartupBridgeData(splash, taskTimings = []) {
 
   const preloadTasks = [
     {
+      // First, so no read below is cached from before the flag it may set (audit 12 review).
+      key: 'onboarding-check',
+      label: 'Onboarding check',
+      run: () => markReturningLearnerOnboarded(),
+    },
+    {
       key: 'summary',
       label: 'Study summary',
       run: () => runPythonBridgeCached('summary'),
@@ -2095,10 +2101,7 @@ async function preloadStartupBridgeData(splash, taskTimings = []) {
     {
       key: 'learning-path-status',
       label: 'Learning path status',
-      run: async () => {
-        await markReturningLearnerOnboarded()
-        return runPythonBridgeCached('learning-path-status')
-      },
+      run: () => runPythonBridgeCached('learning-path-status'),
     },
     {
       key: 'assistant-snapshot',

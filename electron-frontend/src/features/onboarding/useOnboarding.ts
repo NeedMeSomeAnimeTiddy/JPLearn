@@ -44,19 +44,20 @@ export function useOnboarding(props: OnboardingWizardProps) {
   const goToPage = useCallback((next: Page) => {
     if (actualSteps.includes(next)) {
       setPage(next)
+      setSubmitError(null)
     }
   }, [actualSteps])
 
   const goNext = useCallback(() => {
     if (isLastStep) return
     const nextPage = actualSteps[currentIndex + 1]
-    if (nextPage !== undefined) setPage(nextPage)
+    if (nextPage !== undefined) { setPage(nextPage); setSubmitError(null) }
   }, [actualSteps, currentIndex, isLastStep])
 
   const goBack = useCallback(() => {
     if (isFirstStep) return
     const prevPage = actualSteps[currentIndex - 1]
-    if (prevPage !== undefined) setPage(prevPage)
+    if (prevPage !== undefined) { setPage(prevPage); setSubmitError(null) }
   }, [actualSteps, currentIndex, isFirstStep])
 
   function toggleItem(key: string) {

@@ -10,7 +10,9 @@ export function knownItemsFromChecked(checked: ReadonlySet<string>): KnownItem[]
 
 /** The sentence the wizard shows for a failed save. */
 export function onboardingFailureSentence(failure: OnboardingFailure): string {
-  return `${SUBMIT_FAILURE_LEAD[failure.stage]}: ${failure.message}`
+  // Only the first line: a failed one-shot bridge fallback reports its command, folders and output too.
+  const reason = failure.message.split(/\r?\n/, 1)[0].trim()
+  return `${SUBMIT_FAILURE_LEAD[failure.stage]}: ${reason}`
 }
 
 export interface OnboardingSaveSteps {

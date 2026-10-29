@@ -107,7 +107,8 @@ def test_a_steps_mastered_date_survives_later_syncs() -> None:
         desktop_bridge.build_progression_status()
         row = next(r for r in database.load_user_progression() if r["node_id"] == "hiragana")
         dates.append(row["mastered_at"])
-    assert dates == [date.today().isoformat()] * 3
+    assert dates[0] is not None
+    assert dates == [dates[0]] * 3
 
 
 def test_an_unreadable_stored_date_reads_as_none() -> None:

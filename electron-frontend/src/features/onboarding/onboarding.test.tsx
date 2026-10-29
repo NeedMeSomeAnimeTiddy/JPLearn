@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-li
 import { OnboardingWizard } from './OnboardingWizard'
 import { useOnboarding } from './useOnboarding'
 import { FAMILIARITY_ITEMS } from './constants'
-import { knownItemsFromChecked, saveOnboarding } from './utils'
+import { knownItemsFromChecked, onboardingFailureSentence, saveOnboarding } from './utils'
 import type { OnboardingFailure, OnboardingWizardProps } from './types'
 
 type Submit = (...args: unknown[]) => Promise<OnboardingFailure | null>
@@ -209,5 +209,12 @@ describe('OnboardingWizard: leaving says why it could not', () => {
     await flush()
     expect(onComplete).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('onboardingFailureSentence', () => {
+  it('shows only the first line of a multi-line reason', () => {
+    expect(onboardingFailureSentence({ stage: 'complete', message: 'Python bridge failed\ncommand: python\nstderr: ...' }))
+      .toBe("Couldn't finish onboarding: Python bridge failed")
   })
 })
