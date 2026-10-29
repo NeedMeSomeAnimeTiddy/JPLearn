@@ -49,6 +49,8 @@ const MAX_PROGRESS_FILE_BYTES = 256 * 1024 * 1024
    worker's usual 30 s, and a timed-out job would still finish in Python after the window was told it
    failed (audit 10, review finding 2). */
 const DATABASE_JOB = Object.freeze({ timeoutMs: 10 * 60_000 })
+// Marking onboarding as due is one settings write; the wizard does not wait longer than this for it.
+const SETUP_ONBOARDING_MARK = Object.freeze({ timeoutMs: 10_000 })
 
 function assertBackupFileSize(filePath, maxBytes) {
   const { size } = require('fs').statSync(filePath)
@@ -148,9 +150,21 @@ function registerIpcHandlers(options) {
     (options.runPythonBridgeCached || options.runPythonBridge)(command)
   const runPythonBridgeWithArgsRead = (args) =>
     (options.runPythonBridgeWithArgsCached || options.runPythonBridgeWithArgs)(args)
-  const clearBridgeReadCaches = () => {
+  // With a list of commands, only those cached reads are forgotten.
+  const clearBridgeReadCaches = (commands) => {
     if (typeof options.clearBridgeReadCaches === 'function') {
-      options.clearBridgeReadCaches()
+      options.clearBridgeReadCaches(commands)
+    }
+  }
+  /* PROGRESSION, FEATURE UNLOCKS AND MILESTONES ARE READS THAT WRITE: each syncs and saves what has
+     changed (node transitions, unlocks, badges) before answering. The cached reads built on those
+     rows are forgotten after them (audit 11, design critic M1). */
+  const PROGRESS_READS = ['xp-progress', 'recommendations', 'learning-path-status']
+  const readThatSavesProgress = async (command) => {
+    try {
+      return await runPythonBridgeRead(command)
+    } finally {
+      clearBridgeReadCaches(PROGRESS_READS)
     }
   }
   /* File dialogs and confirm boxes belong to the window that asked, so they stay in front of it
@@ -723,7 +737,9 @@ function registerIpcHandlers(options) {
       if (typeof validatedPayload.sessionId === 'string') {
         args.push(validatedPayload.sessionId)
       }
-      return await options.runPythonBridgeWithArgs(args)
+      const started = await options.runPythonBridgeWithArgs(args)
+      clearBridgeReadCaches()
+      return started
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to start session goal: ${detail}`)
@@ -828,6 +844,10 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:preload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
+      // The main process's warmup also reads back the saved chat history (audit 11, F3).
+      if (typeof options.preloadTutorChat === 'function') {
+        return await options.preloadTutorChat()
+      }
       return await tutorRuntime().preload('renderer-startup')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
@@ -963,6 +983,10 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:unload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
+      // the chat is off now: a new model installed later is not warmed for it (audit 11 review, finding 3)
+      if (typeof options.forgetTutorWarmupRequest === 'function') {
+        options.forgetTutorWarmupRequest()
+      }
       return await tutorRuntime().unload('manual')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
@@ -1267,7 +1291,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('progression:get-state', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await runPythonBridgeRead('progression')
+      return await readThatSavesProgress('progression')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch progression state: ${detail}`)
@@ -1277,7 +1301,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('features:get-state', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await runPythonBridgeRead('feature-unlocks')
+      return await readThatSavesProgress('feature-unlocks')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch feature state: ${detail}`)
@@ -1287,7 +1311,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('achievements:get-milestones', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      return await runPythonBridgeRead('achievement-milestones')
+      return await readThatSavesProgress('achievement-milestones')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to fetch achievement milestones: ${detail}`)
@@ -1923,22 +1947,39 @@ function registerIpcHandlers(options) {
       })
     })
 
+    /* LEAVING THE WIZARD DOES NOT WAIT ON THE STUDY ENGINE (audit 11, F2). The marker that ends first
+       run is written first; a failure there is the learner's to see and retry. Telling the database
+       that onboarding is due comes after, on the worker only and with a time limit, and a failure is
+       only logged: the onboarding flag is the database's own, and the next launch reads it. The
+       Python side never resets a finished onboarding, so this running late cannot undo one. */
+    const markOnboardingPending = async () => {
+      try {
+        await options.runPythonBridgeWorkerOnly(['mark-onboarding-pending'], SETUP_ONBOARDING_MARK)
+      } catch (error) {
+        console.error('setup: could not mark onboarding as due', error)
+      } finally {
+        clearBridgeReadCaches()
+      }
+    }
+
     options.ipcMain.handle('setup:complete', async (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      await options.runPythonBridgeWithArgs(['mark-onboarding-pending'])
-      clearBridgeReadCaches()
       setupRuntime.writeSentinel()
+      await markOnboardingPending()
       if (typeof options.refreshTutorChatRuntime === 'function') {
-        await options.refreshTutorChatRuntime()
+        try {
+          await options.refreshTutorChatRuntime()
+        } catch (error) {
+          console.error('setup: tutor runtime refresh failed', error)
+        }
       }
       return { ok: true }
     })
 
     options.ipcMain.handle('setup:skip', async (event) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
-      await options.runPythonBridgeWithArgs(['mark-onboarding-pending'])
-      clearBridgeReadCaches()
       setupRuntime.writeSentinel()
+      await markOnboardingPending()
       return { ok: true }
     })
   }

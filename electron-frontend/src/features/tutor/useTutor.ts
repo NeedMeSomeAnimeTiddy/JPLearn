@@ -46,6 +46,8 @@ export interface UseTutorReturn {
   dismissAssistantToast: (id: number) => void
   launchAssistantToastAction: (toast: AssistantToast) => void
   queueAssistantToast: (toast: AssistantToast | null) => void
+  /** the main process has been told the window is up: warm the tutor now if the chat is on */
+  notifyTutorStartupReady: () => void
 }
 
 export function useTutor(
@@ -500,6 +502,32 @@ export function useTutor(
     void unloadAssistantChatRuntime().catch(() => undefined)
   }, [settings.assistantChatEnabled])
 
+  /* THE TUTOR WARMS ONLY WHILE THE CHAT IS ON (audit 11, F3; Robbie: "Only if chat is on"). The
+     main process no longer loads the model at launch. Once the window is up, and once more each
+     time the chat is switched back on, it is asked to; never while the chat is off. */
+  /* Refs rather than state: startup-ready is a signal, and re-rendering the whole app for it at
+     launch would buy nothing. */
+  const startupReadyRef = useRef(false)
+  const assistantChatEnabledRef = useRef(settings.assistantChatEnabled)
+  const assistantChatWarmedRef = useRef(false)
+  const warmAssistantChat = useCallback(() => {
+    if (!startupReadyRef.current || assistantChatWarmedRef.current) return
+    assistantChatWarmedRef.current = true
+    void window.jplearnDesktop?.preloadAssistantChatRuntime?.().catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    assistantChatEnabledRef.current = settings.assistantChatEnabled
+    if (!settings.assistantChatEnabled) {
+      assistantChatWarmedRef.current = false
+      return
+    }
+    warmAssistantChat()
+  }, [settings.assistantChatEnabled, warmAssistantChat])
+  const notifyTutorStartupReady = useCallback(() => {
+    startupReadyRef.current = true
+    if (assistantChatEnabledRef.current) warmAssistantChat()
+  }, [warmAssistantChat])
+
   useEffect(() => {
     const getAssistantSnapshotFn = window.jplearnDesktop?.getAssistantSnapshot
     if (!getAssistantSnapshotFn) {
@@ -640,5 +668,6 @@ export function useTutor(
     dismissAssistantToast,
     launchAssistantToastAction,
     queueAssistantToast,
+    notifyTutorStartupReady,
   }
 }

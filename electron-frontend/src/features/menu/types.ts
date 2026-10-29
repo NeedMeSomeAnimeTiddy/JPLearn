@@ -42,6 +42,15 @@ export interface MenuHero {
   section: MenuSectionKey | null
 }
 
+/** drawn in the hero's place while the study engine has not answered once since launch */
+export interface MenuEngineFailure {
+  /** the error's own message */
+  message: string
+  /** a load is out; Retry does nothing until it comes back */
+  retrying: boolean
+  onRetry: () => void
+}
+
 export interface MenuCrown {
   streakDays: number | null
   level: number | null

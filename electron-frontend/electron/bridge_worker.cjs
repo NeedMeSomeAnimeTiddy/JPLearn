@@ -203,7 +203,7 @@ function createBridgeWorker(options) {
     const timeoutMs = Number.isFinite(requestOptions.timeoutMs) && requestOptions.timeoutMs > 0
       ? requestOptions.timeoutMs
       : options.requestTimeoutMs
-    const longJob = timeoutMs !== options.requestTimeoutMs
+    const longJob = timeoutMs > options.requestTimeoutMs
     return new Promise((resolve, reject) => {
       telemetry.workerRequestCount += 1
 

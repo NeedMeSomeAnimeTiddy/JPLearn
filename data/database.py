@@ -1365,6 +1365,19 @@ def log_review(
         )
 
 
+def has_study_history() -> bool:
+    """Whether the learner has studied here before: any saved schedule or logged review.
+
+    Saved schedules count on their own: expertise seeding writes them without a review. Daily
+    Games do not count, since they never touch schedules or reviews. (Audit 11, F7.)
+    """
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT EXISTS (SELECT 1 FROM review_states) OR EXISTS (SELECT 1 FROM review_events) AS studied"
+        ).fetchone()
+    return bool(row and row["studied"])
+
+
 def count_total_reviews() -> int:
     """Return the all-time count of logged review events."""
     with _connect() as conn:

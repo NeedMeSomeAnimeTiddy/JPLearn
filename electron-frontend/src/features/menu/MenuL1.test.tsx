@@ -164,6 +164,63 @@ describe('the L1 menu', () => {
   })
 })
 
+describe('the hero when the study engine never answered (audit 11, F1)', () => {
+  function Failed({ retrying = false, onRetry = vi.fn() }: { retrying?: boolean, onRetry?: () => void }) {
+    const controller = useMenuL1(true)
+    return (
+      <MenuL1
+        controller={controller}
+        hero={heroFromStudyBlock(null)}
+        crown={crownFrom(null, null)}
+        rows={rowsFrom({ nodes: NODES, block: null, streakDays: null })}
+        onOpenSection={onOpenSection}
+        onRunHero={onRunHero}
+        engineFailure={{ message: 'No module named fugashi', retrying, onRetry }}
+      />
+    )
+  }
+
+  it('says so instead of "nothing due", with the message and a Retry the keyboard reaches', async () => {
+    installApi([])
+    const onRetry = vi.fn()
+    render(<Failed onRetry={onRetry} />)
+
+    expect(screen.getByText("JPLearn couldn't start its study engine.")).toBeTruthy()
+    expect(screen.getByText('No module named fugashi')).toBeTruthy()
+    expect(document.querySelector('.sh-fig')).toBeNull()
+
+    const retry = screen.getByRole('button', { name: 'Retry' })
+    retry.focus()
+    expect(document.activeElement).toBe(retry)
+    fireEvent.click(retry)
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    /* Enter on the screen with the hero selected retries too, rather than running a hero that is not there */
+    fireEvent.keyDown(document.querySelector('.mn-open') as HTMLElement, { key: 'Enter' })
+    expect(onRetry).toHaveBeenCalledTimes(2)
+    expect(onRunHero).not.toHaveBeenCalled()
+  })
+
+  it('does nothing on Retry while a load is still out', () => {
+    installApi([])
+    const onRetry = vi.fn()
+    render(<Failed retrying onRetry={onRetry} />)
+    const retry = screen.getByRole('button', { name: 'Retry' })
+    expect(retry.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(retry)
+    expect(onRetry).not.toHaveBeenCalled()
+  })
+
+  it('has no accessibility violations', async () => {
+    installApi([])
+    render(<Failed />)
+    await waitFor(() => expect(document.querySelectorAll('.st-row').length).toBe(5))
+    const results = await (axe as {
+      run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
+    }).run(document.querySelector('.mn-open') as Element)
+    expect(results.violations).toEqual([])
+  })
+})
+
 describe('what the crown and the hero are derived from', () => {
   it('reads XP as size-and-remainder, which is what the bridge sends', () => {
     const xp: XPProgressPayload = {

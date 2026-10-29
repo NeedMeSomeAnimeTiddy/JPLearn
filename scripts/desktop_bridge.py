@@ -158,6 +158,7 @@ from domain.tutor_service import (  # noqa: E402
 )
 from data.database import (  # noqa: E402
     count_total_reviews,
+    has_study_history,
     load_answer_receipt,
     load_badges,
     load_daily_counts,
@@ -1860,9 +1861,15 @@ def complete_onboarding_handler(
 
 
 def mark_onboarding_pending_handler() -> dict[str, object]:
-    """Mark onboarding as pending while preserving all existing study data."""
+    """After the setup wizard: ask the onboarding questions only of a learner who is new here.
+
+    A finished onboarding is never reset, so this arriving late cannot undo one. A learner with
+    study history (a reinstall, a new PC, downloads removed) is marked as onboarded rather than asked
+    again (audit 11, F7; Robbie: "Setup yes, onboarding no"). Study data is never touched.
+    """
     init_study_db()
-    set_setting("onboarding_complete", "0")
+    if get_setting("onboarding_complete") != "1":
+        set_setting("onboarding_complete", "1" if has_study_history() else "0")
     return build_learning_path_status_payload()
 
 
