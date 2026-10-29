@@ -45,7 +45,7 @@ function parseClues(value: unknown, requested: readonly CrosswordClueRequest[]):
       return null
     }
   }
-  if (!Array.isArray(parsed) || parsed.length !== requested.length) return null
+  if (!Array.isArray(parsed)) return null
 
   const requestedByPosition = new Map(requested.map((entry) => [entry.poolPosition, entry]))
   const clues = new Map<number, string>()
@@ -56,8 +56,11 @@ function parseClues(value: unknown, requested: readonly CrosswordClueRequest[]):
     if (!Number.isInteger(poolPosition) || typeof clue !== 'string') return null
     const position = poolPosition as number
     const requestedEntry = requestedByPosition.get(position)
+    // A day's saved set grows with every board (a practice crossword adds its own positions), so
+    // a set may hold clues this board never asked for: they are passed over (audit 16, F5).
+    if (!requestedEntry) continue
     const normalizedClue = clue.trim()
-    if (!requestedEntry || clues.has(position) || !normalizedClue || normalizedClue.length > CROSSWORD_MAX_CLUE_LENGTH) return null
+    if (clues.has(position) || !normalizedClue || normalizedClue.length > CROSSWORD_MAX_CLUE_LENGTH) return null
     if (JAPANESE_SCRIPT_PATTERN.test(normalizedClue)) return null
     if (normalize(normalizedClue).includes(normalize(requestedEntry.answer))) return null
     const normalizedReading = normalize(requestedEntry.reading ?? '').trim()
