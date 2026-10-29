@@ -1,7 +1,7 @@
 // Extracted verbatim from App.tsx (issue #69). Presentational only -- all settings
 // state stays owned by App and is passed in; this renders the modal shell and
 // delegates each tab to its existing feature component.
-import type { Dispatch, RefObject, SetStateAction } from 'react'
+import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import {
   Activity, ArrowRight, BookText, BrainCircuit, CheckCircle2, Circle, Download, Flame,
   Keyboard, Languages, MessageCircle, Minimize2, Minus, PlayCircle, Power,
@@ -96,6 +96,16 @@ export function AppSettingsModal({
   setAutoStartOnLogin,
 }: AppSettingsModalProps) {
   const { toggleThemeSectionCollapsed } = theme
+  // Owned here rather than in App.tsx: nothing outside this modal reads it. Shown as on until the
+  // stored value loads (the main process defaults it to on).
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true)
+  useEffect(() => {
+    void window.jplearnDesktop?.getConfigValue?.('autoUpdateEnabled')?.then((result) => {
+      if (result && typeof result.value === 'boolean') {
+        setAutoUpdateEnabled(result.value)
+      }
+    }).catch(() => { /* use default */ })
+  }, [])
 
   return (
           <div
@@ -795,6 +805,34 @@ export function AppSettingsModal({
                           {autoStartOnLogin
                             ? 'JPLearn will launch automatically when you log in to your computer.'
                             : 'JPLearn will only start when you open it manually.'}
+                        </p>
+                        <p className="settings-section-label">Check for updates automatically</p>
+                        <div className="settings-animation-grid" role="radiogroup" aria-label="Automatic update check options">
+                          {([
+                            { key: true, label: 'On' },
+                            { key: false, label: 'Off' },
+                          ]).map((opt) => (
+                            <button
+                              key={String(opt.key)}
+                              type="button"
+                              className={`settings-icon-entry settings-theme-entry ${autoUpdateEnabled === opt.key ? 'is-active' : ''}`}
+                              onClick={() => {
+                                setAutoUpdateEnabled(opt.key)
+                                void window.jplearnDesktop?.setConfigValue?.('autoUpdateEnabled', opt.key)
+                              }}
+                              role="radio"
+                              aria-checked={autoUpdateEnabled === opt.key}
+                              aria-label={`Check for updates automatically: ${opt.label}`}
+                            >
+                              <span className={`settings-mode-icon-button ${autoUpdateEnabled === opt.key ? 'is-enabled' : ''}`} aria-hidden="true">
+                                {opt.key ? <CheckCircle2 size={18} strokeWidth={2.25} /> : <Circle size={18} strokeWidth={2.25} />}
+                              </span>
+                              <span className="settings-icon-entry-label">{opt.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="settings-help">
+                          Only installed copies check. Turning this off stops checking straight away.
                         </p>
                       </div>
                     </div>
