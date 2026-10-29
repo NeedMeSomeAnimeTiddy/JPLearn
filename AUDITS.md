@@ -6,6 +6,56 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-29 — Progression and onboarding
+
+**Scope:** Audit 12. Robbie chose "Progression (Recommended)" over JLPT prep, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, reading passages, handwriting, and the whole repository.
+- Covered: the progression graph and its sync; feature unlocks; achievement badges; XP and levels; learning-path status; the onboarding wizard; expertise seeding; `mark-onboarding-pending`; their IPC routes and the read cache.
+- Out: recommendation ranking, tutor-reaction writing, and how the menu draws itself.
+
+**Commit audited:** 1097c4c on main, tree clean.
+
+**Method:**
+- The Auditor read the source, history and the census, and ran nothing. No helpers were used.
+- The verifier ran Checks 1, 2, 4, 5, 6 and 9 (linux-build, Python 3.12.3, scratch databases). The lead ran Check 3 locally.
+- The lead ran Check 10 read-only on the live database: 1 XP key stored today.
+- Not run: Checks 7 and 8 (app launches).
+- Report: `AUDIT-progression-and-onboarding-2026-10-29-1-r2.md`.
+
+### Where each finding went
+- F1, the knowledge checklist seeds whole level presets; one N5 Vocabulary tick seeds 1,051 cards (P1, Check 5): reported; asked of Robbie (Q1).
+- F2, XP rewrites every correct answer's key on every correct answer: about 1.2 ms per 1,000 keys, 121–126 ms at 100,000 (P2, Check 2): reported; fix now recommended; debt row drafted as a fallback.
+- F3, eight wall seals can never be earned, including three for steps that are reached (P2, Check 4): reported; asked of Robbie (Q2).
+- F4, a step's mastered date is erased on the next sync (P3, Check 1): reported.
+- F5, onboarding saves fail silently (P3): reported.
+- F6, a learner with history is re-asked onboarding when the setup mark fails or never ran (P3, plausible): reported.
+- F7, the readiness labels and warning are computed and never shown; the opener was removed in 30c6635 (P3, Check 3): reported; debt row drafted.
+- Nits 1–3: reported.
+- Q3, the menu's hard locks against soft gating: asked of Robbie.
+- STALE RECORD: FEATURES.md:114, 118, 120, 126-127, 135-136.
+- RECORDED: DEBT #3, #1, #4.
+- Dropped: the reset unlock moment (Check 8 not run).
+
+### Triggers checked
+- DEBT #3: not fired. The largest seed took 0.13 s for 4,358 cards.
+- DEBT #1: not fired on a fresh database (6–14 ms). F2 adds about 1.2 ms per 1,000 XP keys.
+- DEBT #4: not checked.
+
+### Inspected and found sound — do not re-derive these
+- Progression and feature transitions only move forward, and their fixed-point loops end. The graph is checked at build.
+- Unlock and badge writes keep the first timestamp.
+- Expertise seeding never touches a card with history, runs in one transaction on the worker after the answer queue, clears the caches, and is fast.
+- `mark-onboarding-pending` never resets a finished onboarding, and tests cover it. Setup exits and onboarding completion clear all cached reads; reads that save clear the progress reads.
+- Reset clears progression, unlocks, badges and XP with the review data.
+- XP and review/streak badges are awarded inside the answer transaction and are safe on replay.
+- The scope's 183 tests pass at 1097c4c.
+
+### What this pass could not establish
+- F6 and the reset unlock moment in the app; how any screen looks.
+- No test covers the checklist mapping, the dates surviving a second sync, or the wizard's failure paths.
+
+### Coverage, not a finding
+- The last three passes (startup, import and export, answer checking) did not cover tutor and assistant, JLPT, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, renderer state and settings, passages, handwriting, or packaging and updates.
+
 ## 2026-10-29 — Startup
 
 **Scope:** Audit 11. Robbie chose "Startup (Recommended)" and ran `/crew-audit startup`.
