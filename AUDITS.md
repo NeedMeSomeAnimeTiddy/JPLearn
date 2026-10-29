@@ -56,6 +56,35 @@ are kept in `Z:/Projects/JPLearn/audits`.
 ### Coverage, not a finding
 - The last three passes (startup, import and export, answer checking) did not cover tutor and assistant, JLPT, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, renderer state and settings, passages, handwriting, or packaging and updates.
 
+### Outcome (branch `audit12-repairs`, merged c2f05c1, pushed 2026-10-29)
+- Robbie's answers: Q1 "Only what's ticked"; N3+ "Split it: N3 Kanji, N3 Vocab"; Q2, asked again
+  after JLPT N5-N1 were found to open together, "2 on reach, hide 6"; Q3 "Keep the locks, update
+  docs"; F5 wording "Use this wording"; the checklist descriptions and Bookworm text as shown; the
+  Ready page's "~750-word". A design critic (Opus) required M1-M4, all taken; M2 was settled by
+  re-running the onboarding mark at startup rather than a read-side rule.
+- F1 fixed (ee7e6c2, 9bbd285): `apply_known_items` / `study:apply-known-items` seed only the ticked
+  decks; the level presets and `applyExpertiseLevel` are gone; N3 is two ticks.
+- F2 filed as DEBT #12 (the live database held 1 key, Check 10).
+- F3 fixed (ee7e6c2, 9bbd285): the six unearnable seals left the curriculum and the wall (x / 19);
+  Free Talker and Avid Reader are earned on reach. Learners already past them get both seals dated at
+  their first read after the update; nothing records the reach date.
+- F4 fixed (ee7e6c2): stored dates are loaded, so later syncs keep `mastered_at`.
+- F5 fixed (9bbd285, dc45c18): the wizard shows "Couldn't save what you already know: <reason>" or
+  "Couldn't finish onboarding: <reason>" (first line only) above its pages; Start or Skip retries; a
+  ref stops double submits; nothing is seeded when nothing is ticked.
+- F6 fixed (ee7e6c2, dc45c18, cf083ad): `onboarding-check`, the first startup preload task, re-runs
+  `mark-onboarding-pending` after setup; a failure is logged and recorded in the preload telemetry.
+  Known consequence: a learner whose seed saved but whose completion failed, and who quit, is treated
+  as onboarded next launch and their goal and daily minutes are not saved.
+- F7 fixed in part (9bbd285): the dead readiness-warning state is gone; the unread steps are DEBT #13.
+- Nits 1-3 fixed. Stale FEATURES.md lines corrected; the soft-gating notes now say the menu locks
+  THE WORLD and THE EXAM.
+- Checks at the merge: pytest 1903 passed with the known Linux-only conjugation-index failure (passes
+  on Windows); lint 0; build OK; test:ui 1979 of 1981 with two runtime tests timing out under load
+  and passing on rerun; a11y 7; main-process 211; arch_check and generate_ts_types OK. Reviewer
+  (Opus) approved at dc45c18. Not run: Checks 7 and 8 (the app), so the wizard and wall were not
+  seen in the running app.
+
 ## 2026-10-29 — Startup
 
 **Scope:** Audit 11. Robbie chose "Startup (Recommended)" and ran `/crew-audit startup`.
