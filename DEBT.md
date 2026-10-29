@@ -147,7 +147,9 @@ hatch, not a performance target.
 
 **Trigger:** a learner noticing a slow start, `preload.tasks[summary].durationMs` over 2,500 ms in
 `startup-telemetry.json`, or `startupSessionMs` over 5,000 ms. Read those two alongside
-`firstSummaryMs` whenever DEBT #4's trigger is checked.
+`firstSummaryMs` whenever DEBT #4's trigger is checked. Since audit 12 the preload's first task is
+`onboarding-check`, so if the bridge worker starts during the preload, its start-up cost lands there
+rather than in `summary`: add the two when comparing with earlier figures.
 
 ## 11. Home rows still read as a clear day when their data failed to load
 

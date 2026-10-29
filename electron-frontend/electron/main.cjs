@@ -2044,6 +2044,8 @@ async function markReturningLearnerOnboarded() {
     await runPythonBridgeWorkerOnly(['mark-onboarding-pending'], { timeoutMs: 10_000 })
   } catch (error) {
     console.error('[startup] Could not check onboarding against study history:', error)
+    // Rethrown so the preload records the task as failed; the loop carries on to the reads.
+    throw error
   }
 }
 
