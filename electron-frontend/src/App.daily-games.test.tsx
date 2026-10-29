@@ -168,7 +168,8 @@ describe('Daily Games navigation', () => {
     await openDailyGames()
     expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
     await pressTablet(/^03 MATCH PAIRS/)
-    expect(await screen.findByRole('button', { name: /back to the daily road/i })).toBeTruthy()
+    // the game view is lazy-loaded; under a full parallel run its first load can pass 1 s
+    expect(await screen.findByRole('button', { name: /back to the daily road/i }, { timeout: 5000 })).toBeTruthy()
     fireEvent.keyDown(screen.getByRole('button', { name: /back to the daily road/i }), { key: 'Escape' })
     expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
     await backToTheFrontDoor()

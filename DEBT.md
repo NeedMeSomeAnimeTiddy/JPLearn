@@ -130,3 +130,21 @@ grows by a few rows a day.
 
 **Trigger:** `daily_game_attempts` passes 2,000 rows, or `daily-games-state` takes over 300 ms on a
 warm worker.
+
+## 10. The startup budget measures neither the summary nor the wait the learner sees
+
+**Recorded 2026-10-29.** `STARTUP_BUDGETS_MS.firstSummary` (2,500 ms) is checked against the
+renderer's `firstSummaryMs`, timed from `App`'s first render (`electron-frontend/src/App.tsx`,
+`startupBootMarkRef`) to the summary landing. The summary request starts earlier, in the
+main-process startup preload, and the renderer shares it through the read cache, so a slow summary
+that mostly ran before `App` mounted can report under budget. What the learner waits for is the
+window showing, `main.startupSessionMs` in `startup-telemetry.json`, which has no budget, and the
+time before the splash (two awaited config reads in `app.whenReady`) is outside every figure. The
+packaged smoke records these and asserts none. DEBT #4's trigger reads `firstSummaryMs`, so it can
+miss a regression. Not fixed now: the budget values are Robbie's call and nothing is known to be
+slow (audit 11, F6). Since audit 11 the whole splash also has a 30 s deadline, which is an escape
+hatch, not a performance target.
+
+**Trigger:** a learner noticing a slow start, `preload.tasks[summary].durationMs` over 2,500 ms in
+`startup-telemetry.json`, or `startupSessionMs` over 5,000 ms. Read those two alongside
+`firstSummaryMs` whenever DEBT #4's trigger is checked.
