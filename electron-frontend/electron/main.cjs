@@ -298,12 +298,6 @@ let tutorRuntimePreloadPromise = null
 // the window asked for a tutor warmup this session (the chat while switched on, or scenario practice's AI
 // evaluation, which the learner turns on) and has not unloaded since
 let tutorWarmupRequested = false
-let preloadedAssistantChatHistory = {
-  ok: true,
-  turns: [],
-  runtimeActive: false,
-  source: 'startup-none',
-}
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
 const STUDY_JOURNEY_SMOKE_FILENAME = 'study-journey-smoke.json'
@@ -370,12 +364,6 @@ async function refreshTutorRuntimeAfterSetup() {
   }
   localTutorRuntime = createTutorChatRuntime()
   tutorRuntimePreloadPromise = null
-  preloadedAssistantChatHistory = {
-    ok: true,
-    turns: [],
-    runtimeActive: false,
-    source: 'setup-runtime-refresh-started',
-  }
   /* No warmup of its own: the window asks for one when the tutor chat is switched on (audit 11, F3).
      If it has asked this session and not switched the chat off since, the new runtime (a model the
      setup wizard just installed, say) is warmed for it, without the caller waiting (review, finding 3). */
@@ -1315,10 +1303,9 @@ registerIpcHandlers({
   refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
   refreshOcrRuntime: refreshOcrRuntimeAfterSetup,
   stopOcrRuntime: () => localOcrRuntime.stop(),
-  getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
   /* The tutor is warmed only when the window asks, and it asks only while the tutor chat is switched
-     on (audit 11, F3; Robbie: "Only if chat is on"). The warmup also reads back the saved chat
-     history, as the launch warmup used to. */
+     on (audit 11, F3; Robbie: "Only if chat is on"). Chat history lives in the IPC handlers for the
+     session only (audit 15, F4), so the warmup reads nothing back. */
   preloadTutorChat: () => {
     tutorWarmupRequested = true
     return preloadTutorChatStartupData()
@@ -1332,63 +1319,15 @@ registerIpcHandlers({
   setIsQuitting: () => { isQuitting = true },
 })
 
-/* WARM THE TUTOR AND READ BACK ITS SAVED HISTORY, when the window asks (audit 11, F3). Calls that
-   arrive while one is running share it; a later call (the chat switched off and on again, or a new
-   model) runs again, so the runtime the learner ends up with is the one that was warmed. */
+/* WARM THE TUTOR when the window asks (audit 11, F3). Calls that arrive while one is running share
+   it; a later call (the chat switched off and on again, or a new model) runs again, so the runtime the
+   learner ends up with is the one that was warmed. */
 async function preloadTutorChatStartupData() {
   if (tutorRuntimePreloadPromise) {
     return tutorRuntimePreloadPromise
   }
   const runtime = localTutorRuntime
-  const run = (async () => {
-    let result
-    try {
-      result = await runtime.preload('renderer-startup')
-    } catch (error) {
-      preloadedAssistantChatHistory = {
-        ok: true,
-        turns: [],
-        runtimeActive: false,
-        source: 'startup-preload-failed',
-      }
-      throw error
-    }
-
-    const status = runtime.getStatus()
-    const runtimeActive = Boolean(
-      status
-      && status.loaded
-      && String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp',
-    )
-    if (!runtimeActive) {
-      preloadedAssistantChatHistory = {
-        ok: true,
-        turns: [],
-        runtimeActive: false,
-        source: 'startup-runtime-inactive',
-      }
-      return result
-    }
-
-    try {
-      const payload = await runPythonBridgeWithArgs(['assistant-chat-history', '20'])
-      const turns = Array.isArray(payload?.turns) ? payload.turns : []
-      preloadedAssistantChatHistory = {
-        ok: true,
-        turns,
-        runtimeActive: true,
-        source: 'startup-preloaded',
-      }
-    } catch {
-      preloadedAssistantChatHistory = {
-        ok: true,
-        turns: [],
-        runtimeActive: true,
-        source: 'startup-history-failed',
-      }
-    }
-    return result
-  })()
+  const run = runtime.preload('renderer-startup')
   tutorRuntimePreloadPromise = run
   try {
     return await run

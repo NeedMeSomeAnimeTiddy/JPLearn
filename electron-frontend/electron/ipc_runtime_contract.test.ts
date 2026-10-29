@@ -775,3 +775,68 @@ describe('ipc runtime contract', () => {
     await expect(handler(createValidEvent())).rejects.toThrow(/Failed to fetch study summary: bridge exploded/)
   })
 })
+
+describe('the tutor chat history (audit 15, F1, F4, nits 2 and 3)', () => {
+  function chatHarness(sendMessage = vi.fn(async (message: string) => ({ ok: true, text: `re:${message}`, provider: 'llama.cpp' }))) {
+    const harness = createRegisteredHandlers({
+      runPythonBridgeWithArgs: vi.fn(async () => ({ ok: true, context: { memory: 'facts[likes trains]' } })),
+    })
+    harness.options.localTutorRuntime.sendMessage = sendMessage
+    const send = (message: string, context?: Record<string, unknown>) => harness.handlers.get('assistant-chat:send-message')(createValidEvent(), { message, context })
+    const turns = async () => (await harness.handlers.get('assistant:get-chat-history')(createValidEvent())).turns
+    return { ...harness, send, turns, sendMessage }
+  }
+
+  it('sends the last six turns, oldest first, before the new question', async () => {
+    const { send, sendMessage } = chatHarness()
+    for (let index = 1; index <= 4; index += 1) await send(`q${index}`)
+    await send('q5')
+    const [message, , sendOptions] = sendMessage.mock.calls[4]
+    expect(message).toBe('q5')
+    expect(sendOptions.history.map((turn: { content: string }) => turn.content)).toEqual(['q2', 're:q2', 'q3', 're:q3', 'q4', 're:q4'])
+    expect(sendOptions.history.every((turn: Record<string, unknown>) => Object.keys(turn).sort().join() === 'content,role')).toBe(true)
+  })
+
+  it('keeps nothing of a failed question, and passes the reason on bare', async () => {
+    const sendMessage = vi.fn(async (message: string) => {
+      if (message === 'fails') throw new Error('the model took too long to answer')
+      return { ok: true, text: `re:${message}`, provider: 'llama.cpp' }
+    })
+    const { send, turns } = chatHarness(sendMessage)
+    await send('works')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      await expect(send('fails')).rejects.toThrow(/^the model took too long to answer$/)
+    } finally {
+      warn.mockRestore()
+    }
+    expect((await turns()).map((turn: { content: string }) => turn.content)).toEqual(['works', 're:works'])
+  })
+
+  it('does not pass the session id on to the model', async () => {
+    const { send, sendMessage, options } = chatHarness()
+    await send('hello', { session_id: 'session-abc' })
+    expect(options.runPythonBridgeWithArgs).toHaveBeenCalledWith(['assistant-chat-context-v2', 'session-abc', 'hello'])
+    expect(sendMessage.mock.calls[0][1]).toEqual({ memory: 'facts[likes trains]' })
+  })
+
+  it('keeps the last 20 turns and forgets them all on clear', async () => {
+    const { send, turns, handlers } = chatHarness()
+    for (let index = 0; index < 12; index += 1) await send(`q${index}`)
+    const kept = await turns()
+    expect(kept).toHaveLength(20)
+    expect(kept[0].content).toBe('q2')
+    await handlers.get('assistant:clear-chat-history')(createValidEvent())
+    expect(await turns()).toEqual([])
+  })
+
+  it('warms the model for scenario practice without counting as the chat asking (F6)', async () => {
+    const { handlers, options } = createRegisteredHandlers({ preloadTutorChat: vi.fn() })
+    await expect(handlers.get('scenario:preload-model')(createValidEvent())).resolves.toEqual({ ok: true })
+    expect(options.localTutorRuntime.preload).toHaveBeenCalledWith('scenario-start')
+    expect(options.preloadTutorChat).not.toHaveBeenCalled()
+    options.localTutorRuntime.preload.mockRejectedValueOnce(new Error('the model failed to load'))
+    await expect(handlers.get('scenario:preload-model')(createValidEvent())).resolves.toEqual({ ok: false })
+    await expect(handlers.get('scenario:preload-model')(createValidEvent('https://evil.example'))).rejects.toThrow(/untrusted URL/i)
+  })
+})

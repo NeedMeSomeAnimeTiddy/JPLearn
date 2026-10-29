@@ -14,12 +14,32 @@ try {
 const DEFAULT_INACTIVITY_UNLOAD_MS = 5 * 60 * 1000
 const DEFAULT_LLAMACPP_TIMEOUT_MS = 90000
 // Scenario Practice cannot wait on a slow judgement: past this the turn falls
-// back to the authored recovery line, exactly as if no model were installed.
+// back to the authored recovery line, exactly as if no model were installed. A cold
+// model never makes it wait: judging returns at once while the model loads (audit 15, F3).
 const SCENARIO_EVALUATION_TIMEOUT_MS = 15000
 const DEFAULT_MAX_CONTEXT_CHARS = 1800
 const DEFAULT_MAX_MESSAGE_CHARS = 600
 const DEFAULT_MAX_OUTPUT_CHARS = 420
-const DEFAULT_MAX_PROMPT_CHARS = 3200
+// The system message: the prompt and adapter note are never cut, and the context gets what is left,
+// at least TUTOR_MIN_CONTEXT_CHARS (audit 15, F5). The server holds 4,096 tokens.
+const DEFAULT_MAX_PROMPT_CHARS = 4000
+const TUTOR_MIN_CONTEXT_CHARS = 1200
+// The earlier turns sent with a chat question (audit 15, F1; Robbie: "Remember recent turns"): the
+// last three exchanges, oldest dropped first past the budget.
+const TUTOR_HISTORY_MAX_TURNS = 6
+const TUTOR_HISTORY_MAX_CHARS = 900
+const TUTOR_HISTORY_TURN_CHARS = 300
+// Each context value is clipped to 280 characters, the memory graph to 480 so its later sections
+// (commitments and after) reach the model; past the budget, keys go in this order, never the graph.
+const CONTEXT_VALUE_CHARS = 280
+const MEMORY_GRAPH_CHARS = 480
+const CONTEXT_DROP_ORDER = ['persona', 'emotional_state', 'recent_activity', 'goals', 'strengths', 'weaknesses', 'commitments', 'memory']
+// A model that failed to load is not respawned for every request: within this window the next
+// request fails at once with the same reason (audit 15, F2).
+const MODEL_LOAD_RETRY_MS = 30000
+// The translation model setup installs (setup_runtime.cjs TRANSLATION_MODELS.qwen_ja_en); not
+// required from there, since setup_runtime requires this file.
+const TRANSLATION_MODEL_FILENAME = 'Qwen3.5-0.8B-JP-Q4_K_M.gguf'
 const DEFAULT_TRANSLATION_OUTPUT_CHARS = 900
 const DEFAULT_OFFLINE_DICTIONARY_SQLITE_PATH = path.resolve(
   __dirname,
@@ -49,7 +69,7 @@ const DEFAULT_TUTOR_SYSTEM_PROMPT = [
   '- Sound natural and conversational, like a patient coach speaking one-to-one. Keep replies short and focused: 1 to 3 sentences, never more than one short paragraph.',
   '- Do not use emojis, emoticons, or decorative symbols. Express warmth through words only.',
   '- Use plain punctuation to avoid mojibake. Prefer ASCII quotes and hyphens over typographic punctuation.',
-  '- Always reply in Japanese only, even if the user writes in English.',
+  '- Reply in Japanese so the learner practises reading it, even if they write in English. Only when the learner asks what something means or how grammar works, explain in English, keeping any Japanese examples with a kana reading in parentheses.',
   '- Keep Japanese natural and learner-friendly. If needed, include a short kana reading in parentheses.',
   '',
   'How to teach:',
@@ -490,6 +510,47 @@ function resolveContextPriorityNote(profile) {
   return ''
 }
 
+/* What the tutor chat shows after "The tutor couldn't answer: " (audit 15, F2; Robbie's wording).
+   Each reason is the whole message, lowercase, so the renderer shows it as it is. */
+const TUTOR_REASONS = {
+  loadFailed: 'the model failed to load',
+  noModel: 'no tutor model is installed',
+  tooSlow: 'the model took too long to answer',
+  noAnswer: 'the model gave no answer',
+  tooLong: 'the question and the conversation are too long',
+  failed: 'the model stopped with an error',
+  busy: 'another request is still running',
+  stopped: 'the request was stopped',
+}
+
+class ModelLoadError extends Error {
+  constructor(detail) {
+    super(TUTOR_REASONS.loadFailed)
+    this.name = 'ModelLoadError'
+    this.detail = detail
+  }
+}
+
+class ContextTooLongError extends Error {
+  constructor() {
+    super(TUTOR_REASONS.tooLong)
+    this.name = 'ContextTooLongError'
+  }
+}
+
+/** A non-200 from llama-server; a prompt past the context window has its own reason. */
+function llamaServerStatusError(response) {
+  try {
+    const parsed = JSON.parse(response.body)
+    if (parsed && parsed.error && parsed.error.type === 'exceed_context_size_error') {
+      return new ContextTooLongError()
+    }
+  } catch {
+    // not JSON: the status alone
+  }
+  return new Error(`llama-server returned status ${response.status}`)
+}
+
 class InferenceAbortError extends Error {
   constructor(message = 'Inference cancelled') {
     super(message)
@@ -522,28 +583,90 @@ function clipText(value, maxChars) {
     : `${normalized.slice(0, Math.max(0, limit - 3))}...`
 }
 
+function contextValueLimit(key) {
+  return key === 'memory_graph' ? MEMORY_GRAPH_CHARS : CONTEXT_VALUE_CHARS
+}
+
 function sanitizeContextText(context = {}, options = {}) {
   const maxContextChars = Number.isFinite(options.maxContextChars)
     ? Math.max(120, Math.floor(options.maxContextChars))
     : DEFAULT_MAX_CONTEXT_CHARS
-  const pairs = []
-  let consumedChars = 0
+  const lines = []
   for (const [key, value] of Object.entries(context)) {
     if (typeof value !== 'string') {
       continue
     }
-    const normalized = clipText(value, 280)
-    if (!normalized) {
-      continue
+    const normalized = clipText(value, contextValueLimit(key))
+    if (normalized) {
+      lines.push({ key, line: `${key}: ${normalized}` })
     }
-    const line = `${key}: ${normalized}`
-    if (consumedChars + line.length > maxContextChars) {
+  }
+  const kept = lines.slice(0, 10)
+  const size = () => kept.reduce((total, entry) => total + entry.line.length + 1, 0)
+  // over budget, the least useful keys go first and the memory graph never (audit 15, F5)
+  for (const key of CONTEXT_DROP_ORDER) {
+    if (size() <= maxContextChars) {
       break
     }
-    pairs.push(line)
-    consumedChars += line.length
+    const index = kept.findIndex((entry) => entry.key === key)
+    if (index >= 0) {
+      kept.splice(index, 1)
+    }
   }
-  return pairs.slice(0, 10).join('\n')
+  while (size() > maxContextChars && kept.length > 1) {
+    kept.splice(kept.findIndex((entry) => entry.key !== 'memory_graph'), 1)
+  }
+  return kept.map((entry) => entry.line).join('\n')
+}
+
+/* The system message: the prompt and the adapter's instructions come first and are never cut; the
+   context gets what is left of the budget, and never less than TUTOR_MIN_CONTEXT_CHARS (audit 15, F5). */
+function composeSystemPrompt(context = {}, runtimeOptions = {}, promptTuningProfile = 'default') {
+  const maxSystemChars = runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS
+  const systemPrompt = clipText(
+    typeof runtimeOptions.systemPromptOverride === 'string' && runtimeOptions.systemPromptOverride.trim()
+      ? runtimeOptions.systemPromptOverride.trim()
+      : resolveTutorSystemPrompt(),
+    maxSystemChars,
+  )
+  const promptAdapter = runtimeOptions.promptAdapter && typeof runtimeOptions.promptAdapter === 'object'
+    ? runtimeOptions.promptAdapter
+    : null
+  const fixedParts = [systemPrompt]
+  if (promptAdapter && typeof promptAdapter.systemNote === 'string' && promptAdapter.systemNote.trim()) {
+    fixedParts.push('Adapter instructions:', promptAdapter.systemNote.trim())
+  }
+  const fixedText = fixedParts.join('\n\n')
+  const contextPriorityNote = resolveContextPriorityNote(promptTuningProfile)
+  const requestedContextChars = Number.isFinite(runtimeOptions.maxContextChars)
+    ? Math.floor(runtimeOptions.maxContextChars)
+    : DEFAULT_MAX_CONTEXT_CHARS
+  const contextBudget = Math.min(
+    requestedContextChars,
+    Math.max(TUTOR_MIN_CONTEXT_CHARS, maxSystemChars - fixedText.length - (contextPriorityNote || '').length - 24),
+  )
+  const contextText = sanitizeContextText(context, { maxContextChars: contextBudget })
+  return contextText
+    ? [fixedText, contextPriorityNote, 'Current context:', contextText].filter(Boolean).join('\n\n')
+    : fixedText
+}
+
+/* Earlier chat turns, oldest first, as chat messages: each clipped, the oldest dropped first until
+   they fit (audit 15, F1). Anything that is not a user or assistant turn with text is ignored. */
+function boundChatHistory(history) {
+  if (!Array.isArray(history)) {
+    return []
+  }
+  const turns = history
+    .filter((turn) => turn && (turn.role === 'user' || turn.role === 'assistant') && typeof turn.content === 'string')
+    .slice(-TUTOR_HISTORY_MAX_TURNS)
+    .map((turn) => ({ role: turn.role, content: clipText(turn.content, TUTOR_HISTORY_TURN_CHARS) }))
+    .filter((turn) => turn.content)
+  let total = turns.reduce((sum, turn) => sum + turn.content.length, 0)
+  while (turns.length > 0 && total > TUTOR_HISTORY_MAX_CHARS) {
+    total -= turns.shift().content.length
+  }
+  return turns
 }
 
 function extractCliResponseText(rawOutput) {
@@ -581,31 +704,11 @@ function extractCliResponseText(rawOutput) {
   return body.trim()
 }
 
-function buildScriptedFallbackResponse(message, context = {}, detail = '') {
-  const focus = typeof context.focus_area === 'string' && context.focus_area.trim().length > 0
-    ? context.focus_area.trim()
-    : 'にがてなポイント'
-  const messageHint = clipText(message, 70)
-  void detail
-  const promptLead = messageHint ? `「${messageHint}」について、` : ''
-  return {
-    text: `${promptLead}${focus}を1ラウンドだけ集中して練習しましょう。終わったら不安な項目をもう一度確認しましょう。`,
-    provider: 'scripted-fallback',
-    model: 'deterministic-scripted',
-  }
-}
-
-function buildLowSignalRecoveryReply(message) {
-  const normalized = String(message || '').trim()
-  if (detectTranslationIntent(normalized)) {
-    return '返答が不安定でした。翻訳したい語句をそのまま送ってください。1行で日本語訳を返します。'
-  }
-  return '返答が不安定でした。短い文でもう一度日本語で送ってください。'
-}
-
+/* Only a reply that is nothing but a hedge is replaced by a clarifying question: "It depends on
+   politeness: ..." is an answer, and the prompt asks the model to say when it is unsure (audit 15). */
 function isLowConfidenceAssistantReply(rawText) {
   const text = String(rawText || '').trim()
-  if (!text) {
+  if (!text || text.length >= 60) {
     return false
   }
   return /(i am not sure|i'm not sure|not sure|unsure|i do not know|i don't know|cannot tell|can't tell|need more context|insufficient context|it depends)/i.test(text)
@@ -623,24 +726,6 @@ function buildClarifyingQuestionForIntent(message) {
     return '学習計画を調整します。10分・20分・30分のどれにしますか。'
   }
   return '文脈が少し足りません。もう1つだけ情報をください。'
-}
-
-function hasJapaneseCharacters(text) {
-  return /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}々〆ヵヶ]/u.test(String(text || ''))
-}
-
-function enforceJapaneseOnlyReply(replyText, sourceMessage) {
-  const text = String(replyText || '').trim()
-  if (!text) {
-    return 'すみません。もう一度日本語で送ってください。'
-  }
-  if (hasJapaneseCharacters(text)) {
-    return text
-  }
-  if (detectTranslationIntent(sourceMessage)) {
-    return '日本語訳で答えます。翻訳したい語句をそのまま送ってください。'
-  }
-  return 'すみません。日本語で答えます。短くもう一度送ってください。'
 }
 
 function normalizeAsciiToken(value) {
@@ -712,7 +797,9 @@ function extractEnglishTranslationTarget(message) {
     return ''
   }
 
-  const quoted = text.match(/"([^"]{1,60})"|'([^']{1,60})'/)
+  // A single quote opens only where no letter precedes it and closes only where none follows, so the
+  // apostrophe of "What's 'dog'" is not a quotation mark (audit 15, F8).
+  const quoted = text.match(/"([^"]{1,60})"|(?<![A-Za-z])'((?:[^']|'(?=[A-Za-z])){1,60})'(?![A-Za-z])/)
   if (quoted) {
     return normalizeAsciiToken(quoted[1] || quoted[2] || '')
   }
@@ -1234,7 +1321,10 @@ function createLlamaServerAdapter(config = {}) {
 
         const args = [
           '-m', modelPath,
-          '-c', '2048',
+          // one request at a time, so one slot holds the whole context (audit 15: the chat now
+          // carries earlier turns)
+          '-c', '4096',
+          '-np', '1',
           '-t', '6',
           '--host', host,
           '--port', String(port),
@@ -1292,26 +1382,11 @@ function createLlamaServerAdapter(config = {}) {
     },
 
     async infer(message, context = {}, runtimeOptions = {}) {
-      const contextText = sanitizeContextText(context, runtimeOptions)
-      const systemPrompt = typeof runtimeOptions.systemPromptOverride === 'string' && runtimeOptions.systemPromptOverride.trim()
-        ? runtimeOptions.systemPromptOverride.trim()
-        : resolveTutorSystemPrompt()
-      const contextPriorityNote = resolveContextPriorityNote(promptTuningProfile)
-      const composedSystemPrompt = contextText
-        ? [
-            systemPrompt,
-            contextPriorityNote,
-            'Current context:',
-            contextText,
-          ].filter(Boolean).join('\n\n')
-        : systemPrompt
       const promptAdapter = runtimeOptions.promptAdapter && typeof runtimeOptions.promptAdapter === 'object'
         ? runtimeOptions.promptAdapter
         : null
-      const adaptedSystemPrompt = promptAdapter && typeof promptAdapter.systemNote === 'string' && promptAdapter.systemNote.trim()
-        ? [composedSystemPrompt, 'Adapter instructions:', promptAdapter.systemNote.trim()].join('\n\n')
-        : composedSystemPrompt
-      const boundedSystemPrompt = clipText(adaptedSystemPrompt, runtimeOptions.maxPromptChars || DEFAULT_MAX_PROMPT_CHARS)
+      const boundedSystemPrompt = composeSystemPrompt(context, runtimeOptions, promptTuningProfile)
+      const chatHistory = boundChatHistory(runtimeOptions.history)
       const boundedMessage = clipText(
         message,
         Number.isFinite(runtimeOptions.maxMessageChars)
@@ -1346,6 +1421,7 @@ function createLlamaServerAdapter(config = {}) {
       const payload = {
         messages: [
           { role: 'system', content: boundedSystemPrompt },
+          ...chatHistory,
           { role: 'user', content: boundedMessage },
         ],
         temperature,
@@ -1391,7 +1467,7 @@ function createLlamaServerAdapter(config = {}) {
           runtimeOptions.signal,
         )
         if (completionResponse.status !== 200) {
-          throw new Error(`llama-server returned status ${completionResponse.status}`)
+          throw llamaServerStatusError(completionResponse)
         }
         try {
           const completionParsed = JSON.parse(completionResponse.body)
@@ -1412,7 +1488,7 @@ function createLlamaServerAdapter(config = {}) {
         )
 
         if (response.status !== 200) {
-          throw new Error(`llama-server returned status ${response.status}`)
+          throw llamaServerStatusError(response)
         }
 
         let parsed
@@ -1542,13 +1618,25 @@ function resolveTutorRuntimeFiles(options = {}) {
     || process.env.JPLEARN_TUTOR_PROVIDER
     || (discoveredLlamaServerPath && autoModelPath ? 'llama.cpp' : 'stub'),
   )
+  const modelPath = options.llamaModelPath
+    || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath)
+  const assetsDir = resolveAssetsBaseDir()
   return {
     provider,
     serverPath: options.llamaServerPath
       || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
-    modelPath: options.llamaModelPath
-      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath),
+    modelPath,
     autoModelPath,
+    /* The model found is the translation model, not a tutor model: chosen by setup, or the only GGUF
+       the scan found. A model named by option or environment counts as a tutor model (audit 15, F7). */
+    translationModel: Boolean(
+      modelPath
+      && modelPath === autoModelPath
+      && (
+        (assetsDir && modelPath === readActiveTranslationModelPath(assetsDir))
+        || path.basename(modelPath).toLowerCase() === TRANSLATION_MODEL_FILENAME.toLowerCase()
+      ),
+    ),
   }
 }
 
@@ -1647,7 +1735,18 @@ function createTutorChatRuntime(options = {}) {
   let isInferenceActive = false
   let activeInferenceLease = null
   let loadPromise = null
+  let lastLoadFailedAt = 0
   let activePromptAdapterId = 'default'
+  // scenario judging and crossword clues need a tutor model, as the chat does (audit 15, F7)
+  const usesTranslationModel = configuredProvider === 'llama.cpp' && runtimeFiles.translationModel
+  // the built-in stub stands in only for tests; the chat never shows its line as an answer (audit 15)
+  const usesBuiltinStub = configuredProvider !== 'llama.cpp'
+    && typeof options.adapterFactory !== 'function'
+    && !options.adapterRegistry
+
+  function isWarm() {
+    return Boolean(loaded && adapter && (typeof adapter.isRunning !== 'function' || adapter.isRunning()))
+  }
   let loadedAdapterManifestPath = ''
 
   function clearUnloadTimer() {
@@ -1707,6 +1806,9 @@ function createTutorChatRuntime(options = {}) {
       await loadPromise
       return false
     }
+    if (lastLoadFailedAt && Date.now() - lastLoadFailedAt < MODEL_LOAD_RETRY_MS) {
+      throw new ModelLoadError(lastError)
+    }
 
     loadPromise = (async () => {
       adapter = adapterFactory()
@@ -1717,17 +1819,14 @@ function createTutorChatRuntime(options = {}) {
       try {
         await adapter.load()
         lastError = null
+        lastLoadFailedAt = 0
       } catch (error) {
+        // No stand-in answers in its place: the request fails with the reason (audit 15, F2).
         const detail = error instanceof Error ? error.message : String(error)
-        if (configuredProvider === 'llama.cpp') {
-          adapter = createStubAdapter()
-          await adapter.load()
-          activeProvider = 'stub-fallback'
-          activeModel = 'llama.cpp-unavailable'
-          lastError = detail
-        } else {
-          throw error
-        }
+        adapter = null
+        lastError = detail
+        lastLoadFailedAt = Date.now()
+        throw new ModelLoadError(detail)
       }
       loaded = true
       loadedAtUtc = new Date().toISOString()
@@ -1742,17 +1841,18 @@ function createTutorChatRuntime(options = {}) {
   }
 
   const runtime = {
-    async sendMessage(message, context = {}) {
+    async sendMessage(message, context = {}, sendOptions = {}) {
       if (typeof message !== 'string' || message.trim().length === 0) {
         throw new Error('Chat message must not be empty')
       }
       if (isInferenceActive) {
-        throw new Error('Chat inference already active; cancel or wait for completion')
+        throw new Error(TUTOR_REASONS.busy)
       }
 
       const trimmedMessage = clipText(message, maxMessageChars)
       const translationTarget = extractTranslationTarget(trimmedMessage)
-      if (translationTarget) {
+      // a key of one letter is never a word worth answering from the dictionary (audit 15, F8)
+      if (translationTarget && translationTarget.replace(/\s+/g, '').length >= 2) {
         const builtinHit = resolveBuiltinTranslationEntry(translationTarget)
         if (builtinHit) {
           return {
@@ -1780,13 +1880,18 @@ function createTutorChatRuntime(options = {}) {
         }
       }
 
+      if (usesBuiltinStub) {
+        throw new Error(TUTOR_REASONS.noModel)
+      }
+
       const boundedContext = {}
       for (const [key, value] of Object.entries(context || {})) {
         if (typeof value !== 'string') {
           continue
         }
-        boundedContext[key] = clipText(value, 280)
+        boundedContext[key] = clipText(value, contextValueLimit(key))
       }
+      const history = Array.isArray(sendOptions && sendOptions.history) ? sendOptions.history : []
 
       const adapterState = promptAdapterManifest.getAdapters()
       const selectedPromptAdapter = resolvePromptAdapterSelection(trimmedMessage, boundedContext, adapterState.adapters)
@@ -1796,14 +1901,22 @@ function createTutorChatRuntime(options = {}) {
 
       const inferenceLease = acquireInferenceLease()
       if (!inferenceLease) {
-        throw new Error('Chat inference already active; cancel or wait for completion')
+        throw new Error(TUTOR_REASONS.busy)
       }
 
       loadedAdapterManifestPath = adapterState.manifestPath
       activePromptAdapterId = selectedPromptAdapterId
 
       try {
-        const coldStart = await ensureLoaded()
+        let coldStart
+        try {
+          coldStart = await ensureLoaded()
+        } catch (error) {
+          if (!(error instanceof ModelLoadError)) {
+            lastError = error instanceof Error ? error.message : String(error)
+          }
+          throw new Error(TUTOR_REASONS.loadFailed)
+        }
         lastUsedAtUtc = new Date().toISOString()
 
         const startedAt = Date.now()
@@ -1820,6 +1933,7 @@ function createTutorChatRuntime(options = {}) {
               maxPromptChars,
               maxOutputTokens,
               promptAdapter: selectedPromptAdapter,
+              history,
             })
             cleanedText = normalizeMojibakePunctuation(String(inference.text || ''))
             if (isLowConfidenceAssistantReply(cleanedText)) {
@@ -1830,19 +1944,13 @@ function createTutorChatRuntime(options = {}) {
               break
             }
             if (attempt >= 1) {
-              cleanedText = buildLowSignalRecoveryReply(trimmedMessage)
-              break
+              throw new Error(TUTOR_REASONS.noAnswer)
             }
           }
           const elapsedMs = Date.now() - startedAt
-          cleanedText = enforceJapaneseOnlyReply(cleanedText, trimmedMessage)
-          if (activeProvider !== 'stub-fallback') {
-            lastError = null
-          }
+          lastError = null
           if (inference && typeof inference.provider === 'string') {
-            if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
-              activeProvider = inference.provider
-            }
+            activeProvider = inference.provider
           }
           if (inference && typeof inference.model === 'string') {
             activeModel = inference.model
@@ -1857,21 +1965,24 @@ function createTutorChatRuntime(options = {}) {
             elapsedMs,
           }
         } catch (error) {
+          /* A failed turn is an error with a reason the learner can read, never a stand-in reply
+             (audit 15, F2). The raw detail stays in lastError and the main log. */
           const detail = error instanceof Error ? error.message : String(error)
           if (error instanceof InferenceAbortError || /llama\.cpp exited with code 130/i.test(detail)) {
             lastError = 'inference-cancelled'
-            throw new Error('Chat inference cancelled')
+            throw new Error(TUTOR_REASONS.stopped)
           }
           lastError = detail
-          const fallback = buildScriptedFallbackResponse(trimmedMessage, boundedContext, detail)
-          return {
-            ok: true,
-            text: clipText(enforceJapaneseOnlyReply(normalizeMojibakePunctuation(fallback.text), trimmedMessage), maxOutputChars),
-            provider: fallback.provider,
-            model: fallback.model,
-            coldStart,
-            elapsedMs: Date.now() - startedAt,
+          if (error instanceof ContextTooLongError) {
+            throw new Error(TUTOR_REASONS.tooLong)
           }
+          if (detail === TUTOR_REASONS.noAnswer) {
+            throw new Error(TUTOR_REASONS.noAnswer)
+          }
+          if (/timed out/i.test(detail)) {
+            throw new Error(TUTOR_REASONS.tooSlow)
+          }
+          throw new Error(TUTOR_REASONS.failed)
         }
       } finally {
         releaseInferenceLease(inferenceLease)
@@ -1883,7 +1994,7 @@ function createTutorChatRuntime(options = {}) {
         throw new Error('Translation text must not be empty')
       }
       if (isInferenceActive) {
-        throw new Error('Chat inference already active; cancel or wait for completion')
+        throw new Error(TUTOR_REASONS.busy)
       }
 
       const sourceLang = typeof params.sourceLang === 'string' ? params.sourceLang.trim().toLowerCase() : 'ja'
@@ -1899,11 +2010,19 @@ function createTutorChatRuntime(options = {}) {
       const clipped = String(preparedText || '').trim().length > trimmedText.length
       const inferenceLease = acquireInferenceLease()
       if (!inferenceLease) {
-        throw new Error('Chat inference already active; cancel or wait for completion')
+        throw new Error(TUTOR_REASONS.busy)
       }
 
       try {
-        const coldStart = await ensureLoaded()
+        let coldStart
+        try {
+          coldStart = await ensureLoaded()
+        } catch (error) {
+          if (!(error instanceof ModelLoadError)) {
+            lastError = error instanceof Error ? error.message : String(error)
+          }
+          throw new Error(TUTOR_REASONS.loadFailed)
+        }
         lastUsedAtUtc = new Date().toISOString()
 
         const startedAt = Date.now()
@@ -1955,13 +2074,9 @@ function createTutorChatRuntime(options = {}) {
           if (!cleanedText) {
             throw new Error('Translation output was empty')
           }
-          if (activeProvider !== 'stub-fallback') {
-            lastError = null
-          }
+          lastError = null
           if (inference && typeof inference.provider === 'string') {
-            if (!(activeProvider === 'stub-fallback' && inference.provider === 'stub')) {
-              activeProvider = inference.provider
-            }
+            activeProvider = inference.provider
           }
           if (inference && typeof inference.model === 'string') {
             activeModel = inference.model
@@ -1990,8 +2105,16 @@ function createTutorChatRuntime(options = {}) {
       if (isInferenceActive || configuredProvider !== 'llama.cpp') {
         return { ok: false, text: '' }
       }
+      if (usesTranslationModel) {
+        return { ok: false, text: '', reason: 'no-tutor-model' }
+      }
       if (!Array.isArray(entries) || entries.length === 0) {
         return { ok: false, text: '' }
+      }
+      /* Clues are asked for once, when the crossword opens, and a cold model is not loaded for them:
+         nothing would use it, and the crossword is not the chat (audit 15, F3). */
+      if (!isWarm()) {
+        return { ok: false, text: '', reason: 'model-warming' }
       }
 
       const inferenceLease = acquireInferenceLease()
@@ -2002,7 +2125,7 @@ function createTutorChatRuntime(options = {}) {
       let timeout = null
       try {
         const coldStart = await ensureLoaded()
-        if (inferenceLease.controller.signal.aborted || activeProvider === 'stub-fallback') {
+        if (inferenceLease.controller.signal.aborted) {
           return { ok: false, text: '' }
         }
 
@@ -2021,6 +2144,8 @@ function createTutorChatRuntime(options = {}) {
           signal: inferenceLease.controller.signal,
           maxContextChars: 2_000,
           maxPromptChars: 2_000,
+          // the whole entry list, or the clue set never parses (audit 15 design critic, 1)
+          maxMessageChars: 1_800,
           maxOutputTokens: 240,
           disableThinking: true,
           systemPromptOverride: 'You generate safe English crossword clues. Return only the requested JSON array and never reveal a Japanese answer.',
@@ -2052,13 +2177,25 @@ function createTutorChatRuntime(options = {}) {
      * Judges one uncertain Scenario Practice response and returns the model's
      * raw JSON text for the renderer to validate. Deliberately narrow: it never
      * writes dialogue, names nodes, or decides progression — the scenario
-     * engine owns all of that. Any problem at all (no model, busy lease, cold
-     * start, abort, timeout, stub adapter) resolves to `{ ok: false }`, which
-     * the caller treats exactly like "no model installed".
+     * engine owns all of that. Any problem at all (no tutor model, busy lease,
+     * a cold model, abort, timeout, stub adapter) resolves to `{ ok: false }`,
+     * which the caller treats exactly like "no model installed". A cold model is
+     * loaded in the background for the next uncertain turn, and this one does not
+     * wait for it (audit 15, F3).
      */
     async evaluateScenarioResponse(request) {
       if (!request || typeof request !== 'object' || configuredProvider !== 'llama.cpp') {
         return { ok: false, text: '' }
+      }
+      if (usesTranslationModel) {
+        return { ok: false, text: '', reason: 'no-tutor-model' }
+      }
+      if (!isWarm()) {
+        // preload arms the idle unload once the load settles, so a model nobody uses still goes
+        if (!isInferenceActive) {
+          void runtime.preload('scenario-judge').catch(() => undefined)
+        }
+        return { ok: false, text: '', reason: 'model-warming' }
       }
 
       const inferenceLease = acquireInferenceLease()
@@ -2069,7 +2206,7 @@ function createTutorChatRuntime(options = {}) {
       let timeout = null
       try {
         const coldStart = await ensureLoaded()
-        if (inferenceLease.controller.signal.aborted || activeProvider === 'stub-fallback') {
+        if (inferenceLease.controller.signal.aborted) {
           return { ok: false, text: '' }
         }
 
@@ -2097,6 +2234,8 @@ function createTutorChatRuntime(options = {}) {
           signal: inferenceLease.controller.signal,
           maxContextChars: 3_000,
           maxPromptChars: 3_000,
+          // the learner's response is the last line: never cut (audit 15 design critic, 1)
+          maxMessageChars: 2_600,
           maxOutputTokens: 220,
           disableThinking: true,
           systemPromptOverride: 'You grade a single Japanese utterance and reply with one JSON object only. You never produce conversation.',
@@ -2147,6 +2286,9 @@ function createTutorChatRuntime(options = {}) {
     },
 
     async preload(reason = 'startup-preload') {
+      if (reason === 'scenario-start' && usesTranslationModel) {
+        return { ok: false, reason: 'no-tutor-model', coldStart: false, loaded }
+      }
       // an unload timer armed by an earlier request must not fire into this (re)load
       clearUnloadTimer()
       const coldStart = await ensureLoaded()
@@ -2204,6 +2346,8 @@ function createTutorChatRuntime(options = {}) {
       activeProvider = configuredProvider
       activeModel = configuredProvider === 'llama.cpp' ? llamaCppConfig.modelPath || 'unknown' : 'stub'
       activePromptAdapterId = 'default'
+      // switching the chat off and on is the learner's retry of a failed load
+      lastLoadFailedAt = 0
       return {
         ok: true,
         reason,
@@ -2222,4 +2366,9 @@ module.exports = {
   extractCliResponseText,
   httpRequestJson,
   createLlamaServerAdapter,
+  // for tests of what reaches the model (audit 15)
+  composeSystemPrompt,
+  boundChatHistory,
+  extractEnglishTranslationTarget,
+  llamaServerStatusError,
 }

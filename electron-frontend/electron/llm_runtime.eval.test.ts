@@ -55,8 +55,9 @@ describe('llm runtime quality evals', () => {
           return undefined
         },
         async infer(message) {
+          // only a reply that is nothing but a short hedge is replaced (audit 15)
           return {
-            text: `I'm not sure about this yet: ${message}`,
+            text: message.startsWith('Explain') ? `I'm not sure, but ${message.toLowerCase()} uses the te-form to link two actions in order.` : "I'm not sure.",
             provider: 'stub',
             model: 'stub-model',
           }
@@ -72,5 +73,8 @@ describe('llm runtime quality evals', () => {
 
     const study = await runtime.sendMessage('What should I study next?')
     expect(study.text).toMatch(/10分・20分・30分/)
+
+    const kept = await runtime.sendMessage('Explain this sentence')
+    expect(kept.text).toMatch(/^I'm not sure, but explain this sentence/)
   })
 })

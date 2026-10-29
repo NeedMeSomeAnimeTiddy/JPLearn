@@ -4,32 +4,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { createTutorChatRuntime, createAdapterRegistry, extractCliResponseText } = require('./llm_runtime.cjs')
 
 describe('llm runtime', () => {
-  it('uses stub provider by default', async () => {
+  it('says no tutor model is installed when only the built-in stub is there (audit 15, F2)', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
     })
 
-    const response = await runtime.sendMessage('Help me review weak cards', { focus_area: 'kanji_n5' })
-    expect(response.ok).toBe(true)
-    expect(response.provider).toBe('stub')
-    expect(typeof response.text).toBe('string')
-    expect(response.text.length).toBeGreaterThan(0)
+    await expect(runtime.sendMessage('Help me review weak cards', { focus_area: 'kanji_n5' }))
+      .rejects.toThrow('no tutor model is installed')
   })
 
-  it('falls back to stub when llama.cpp is not configured', async () => {
+  it('fails with a reason when llama.cpp cannot load, with no stand-in answer (audit 15, F2)', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'llama.cpp',
       llamaServerPath: 'C:/missing/llama-server.exe',
       llamaModelPath: 'C:/missing/model.gguf',
     })
 
-    const response = await runtime.sendMessage('What should I practice next?', { focus_area: 'vocab_n5' })
-    expect(response.ok).toBe(true)
-    expect(response.provider).toBe('stub')
+    await expect(runtime.sendMessage('What should I practice next?', { focus_area: 'vocab_n5' }))
+      .rejects.toThrow('the model failed to load')
 
     const status = runtime.getStatus()
-    expect(status.loaded).toBe(true)
-    expect(status.activeProvider).toBe('stub-fallback')
+    expect(status.loaded).toBe(false)
+    expect(status.activeProvider).not.toBe('stub-fallback')
     expect(typeof status.lastError).toBe('string')
   })
 
@@ -59,7 +55,8 @@ describe('llm runtime', () => {
     const response = await runtime.sendMessage('hello coach')
     expect(response.provider).toBe('custom-provider')
     expect(response.model).toBe('custom-model')
-    expect(response.text).toContain('すみません')
+    // an English reply reaches the learner as written (audit 15, Q1)
+    expect(response.text).toBe('custom:hello coach')
   })
 
   it('enforces single active inference', async () => {
@@ -92,7 +89,7 @@ describe('llm runtime', () => {
     while (!gate.release) {
       await new Promise((resolve) => setTimeout(resolve, 0))
     }
-    await expect(runtime.sendMessage('second')).rejects.toThrow(/already active/i)
+    await expect(runtime.sendMessage('second')).rejects.toThrow('another request is still running')
     gate.release()
     await expect(first).resolves.toMatchObject({ ok: true })
   })
@@ -157,39 +154,23 @@ describe('llm runtime', () => {
     expect(runtime.getStatus().inferenceActive).toBe(false)
   })
 
-  it('reserves cold loading for crossword inference before a competing tutor request', async () => {
-    let releaseLoad: (() => void) | undefined
-    const loadGate = new Promise<void>((resolve) => {
-      releaseLoad = resolve
-    })
-    const infer = vi.fn(async () => ({
-      text: '[{"poolPosition":0,"clue":"Place to learn"}]',
-      provider: 'llama.cpp',
-      model: 'test-model',
-    }))
+  it('does not load a cold model for crossword clues (audit 15, F3)', async () => {
+    const load = vi.fn(async () => undefined)
+    const infer = vi.fn(async () => ({ text: '[]', provider: 'llama.cpp', model: 'test-model' }))
     const runtime = createTutorChatRuntime({
       provider: 'llama.cpp',
-      adapterFactory: () => ({
-        load: async () => loadGate,
-        unload: async () => undefined,
-        infer,
-      }),
+      adapterFactory: () => ({ load, unload: async () => undefined, infer }),
     })
 
-    const crossword = runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }])
-    expect(runtime.getStatus().inferenceActive).toBe(true)
-
-    await expect(runtime.sendMessage('competing tutor request')).rejects.toThrow(/already active/i)
-    expect(runtime.getStatus().inferenceActive).toBe(true)
+    await expect(runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }]))
+      .resolves.toEqual({ ok: false, text: '', reason: 'model-warming' })
+    expect(load).not.toHaveBeenCalled()
     expect(infer).not.toHaveBeenCalled()
-
-    releaseLoad?.()
-    await expect(crossword).resolves.toMatchObject({ ok: true })
-    expect(infer).toHaveBeenCalledTimes(1)
+    expect(runtime.getStatus().loaded).toBe(false)
     expect(runtime.getStatus().inferenceActive).toBe(false)
   })
 
-  it('returns scripted fallback response when adapter inference fails', async () => {
+  it('fails with a reason when adapter inference fails (audit 15, F2)', async () => {
     const runtime = createTutorChatRuntime({
       provider: 'stub',
       adapterFactory: () => ({
@@ -205,11 +186,9 @@ describe('llm runtime', () => {
       }),
     })
 
-    const response = await runtime.sendMessage('help with kanji', { focus_area: 'kanji_n5' })
-    expect(response.ok).toBe(true)
-    expect(response.provider).toBe('scripted-fallback')
-    expect(response.text).toMatch(/練習しましょう/)
-    expect(response.text.length).toBeLessThanOrEqual(700)
+    await expect(runtime.sendMessage('help with kanji', { focus_area: 'kanji_n5' }))
+      .rejects.toThrow('the model stopped with an error')
+    expect(runtime.getStatus().lastError).toBe('adapter boom')
   })
 
   it('answers a translation question from the offline dictionary, before adapter inference', async () => {
@@ -505,7 +484,7 @@ describe('llm runtime', () => {
     })
 
     await expect(runtime.sendMessage('hello', { focus_area: 'today\'s weakest area' })).rejects.toThrow(
-      /chat inference cancelled/i,
+      'the request was stopped',
     )
   })
 
@@ -526,7 +505,7 @@ describe('llm runtime', () => {
     })
 
     await expect(runtime.sendMessage('cancel me please', { focus_area: 'kanji_n5' })).rejects.toThrow(
-      /chat inference cancelled/i,
+      'the request was stopped',
     )
   })
 
@@ -577,7 +556,7 @@ describe('llm runtime', () => {
     expect(cancelPayload.ok).toBe(true)
     expect(cancelPayload.cancelled).toBe(true)
     /* a cancel that lands before inference starts is a cancel, not a scripted reply (audit 5 nit 1) */
-    await expect(pending).rejects.toThrow('Chat inference cancelled')
+    await expect(pending).rejects.toThrow('the request was stopped')
   })
 
   it('auto-selects translation adapter by intent', async () => {
@@ -803,9 +782,13 @@ describe('the tutor model server lifecycle (audit 5, F3/F7)', () => {
       const runtime = createTutorChatRuntime({
         provider: 'llama.cpp', inactivityUnloadMs: 15000, adapterFactory: () => makeAdapter(state),
       })
-      await runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }])
+      await runtime.preload('test-warm') // clues never load a cold model (audit 15, F3)
+      await vi.advanceTimersByTimeAsync(10000)
+      await expect(runtime.generateCrosswordClues([{ poolPosition: 0, answer: '学校', fallbackClue: 'school' }]))
+        .resolves.toMatchObject({ ok: true })
+      await vi.advanceTimersByTimeAsync(10000) // the clue request reset the idle window
       expect(runtime.getStatus().loaded).toBe(true)
-      await vi.advanceTimersByTimeAsync(15000)
+      await vi.advanceTimersByTimeAsync(5000)
       expect(runtime.getStatus().loaded).toBe(false)
     } finally {
       vi.useRealTimers()
