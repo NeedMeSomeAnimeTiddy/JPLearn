@@ -337,15 +337,6 @@ export type AppFontPreset =
   | 'reggae_one'
   | 'system_ui'
 export type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
-export type ExpertiseLevel =
-  | 'total_beginner'
-  | 'know_hiragana'
-  | 'know_kana'
-  | 'jlpt_n5_foundation'
-  | 'jlpt_n4_foundation'
-  | 'jlpt_n3_foundation'
-  | 'jlpt_n2_foundation'
-  | 'jlpt_n1_foundation'
 export type SettingsTabKey = 'appearance' | 'assistant' | 'system'
 export type OverviewSectionKey =
   | 'studyActivity'

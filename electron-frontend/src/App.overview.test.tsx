@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
+import type { KnownItem } from './electron'
 import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
 afterEach(() => {
@@ -69,9 +70,9 @@ const baseDesktopApi = {
       goal_met: false,
     },
   }),
-  applyExpertiseLevel: async (level: 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation') => ({
+  applyKnownItems: async (items: KnownItem[]) => ({
     ok: true,
-    level,
+    items,
     seeded_cards: 0,
     decks: [],
   }),

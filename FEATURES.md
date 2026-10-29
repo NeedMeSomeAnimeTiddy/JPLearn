@@ -111,20 +111,21 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 ### Feature Unlock System
 - Backend model for feature gating via progression node mastery (e.g., listening_mode requires hiragana mastery) and feature dependency chains (e.g., tutor_chat requires conversation_mode)
 - Currently cataloged features: themes, achievements, listening_mode, conversation_mode, kanji_mode, reading_mode, advanced_analytics, jlpt_dashboard, tutor_chat
-- **Not currently used to gate navigation or minigame access in the frontend** — nothing in the Electron UI reads `is_unlocked` except the Achievements panel (for the "badge" rewards below). Every feature is reachable from the UI regardless of unlock state today; this system only drives which feature-unlock badges show as earned.
+- The menu reads `is_unlocked` and refuses its locked rows: THE WORLD stays locked until `conversation_mode` unlocks and THE EXAM until `jlpt_dashboard` unlocks. Minigames and the curriculum path are not gated by it. It also drives which feature-unlock badges show as earned.
 
 ### Milestone Achievement Badges
 - Review-count milestones (100 / 500 / 1,000 reviews completed) and best-streak milestones (3 / 7 / 14 / 30 / 100 days), independent of the feature-unlock badge system above
-- Node-mastery badges (tutorial, hiragana, katakana, scripted conversation, free conversation, reading, JLPT N5-N1) tied to the progression graph's "milestone"-type rewards; silent (no toast) since node mastery already has its own tutor-reaction celebration
+- Node-mastery badges (tutorial, hiragana, katakana, free conversation, reading) tied to the progression graph's "milestone"-type rewards; silent (no toast). Free conversation and reading are earned when the step is reached. Scripted conversation and JLPT N5-N1 readiness seals were removed in audit 12: nothing measured them, and the path opened them all at once
+- 19 seals in all (6 feature unlocks, 3 review counts, 5 streaks, 5 node badges)
 - Sticky once earned (persisted in `user_badges`); review-count and streak milestones fire a celebratory toast the moment a threshold is crossed
-- Shown alongside feature-unlock badges in the Achievements panel on the Overview page
+- Shown on the menu's wall (YOU → RECORDS, `x / 19 SEALS`) and counted on the ledger. `AchievementsPanel` still exists but nothing renders it
 - Progression-node mastery is synced from live review data on each read for the six deck-backed nodes (tutorial, hiragana, katakana, vocabulary_n5, grammar_n5, kanji_n5). The other ten report `is_tracked: false` and no ratio: a signal exists for some of them (`review_events.tags_csv`, `scenario_sessions`, `jlpt_exam_results`) but none carries a denominator, and a fabricated 0% cannot be recognised as wrong. `sentence_examples` is excluded on purpose — the bridge serves the full ~60k sentence corpus, so its 80% requirement is unreachable
 - Tutorial completion accepts existing review history as well as the onboarding flag, because onboarding is skippable and every other node chains off it
 
 ### Curriculum Map
 - The 16-node `JPLEARN_GRAPH` rendered on Home (`src/features/progression/`): position, what is finished, what is next
-- **Soft gating** — a gated node is never unreachable. Clicking one opens the same confirmation the readiness warning uses, and the choice is remembered per node
-- Readiness labels (completed, suggested_next, recommended, challenging, advanced) with per-step mastery percentages
+- **Advisory path** — a gated node is never unreachable from the path. Clicking one opens a confirmation (`ReadinessWarningModal`), and the choice is remembered per node. The menu is stricter: it hard-locks THE WORLD and THE EXAM until their features unlock (see Feature Unlock System)
+- The bridge still computes readiness labels (completed, suggested_next, recommended, challenging, advanced) and the old per-section readiness warning, but no screen shows either
 - Section order is *derived* from the graph. The `LEARNING_PATHS` dict, its `complete_beginner` path, the `active_learning_path` setting and the path-selection command were removed in #78 Phase 5 — one curriculum, one definition
 
 ---
@@ -132,7 +133,7 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 ## XP & Leveling
 
 ### XP System
-- Sources: correct_answer (10 XP), streak_bonus (25 XP), mastery_milestone (100 XP), daily_completion (50 XP), feature_unlock_bonus (75 XP)
+- Only correct_answer (10 XP) is granted today. The domain also defines streak_bonus (25 XP), mastery_milestone (100 XP), daily_completion (50 XP) and feature_unlock_bonus (75 XP), but nothing awards them
 - Dedup-key based idempotency (prevents double-counting)
 - Level curve: iterative scaling (base=100 XP, factor=1.5×, max level=100)
 
@@ -346,6 +347,7 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 
 ### Setup & Onboarding
 - Setup wizard for optional model downloads (llama.cpp, GGUF, VOICEVOX)
+- Onboarding checklist ("What do you already know?"): hiragana, katakana, and N5/N4/N3 kanji and vocabulary. Each tick seeds only its own deck as known; nothing ticked seeds nothing. A failed save keeps the wizard open with the reason, and Start or Skip retries
 - Session recovery command (`npm run session:recover`)
 - One-time database migration from legacy locations
 

@@ -86,27 +86,27 @@ describe('what the ledger is made of', () => {
   it('reads the streak, the best and the freezes from the summary', () => {
     const L = buildLedger(
       summary({ current_days: 4, best_days: 9, freezes_available: 2 }), xp({}), year,
-      { earned: 3, total: 25 },
+      { earned: 3, total: 19 },
     )
     expect(L.streak).toEqual({ now: 4, best: 9, freezes: 2 })
   })
 
   it('survives a summary that has not arrived', () => {
-    expect(buildLedger(null, null, year, { earned: 0, total: 25 }).streak)
+    expect(buildLedger(null, null, year, { earned: 0, total: 19 }).streak)
       .toEqual({ now: 0, best: 0, freezes: 0 })
   })
 
   it('reads XP as a size and a remainder, not two thresholds', () => {
     /* `xp_for_current_level` is the SIZE of the level and `xp_to_next_level` what is left of it;
        reading them as absolute thresholds is what once put "0 / 1 XP" on the crown */
-    const L = buildLedger(summary(null), xp({ xp_for_current_level: 900, xp_to_next_level: 260 }), year, { earned: 0, total: 25 })
+    const L = buildLedger(summary(null), xp({ xp_for_current_level: 900, xp_to_next_level: 260 }), year, { earned: 0, total: 19 })
     expect(L.level).toEqual({ level: 3, xpIn: 640, xpOf: 900 })
   })
 
   it('draws an unmeasured figure as an absence rather than a zero', () => {
     /* all six now, not two: an account with nothing in it has nothing to say on any row, and each
        says its own absence rather than a shared zero */
-    const L = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 25 })
+    const L = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 19 })
     expect(L.rows.map((r) => r.value)).toEqual([null, null, null, null, null, null])
     expect(L.rows[0].absent).toMatch(/NOTHING REVIEWED/)
     expect(new Set(L.rows.map((r) => r.absent)).size).toBe(L.rows.length)
@@ -147,7 +147,7 @@ describe('what the ledger is made of', () => {
     } as unknown as StudySummaryPayload)
 
     const built = (over: Record<string, unknown> = {}) =>
-      buildLedger(full(over), xp({}), ledgerYear([], TODAY), { earned: 2, total: 25 })
+      buildLedger(full(over), xp({}), ledgerYear([], TODAY), { earned: 2, total: 19 })
 
     it('shows the worst script on the plate, and does not re-sort what the backend ordered', () => {
       /* the query returns these worst-first; sorting again here is how the plate and the sheet
@@ -235,7 +235,7 @@ describe('what the ledger is made of', () => {
   it('does not carry a rank or a study-time figure at all', () => {
     /* neither exists in this app -- there is no grade system anywhere in `domain/`, and
        `session_history` carries no duration. A figure with no source is not drawn. */
-    const keys = buildLedger(summary(null), xp({}), year, { earned: 0, total: 25 }).rows.map((r) => r.key)
+    const keys = buildLedger(summary(null), xp({}), year, { earned: 0, total: 19 }).rows.map((r) => r.key)
     expect(keys).not.toContain('rank')
     expect(keys).not.toContain('time')
   })
@@ -307,7 +307,7 @@ const ledgerOf = (year = busyYear) => buildLedger(
   summary({ current_days: 4, best_days: 11, freezes_available: 2 }),
   xp({ level: 2, xp_for_current_level: 150, xp_to_next_level: 50, total_xp: 300 }),
   year,
-  { earned: 2, total: 25 },
+  { earned: 2, total: 19 },
 )
 
 describe('the shape of the year, which every sheet reads', () => {
@@ -359,7 +359,7 @@ describe('what a figure opens onto', () => {
 
   it('draws an absence faint rather than leaving the line out', () => {
     /* a line that vanishes when its answer is nothing makes two accounts' sheets different shapes */
-    const empty = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 25 })
+    const empty = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 19 })
     const s = ledgerSheet('accuracy', empty)!
     expect(s.lines).toHaveLength(4)
     expect(s.lines.every((l) => l.off || l.v !== '—')).toBe(true)
@@ -378,7 +378,7 @@ describe('what a figure opens onto', () => {
 
   it('has no level sheet at all on an account with no XP payload', () => {
     /* a plate that cannot answer stays a plate rather than opening onto four dashes */
-    const noXp = buildLedger(summary(null), null, busyYear, { earned: 0, total: 25 })
+    const noXp = buildLedger(summary(null), null, busyYear, { earned: 0, total: 19 })
     expect(ledgerSheet('level', noXp)).toBeNull()
   })
 })
@@ -407,6 +407,12 @@ describe('the ledger on screen', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => expect(document.querySelector('.lg-sheet')).toBeNull())
     expect(onUp).not.toHaveBeenCalled()
+  })
+
+  it('counts the nineteen seals the wall shows', async () => {
+    render(<Ledger summary={summary({ current_days: 4, best_days: 11, freezes_available: 2 })}
+      xp={xp({})} onOpenAchievements={vi.fn()} onUp={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Achievements — 0 of 19 earned' })).toBeTruthy())
   })
 
   it('makes every figure a real button, so the mouse and the keyboard agree', () => {

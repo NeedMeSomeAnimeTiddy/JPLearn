@@ -28,8 +28,19 @@ export interface OnboardingWizardProps {
   fontSize: 'small' | 'medium' | 'large'
   fontSizeOptions: Array<{ key: 'small' | 'medium' | 'large'; label: string }>
   onFontSizeSelect: (key: 'small' | 'medium' | 'large') => void
-  onComplete: (pathId: string, checkedItems: Set<string>, answers: OnboardingAnswers) => void
-  onSkip: (checkedItems: Set<string>, answers: OnboardingAnswers) => void
+  /* Both resolve null once onboarding is saved, or say which stage failed and why; the wizard
+     stays open with the reason and the same button retries the whole sequence. */
+  onComplete: (pathId: string, checkedItems: Set<string>, answers: OnboardingAnswers) => Promise<OnboardingFailure | null>
+  onSkip: (checkedItems: Set<string>, answers: OnboardingAnswers) => Promise<OnboardingFailure | null>
+}
+
+/** `known_items` is seeding the ticked decks; `complete` is recording that onboarding finished. */
+export type OnboardingStage = 'known_items' | 'complete'
+
+export interface OnboardingFailure {
+  stage: OnboardingStage
+  /** already peeled of Electron's IPC wrapper */
+  message: string
 }
 
 export type Page = 1 | 2 | 3 | 4 | 5 | 6

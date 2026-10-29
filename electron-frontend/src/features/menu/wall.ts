@@ -2,7 +2,7 @@ import { BADGE_METADATA } from '../achievements'
 import type { BadgeEntry } from '../achievements/types'
 
 /* ==================================================================================================
-   THE WALL — YOU's level three. Twenty-five seals, and what each one takes.
+   THE WALL — YOU's level three. Nineteen seals, and what each one takes.
 
    THE DESCRIPTION IS THE REQUIREMENT, which is the whole reason this screen can exist without
    inventing anything. Every string in `BADGE_METADATA` says what earns the badge — "Unlocked
@@ -10,21 +10,22 @@ import type { BadgeEntry } from '../achievements/types'
    without a second field being made up for it.
 
    THE GROUPS ARE THE CATALOG'S OWN `category`, and there are three: `learning_mode`, `mastery` and
-   `milestone`. The mockup drew its own grouping over invented badges; these are the twenty-five the
-   app actually ships, in the order the app already walks them.
+   `milestone`. The mockup drew its own grouping over invented badges; these are the nineteen the
+   app actually ships, in the order the app already walks them. (Six more -- scripted conversation
+   and JLPT N5 through N1 readiness -- were dropped in audit 12: nothing measured them, and the path
+   opened them all at once.)
 
    A SEAL WEARS ITS OWN FIGURE WHERE IT HAS ONE, AND ITS ICON WHERE IT DOES NOT. The mockup gave
    each badge a Japanese glyph, authored for the mockup and existing nowhere in this app — inventing
-   twenty-five kanji is exactly what this port refuses to do, so the fallback is the lucide mark
+   nineteen kanji is exactly what this port refuses to do, so the fallback is the lucide mark
    `BADGE_METADATA` already carries.
 
-   BUT THIRTEEN OF THE TWENTY-FIVE ARE QUANTITIES, AND THE ICON WAS HIDING THEM. `reviews_100`,
+   BUT EIGHT OF THE NINETEEN ARE QUANTITIES, AND THE ICON WAS HIDING THEM. `reviews_100`,
    `reviews_500` and `reviews_1000` all carry `icon: 'target'`, so three badges that differ only by
-   an order of magnitude drew as three identical grey rings; the five streaks all carry `flame` and
-   the five JLPT levels all carry `target` again. Reading the figure out of the descriptor is not
-   inventing anything — `streak_14` means fourteen and `jlpt_n3_passed` means N3 — and it is what
-   the design's own plate does: 100 / 500 / 1K across the volume row, N5 through N1 across the
-   milestones. See `sealMark`.
+   an order of magnitude drew as three identical grey rings; the five streaks all carry `flame`.
+   Reading the figure out of the descriptor is not inventing anything — `streak_14` means fourteen
+   — and it is what the design's own plate does: 100 / 500 / 1K across the volume row. See
+   `sealMark`.
    ================================================================================================== */
 
 /* THE FIGURE A SEAL CARRIES, or null when the badge is not a quantity and keeps its pictogram.
@@ -38,8 +39,6 @@ export function sealMark(descriptor: string): string | null {
   }
   const streak = /^streak_(\d+)$/.exec(descriptor)
   if (streak) return streak[1]
-  const jlpt = /^jlpt_(n[1-5])_passed$/.exec(descriptor)
-  if (jlpt) return jlpt[1].toUpperCase()
   return null
 }
 
