@@ -68,6 +68,46 @@ are kept in `Z:/Projects/JPLearn/audits`.
 ### Coverage, not a finding
 - The last three passes (dictionary and OCR, packaging, progression) did not cover JLPT, minigames and Daily Games, the menu and valley, renderer state and settings, reading passages, or handwriting. No pass has ever covered those six.
 
+### Outcome (branch `audit15-repairs`, merged 09f51f5, pushed 2026-10-29)
+- Robbie's answers: F1 "Remember recent turns"; F4 "Forget on close"; Q1 Japanese for practice,
+  English only when the learner asks what something means or how grammar works; F2 "The tutor
+  couldn't answer: <reason>", not kept in history; voice speaks only the Japanese parts; footer
+  "ENTER ASKS A FOLLOW-UP · THE TUTOR SEES THE LAST 3 EXCHANGES"; with no model, "no tutor model is
+  installed". A design critic (Opus) approved revision 1 with amendments, all taken (revision 2).
+- F1 fixed (80471b7, df92f57): the last six turns (three exchanges) go to the model with each
+  question, 300 characters a turn and 900 in all, oldest dropped first; CLEAR forgets them.
+- F2 fixed (80471b7, df92f57): no canned replies. Each failure throws a short reason (load failed, no
+  model, too slow, no answer, too long, error, busy, stopped); a failed load is not retried for 30 s;
+  the question is dropped from the chat and the failure is not kept. Only a reply that is nothing but
+  a short hedge becomes the clarifying question.
+- F3 fixed (80471b7): a cold scenario judgement answers at once and warms the model in the
+  background, which arms the idle unload; crossword clues never load a cold model.
+- F4 fixed (80471b7, df92f57, e45a88e): history lives in the main process for the session (20 turns
+  kept); the startup read, the preloaded route, the bridge commands assistant-chat-append, -history
+  and -clear, the compaction on every snapshot and the chat summaries in the context are gone. The
+  tables stay and reset-db still clears them.
+- F5 fixed (80471b7): the prompt and adapter note are never cut; the context keeps at least 1,200 of
+  4,000 characters, dropping low-value keys first and never the memory graph (clip 480);
+  llama-server runs `-c 4096 -np 1`, and its "too long" error has its own reason. Judge and clue
+  prompts reach the model whole (2,600 and 1,800; the largest authored judge prompt is about 1,450).
+- F6 fixed (80471b7, df92f57): scenario practice warms through `scenario:preload-model`.
+- F7 fixed (80471b7): judging, clues and the scenario warmup refuse the translation model (setup's
+  choice or the only GGUF found); a model named by option or environment counts as a tutor model.
+- F8 fixed (80471b7): a single quote quotes only at a word boundary; keys under two letters skip the
+  dictionary. "What's 'dog' in Japanese?" now looks up dog, not s (tested).
+- Q1 also reached `models/llama/instructions.txt`, which replaces the built-in prompt when present
+  (a run from the repo) and still said "match the user's language".
+- Nits 1-3 fixed; FEATURES.md corrected; DEBT #15 amended (second caller, up to 54 encodes a
+  message, trigger extended). The drafted F5 and F7 debt rows were not filed: both are fixed.
+- Review (Opus): approve with nits. Fixed: a stale comment, a test that did not isolate the
+  background load's idle unload (701d24a). Left: an unload during a background scenario load can
+  leave one idle timer that re-unloads an unloaded runtime (harmless).
+- Checks: pytest on linux-build 1923 passed, 4 skipped, only the known Linux
+  test_conjugation_index failure; arch_check and the generated types clean. On win-build at
+  701d24a lint, build, vitest 2064/2064 and a11y 7/7 pass.
+- Not run: the app end to end. Robbie's install has no tutor model, so no reply, judgement or clue
+  from a real model was seen, and no screen was looked at.
+
 ## 2026-10-29 — Dictionary, lookup and OCR
 
 **Scope:** Audit 14. Robbie chose "Dictionary, lookup, OCR (Recommended)" over tutor and assistant, and minigames and Daily Games, then ran `/crew-audit`.
