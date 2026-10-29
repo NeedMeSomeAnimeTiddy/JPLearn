@@ -293,7 +293,8 @@ const localSetupRuntime = createSetupRuntime()
 const localSpeechRuntime = createSpeechRuntime({ repoRoot })
 const localOcrRuntime = createOcrRuntime({ repoRoot })
 let tutorRuntimePreloadPromise = null
-// the window asked for a tutor warmup this session (only while its chat is on) and has not unloaded since
+// the window asked for a tutor warmup this session (the chat while switched on, or scenario practice's AI
+// evaluation, which the learner turns on) and has not unloaded since
 let tutorWarmupRequested = false
 let preloadedAssistantChatHistory = {
   ok: true,
