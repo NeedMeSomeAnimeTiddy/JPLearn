@@ -385,20 +385,36 @@ def test_study_pipeline_assistant_snapshot(tmp_path: Path, monkeypatch) -> None:
     assert isinstance(snapshot["events"], list)
 
 
-def test_assistant_chat_memory_compaction_creates_summaries(tmp_path: Path, monkeypatch) -> None:
+def test_saved_chat_rows_are_left_alone_and_never_reach_the_context(tmp_path: Path, monkeypatch) -> None:
+    """Chat history lives in the main process for the session only (audit 15, F4): the old tables
+    are neither compacted nor read, and the context carries no chat summaries."""
     _use_temp_db(tmp_path, monkeypatch)
+    with database._connect() as conn:
+        for index in range(30):
+            conn.execute(
+                "INSERT INTO assistant_chat_turns (role, content, created_at_utc) VALUES (?, ?, ?)",
+                ("user" if index % 2 == 0 else "assistant", f"old turn {index}", "2026-01-01T00:00:00+00:00"),
+            )
+        conn.execute(
+            "INSERT INTO assistant_chat_summaries (start_turn_id, end_turn_id, summary_json, created_at_utc)"
+            " VALUES (1, 12, ?, ?)",
+            ('{"focus_tags": "kanji", "latest_user_intent": "old intent"}', "2026-01-01T00:00:00+00:00"),
+        )
 
-    for index in range(30):
-        role = "user" if index % 2 == 0 else "assistant"
-        content = "Need help with kanji and streak goals" if role == "user" else "Next: run typed recall"
-        study_pipeline.append_assistant_chat_turn(role, content)
+    study_pipeline.load_assistant_snapshot()
+    contexts = [
+        study_pipeline.assemble_assistant_chat_context(user_message="kanji"),
+        study_pipeline.assemble_assistant_chat_context_v2_with_embeddings(user_message="kanji"),
+    ]
 
-    turns = study_pipeline.load_recent_assistant_chat_turns(limit=100)
-    assert len(turns) <= 20
-
-    summaries = database.load_recent_assistant_chat_summaries(limit=5)
-    assert summaries
-    assert "focus_tags" in summaries[0]
+    with database._connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM assistant_chat_turns").fetchone()[0] == 30
+        assert conn.execute("SELECT COUNT(*) FROM assistant_chat_summaries").fetchone()[0] == 1
+    for context in contexts:
+        assert "summaries[" not in context["memory"]
+        assert "summaries[" not in context["memory_graph"]
+        assert "old intent" not in context["memory_graph"]
+        assert context["memory"].startswith("facts[")
 
 
 def test_assistant_chat_context_assembler_exposes_required_context_tiers(tmp_path: Path, monkeypatch) -> None:
@@ -417,12 +433,6 @@ def test_assistant_chat_context_assembler_exposes_required_context_tiers(tmp_pat
             "focus_area": "kanji_n5",
         },
     )
-
-    for index in range(10):
-        study_pipeline.append_assistant_chat_turn(
-            "user" if index % 2 == 0 else "assistant",
-            "Need context cloze support" if index % 2 == 0 else "Try one short cloze loop.",
-        )
 
     context = study_pipeline.assemble_assistant_chat_context()
 

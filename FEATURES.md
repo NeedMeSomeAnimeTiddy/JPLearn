@@ -202,14 +202,15 @@ Each script deck has a tailored set of available minigames (`electron-frontend/s
 
 ### LLM Tutor Integration
 - llama.cpp runtime (local CPU inference, no cloud dependency)
-- Tutor chat UI with status, preload, send, cancel, unload controls
+- Tutor chat in Look It Up: send and CLEAR; the model is warmed when the chat is switched on and
+  unloaded when idle. The last three exchanges go with each question and are forgotten on close
+  (audit 15). A failed reply reads "The tutor couldn't answer: <reason>".
 - Tutor reaction system: converts progression/feature/level/recommendation events into structured messages (congratulation, encouragement, guidance, acknowledgement). Not surfaced: backend only (bridge `tutor-reactions` / `tutor-dismiss`); no screen shows it and the window has no route to it since audit 8. The daily goal (`daily-goal`, `daily-goal-set`) and word of the day (`word-of-the-day`) bridge commands are likewise backend only.
 - Automatic model selection: GGUF model auto-detected by RAM (low/medium/high/ultra tiers)
 - Setup wizard for optional model download
 
 ### Assistant Memory & Context
 - Memory facts table with embedding-based retrieval (hashed character trigram vectors)
-- Chat summaries for long-context retention
 - Chat interaction tracking (dismissal, feedback, snooze)
 
 ---

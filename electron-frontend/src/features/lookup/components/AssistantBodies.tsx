@@ -78,7 +78,6 @@ export function QuestionBody({ chat, pages, page, replyKey }: QuestionBodyProps)
   }
 
   const speaking = replyKey !== null && chat.speakingKey === replyKey
-  const earlier = Math.max(0, chat.turns.length - 2)
   return (
     <>
       <div className="lk-ans">
@@ -114,7 +113,7 @@ export function QuestionBody({ chat, pages, page, replyKey }: QuestionBodyProps)
       <div className="lk-note quiet lk-note-row">
         <span>
           {chat.turns.length > 0 ? 'ENTER ASKS A FOLLOW-UP' : 'ENTER ASKS'}
-          {earlier > 0 ? ` · ${earlier} EARLIER TURNS KEPT` : ' · THE LAST 20 TURNS ARE KEPT'}
+          {' · THE TUTOR SEES THE LAST 3 EXCHANGES'}
         </span>
         <ChatChips chat={chat} />
       </div>

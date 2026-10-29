@@ -358,6 +358,24 @@ describe('LookupOverlay', () => {
     expect(screen.getByRole('button', { name: /A QUESTION/ }).querySelector('u')?.textContent).toBe(String(pages.length))
   })
 
+  it('says on the note line what the tutor sees, with turns and without (audit 15)', async () => {
+    installApi()
+    render(<Harness route="tutor" assistant={withModel()} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    const note = () => document.querySelector('.lk-note-row > span')?.textContent
+    await waitFor(() => expect(note()).toBe('ENTER ASKS · THE TUTOR SEES THE LAST 3 EXCHANGES'))
+    cleanup()
+
+    render(<Harness route="tutor" assistant={withModel({
+      turns: [
+        { role: 'user', content: 'why?', created_at_utc: '2026-10-26T00:00:00Z' },
+        { role: 'assistant', content: 'しは小さいかなと読みます。', created_at_utc: '2026-10-26T00:00:01Z' },
+      ],
+    })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(note()).toBe('ENTER ASKS A FOLLOW-UP · THE TUTOR SEES THE LAST 3 EXCHANGES'))
+  })
+
   it('takes a pasted image to A SCREENSHOT and reads it', async () => {
     installApi()
     const assistant = withModel()

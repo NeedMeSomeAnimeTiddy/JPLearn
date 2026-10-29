@@ -118,6 +118,10 @@ function registerIpcHandlers(options) {
       ? options.getLocalTutorRuntime()
       : options.localTutorRuntime
   )
+  /* The tutor chat's history for this session: the only copy (audit 15, F4; Robbie: "Forget on
+     close"). The last 20 turns are kept; the last six go to the model with each question (F1). */
+  const TUTOR_CHAT_KEPT_TURNS = 20
+  const TUTOR_CHAT_SENT_TURNS = 6
   const transientAssistantChatTurns = []
   const appendTransientAssistantChatTurn = (role, content) => {
     transientAssistantChatTurns.push({
@@ -125,6 +129,9 @@ function registerIpcHandlers(options) {
       content,
       created_at_utc: new Date().toISOString(),
     })
+    if (transientAssistantChatTurns.length > TUTOR_CHAT_KEPT_TURNS) {
+      transientAssistantChatTurns.splice(0, transientAssistantChatTurns.length - TUTOR_CHAT_KEPT_TURNS)
+    }
   }
   const readTransientAssistantChatTurns = (limit) => {
     const normalizedLimit = validatePositiveLimit(limit, 20)
@@ -832,19 +839,6 @@ function registerIpcHandlers(options) {
     }
   })
 
-  options.ipcMain.handle('assistant:get-chat-history-preloaded', (event) => {
-    assertTrustedIpcSender(event, trustedSenderOptions())
-    if (typeof options.getPreloadedAssistantChatHistory === 'function') {
-      return options.getPreloadedAssistantChatHistory()
-    }
-    return {
-      ok: true,
-      turns: [],
-      runtimeActive: false,
-      source: 'not-configured',
-    }
-  })
-
   options.ipcMain.handle('assistant:clear-chat-history', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     clearTransientAssistantChatTurns()
@@ -859,7 +853,7 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:preload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
-      // The main process's warmup also reads back the saved chat history (audit 11, F3).
+      // the main process's warmup, which records that the chat asked for it (audit 11, F3)
       if (typeof options.preloadTutorChat === 'function') {
         return await options.preloadTutorChat()
       }
@@ -873,7 +867,10 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:send-message', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedPayload = validateAssistantChatRuntimePayload(payload)
-    appendTransientAssistantChatTurn('user', validatedPayload.message)
+    // the earlier turns, taken before this one is asked (audit 15, F1)
+    const history = transientAssistantChatTurns
+      .slice(-TUTOR_CHAT_SENT_TURNS)
+      .map((turn) => ({ role: turn.role, content: turn.content }))
 
     try {
       let assembledContext = {}
@@ -886,9 +883,9 @@ function registerIpcHandlers(options) {
             // An unusable id only loses the session's context; the chat itself goes on (audit 8 F3).
           }
         }
-        // Prefer the embedding-aware context (ranks assistant memory facts/
-        // summaries by similarity to the message); fall back to the plain
-        // keyword-matched context if the v2 path errors for any reason.
+        // Prefer the embedding-aware context (ranks assistant memory facts by
+        // similarity to the message); fall back to the plain keyword-matched
+        // context if the v2 path errors for any reason.
         let contextResponse
         try {
           contextResponse = await options.runPythonBridgeWithArgs([
@@ -907,19 +904,22 @@ function registerIpcHandlers(options) {
           assembledContext = contextResponse.context
         }
       } catch {
-        // Fallback to renderer-provided context when context assembly fails.
+        // No context: the question still goes to the model on its own.
       }
 
-      const runtimeContext = {
-        ...assembledContext,
-        ...validatedPayload.context,
-      }
-      const response = await tutorRuntime().sendMessage(validatedPayload.message, runtimeContext)
+      /* The renderer's context holds only the session id, which picks the bridge context above and
+         means nothing to the model, so it is not sent on (audit 15, nit 3). */
+      const response = await tutorRuntime().sendMessage(validatedPayload.message, assembledContext, { history })
+      // a question is kept only with its answer: a refused or failed one leaves no turn (nit 2)
+      appendTransientAssistantChatTurn('user', validatedPayload.message)
       appendTransientAssistantChatTurn('assistant', response.text)
       return response
     } catch (error) {
+      /* The runtime's reason is what the chat shows after "The tutor couldn't answer: ", so it goes
+         to the window unwrapped; the full detail is logged here (audit 15, F2). */
       const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to send assistant chat message: ${detail}`)
+      console.warn('assistant-chat:send-message failed:', detail, tutorRuntime().getStatus?.().lastError || '')
+      throw new Error(detail)
     }
   })
 
@@ -992,6 +992,19 @@ function registerIpcHandlers(options) {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Failed to translate OCR text: ${detail}`)
+    }
+  })
+
+  /* Scenario practice warms the model for its own judging, without counting as the chat asking for
+     it, so setup does not warm a new model for a chat that is off (audit 15, F6). Needs a tutor model
+     (F7); a failed load is only a cold first judgement. */
+  options.ipcMain.handle('scenario:preload-model', async (event) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    try {
+      const result = await tutorRuntime().preload('scenario-start')
+      return { ok: Boolean(result && result.ok) }
+    } catch {
+      return { ok: false }
     }
   })
 

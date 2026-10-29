@@ -17,7 +17,8 @@ const AMBIGUOUS_RESPONSE = 'あのう、黒いのをひとつもらえたりし�
 function aiBridge() {
   return {
     evaluateScenarioResponse: vi.fn(async () => ({ ok: false, text: '' })),
-    preloadAssistantChatRuntime: vi.fn(async () => ({ ok: true })),
+    preloadScenarioModel: vi.fn(async () => ({ ok: true })),
+    preloadAssistantChatRuntime: vi.fn(async () => ({ ok: true, reason: '', coldStart: false, loaded: true })),
     cancelAssistantChatInference: vi.fn(async () => ({ ok: true, cancelled: true })),
   }
 }
@@ -249,7 +250,9 @@ describe('useScenarioTutor — optional AI evaluation', () => {
     act(() => result.current.selectScenario('cafe-order'))
     act(() => result.current.selectLevel('beginner'))
     act(() => result.current.startScenario())
-    expect(bridge.preloadAssistantChatRuntime).toHaveBeenCalledOnce()
+    expect(bridge.preloadScenarioModel).toHaveBeenCalledOnce()
+    // the scenario's own route: warming it never marks the chat as wanted (audit 15, D6)
+    expect(bridge.preloadAssistantChatRuntime).not.toHaveBeenCalled()
 
     cleanup()
     const offBridge = aiBridge()
@@ -258,6 +261,7 @@ describe('useScenarioTutor — optional AI evaluation', () => {
     act(() => off.current.selectScenario('cafe-order'))
     act(() => off.current.selectLevel('beginner'))
     act(() => off.current.startScenario())
+    expect(offBridge.preloadScenarioModel).not.toHaveBeenCalled()
     expect(offBridge.preloadAssistantChatRuntime).not.toHaveBeenCalled()
   })
 
