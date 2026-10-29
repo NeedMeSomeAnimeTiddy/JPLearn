@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { createTutorChatRuntime, createAdapterRegistry, extractCliResponseText } = require('./llm_runtime.cjs')
 
@@ -306,6 +306,61 @@ describe('llm runtime', () => {
     expect(response.provider).toBe('offline-jmdict')
     expect(response.model).toBe('jmdict-offline')
     expect(response.text).toBe('お手洗い (おてあらい)')
+  })
+
+  // Audit 14, F4: "translation is ready" is decided by the same resolver the runtime uses.
+  describe('translation readiness', () => {
+    const fs = require('node:fs')
+    const os = require('node:os')
+    const path = require('node:path')
+    const { resolveTutorRuntimeFiles, isLocalTranslationReady } = require('./llm_runtime.cjs')
+    const saved: Record<string, string | undefined> = {}
+    const keys = ['JPLEARN_ASSETS_DIR', 'JPLEARN_TUTOR_PROVIDER', 'JPLEARN_LLAMA_SERVER_PATH', 'JPLEARN_LLAMA_MODEL_PATH']
+    let assets = ''
+
+    beforeEach(() => {
+      for (const key of keys) {
+        saved[key] = process.env[key]
+        delete process.env[key]
+      }
+      assets = fs.mkdtempSync(path.join(os.tmpdir(), 'jplearn-assets-'))
+      process.env.JPLEARN_ASSETS_DIR = assets
+      const bin = path.join(assets, 'tools', 'llama.cpp', 'build', 'bin', 'Release')
+      fs.mkdirSync(bin, { recursive: true })
+      fs.writeFileSync(path.join(bin, 'llama-server.exe'), '')
+      fs.mkdirSync(path.join(assets, 'models', 'llama'), { recursive: true })
+    })
+
+    afterEach(() => {
+      for (const key of keys) {
+        if (saved[key] === undefined) delete process.env[key]
+        else process.env[key] = saved[key]
+      }
+      fs.rmSync(assets, { recursive: true, force: true })
+    })
+
+    it('is ready with a runner and a model on disk, and not without the model', () => {
+      expect(isLocalTranslationReady()).toBe(false)
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'translate.gguf'), '')
+      expect(isLocalTranslationReady()).toBe(true)
+    })
+
+    it('is not ready when the tutor is forced onto the stub', () => {
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'translate.gguf'), '')
+      process.env.JPLEARN_TUTOR_PROVIDER = 'stub'
+      expect(isLocalTranslationReady()).toBe(false)
+    })
+
+    it('uses the selected translation model when no tutor model is active', () => {
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'a-other.gguf'), '')
+      fs.writeFileSync(path.join(assets, 'models', 'llama', 'z-selected.gguf'), '')
+      fs.mkdirSync(path.join(assets, 'translation'), { recursive: true })
+      fs.writeFileSync(
+        path.join(assets, 'translation', 'active-translation-model.json'),
+        JSON.stringify({ tier: 'qwen_ja_en', filename: 'z-selected.gguf' }),
+      )
+      expect(path.basename(resolveTutorRuntimeFiles().modelPath)).toBe('z-selected.gguf')
+    })
   })
 
   // Audit 14, F3: the tutor reads the index the build makes (dictionary_entries + dictionary_fts).

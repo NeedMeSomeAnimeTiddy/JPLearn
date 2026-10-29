@@ -205,6 +205,14 @@ function registerIpcHandlers(options) {
   }
   // Installing, switching, or removing an OCR model invalidates the warm
   // PaddleOCR engine held by the persistent OCR process.
+  // The tutor runtime, which also translates OCR text, picks its server and model when it is
+  // created; installing, selecting or removing either recreates it (audit 14, F4).
+  const refreshTranslationRuntime = async () => {
+    if (typeof options.refreshTutorChatRuntime === 'function') {
+      await options.refreshTutorChatRuntime()
+    }
+  }
+
   const refreshOcrRuntime = () => {
     if (typeof options.refreshOcrRuntime === 'function') {
       options.refreshOcrRuntime()
@@ -1696,7 +1704,9 @@ function registerIpcHandlers(options) {
         ? backend
         : undefined
       try {
-        return await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot, safeBackend)
+        const result = await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot, safeBackend)
+        await refreshTranslationRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`llama.cpp download failed: ${detail}`)
@@ -1879,20 +1889,24 @@ function registerIpcHandlers(options) {
       }
       const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
       try {
-        return await setupRuntime.downloadTranslationModel(tier, event.sender, options.repoRoot, { force })
+        const result = await setupRuntime.downloadTranslationModel(tier, event.sender, options.repoRoot, { force })
+        await refreshTranslationRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Translation model download failed: ${detail}`)
       }
     })
 
-    options.ipcMain.handle('setup:set-active-translation-model', (event, tier) => {
+    options.ipcMain.handle('setup:set-active-translation-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['qwen_ja_en'].includes(tier)) {
         throw new Error('Invalid translation model tier')
       }
       try {
-        return setupRuntime.setActiveTranslationModelTier(tier)
+        const result = setupRuntime.setActiveTranslationModelTier(tier)
+        await refreshTranslationRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to select translation model: ${detail}`)
@@ -1909,7 +1923,10 @@ function registerIpcHandlers(options) {
         if (typeof options.unloadTutorChatRuntime === 'function') {
           await options.unloadTutorChatRuntime()
         }
-        return setupRuntime.uninstallTranslationModel(tier)
+        const result = setupRuntime.uninstallTranslationModel(tier)
+        // recreated, so it no longer holds the removed model's path
+        await refreshTranslationRuntime()
+        return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
         throw new Error(`Failed to uninstall translation model: ${detail}`)
@@ -1928,6 +1945,7 @@ function registerIpcHandlers(options) {
         // OCR handlers above.
         const result = await setupRuntime.applyTranslationProfile(tier, event.sender, options.repoRoot, { force })
         refreshOcrRuntime()
+        await refreshTranslationRuntime()
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)

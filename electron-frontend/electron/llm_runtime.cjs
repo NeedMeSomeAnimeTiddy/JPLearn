@@ -351,6 +351,20 @@ function resolveBundledModelPath() {
   return ''
 }
 
+// The translation model setup selected (translation/active-translation-model.json, written by
+// setup_runtime.setActiveTranslationModelTier), as a file under models/llama; '' when none.
+function readActiveTranslationModelPath(assetsDir) {
+  try {
+    const raw = fs.readFileSync(path.join(assetsDir, 'translation', 'active-translation-model.json'), 'utf8')
+    const parsed = JSON.parse(raw)
+    const filename = parsed && typeof parsed.filename === 'string' ? path.basename(parsed.filename.trim()) : ''
+    const candidate = filename ? path.join(assetsDir, 'models', 'llama', filename) : ''
+    return candidate && fs.existsSync(candidate) ? candidate : ''
+  } catch {
+    return ''
+  }
+}
+
 function resolveDownloadedModelPath() {
   const assetsDir = resolveAssetsBaseDir()
   if (!assetsDir) {
@@ -374,6 +388,12 @@ function resolveDownloadedModelPath() {
         return activePath
       }
     }
+  }
+
+  // Then the selected translation model (audit 14, F4: the setting is read, not just written).
+  const translationModelPath = readActiveTranslationModelPath(assetsDir)
+  if (translationModelPath) {
+    return translationModelPath
   }
 
   // GGUF files placed directly in models/.
@@ -1492,15 +1512,56 @@ function createAdapterRegistry() {
   }
 }
 
+// Ambient environment variables are honoured only when they point at a file that exists; explicit
+// options are honoured as-is (a stale variable would otherwise make the runtime fail to load and
+// silently drop to the stub).
+function preferExistingPath(preferredPath, fallbackPath) {
+  const trimmedPreferred = typeof preferredPath === 'string' ? preferredPath.trim() : ''
+  if (trimmedPreferred && fs.existsSync(trimmedPreferred)) {
+    return trimmedPreferred
+  }
+  return fallbackPath
+}
+
+/**
+ * Which provider, llama-server and model the tutor runtime would use, from files and environment
+ * only: nothing is spawned or loaded. createTutorChatRuntime uses it, and so does setup's install
+ * info, so "translation is ready" means exactly what the runtime will do (audit 14, F4).
+ */
+function resolveTutorRuntimeFiles(options = {}) {
+  const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
+  const autoModelPath = resolveDownloadedModelPath() || ''
+  const provider = normalizeProviderName(
+    options.provider
+    || process.env.JPLEARN_TUTOR_PROVIDER
+    || (discoveredLlamaServerPath && autoModelPath ? 'llama.cpp' : 'stub'),
+  )
+  return {
+    provider,
+    serverPath: options.llamaServerPath
+      || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
+    modelPath: options.llamaModelPath
+      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath),
+    autoModelPath,
+  }
+}
+
+/** OCR translation can run: the runtime would be llama.cpp with a server and a model on disk. */
+function isLocalTranslationReady() {
+  const files = resolveTutorRuntimeFiles()
+  return files.provider === 'llama.cpp'
+    && Boolean(files.serverPath && fs.existsSync(files.serverPath))
+    && Boolean(files.modelPath && fs.existsSync(files.modelPath))
+}
+
 function createTutorChatRuntime(options = {}) {
   const inactivityUnloadMs = Number.isFinite(options.inactivityUnloadMs)
     ? Math.max(15000, Math.floor(options.inactivityUnloadMs))
     : DEFAULT_INACTIVITY_UNLOAD_MS
 
-  const discoveredLlamaServerPath = resolveBundledLlamaServerPath()
-  const downloadedModelPath = resolveDownloadedModelPath()
+  const runtimeFiles = resolveTutorRuntimeFiles(options)
   const discoveredModelPath = resolveBundledModelPath()
-  const autoModelPath = downloadedModelPath || ''
+  const autoModelPath = runtimeFiles.autoModelPath
   const docsDir = resolveAssetsBaseDir()
   const modelStateBases = [
     docsDir ? path.join(docsDir, 'models') : '',
@@ -1510,27 +1571,10 @@ function createTutorChatRuntime(options = {}) {
     .map((base) => (base && fs.existsSync(base) ? readActiveModelTier(base) : null))
     .find((tier) => typeof tier === 'string' && tier.trim())
     || null
-  const configuredProvider = normalizeProviderName(
-    options.provider
-    || process.env.JPLEARN_TUTOR_PROVIDER
-    || (discoveredLlamaServerPath && autoModelPath ? 'llama.cpp' : 'stub'),
-  )
-  // Explicit options are honored as-is. For ambient environment variables we
-  // fall back to the discovered on-disk model/server when the configured path
-  // is missing (e.g. a stale variable points at a model that no longer exists);
-  // otherwise the runtime would fail to load and silently drop to the stub.
-  const preferExistingPath = (preferredPath, fallbackPath) => {
-    const trimmedPreferred = typeof preferredPath === 'string' ? preferredPath.trim() : ''
-    if (trimmedPreferred && fs.existsSync(trimmedPreferred)) {
-      return trimmedPreferred
-    }
-    return fallbackPath
-  }
+  const configuredProvider = runtimeFiles.provider
   const llamaCppConfig = {
-    executablePath: options.llamaServerPath
-      || preferExistingPath(process.env.JPLEARN_LLAMA_SERVER_PATH, discoveredLlamaServerPath),
-    modelPath: options.llamaModelPath
-      || preferExistingPath(process.env.JPLEARN_LLAMA_MODEL_PATH, autoModelPath),
+    executablePath: runtimeFiles.serverPath,
+    modelPath: runtimeFiles.modelPath,
     promptTuningProfile: detectPromptTuningProfile({
       activeTier: activeModelTier,
       modelPath: options.llamaModelPath
@@ -1843,10 +1887,10 @@ function createTutorChatRuntime(options = {}) {
       }
 
       const preparedText = preprocessOcrTextForTranslation(text)
-      const trimmedText = clipText(
-        preparedText,
-        Number.isFinite(params.maxInputChars) ? Number(params.maxInputChars) : 2400,
-      )
+      const maxInputChars = Number.isFinite(params.maxInputChars) ? Number(params.maxInputChars) : 2400
+      const trimmedText = clipText(preparedText, maxInputChars)
+      // the screen says "first part of the text" when this is true (audit 14, N2)
+      const clipped = String(preparedText || '').trim().length > trimmedText.length
       const inferenceLease = acquireInferenceLease()
       if (!inferenceLease) {
         throw new Error('Chat inference already active; cancel or wait for completion')
@@ -1919,6 +1963,7 @@ function createTutorChatRuntime(options = {}) {
           return {
             ok: true,
             text: clipText(cleanedText, translationOutputChars),
+            clipped,
             provider: String((inference && inference.provider) || 'unknown'),
             model: String((inference && inference.model) || 'unknown'),
             coldStart,
@@ -2165,6 +2210,8 @@ function createTutorChatRuntime(options = {}) {
 
 module.exports = {
   createTutorChatRuntime,
+  resolveTutorRuntimeFiles,
+  isLocalTranslationReady,
   createAdapterRegistry,
   extractCliResponseText,
   httpRequestJson,
