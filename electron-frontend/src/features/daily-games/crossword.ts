@@ -12,6 +12,7 @@ import {
   CROSSWORD_COPY,
 } from './constants'
 import type { CrosswordBoard, CrosswordCoordinate, CrosswordDirection, CrosswordEntry } from './types'
+import { isKanaKanjiWord } from './utils'
 
 interface CrosswordCandidate {
   poolPosition: number
@@ -63,6 +64,7 @@ function getCandidates(words: readonly DailyGamesWordPayload[], random: () => nu
     .filter((candidate) => {
       const isEligible = candidate.characters.length >= 2
         && candidate.characters.length <= CROSSWORD_MAX_GRID_SIZE
+        && isKanaKanjiWord(candidate.answer)
         && candidate.clue.length > 0
         && !answers.has(candidate.answer)
       if (isEligible) answers.add(candidate.answer)

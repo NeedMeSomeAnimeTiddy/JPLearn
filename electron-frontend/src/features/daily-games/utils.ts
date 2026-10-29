@@ -1,4 +1,5 @@
 import type { DailyGamesStatePayload, DailyGamesWordPayload } from '../../generated/types'
+import { normalizeText } from '../../lib/deckUtils'
 import {
   DAILY_GAMES_COPY,
   MATCH_PAIRS_MAX_WORDS,
@@ -25,6 +26,15 @@ export function isDailyGameComplete(data: DailyGamesStatePayload, gameType: stri
   return data.progress.completed_daily_game_types.includes(gameType)
 }
 
+/**
+ * Whether a word is written only in kana (with ー) and kanji (with 々), so every cell of a board
+ * can be typed or found. Stored forms such as "いい; よい" or "パート (タイム)" carry spaces and
+ * punctuation that a crossword cell can never match (audit 16, F2).
+ */
+export function isKanaKanjiWord(value: string): boolean {
+  return /^[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}ー々]+$/u.test(value)
+}
+
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0
   return () => {
@@ -48,12 +58,35 @@ function shuffle<T>(items: readonly T[], random: () => number): T[] {
 export function buildMatchPairs(words: readonly DailyGamesWordPayload[], seed: number): MatchPair[] {
   const pairCount = Math.min(words.length, Math.max(MATCH_PAIRS_MIN_WORDS, Math.min(words.length, MATCH_PAIRS_MAX_WORDS)))
   const random = seededRandom(seed)
-  const selected = shuffle(words.map((word, poolPosition) => ({ word, poolPosition })), random).slice(0, pairCount)
+  /* two words written the same (市 "market", 市 "city") would show twin character tiles, so only
+     the first of each is dealt (audit 16, F3); a pool without such a pair deals as before */
+  const writtenForms = new Set<string>()
+  const selected = shuffle(words.map((word, poolPosition) => ({ word, poolPosition })), random)
+    .filter(({ word }) => {
+      const written = word.character.trim()
+      if (writtenForms.has(written)) return false
+      writtenForms.add(written)
+      return true
+    })
+    .slice(0, pairCount)
   const pairs = selected.flatMap(({ word, poolPosition }) => [
     { id: `${poolPosition}-character`, poolPosition, side: 'character' as const, value: word.character, word },
     { id: `${poolPosition}-meaning`, poolPosition, side: 'meaning' as const, value: word.meaning, word },
   ])
   return shuffle(pairs, random)
+}
+
+/**
+ * Whether a character tile and a meaning tile make a pair: the same word, or a word whose meaning
+ * reads the same as the meaning tile (青 and 青い are both "blue", so either "blue" tile counts;
+ * audit 16, F3). No two dealt words are written the same, so tiles that belong together form
+ * classes by meaning with as many character tiles as meaning tiles, and any accepted pick leaves
+ * the board completable.
+ */
+export function pairsBelongTogether(characterTile: MatchPair, meaningTile: MatchPair): boolean {
+  if (characterTile.poolPosition === meaningTile.poolPosition) return true
+  const characterMeaning = characterTile.word?.meaning
+  return characterMeaning !== undefined && normalizeText(characterMeaning) === normalizeText(meaningTile.value)
 }
 
 export function buildTypingBlitz(words: readonly DailyGamesWordPayload[], seed: number): TypingBlitzWord[] {
@@ -82,7 +115,10 @@ function getWordSearchCandidates(words: readonly DailyGamesWordPayload[], random
   const selectedValues = new Set<string>()
   return shuffle(words.map((word, poolPosition) => ({ poolPosition, value: word.character.trim(), characters: Array.from(word.character.trim()) })), random)
     .filter((word) => {
-      const isEligible = word.characters.length > 0 && word.characters.length <= WORD_SEARCH_MAX_GRID_SIZE && !selectedValues.has(word.value)
+      const isEligible = word.characters.length > 0
+        && word.characters.length <= WORD_SEARCH_MAX_GRID_SIZE
+        && isKanaKanjiWord(word.value)
+        && !selectedValues.has(word.value)
       if (isEligible) selectedValues.add(word.value)
       return isEligible
     })

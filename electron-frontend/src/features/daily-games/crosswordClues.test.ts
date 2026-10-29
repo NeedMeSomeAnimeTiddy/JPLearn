@@ -73,6 +73,55 @@ describe('crossword clue adapter', () => {
     ])
   })
 
+  describe('a saved set holding more positions than the board asks for (audit 16 F5)', () => {
+    const boardClues = () => board.entries.map((entry, index) => ({ poolPosition: entry.poolPosition as number, clue: `Saved clue ${index + 1}` }))
+    /* another board of the day (a practice crossword) saved position 99 */
+    const extra = { poolPosition: 99, clue: 'Another board' }
+
+    it('serves the board from the cache with no new request', async () => {
+      const generateClues = vi.fn(async () => valid())
+      const result = await enrichCrosswordClues('2026-07-15', board, {
+        getCachedClues: async () => [...boardClues(), extra],
+        generateClues,
+      })
+      expect(generateClues).not.toHaveBeenCalled()
+      expect(result.entries.map((entry) => entry.clue)).toEqual(['Saved clue 1', 'Saved clue 2', 'Saved clue 3'])
+    })
+
+    it('asks again when the cache lacks one of the board\'s positions', async () => {
+      const generateClues = vi.fn(async () => valid())
+      const result = await enrichCrosswordClues('2026-07-15', board, {
+        getCachedClues: async () => [...boardClues().slice(1), extra],
+        generateClues,
+      })
+      expect(generateClues).toHaveBeenCalledOnce()
+      expect(result.entries.map((entry) => entry.clue)).toEqual(['English definition 1', 'English definition 2', 'English definition 3'])
+    })
+
+    it('still rejects the set when one of the board\'s own clues fails validation', async () => {
+      const leaked = boardClues().map((item, index) => (index === 0 ? { ...item, clue: `Means ${board.entries[0].answer}` } : item))
+      const generateClues = vi.fn(async () => valid())
+      await enrichCrosswordClues('2026-07-15', board, { getCachedClues: async () => [...leaked, extra], generateClues })
+      expect(generateClues).toHaveBeenCalledOnce()
+    })
+
+    it('takes the saved set returned after a save when it holds every position', async () => {
+      const result = await enrichCrosswordClues('2026-07-15', board, {
+        generateClues: async () => valid(),
+        saveCachedClues: async () => [extra, ...boardClues()],
+      })
+      expect(result.entries.map((entry) => entry.clue)).toEqual(['Saved clue 1', 'Saved clue 2', 'Saved clue 3'])
+    })
+
+    it('keeps the generated clues when the returned set lacks a position', async () => {
+      const result = await enrichCrosswordClues('2026-07-15', board, {
+        generateClues: async () => valid(),
+        saveCachedClues: async () => [extra, ...boardClues().slice(1)],
+      })
+      expect(result.entries.map((entry) => entry.clue)).toEqual(['English definition 1', 'English definition 2', 'English definition 3'])
+    })
+  })
+
   it('falls back when the tutor is concurrently active and accepts a complete safe response otherwise', async () => {
     const concurrentTutor = vi.fn(async () => { throw new Error('Tutor inference active') })
     await expect(enrichCrosswordClues('2026-07-15', board, { generateClues: concurrentTutor })).resolves.toEqual(board)

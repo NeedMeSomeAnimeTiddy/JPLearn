@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { screenHead } from '../../menu'
 import { puzzleHead } from '../../menu/daily'
 import { DAILY_GAME_TILES, DAILY_GAMES_COPY, PUZZLE_COPY } from '../constants'
 import type { DailyGameType, DailyGamesMode, DailyGamesSessionDependencies } from '../types'
-import type { DailyGamesMissedWordPayload } from '../../../generated/types'
+import type { DailyGamesMissedWordPayload, DailyGamesStatePayload } from '../../../generated/types'
 import { getDefaultDailyGamesSessionDependencies, useDailyGames } from '../useDailyGames'
 import { DailyGameSession } from './DailyGameSession'
 import { PuzzlePlate } from './PuzzlePlate'
@@ -67,7 +67,31 @@ function ChosenPuzzle({
   const { data, error, isLoading, retry, replaceData } = useDailyGames(deps)
   const head = puzzleHead(gameType)
 
+  /* AN OPEN PUZZLE OUTRANKS THE DAY. Once a session has opened on a pool, a refresh behind it --
+     the state a save returns, midnight's new day, a refresh that fails or comes back empty --
+     never swaps it for a plate; the session keeps the pool it opened with (audit 16, F4 and N1).
+     Leaving the puzzle unmounts this view, so the next one opened takes the day as it is then. */
+  const sessionKey = `${gameType}:${mode}`
+  const [opened, setOpened] = useState<{ key: string; data: DailyGamesStatePayload } | null>(null)
+  const openable = !isLoading && !error && data !== null && data.pool.words.length > 0 ? data : null
+  if (openable && opened?.key !== sessionKey) setOpened({ key: sessionKey, data: openable })
+  const sessionData = opened?.key === sessionKey ? opened.data : openable
+
   function body() {
+    if (sessionData) {
+      return (
+        <DailyGameSession
+          key={sessionKey}
+          mode={mode}
+          data={sessionData}
+          dependencies={deps}
+          gameType={gameType}
+          onBack={onBack}
+          onStateUpdated={replaceData}
+          onReviewMissedWords={onReviewMissedWords}
+        />
+      )
+    }
     if (isLoading) {
       return (
         <PuzzlePlate
@@ -95,29 +119,16 @@ function ChosenPuzzle({
         />
       )
     }
-    if (data.pool.words.length === 0) {
-      return (
-        <PuzzlePlate
-          head={head}
-          cap={PUZZLE_COPY.emptyCap}
-          title={DAILY_GAMES_COPY.emptyTitle}
-          body={DAILY_GAMES_COPY.emptyBody}
-          tone="status"
-          slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: onBack }}
-          onBack={onBack}
-          backAria={DAILY_GAMES_COPY.backToGames}
-        />
-      )
-    }
     return (
-      <DailyGameSession
-        mode={mode}
-        data={data}
-        dependencies={deps}
-        gameType={gameType}
+      <PuzzlePlate
+        head={head}
+        cap={PUZZLE_COPY.emptyCap}
+        title={DAILY_GAMES_COPY.emptyTitle}
+        body={DAILY_GAMES_COPY.emptyBody}
+        tone="status"
+        slab={{ text: PUZZLE_COPY.roadSlab, jp: PUZZLE_COPY.roadSlabJp, onClick: onBack }}
         onBack={onBack}
-        onStateUpdated={replaceData}
-        onReviewMissedWords={onReviewMissedWords}
+        backAria={DAILY_GAMES_COPY.backToGames}
       />
     )
   }
