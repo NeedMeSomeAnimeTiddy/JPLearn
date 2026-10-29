@@ -564,9 +564,9 @@ def test_build_achievement_milestones_status_reports_node_mastery_badges(
     assert badges_by_descriptor["hiragana_mastered"]["earned"] is True
     assert badges_by_descriptor["tutorial_complete"]["earned"] is True
     assert badges_by_descriptor["katakana_mastered"]["earned"] is False
-    # Not-yet-synced nodes (need completion-tracking that doesn't exist yet)
-    # are reported as unearned, never dropped from the list.
-    assert badges_by_descriptor["jlpt_n5_passed"]["earned"] is False
+    # Reached-on-arrival seals stay unearned until their step is reached (audit 12, F3).
+    assert badges_by_descriptor["free_conversation_unlocked"]["earned"] is False
+    assert badges_by_descriptor["reading_unlocked"]["earned"] is False
     assert "hiragana_mastered" in database.load_badges()
 
 
@@ -2362,12 +2362,12 @@ def test_run_command_grammar_minigame_data_rejects_unknown_type() -> None:
     assert "Unsupported grammar minigame type" in str(payload["error"])
 
 
-def test_apply_expertise_level_n5_foundation_marks_target_decks_mastered(tmp_path: Path, monkeypatch) -> None:
+def test_apply_known_items_marks_the_ticked_decks_mastered(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 
-    response = desktop_bridge.apply_expertise_level("jlpt_n5_foundation")
+    response = desktop_bridge.apply_known_items(["hiragana", "katakana", "kanji_n5", "vocab_n5"])
     assert response["ok"] is True
-    assert response["level"] == "jlpt_n5_foundation"
+    assert response["items"] == ["hiragana", "katakana", "kanji_n5", "vocab_n5"]
 
     summary = cast(dict[str, Any], desktop_bridge.build_summary())
     decks = cast(list[dict[str, Any]], summary["decks"])

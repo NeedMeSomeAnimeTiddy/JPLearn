@@ -221,7 +221,8 @@ type DeckSlug =
   | 'grammar_patterns'
   | 'sentence_examples'
 type ScriptCurriculumSlug = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
-type ExpertiseLevel = 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation'
+/** A tick on onboarding's "What do you already know?" checklist; the bridge seeds its decks alone. */
+type KnownItem = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'kanji_n4' | 'vocab_n4' | 'kanji_n3' | 'vocab_n3'
 
 interface ScriptDeckPayload {
   slug: string
@@ -611,9 +612,9 @@ interface DesktopApi {
     sessionId?: string
   }) => Promise<SessionGoalStartResponse>
   getSessionSummary: (sessionId: string) => Promise<SessionSummaryResponse>
-  applyExpertiseLevel: (level: ExpertiseLevel) => Promise<{
+  applyKnownItems: (items: KnownItem[]) => Promise<{
     ok: boolean
-    level: ExpertiseLevel
+    items: KnownItem[]
     seeded_cards: number
     decks: string[]
   }>

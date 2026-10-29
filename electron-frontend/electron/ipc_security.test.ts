@@ -7,7 +7,8 @@ const {
   isRendererPermissionAllowed,
   validateDictionarySearchQuery,
   validateDeckSlug,
-  validateExpertiseLevelInput,
+  validateKnownItemsInput,
+  validateDailyMinutesInput,
   validateSessionGoalPayload,
   validateSessionId,
   validateKanjiDetailCharacter,
@@ -284,8 +285,17 @@ describe('ipc_security', () => {
     expect(validateStartupThemeInput('harbor_mist')).toBe('harbor_mist')
     expect(() => validateStartupThemeInput(42)).toThrow(/invalid startup theme/i)
 
-    expect(validateExpertiseLevelInput('total_beginner')).toBe('total_beginner')
-    expect(() => validateExpertiseLevelInput('expert')).toThrow(/invalid expertise level/i)
+    expect(validateKnownItemsInput([])).toEqual([])
+    expect(validateKnownItemsInput(['vocab_n5', 'kanji_n3', 'vocab_n5'])).toEqual(['vocab_n5', 'kanji_n3'])
+    expect(() => validateKnownItemsInput('vocab_n5')).toThrow(/invalid known items/i)
+    expect(() => validateKnownItemsInput(['jlpt_n5_foundation'])).toThrow(/invalid known item/i)
+    expect(() => validateKnownItemsInput(['hiragana', 42])).toThrow(/invalid known item/i)
+    expect(() => validateKnownItemsInput(Array.from({ length: 9 }, () => 'hiragana'))).toThrow(/invalid known items/i)
+
+    expect(validateDailyMinutesInput(20)).toBe('20')
+    for (const bad of [Number.NaN, 1.5, 0, 241, '20', undefined]) {
+      expect(validateDailyMinutesInput(bad)).toBe('')
+    }
   })
 
   it('validates record game result payload and rejects malformed values', () => {

@@ -42,7 +42,7 @@ describe('preload contract', () => {
       "recordGameResult: (payload) => ipcRenderer.invoke('study:record-game-result', payload)",
       "startSessionGoal: (payload) => ipcRenderer.invoke('study:start-session-goal', payload)",
       "getSessionSummary: (sessionId) => ipcRenderer.invoke('study:get-session-summary', sessionId)",
-      "applyExpertiseLevel: (level) => ipcRenderer.invoke('study:apply-expertise-level', level)",
+      "applyKnownItems: (items) => ipcRenderer.invoke('study:apply-known-items', items)",
       "getAssistantSnapshot: (sessionId) => ipcRenderer.invoke('assistant:get-snapshot', sessionId)",
       "getAssistantEvents: (limit) => ipcRenderer.invoke('assistant:get-events', limit)",
       "consumeAssistantEvents: (eventIds) => ipcRenderer.invoke('assistant:consume-events', eventIds)",
@@ -90,6 +90,8 @@ describe('preload contract', () => {
       'setDailyGoal',
       'getWordOfDay',
       'testNotification',
+      // Replaced by applyKnownItems when the checklist stopped seeding whole levels (audit 12, F1).
+      'applyExpertiseLevel',
     ]
     for (const name of removed) {
       expect(preloadSource, `${name} should not be exposed`).not.toContain(`  ${name}:`)

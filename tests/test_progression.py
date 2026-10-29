@@ -515,9 +515,14 @@ class TestJPLearnGraph:
         assert n1.children == ()
         assert n1.branches == ()
 
-    def test_all_nodes_have_rewards(self):
+    def test_all_nodes_have_rewards_except_the_unearnable_seals(self):
+        # Audit 12, F3: scripted conversation and the JLPT steps lost seals nothing could earn.
+        without = {"scripted_conv", "jlpt_n5", "jlpt_n4", "jlpt_n3", "jlpt_n2", "jlpt_n1"}
         for node_id, node in JPLEARN_GRAPH.nodes.items():
-            assert node.rewards, f"Node '{node_id}' has no rewards defined"
+            if node_id in without:
+                assert node.rewards == (), node_id
+            else:
+                assert node.rewards, f"Node '{node_id}' has no rewards defined"
 
     def test_hiragana_min_mastered_is_46(self):
         node = JPLEARN_GRAPH.nodes["hiragana"]

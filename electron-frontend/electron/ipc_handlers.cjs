@@ -10,7 +10,8 @@ const {
   validateAssistantChatImagePayload,
   validateStartupThemeInput,
   validateRecordGameResultPayload,
-  validateExpertiseLevelInput,
+  validateKnownItemsInput,
+  validateDailyMinutesInput,
   validateSpeakPayload,
   validateTranscribeSpeechPayload,
   validateJLPTLevel,
@@ -757,20 +758,17 @@ function registerIpcHandlers(options) {
     }
   })
 
-  options.ipcMain.handle('study:apply-expertise-level', async (event, level) => {
+  // Errors pass through unprefixed: the onboarding wizard shows the reason after its own sentence
+  // ("Couldn't save what you already know: <reason>", audit 12, F5).
+  options.ipcMain.handle('study:apply-known-items', async (event, items) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
-    const validatedLevel = validateExpertiseLevelInput(level)
-    try {
-      // Seeds review schedules: in turn with answers, reset and import, on the worker alone.
-      const response = await options.answerQueue.runExclusive(
-        () => options.runPythonBridgeWorkerOnly(['apply-expertise-level', validatedLevel]),
-      )
-      clearBridgeReadCaches()
-      return response
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to apply expertise level: ${detail}`)
-    }
+    const validatedItems = validateKnownItemsInput(items)
+    // Seeds review schedules: in turn with answers, reset and import, on the worker alone.
+    const response = await options.answerQueue.runExclusive(
+      () => options.runPythonBridgeWorkerOnly(['apply-known-items', ...validatedItems]),
+    )
+    clearBridgeReadCaches()
+    return response
   })
 
   options.ipcMain.handle('assistant:get-snapshot', async (event, sessionId) => {
@@ -1421,19 +1419,16 @@ function registerIpcHandlers(options) {
     }
   })
 
+  // Errors pass through unprefixed, as for study:apply-known-items: the wizard says
+  // "Couldn't finish onboarding: <reason>" itself (audit 12, F5).
   options.ipcMain.handle('learning-path:complete-onboarding', async (event, payload) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const goal = typeof payload?.goal === 'string' ? payload.goal.slice(0, 32) : ''
-    const dailyMinutes = typeof payload?.dailyMinutes === 'number' ? String(payload.dailyMinutes) : ''
+    const dailyMinutes = validateDailyMinutesInput(payload?.dailyMinutes)
     const targetLevel = typeof payload?.targetLevel === 'string' ? payload.targetLevel.slice(0, 8) : ''
-    try {
-      const response = await options.runPythonBridgeWithArgs(['complete-onboarding', goal, dailyMinutes, targetLevel])
-      clearBridgeReadCaches()
-      return response
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error)
-      throw new Error(`Failed to complete onboarding: ${detail}`)
-    }
+    const response = await options.runPythonBridgeWithArgs(['complete-onboarding', goal, dailyMinutes, targetLevel])
+    clearBridgeReadCaches()
+    return response
   })
 
   options.ipcMain.handle('analytics:export-and-save-csv', async (event, type) => {

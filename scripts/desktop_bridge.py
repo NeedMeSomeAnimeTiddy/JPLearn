@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 import unicodedata
-from typing import Callable, Mapping, NamedTuple
+from typing import Callable, Mapping, NamedTuple, Sequence
 from uuid import uuid4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -382,65 +382,19 @@ VOCAB_N5_CATEGORY_SLUGS: tuple[str, ...] = tuple(
     slug for _, slug in OVERVIEW_WORDS_CATEGORY_SPECS
 )
 
-EXPERTISE_LEVEL_TO_SLUGS: dict[str, tuple[str, ...]] = {
-    "total_beginner": (),
-    "know_hiragana": ("hiragana",),
-    "know_kana": ("hiragana", "katakana"),
-    "jlpt_n5_foundation": (
-        "hiragana",
-        "katakana",
-        "kanji_n5",
-        "vocab_n5",
-        *VOCAB_N5_CATEGORY_SLUGS,
-    ),
-    "jlpt_n4_foundation": (
-        "hiragana",
-        "katakana",
-        "kanji_n5",
-        "vocab_n5",
-        *VOCAB_N5_CATEGORY_SLUGS,
-        "kanji_n4",
-        "vocab_n4",
-    ),
-    "jlpt_n3_foundation": (
-        "hiragana",
-        "katakana",
-        "kanji_n5",
-        "vocab_n5",
-        *VOCAB_N5_CATEGORY_SLUGS,
-        "kanji_n4",
-        "vocab_n4",
-        "kanji_n3",
-        "vocab_n3",
-    ),
-    "jlpt_n2_foundation": (
-        "hiragana",
-        "katakana",
-        "kanji_n5",
-        "vocab_n5",
-        *VOCAB_N5_CATEGORY_SLUGS,
-        "kanji_n4",
-        "vocab_n4",
-        "kanji_n3",
-        "vocab_n3",
-        "kanji_n2",
-        "vocab_n2",
-    ),
-    "jlpt_n1_foundation": (
-        "hiragana",
-        "katakana",
-        "kanji_n5",
-        "vocab_n5",
-        *VOCAB_N5_CATEGORY_SLUGS,
-        "kanji_n4",
-        "vocab_n4",
-        "kanji_n3",
-        "vocab_n3",
-        "kanji_n2",
-        "vocab_n2",
-        "kanji_n1",
-        "vocab_n1",
-    ),
+#: What each tick on onboarding's "What do you already know?" checklist claims: its own decks and
+#: nothing else (audit 12, F1; Robbie: "Only what's ticked", and the old "N3+" tick split into N3 Kanji
+#: and N3 Vocabulary). It replaced whole-level presets, under which ticking only N5 Vocabulary also
+#: claimed both kana decks and the N5 kanji. The keys are the checklist's (`FAMILIARITY_ITEMS`).
+KNOWN_ITEM_TO_SLUGS: dict[str, tuple[str, ...]] = {
+    "hiragana": ("hiragana",),
+    "katakana": ("katakana",),
+    "kanji_n5": ("kanji_n5",),
+    "vocab_n5": ("vocab_n5", *VOCAB_N5_CATEGORY_SLUGS),
+    "kanji_n4": ("kanji_n4",),
+    "vocab_n4": ("vocab_n4",),
+    "kanji_n3": ("kanji_n3",),
+    "vocab_n3": ("vocab_n3",),
 }
 
 @dataclass(frozen=True)
@@ -1935,6 +1889,16 @@ _NOW_UTC = lambda: datetime.now(timezone.utc).isoformat()  # noqa: E731
 # ---------------------------------------------------------------------------
 
 
+def _stored_date(value: object) -> date | None:
+    """A stored ISO date, or None when it is missing or unreadable (never an error on a read)."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
 def _load_progression_state() -> ProgressionState:
     rows = load_user_progression()
     if not rows:
@@ -1946,6 +1910,10 @@ def _load_progression_state() -> ProgressionState:
             status=row["status"],
             mastered_item_count=row["mastered_item_count"],
             total_item_count=row["total_item_count"],
+            # Loaded so the next sync writes them back unchanged: they were dropped here, and the
+            # upsert then erased mastered_at on every sync after the one that set it (audit 12, F4).
+            first_activated_date=_stored_date(row["first_activated_at"]),
+            mastered_date=_stored_date(row["mastered_at"]),
         )
     # Fill any missing nodes with locked defaults
     for node_id in JPLEARN_GRAPH.nodes:
@@ -2272,6 +2240,17 @@ def build_feature_unlock_status() -> dict[str, object]:
     return {"features": result}
 
 
+def _node_seal_is_earned(node_id: str, status: str) -> bool:
+    """A measured step's seal is earned when it is mastered, an unmeasured one's when it is reached.
+
+    Nothing records when an unmeasured step was reached, so a learner already past it is given
+    the seal, dated now, on the first read after audit 12 (F3).
+    """
+    if node_id in MEASURED_NODE_IDS:
+        return status == "mastered"
+    return status != "locked"
+
+
 def build_achievement_milestones_status() -> dict[str, object]:
     """Return review-count, streak, and node-mastery achievement badges.
 
@@ -2290,11 +2269,11 @@ def build_achievement_milestones_status() -> dict[str, object]:
         save_badge(descriptor, now)
 
     prog_state, _events = sync_progression_state()
-    for node_id in _PROGRESSION_SYNC_ORDER:
+    for node_id, node in JPLEARN_GRAPH.nodes.items():
         ns = prog_state.node_states.get(node_id)
-        if ns is None or ns.status != "mastered":
+        if ns is None or not _node_seal_is_earned(node_id, ns.status):
             continue
-        for reward in JPLEARN_GRAPH.nodes[node_id].rewards:
+        for reward in node.rewards:
             if reward.reward_type == "milestone":
                 save_badge(reward.descriptor, now)
 
@@ -2687,24 +2666,28 @@ def _mastered_seed_state(card_id: int, onboarding_day: date) -> ReviewState:
     return state
 
 
-def apply_expertise_level(level: str) -> dict[str, object]:
+def apply_known_items(items: Sequence[str]) -> dict[str, object]:
     """Give every card of the claimed decks a mastered schedule, unless it has history of its own.
 
     A card with a review_states row or any logged review is left exactly as it is: seeding used to
     overwrite real schedules it judged weaker (see ``data/state_rebuild.py``), and a row from before
     the FSRS columns can carry real progress with no last-review date, so absence of a row and of
-    events is the only safe test. Robbie decided (2026-10-26) that claiming a level writes schedules,
-    not only mastery.
+    events is the only safe test. Robbie decided (2026-10-26) that claiming knowledge writes
+    schedules, not only mastery.
 
     Each card it seeds also gets the full mastery counter, in the same transaction and under the
-    level deck's slug (audit 3, F1). The counters used to be set only in the renderer's snapshot,
+    deck's own slug (audit 3, F1). The counters used to be set only in the renderer's snapshot,
     which the first restart after any answer threw away.
     """
     init_study_db()
-    normalized_level = level.strip().lower()
-    target_slugs = EXPERTISE_LEVEL_TO_SLUGS.get(normalized_level)
-    if target_slugs is None:
-        raise ValueError(f"Unknown expertise level: {level}")
+    keys: list[str] = []
+    for item in items:
+        key = item.strip().lower()
+        if key not in KNOWN_ITEM_TO_SLUGS:
+            raise ValueError(f"Unknown checklist item: {item}")
+        if key not in keys:
+            keys.append(key)
+    target_slugs = list(dict.fromkeys(slug for key in keys for slug in KNOWN_ITEM_TO_SLUGS[key]))
 
     onboarding_day = date.today()
     seeds: list[tuple[str, str, list[ReviewState]]] = []
@@ -2728,7 +2711,7 @@ def apply_expertise_level(level: str) -> dict[str, object]:
 
     return {
         "ok": True,
-        "level": normalized_level,
+        "items": keys,
         "seeded_cards": seeded_cards,
         "decks": touched_decks,
     }
@@ -3874,11 +3857,10 @@ def _cmd_daily_goal_set(argv: list[str]) -> tuple[int, dict[str, object]]:
         return 2, {"error": f"Invalid target: {exc}"}
 
 
-def _cmd_apply_expertise_level(argv: list[str]) -> tuple[int, dict[str, object]]:
-    if len(argv) < 2:
-        return 2, {"error": "Usage: apply-expertise-level <level>"}
+def _cmd_apply_known_items(argv: list[str]) -> tuple[int, dict[str, object]]:
+    """apply-known-items [<item> ...]: no items seeds nothing and still answers ok."""
     try:
-        payload = apply_expertise_level(argv[1])
+        payload = apply_known_items(argv[1:])
     except ValueError as exc:
         return 2, {"error": str(exc)}
     return 0, payload
@@ -4484,7 +4466,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "daily-games-record-attempt": _cmd_daily_games_record_attempt,
     "word-of-the-day": _cmd_word_of_the_day,
     "daily-goal-set": _cmd_daily_goal_set,
-    "apply-expertise-level": _cmd_apply_expertise_level,
+    "apply-known-items": _cmd_apply_known_items,
     "study-queue": _cmd_study_queue,
     "grammar-minigame-data": _cmd_grammar_minigame_data,
     "conjugation-drill-data": _cmd_conjugation_drill_data,

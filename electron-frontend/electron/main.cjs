@@ -2033,6 +2033,20 @@ async function runStudyJourneySmokeIfEnabled() {
   }
 }
 
+/* A learner with study history is never asked the onboarding questions (audit 11, F7; Robbie: "Setup
+   yes, onboarding no"). Leaving the setup wizard applies that once, but a failed or timed-out mark there,
+   or a database older than the flag, left them asked again on every launch (audit 12, F6). So it is
+   applied again at each start after setup, before the status read. The bridge never resets a finished
+   onboarding and writes nothing when the flag is already "1"; a failure is logged and startup goes on. */
+async function markReturningLearnerOnboarded() {
+  if (localSetupRuntime.isFirstRun()) return
+  try {
+    await runPythonBridgeWorkerOnly(['mark-onboarding-pending'], { timeoutMs: 10_000 })
+  } catch (error) {
+    console.error('[startup] Could not check onboarding against study history:', error)
+  }
+}
+
 // taskTimings is filled as each task ends, so a caller that stops waiting still has what finished.
 async function preloadStartupBridgeData(splash, taskTimings = []) {
   updateSplashStatus(splash, 'Loading study data...', 'Preparing your decks and stats...', STARTUP_PRELOAD_PROGRESS_START_PCT)
@@ -2081,7 +2095,10 @@ async function preloadStartupBridgeData(splash, taskTimings = []) {
     {
       key: 'learning-path-status',
       label: 'Learning path status',
-      run: () => runPythonBridgeCached('learning-path-status'),
+      run: async () => {
+        await markReturningLearnerOnboarded()
+        return runPythonBridgeCached('learning-path-status')
+      },
     },
     {
       key: 'assistant-snapshot',

@@ -66,7 +66,7 @@ retries as a **one-shot process spawn** (`runPythonBridgeWithArgsOneShot`), whic
 full interpreter + import cost. A command the worker answered with a failure code is not
 replayed (audit 7 F2, a policy: most such failures repeat, and a replay can save a write twice;
 a transient one such as a locked database now reaches the caller). Writes that must not run twice go through
-`runPythonBridgeWorkerOnly` and never fall back: answers, reset, the legacy import, expertise
+`runPythonBridgeWorkerOnly` and never fall back: answers, reset, the legacy import, onboarding
 seeding, the backup import, Daily Games attempts, JLPT results, assistant event tracking and
 the FSRS weight reload/reset.
 
@@ -334,7 +334,7 @@ The counter does not gate anything: `buildCategoryProgress` only picks a fallbac
 The level bars show each level deck's summed counters over four times its size; the bridge
 sums them (`build_level_progress`) so the renderer does not fetch every level's cards. Onboarding
 writes the counters in the bridge, in the same transaction that seeds the schedules
-(`apply_expertise_level`, audit 3 F1); the renderer re-reads them.
+(`apply_known_items`, audit 3 F1; per checklist tick since audit 12); the renderer re-reads them.
 
 The counter is deliberately **not derived** from FSRS state. Measured against
 `domain/scheduler.py`: `repetitions` counts distinct successful *days*, so it stays
