@@ -153,7 +153,8 @@ describe('deferred network probes', () => {
   })
 })
 
-describe('install-state reads stay on the machine (audit 6 F1)', () => {
+// The first read of install state is slow on a cold machine: the Windows build VM hit the 5 s default.
+describe('install-state reads stay on the machine (audit 6 F1)', { timeout: 30_000 }, () => {
   it('contacts no host when the caller does not wait for estimates', async () => {
     const assets = makeTempDir('jplearn-assets-')
     vi.stubEnv('JPLEARN_ASSETS_DIR', assets)
