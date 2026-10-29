@@ -222,4 +222,11 @@ Check 3).
 
 **Trigger:** a tutor tier is installed with its embedder and a warm English `dictionary-search`
 takes over 300 ms, or the first one after a bridge start takes over 2 s, or a bridge timeout is
-logged while Look It Up or the Dictionary panel is open.
+logged while Look It Up or the Dictionary panel is open, or a tutor chat message's context takes
+over 1 s on the bridge.
+
+**Amended 2026-10-29 (audit 15).** A second caller: every tutor chat message asks the bridge for
+`assistant-chat-context-v2` (`electron/ipc_handlers.cjs`), which embeds the message and up to 52
+memory facts with the same model (`data/study_pipeline.py`, `_format_memory_rollup_v2` and
+`assemble_assistant_chat_context_v2_with_embeddings`): up to 54 encodes a message. Audit 15 removed
+the chat summaries, which took it from 72.

@@ -28,10 +28,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from data.study_pipeline import (  # noqa: E402
-    append_assistant_chat_turn,
     assemble_assistant_chat_context,
     assemble_assistant_chat_context_v2_with_embeddings,
-    clear_assistant_chat,
     consume_assistant_events,
     init_study_db,
     load_activity_summary,
@@ -41,7 +39,6 @@ from data.study_pipeline import (  # noqa: E402
     load_curriculum_stage_summary,
     load_narrative_chapter_summary,
     load_pending_assistant_events,
-    load_recent_assistant_chat_turns,
     load_item_history,
     load_mistake_breakdown,
     load_minigame_breakdown,
@@ -3356,26 +3353,6 @@ def track_assistant_event(
     return {"ok": True}
 
 
-def append_chat_turn(role: str, content: str) -> dict[str, object]:
-    init_study_db()
-    append_assistant_chat_turn(role, content)
-    return {"ok": True}
-
-
-def get_recent_chat_turns(limit: int = 20) -> dict[str, object]:
-    init_study_db()
-    return {
-        "ok": True,
-        "turns": load_recent_assistant_chat_turns(limit=limit),
-    }
-
-
-def clear_chat_history() -> dict[str, object]:
-    init_study_db()
-    removed = clear_assistant_chat()
-    return {"ok": True, "removed": removed}
-
-
 def get_assistant_chat_context(session_id: str | None = None, user_message: str | None = None) -> dict[str, object]:
     init_study_db()
     return {
@@ -4069,28 +4046,6 @@ def _cmd_assistant_events_track(argv: list[str]) -> tuple[int, dict[str, object]
     return 0, payload
 
 
-def _cmd_assistant_chat_append(argv: list[str]) -> tuple[int, dict[str, object]]:
-    if len(argv) < 3:
-        return 2, {"error": "Usage: assistant-chat-append <role> <content>"}
-    try:
-        payload = append_chat_turn(argv[1], argv[2])
-    except ValueError as exc:
-        return 2, {"error": str(exc)}
-    return 0, payload
-
-
-def _cmd_assistant_chat_history(argv: list[str]) -> tuple[int, dict[str, object]]:
-    try:
-        limit = int(argv[1]) if len(argv) > 1 and argv[1].strip() else 20
-    except ValueError as exc:
-        return 2, {"error": str(exc)}
-    return 0, get_recent_chat_turns(limit=limit)
-
-
-def _cmd_assistant_chat_clear(argv: list[str]) -> tuple[int, dict[str, object]]:
-    return 0, clear_chat_history()
-
-
 def _cmd_assistant_chat_context(argv: list[str]) -> tuple[int, dict[str, object]]:
     session_id = argv[1].strip() if len(argv) > 1 and argv[1].strip() else None
     user_message = argv[2] if len(argv) > 2 and argv[2].strip() else None
@@ -4497,9 +4452,6 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "assistant-events": _cmd_assistant_events,
     "assistant-events-consume": _cmd_assistant_events_consume,
     "assistant-events-track": _cmd_assistant_events_track,
-    "assistant-chat-append": _cmd_assistant_chat_append,
-    "assistant-chat-history": _cmd_assistant_chat_history,
-    "assistant-chat-clear": _cmd_assistant_chat_clear,
     "assistant-chat-context": _cmd_assistant_chat_context,
     "assistant-chat-context-v2": _cmd_assistant_chat_context_v2,
     "assistant-chat-ocr": _cmd_assistant_chat_ocr,
