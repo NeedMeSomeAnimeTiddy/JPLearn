@@ -20,7 +20,7 @@ export function TutorTitlebarButton({ open, onClick }: TutorTitlebarButtonProps)
       onClick={onClick}
       aria-expanded={open}
       aria-label={open ? 'Close the tutor (Look it up)' : 'Open the tutor (Look it up)'}
-      title={open ? 'Close Look it up' : 'Ask the tutor or read a screenshot in Look it up (/)'}
+      title={open ? 'Close Look it up' : 'Look it up (/): ask the tutor or read a screenshot'}
     >
       <GraduationCap className="window-nav-icon" strokeWidth={2.2} aria-hidden="true" />
     </button>
