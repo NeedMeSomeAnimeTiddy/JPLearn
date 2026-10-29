@@ -138,6 +138,19 @@ describe('installFeaturePackages', () => {
     expect(fs.readdirSync(path.join(assets, 'python-packages', 'cp311'))).toEqual([])
   })
 
+  it('names the missing media components when OpenCV cannot load', async () => {
+    const python = fakeBundle()
+    const run = vi.fn(async (_cmd: string, args: string[]) => {
+      if (args.includes('--target')) {
+        fs.mkdirSync(args[args.indexOf('--target') + 1], { recursive: true })
+        return { code: 0, stdout: '', stderr: '' }
+      }
+      return { code: 1, stdout: '', stderr: 'ImportError: DLL load failed while importing cv2: The specified module could not be found.' }
+    })
+    await expect(packages.installFeaturePackages({ assetsDir: assets, feature: 'ocr', run, pythonCmd: python }))
+      .rejects.toThrow(/Media Feature Pack/)
+  })
+
   it('runs one install of a feature at a time', async () => {
     const python = fakeBundle()
     let release: () => void = () => {}

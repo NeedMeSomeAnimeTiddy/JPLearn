@@ -160,7 +160,8 @@ try {
   # build machine, which must have the x64 Visual C++ Redistributable installed. App-local copies
   # are how Microsoft's redistribution terms allow shipping them.
   Write-Host "Adding the Visual C++ runtime to the bundle..."
-  $vcRuntime = @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+  # vcomp140 is OpenMP, which paddle's mkldnn.dll links.
+  $vcRuntime = @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll", "vcomp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
   # Sysnative is the real System32 from a 32-bit PowerShell, which would otherwise be handed
   # SysWOW64's 32-bit DLLs.
   $systemDir = if ([Environment]::Is64BitProcess) { "System32" } else { "Sysnative" }
@@ -177,9 +178,9 @@ try {
       Write-Host "  added: $dll"
     }
   }
-  # Newer parts of the runtime some native builds also link (OpenMP, the C++20 extras), copied
+  # Newer parts of the runtime some native builds also link (the C++20 extras), copied
   # when the source has them.
-  foreach ($dll in @("vcomp140.dll", "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll")) {
+  foreach ($dll in @("msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll")) {
     $source = Join-Path $vcSource $dll
     $target = Join-Path $pythonDir $dll
     if ((Test-Path -LiteralPath $source) -and -not (Test-Path -LiteralPath $target)) {

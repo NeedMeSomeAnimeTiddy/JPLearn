@@ -49,7 +49,7 @@ const FEATURE_PACKAGES = {
     imports: ['paddleocr', 'onnxruntime', 'numpy', 'PIL', 'cv2', 'fasttext'],
   },
   speech: {
-    pins: ['faster-whisper==1.2.1', 'ctranslate2==4.8.0', 'av==18.0.0', 'onnxruntime==1.27.0', 'tokenizers==0.22.2'],
+    pins: ['faster-whisper==1.2.1', 'ctranslate2==4.8.0', 'av==18.0.0', 'onnxruntime==1.27.0', 'tokenizers==0.22.2', 'numpy==1.26.4'],
     imports: ['faster_whisper'],
   },
   // Only on a machine with an NVIDIA GPU whose CUDA runtime is missing.
@@ -58,7 +58,7 @@ const FEATURE_PACKAGES = {
     imports: ['nvidia.cublas'],
   },
   embedder: {
-    pins: ['onnxruntime==1.27.0', 'tokenizers==0.22.2'],
+    pins: ['onnxruntime==1.27.0', 'tokenizers==0.22.2', 'numpy==1.26.4'],
     imports: ['onnxruntime', 'tokenizers'],
   },
 }
@@ -228,7 +228,13 @@ async function installFeaturePackagesOnce({ assetsDir, feature, baseEnv = proces
   if (install.code !== 0 || !probe || probe.code !== 0) {
     fs.rmSync(partial, { recursive: true, force: true })
     const detail = install.code !== 0 ? install.stderr || install.stdout : probe.stderr || probe.stdout
-    throw new Error(`Could not install the ${feature} packages: ${(detail || '').trim().split(/\r?\n/).slice(-1)[0] || 'unknown error'}`)
+    const last = (detail || '').trim().split(/\r?\n/).slice(-1)[0] || 'unknown error'
+    // OpenCV and PyAV link Windows' own media DLLs, which Windows N editions and Windows Server
+    // leave out and nothing can ship in their place (audit 13 check on a bare Server).
+    const hint = /DLL load failed while importing (cv2|_core)\b/.test(last)
+      ? ' (this Windows is missing its media components; on an N edition, install the Media Feature Pack from Settings > Apps > Optional features)'
+      : ''
+    throw new Error(`Could not install the ${feature} packages: ${last}${hint}`)
   }
 
   fs.writeFileSync(path.join(partial, READY_MARKER), JSON.stringify({ pins: spec.pins, tag }, null, 2))
