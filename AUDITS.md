@@ -54,6 +54,46 @@ are kept in `Z:/Projects/JPLearn/audits`.
 ### Coverage, not a finding
 - The last three passes (packaging, progression, startup) did not cover tutor and assistant, JLPT, minigames and Daily Games, the menu and valley, renderer state and settings, passages or handwriting.
 
+### Outcome (branch `audit14-repairs`, merged d6dd3f1)
+- Robbie's answers: F1 "No dictionary clue"; F4 "Install the runner too" and the failure wording
+  "Read the text, but couldn't translate it: <reason>" above the kept Japanese lines; F5 "Search
+  decks + romaji"; F6 "Use Look It Up's line"; N2 "Honest labels"; the English heading "ENGLISH",
+  or "ENGLISH · FIRST PART OF THE TEXT" when the text was clipped. A design critic (Astra) approved
+  revision 3 with amendments, all taken.
+- F1 fixed (51bda68): a card takes a dictionary entry only when it is the same word: the reading
+  matches the card's romaji and the spelling or a content word of meaning matches; a kana card must
+  be read as spelled; a tie between different meanings attaches nothing. Measured over N5/N4: 1,144
+  kept, 202 corrected, 31 added, 27 wrong removed, 3 lost (あの, コート, バス: multi-meaning cards).
+  Enrichment takes 0.43 s, from 0.9 s. Over every deck, 47 of 9,484 enriched cards take an entry
+  spelled inside their own spelling, all affix cards, spelling variants or grammar patterns, so the
+  reviewer's proposed guard was not added.
+- F3 fixed (b35de6e, 8d164cc): the tutor reads the real index (FTS phrase, common first, then the
+  first meaning, the shorter word, more senses), with no JSON fallback. Exact gloss first, then a
+  whole word of a gloss. The index keeps 240 characters of glosses, so a meaning past that is not
+  found (accepted); the cut-off last piece is never an answer. Checked: water 水, dog 犬, teacher
+  先生, to go 行く, red 赤; "to eat" gives 食う, "bathroom" 浴室.
+- F4 fixed (b0dded3, d95c01a, 8d164cc): Image Translation installs llama.cpp last and counts as
+  installed only with it; the screenshot route opens only when the tutor runtime would run a real
+  model (`translationReady`); the active translation model is read; setup routes recreate the
+  runtime only when its server or model changed; the text read is shown before the translation
+  and kept when it fails.
+- F2 filed as DEBT #15; ARCHITECTURE §8 B1 names it. Look It Up searches only on its word and phrase
+  routes (critic A6).
+- F5, F6, N1-N4 fixed (d95c01a): Look It Up's word route searches your decks first, then the
+  dictionary, then romaji as kana (shared with the Dictionary panel); the panel shows Look It Up's
+  missing-dictionary line; OCR labels as Robbie chose.
+- Records corrected (abab4e0): the audit 5 F1 line, the `llm_runtime.cjs` comment, ARCHITECTURE B1.
+- Review (Opus): approve with nits, then approve. Fixed: needless runtime restarts cancelling a reply,
+  an old image's lines under a new image's error, the cut-off gloss, a false "would answer more"
+  note, long-vowel folding. Left: Image Translation's stated size and the wizard's progress bar
+  still leave out the runner.
+- Checks: pytest on linux-build 1921 passed, 4 skipped, only the known Linux test_conjugation_index
+  failure; arch_check and the generated types clean. On win-build lint, build and a11y (7) pass;
+  test:ui 2026/2029 with three timeouts that pass on rerun, two of them the new index tests, now
+  given 30 s (3b4974e).
+- Not run: the app end to end. Robbie's install has no OCR, llama.cpp, tutor model or dictionary,
+  so no screen of this was looked at and no real translation was made.
+
 ## 2026-10-29 — Packaging, updates and upgrades
 
 **Scope:** Audit 13. Robbie chose "Packaging and upgrades (Recommended)" over JLPT prep, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, reading passages, handwriting, and the whole repository.
