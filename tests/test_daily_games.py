@@ -11,6 +11,7 @@ from domain.daily_games import (
     DailyWordPool,
     apply_daily_game_completion,
     daily_game_seed,
+    daily_games_streak_as_of,
     daily_pool_fingerprint,
     select_daily_word_pool,
 )
@@ -394,3 +395,90 @@ def test_stale_completion_day_is_ignored() -> None:
     )
 
     assert apply_daily_game_completion(state, date(2026, 7, 14)) == state
+
+
+# ---- the streak as the road shows it today (audit 16, F6) ----
+
+def _july_streak(last_day: date, *, streak: int = 4, freezes: int = 2) -> DailyGamesStreakState:
+    return DailyGamesStreakState(
+        last_completed_day=last_day,
+        current_streak_days=streak,
+        best_streak_days=6,
+        freezes_available=freezes,
+        freeze_month=date(last_day.year, last_day.month, 1),
+    )
+
+
+def test_streak_as_of_with_no_history_shows_nothing_and_the_months_freezes() -> None:
+    shown = daily_games_streak_as_of(DailyGamesStreakState(), date(2026, 7, 15))
+
+    assert shown.current_streak_days == 0
+    assert shown.freezes_available == 3
+    assert shown.freeze_month == date(2026, 7, 1)
+    assert shown.last_completed_day is None
+
+
+def test_streak_as_of_today_or_the_day_after_is_stored() -> None:
+    state = _july_streak(date(2026, 7, 15))
+
+    assert daily_games_streak_as_of(state, date(2026, 7, 15)) == state
+    assert daily_games_streak_as_of(state, date(2026, 7, 16)) == state
+
+
+def test_streak_as_of_the_day_after_across_a_month_shows_the_new_months_freezes() -> None:
+    state = _july_streak(date(2026, 7, 31), freezes=0)
+
+    shown = daily_games_streak_as_of(state, date(2026, 8, 1))
+
+    assert shown.current_streak_days == 4
+    assert shown.freezes_available == 3
+    assert shown.freeze_month == date(2026, 8, 1)
+    assert shown.last_completed_day == date(2026, 7, 31)
+    assert shown.best_streak_days == 6
+
+
+def test_streak_as_of_a_covered_gap_keeps_the_streak_and_spends_freezes() -> None:
+    state = _july_streak(date(2026, 7, 10), freezes=2)
+
+    shown = daily_games_streak_as_of(state, date(2026, 7, 13))  # 11th and 12th missed
+
+    assert shown.current_streak_days == 4
+    assert shown.freezes_available == 0
+
+
+def test_streak_as_of_an_uncovered_gap_shows_zero_and_spends_nothing() -> None:
+    state = _july_streak(date(2026, 7, 10), freezes=2)
+
+    shown = daily_games_streak_as_of(state, date(2026, 7, 14))  # three missed, two freezes
+
+    assert shown.current_streak_days == 0
+    assert shown.freezes_available == 2
+    assert shown.best_streak_days == 6
+
+
+def test_streak_as_of_a_gap_over_two_months_uses_each_months_freezes() -> None:
+    state = _july_streak(date(2026, 7, 30), freezes=1)
+
+    shown = daily_games_streak_as_of(state, date(2026, 8, 2))  # 31 July and 1 August missed
+
+    assert shown.current_streak_days == 4
+    assert shown.freezes_available == 2
+    assert shown.freeze_month == date(2026, 8, 1)
+
+
+def test_streak_as_of_a_day_before_the_last_completion_is_unchanged() -> None:
+    state = _july_streak(date(2026, 7, 15))
+
+    assert daily_games_streak_as_of(state, date(2026, 7, 2)) == state
+
+
+def test_streak_as_of_never_changes_what_a_completion_does() -> None:
+    state = _july_streak(date(2026, 7, 10), freezes=2)
+    for _ in range(3):
+        daily_games_streak_as_of(state, date(2026, 7, 13))
+
+    completed = apply_daily_game_completion(state, date(2026, 7, 13))
+
+    assert completed.current_streak_days == 5
+    assert completed.freezes_available == 0
+

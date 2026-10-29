@@ -122,7 +122,7 @@ Check 3), or a learner noticing that due cards were not served first.
 
 ## 9. Daily Games state reads every attempt ever played, one query per attempt
 
-**Recorded 2026-10-28.** `_reconcile_daily_games_streak` (`scripts/desktop_bridge.py:1125-1142`)
+**Recorded 2026-10-28.** `_reconcile_daily_games_streak` (`scripts/desktop_bridge.py:1060-1077`; lines refreshed by audit 16)
 calls `load_attempts()` with no day. That selects every `daily_game_attempts` row and runs one
 outcomes query per row (`data/daily_games_repository.py:370-393`), on every `daily-games-state` and
 `daily-games-record-attempt`. Not fixed now: the live table holds 0 rows (audit 7, Check 4), and it

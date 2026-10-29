@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from hashlib import sha256
 from typing import Literal
@@ -276,6 +276,48 @@ def apply_daily_game_completion(
         best_streak_days=max(state.best_streak_days, next_streak),
         freezes_available=freezes_available,
         freeze_month=freeze_month,
+    )
+
+
+def daily_games_streak_as_of(
+    state: DailyGamesStreakState,
+    today: date,
+) -> DailyGamesStreakState:
+    """Return the streak and freezes as the learner should see them on ``today``.
+
+    Display only: the stored state is never replaced by this. A streak whose
+    missed days are no longer covered by freezes shows 0, and a new calendar
+    month shows its own freezes before anything is completed in it (audit 16,
+    F6). ``today`` is local time supplied by the caller; a day before the last
+    completion (a historical request) returns the state unchanged.
+    """
+    if state.last_completed_day is not None and today < state.last_completed_day:
+        return state
+
+    month = _month_start(today)
+    refreshed_freezes = (
+        min(max(state.freezes_available, 0), MAX_MONTHLY_FREEZES)
+        if state.freeze_month == month
+        else MAX_MONTHLY_FREEZES
+    )
+    if state.last_completed_day is None:
+        return replace(
+            state,
+            current_streak_days=0,
+            freezes_available=refreshed_freezes,
+            freeze_month=month,
+        )
+    if (today - state.last_completed_day).days <= 1:
+        return replace(state, freezes_available=refreshed_freezes, freeze_month=month)
+
+    # What a completion today would do, less the day it would add: today is not missed yet.
+    probe = apply_daily_game_completion(state, today)
+    covered = probe.current_streak_days > 1
+    return replace(
+        state,
+        current_streak_days=state.current_streak_days if covered else 0,
+        freezes_available=probe.freezes_available,
+        freeze_month=probe.freeze_month,
     )
 
 

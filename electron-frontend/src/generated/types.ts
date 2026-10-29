@@ -272,9 +272,7 @@ export interface DailyGamesMissedWordPayload {
 }
 
 export interface DailyGamesProgressPayload {
-  attempt_count: number
   completed_daily_game_types: string[]
-  missed_words: DailyGamesMissedWordPayload[]
 }
 
 export interface DailyGamesStatePayload {

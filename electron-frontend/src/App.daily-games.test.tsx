@@ -15,7 +15,7 @@ const dailyState = {
     words: [{ deck_slug: 'vocab_n5', deck_name: 'N5 Vocabulary', card_id: 1, character: '猫', romaji: 'neko', meaning: 'cat', source: 'deck' }],
   },
   streak: { last_completed_day: null, current_streak_days: 1, best_streak_days: 1, freezes_available: 0, freeze_month: null },
-  attempts: [], progress: { attempt_count: 0, completed_daily_game_types: [], missed_words: [] },
+  attempts: [], progress: { completed_daily_game_types: [] },
 }
 
 const desktopApi = {
@@ -62,17 +62,8 @@ const reviewDailyState = {
   },
 }
 
-const completedReviewDailyState = {
-  ...reviewDailyState,
-  progress: {
-    ...reviewDailyState.progress,
-    missed_words: [
-      { word: reviewDailyState.pool.words[0], miss_count: 1 },
-      { word: reviewDailyState.pool.words[1], miss_count: 1 },
-      { word: reviewDailyState.pool.words[0], miss_count: 2 },
-    ],
-  },
-}
+// the bridge sends no missed-word summary (audit 16, N2): the window builds it from the outcomes
+const completedReviewDailyState = { ...reviewDailyState }
 
 function buildReviewDesktopApi(recordGameResult = vi.fn(async () => ({ ok: true, card_id: 1, repetitions: 0, interval: 1, next_review: '2026-01-01', ease_factor: 2.5 }))) {
   const getDeckCards = vi.fn(async (slug: string) => ({ slug, name: slug, cards: slug === 'deck_a' ? [deckACard] : [deckBCard] }))
@@ -375,10 +366,7 @@ describe('missed-word review scores', () => {
     window.jplearnDesktop = {
       ...review.api,
       getDailyGamesState: async () => vocabState,
-      recordDailyGamesAttempt: async () => ({
-        ...vocabState,
-        progress: { ...vocabState.progress, missed_words: vocabWords.map((word) => ({ word, miss_count: 1 })) },
-      }),
+      recordDailyGamesAttempt: async () => ({ ...vocabState }),
       getDeckCards: vi.fn(async (slug: string) => ({ slug, name: slug, cards: [deckACard, { ...deckBCard, id: 2 }] })),
     } as unknown as typeof window.jplearnDesktop
     render(<App />)

@@ -105,7 +105,7 @@ function makeApi() {
         words: [{ deck_slug: 'vocab_n5', deck_name: 'N5 Vocabulary', card_id: 1, character: '猫', romaji: 'neko', meaning: 'cat', source: 'deck' }],
       },
       streak: { last_completed_day: null, current_streak_days: 1, best_streak_days: 1, freezes_available: 0, freeze_month: null },
-      attempts: [], progress: { attempt_count: 0, completed_daily_game_types: [], missed_words: [] },
+      attempts: [], progress: { completed_daily_game_types: [] },
     }),
     getBlockProgress: async () => ({ blocks: [] }),
     getStudyQueue: async () => ({ items: [] }),

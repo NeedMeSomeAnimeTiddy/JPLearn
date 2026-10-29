@@ -46,7 +46,7 @@ const desktopApi = {
   getDailyGamesState: async () => ({
     pool: { day: '2026-07-15', algorithm_version: 1, game_seeds: {}, words: [] },
     streak: { last_completed_day: null, current_streak_days: 0, best_streak_days: 0, freezes_available: 0, freeze_month: null },
-    attempts: [], progress: { attempt_count: 0, completed_daily_game_types: [], missed_words: [] },
+    attempts: [], progress: { completed_daily_game_types: [] },
   }),
   notifyStartupReady: async () => ({ ok: true }),
   setStartupTheme: async (theme: string) => ({ ok: true, theme }),

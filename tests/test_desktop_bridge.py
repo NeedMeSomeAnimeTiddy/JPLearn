@@ -1868,9 +1868,8 @@ def test_daily_games_record_attempt_updates_daily_only_progress_and_streak(
         ),
     )
 
-    assert _daily_progress(updated)["attempt_count"] == 1
+    assert len(_daily_attempts(updated)) == 1
     assert _daily_progress(updated)["completed_daily_game_types"] == ["crossword"]
-    assert _daily_progress(updated)["missed_words"][0]["miss_count"] == 1
     assert _daily_streak(updated)["current_streak_days"] == 1
     assert _daily_attempts(updated)[0]["outcomes"] == [
         {"pool_position": 0, "outcome": "incorrect"}
@@ -1905,10 +1904,10 @@ def test_daily_games_repeated_daily_completion_is_idempotent_and_practice_is_iso
         (desktop_bridge.DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
     )
 
-    assert _daily_progress(first)["attempt_count"] == 1
-    assert _daily_progress(repeated)["attempt_count"] == 1
+    assert len(_daily_attempts(first)) == 1
+    assert len(_daily_attempts(repeated)) == 1
     assert _daily_streak(repeated)["current_streak_days"] == 1
-    assert _daily_progress(practiced)["attempt_count"] == 2
+    assert len(_daily_attempts(practiced)) == 2
     assert _daily_progress(practiced)["completed_daily_game_types"] == ["crossword"]
     assert _daily_streak(practiced)["current_streak_days"] == 1
     with database._connect() as conn:  # type: ignore[attr-defined]
@@ -1953,7 +1952,7 @@ def test_daily_games_state_and_duplicate_retry_reconcile_stale_streak(
         (DailyGameWordOutcome(pool_position=1, outcome="incorrect"),),
     )
 
-    assert _daily_progress(retried)["attempt_count"] == 1
+    assert len(_daily_attempts(retried)) == 1
     assert _daily_streak(retried)["current_streak_days"] == 1
     assert repository.load_streak_state().last_completed_day == date(2026, 7, 15)
 
@@ -2010,46 +2009,7 @@ def test_daily_games_new_completion_reconstructs_streak_from_attempt_days(
     assert reconciled_again.current_streak_days == 2
 
 
-def test_daily_games_state_resolves_misses_by_completion_time_not_insertion_order(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    _use_temp_db(tmp_path, monkeypatch)
-    desktop_bridge.build_daily_games_state("2026-07-15")
-    repository = DailyGamesRepository()
-    repository.save_attempt(
-        DailyGameAttempt(
-            pool_day=date(2026, 7, 15),
-            game_type="typing_blitz",
-            mode="practice",
-            score=0,
-            completed=False,
-            duration_seconds=None,
-            completed_at_utc=datetime(2026, 7, 15, 12, tzinfo=timezone.utc),
-            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="incorrect"),),
-        )
-    )
-    repository.save_attempt(
-        DailyGameAttempt(
-            pool_day=date(2026, 7, 15),
-            game_type="typing_blitz",
-            mode="practice",
-            score=1,
-            completed=False,
-            duration_seconds=None,
-            completed_at_utc=datetime(2026, 7, 15, 10, tzinfo=timezone.utc),
-            outcomes=(DailyGameWordOutcome(pool_position=0, outcome="correct"),),
-        )
-    )
-
-    state = desktop_bridge.build_daily_games_state("2026-07-15")
-
-    assert _daily_progress(state)["missed_words"] == [
-        {"word": _daily_pool(state)["words"][0], "miss_count": 1}
-    ]
-
-
-def test_daily_games_state_clears_resolved_miss_summary(
+def test_daily_games_corrected_miss_clears_the_miss_signal(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -2075,11 +2035,34 @@ def test_daily_games_state_clears_resolved_miss_summary(
         (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
     )
 
-    assert _daily_progress(missed)["missed_words"][0]["miss_count"] == 1
-    assert _daily_progress(corrected)["missed_words"] == []
+    assert len(_daily_attempts(missed)) == 1
+    assert len(_daily_attempts(corrected)) == 2
     assert DailyGamesRepository().load_active_game_miss_card_ids(
         "Vocabulary N5", date(2026, 7, 15)
     ) == set()
+
+
+def test_daily_games_state_shows_the_streak_as_of_the_requested_day(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """A broken streak reads 0 before the next completion; the stored row is left alone (audit 16, F6)."""
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.record_daily_games_attempt(
+        "2026-07-10", "crossword", "daily", 50, True, 20,
+        (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+    )
+    repository = DailyGamesRepository()
+    stored = repository.load_streak_state()
+
+    later = desktop_bridge.build_daily_games_state("2026-07-20")
+    again = desktop_bridge.build_daily_games_state("2026-07-20")
+    historical = desktop_bridge.build_daily_games_state("2026-07-05")
+
+    assert _daily_streak(later)["current_streak_days"] == 0
+    assert _daily_streak(again) == _daily_streak(later)
+    assert _daily_streak(historical)["current_streak_days"] == 1
+    assert repository.load_streak_state() == stored
 
 
 def test_daily_games_commands_reject_malformed_arguments(tmp_path: Path, monkeypatch) -> None:
