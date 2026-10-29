@@ -1,6 +1,7 @@
-// Extracted verbatim from App.tsx (issue #69). Presentational only -- all settings
-// state stays owned by App and is passed in; this renders the modal shell and
-// delegates each tab to its existing feature component.
+// Extracted verbatim from App.tsx (issue #69). Presentational apart from the update-check
+// switch (audit 13), which reads and saves its own config value; all other settings state
+// stays owned by App and is passed in. This renders the modal shell and delegates each tab
+// to its existing feature component.
 import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import {
   Activity, ArrowRight, BookText, BrainCircuit, CheckCircle2, Circle, Download, Flame,

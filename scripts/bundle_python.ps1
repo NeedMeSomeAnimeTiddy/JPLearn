@@ -161,7 +161,10 @@ try {
   # are how Microsoft's redistribution terms allow shipping them.
   Write-Host "Adding the Visual C++ runtime to the bundle..."
   $vcRuntime = @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
-  $vcSource = if ($VcRuntimeDirectory) { $VcRuntimeDirectory } else { Join-Path $env:SystemRoot "System32" }
+  # Sysnative is the real System32 from a 32-bit PowerShell, which would otherwise be handed
+  # SysWOW64's 32-bit DLLs.
+  $systemDir = if ([Environment]::Is64BitProcess) { "System32" } else { "Sysnative" }
+  $vcSource = if ($VcRuntimeDirectory) { $VcRuntimeDirectory } else { Join-Path $env:SystemRoot $systemDir }
   $pythonDir = Split-Path $pythonExe -Parent
   foreach ($dll in $vcRuntime) {
     $source = Join-Path $vcSource $dll
@@ -170,6 +173,16 @@ try {
     }
     $target = Join-Path $pythonDir $dll
     if (-not (Test-Path -LiteralPath $target)) {
+      Copy-Item -LiteralPath $source -Destination $target
+      Write-Host "  added: $dll"
+    }
+  }
+  # Newer parts of the runtime some native builds also link (OpenMP, the C++20 extras), copied
+  # when the source has them.
+  foreach ($dll in @("vcomp140.dll", "msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll")) {
+    $source = Join-Path $vcSource $dll
+    $target = Join-Path $pythonDir $dll
+    if ((Test-Path -LiteralPath $source) -and -not (Test-Path -LiteralPath $target)) {
       Copy-Item -LiteralPath $source -Destination $target
       Write-Host "  added: $dll"
     }
