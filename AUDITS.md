@@ -38,7 +38,7 @@ are kept in `Z:/Projects/JPLearn/audits`.
   - Q1, audit 7 F3's four kept preload reads. Check 5 found no recorded reason.
   - Q2, whether the tutor should warm up at launch. Check 6 narrowed it but did not settle it.
 - STALE RECORD:
-  - the tutor comment at `App.tsx:1144-1145`;
+  - the tutor comment at `App.tsx:1144-1145` (rewritten by the repairs);
   - the `App.tsx` line counts in `electron.instructions.md:21` and `electron-frontend/CLAUDE.md:12`.
 - RECORDED:
   - ARCH §8 B3, whose scope has grown into startup;
@@ -46,6 +46,34 @@ are kept in `Z:/Projects/JPLearn/audits`.
   - DEBT #4, whose trigger metric is the one F6 describes;
   - DEBT #3.
 - Dropped: none.
+
+### Outcome (branch `audit11-repairs`, merged fde578b, pushed 2026-10-29)
+- Robbie's answers: Q2 "Only if chat is on"; Q1 "Keep them, reuse results"; F1 "Plain error +
+  Retry"; F7 "Setup yes, onboarding no". A design critic (Astra) required M1-M6, all taken.
+- F1 fixed (22537af, 45de19f): with no summary since launch, the home hero reads "JPLearn couldn't
+  start its study engine.", the reason and a Retry; a Retry that works reloads the home data and the
+  progression map; a stored snapshot is not shown as current meanwhile.
+- F2 fixed (690e4e3, 22537af): the setup wizard's exits write the first-run marker first and mark
+  onboarding on the worker only, with a 10 s limit; a failure is shown on the wizard.
+- F3 fixed (690e4e3, 22537af, 45de19f): no tutor warmup at launch or after setup; the window asks
+  for one only while the tutor chat is on (and on switching it on), and the warmup still reads back
+  the saved chat history. A model installed by setup is warmed only if the window had asked.
+- F4 fixed (690e4e3, 45de19f): one 30 s deadline for the whole splash; telemetry keeps the finished
+  tasks' timings when it fires.
+- F5 and Q1 fixed (690e4e3, 22537af, 45de19f): the read cache moved to `bridge_read_cache.cjs` with
+  per-command generations, so a read begun before a clear never lands; XP, recommendations and path
+  status are held 15 s and reused from the startup preload; the renderer fetches them once at launch;
+  progression, feature-unlock and milestone reads, which save, clear them. Review found no write that
+  changes them without clearing.
+- F6 filed as DEBT #10. F7 fixed (690e4e3): a finished onboarding is never reset, and saved
+  schedules or reviews mark a learner as onboarded (`data.database.has_study_history`).
+- Nits: 2 (`python_command.cjs`), 3 (snapshot parsed once) fixed; 4 kept on purpose (the tutor
+  snapshot fetch saves tutor state, critic M6). The PRACTICE and STUDY rows under the failure hero
+  filed as DEBT #11.
+- Review (5X Opus Reviewer, two rounds, approved at 45de19f): Retry left the progression map empty,
+  and a narrow cache clear stopped every other read from caching; both fixed.
+- Checks: full pytest 1,904 passed; vitest 147 files, 1,957 tests; lint and build clean. A flaky
+  Daily Games test's lazy-view wait was raised to 5 s. Not tried in the running app.
 
 ### Triggers checked
 - DEBT #4: not checked (Check 2 not run). Its first-summary figure under-measures (F6).
