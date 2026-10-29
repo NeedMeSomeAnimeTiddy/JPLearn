@@ -12,6 +12,7 @@
    ================================================================================================== */
 
 const { spawn } = require('node:child_process')
+const { envWithFeaturePackages } = require('./python_packages.cjs')
 
 /**
  * @param {object} options
@@ -75,6 +76,9 @@ function createBridgeWorker(options) {
 
     const child = spawnFn(pythonCmd, [bridgeScript, '--server'], {
       cwd: bridgeContext.projectRoot,
+      // The tutor's embedder packages, in the installed app (audit 13, F4); added lazily on the
+      // Python side, so the bridge starts as before.
+      env: envWithFeaturePackages({ ...process.env }, (process.env.JPLEARN_ASSETS_DIR || '').trim(), ['embedder']),
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     })

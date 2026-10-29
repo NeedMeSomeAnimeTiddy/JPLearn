@@ -24,6 +24,10 @@ import sys
 import time
 from typing import Any
 
+from downloaded_packages import activate as _activate_downloaded_packages
+
+_activate_downloaded_packages()  # faster-whisper, in the installed app (audit 13, F1)
+
 # Node writes requests as UTF-8. A piped stdin otherwise decodes with the Windows ANSI code page
 # (cp1252 on English Windows), which garbles Japanese text or kills the process (audit 7 F1).
 if hasattr(sys.stdin, "reconfigure"):

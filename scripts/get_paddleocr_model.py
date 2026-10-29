@@ -33,6 +33,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from scripts.downloaded_packages import activate as _activate_downloaded_packages  # noqa: E402
+
+_activate_downloaded_packages()  # OCR's packages, in the installed app (audit 13, F2)
+
 from scripts.ocr_model_cache import (  # noqa: E402
     MISSING_WEIGHTS_MESSAGE,
     adopt_legacy_weights,

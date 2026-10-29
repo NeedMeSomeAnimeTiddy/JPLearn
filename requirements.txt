@@ -1,20 +1,20 @@
-psutil
+psutil==7.2.2
 pytest
 # Required: Japanese morphological tokenization (word/POS segmentation) used
 # by data/text_normalization.py::tokenize_japanese and downstream parsing.
-fugashi
-unidic-lite
+fugashi==1.3.0
+unidic-lite==1.0.8
 # Optional: offline Japanese speech-to-text for the speech-answer minigame mode.
 # Heavy dependency (ctranslate2 + onnxruntime); only required if the user
 # installs a speech recognition model from Setup or Settings.
-faster-whisper
+faster-whisper==1.2.1
 # Optional: local ONNX-based sentence embedder for assistant chat retrieval
 # (scripts/embedder_runtime.py). Lightweight (~15-20 MB) compared to
 # torch/transformers; only required if the mapped embedder model (see
 # scripts/get_embedder_model.py) has been installed. Falls back to the
 # dependency-free hashed embedder in domain/retrieval.py if not installed.
-onnxruntime
-tokenizers
+onnxruntime==1.27.0
+tokenizers==0.22.2
 # Optional: enables Hugging Face CLI (`hf`) for faster/resumable model downloads
 # in scripts/hf_download.py when available.
 huggingface-hub

@@ -121,11 +121,14 @@ try {
   # as required as psutil is - a psutil-only bundle makes every bridge call fail with
   # ModuleNotFoundError.
   #
-  # The rest of requirements.txt is deliberately left out: pytest is test-only, and
-  # faster-whisper / onnxruntime / tokenizers / huggingface-hub are the optional
-  # components the in-app setup wizard installs on demand. Bundling them would add
-  # hundreds of MB to the installer for features most users never enable.
-  $runtimePackages = @("psutil", "fugashi", "unidic-lite")
+  # Pinned to the versions the tests run with (requirements.txt): an unpinned fugashi
+  # once shipped 1.5.2 against a tested 1.3.0 (audit 13, F3).
+  #
+  # The rest of requirements.txt is deliberately left out: pytest is test-only, and the
+  # optional features' packages (faster-whisper for speech, onnxruntime and tokenizers for
+  # the tutor's embedder, OCR's) are installed by the setup wizard on demand into
+  # JPLearn Assets (electron/python_packages.cjs), outside the app's version folder.
+  $runtimePackages = @("psutil==7.2.2", "fugashi==1.3.0", "unidic-lite==1.0.8")
 
   Write-Host "Installing runtime packages into bundle: $($runtimePackages -join ', ')"
   & $pythonExe -m pip install --disable-pip-version-check --quiet @runtimePackages

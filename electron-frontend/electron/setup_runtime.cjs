@@ -13,6 +13,13 @@ const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
 const { execFile, spawn } = require('node:child_process')
+const { resolvePythonCommand, bundledPythonCommand } = require('./python_command.cjs')
+const {
+  featurePackagesReady,
+  envWithFeaturePackages,
+  installFeaturePackages,
+  featurePackageDirs,
+} = require('./python_packages.cjs')
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
 
@@ -690,8 +697,23 @@ function getEmbedderDir(base, embedderTier) {
   return path.join(base, 'models', 'embedders', embedderTier)
 }
 
+// The model files and, in the installed app, the packages that load them (audit 13, F1/F4).
 function isEmbedderInstalled(base, embedderTier) {
   return fs.existsSync(path.join(getEmbedderDir(base, embedderTier), '.embedder-ready'))
+    && featurePackagesReady(base, 'embedder')
+}
+
+/** Removes a feature's downloaded packages; a folder a running server still holds is left. */
+function removeFeaturePackages(base, features) {
+  for (const feature of features) {
+    for (const dir of featurePackageDirs(base, feature)) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true })
+      } catch (error) {
+        console.error(`[setup] Could not remove ${dir} (still in use?):`, error)
+      }
+    }
+  }
 }
 
 function isEmbedderTierStillNeeded(base, embedderTier, excludeChatbotTier) {
@@ -714,6 +736,10 @@ function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
   const base = ensureJPLearnDirs()
   if (isEmbedderInstalled(base, embedderTier)) {
     return Promise.resolve({ alreadyInstalled: true })
+  }
+  // The files may be here from before the packages had a home of their own (audit 13, F4).
+  if (fs.existsSync(path.join(getEmbedderDir(base, embedderTier), '.embedder-ready'))) {
+    return ensureEmbedderPackages(base, embedderTier)
   }
 
   const scriptPath = path.join(scriptRoot, 'scripts', 'get_embedder_model.py')
@@ -750,7 +776,7 @@ function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
       if (code === 0) {
         currentPct = 100
         emitProgress()
-        resolve({ ok: true })
+        resolve(ensureEmbedderPackages(base, embedderTier))
       } else {
         console.error(`get_embedder_model.py (${embedderTier}) exited with code ${code}`)
         resolve({ ok: false, reason: `exit code ${code}` })
@@ -762,6 +788,19 @@ function ensureEmbedderInstalled(embedderTier, sender, scriptRoot) {
       resolve({ ok: false, reason: err.message })
     })
   })
+}
+
+// Best-effort, like the rest of the embedder install: without the packages, chat retrieval keeps
+// using the hashed fallback.
+async function ensureEmbedderPackages(base, embedderTier) {
+  if (featurePackagesReady(base, 'embedder')) return { ok: true }
+  try {
+    await installFeaturePackages({ assetsDir: base, feature: 'embedder' })
+    return { ok: true }
+  } catch (error) {
+    console.error(`[setup] embedder packages for ${embedderTier}:`, error)
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 function getSpeechModelDir(base, tier) {
@@ -776,6 +815,8 @@ function isSpeechModelInstalled(base, tier) {
   if (!model) return false
   const dir = getSpeechModelDir(base, tier)
   return model.files.every((filename) => fs.existsSync(path.join(dir, filename)))
+    // In the installed app, faster-whisper must load too; it was never installed there (audit 13, F1).
+    && featurePackagesReady(base, 'speech')
 }
 
 function getActiveSpeechModelStatePath(base) {
@@ -833,6 +874,8 @@ function uninstallSpeechModel(tier) {
   if (selection && selection.tier === tier) {
     try { fs.unlinkSync(getActiveSpeechModelStatePath(base)) } catch { /* ignore */ }
   }
+  const anyTierLeft = Object.keys(SPEECH_MODELS).some((other) => fs.existsSync(getSpeechModelDir(base, other)))
+  if (!anyTierLeft) removeFeaturePackages(base, ['speech', 'speech-cuda'])
   return { ok: true, tier }
 }
 
@@ -863,6 +906,9 @@ function hasOcrWeightsIn(weightsDir) {
 // PaddleX's default cache, which the OCR server copies into the assets folder on first use.
 function isOcrModelInstalled(base, tier) {
   if (!fs.existsSync(getOcrReadyMarkerPath(base, tier))) return false
+  // In the installed app its packages must be in JPLearn Assets: in the version folder, every
+  // update threw them away (audit 13, F2).
+  if (!featurePackagesReady(base, 'ocr')) return false
   return hasOcrWeightsIn(getOcrWeightsDir(base))
     || hasOcrWeightsIn(path.join(os.homedir(), '.paddlex', 'official_models'))
 }
@@ -927,6 +973,7 @@ function uninstallOcrModel(tier) {
   if (selection && selection.tier === tier) {
     try { fs.unlinkSync(getActiveOcrModelStatePath(base)) } catch { /* ignore */ }
   }
+  removeFeaturePackages(base, ['ocr'])
   return { ok: true, tier }
 }
 
@@ -1026,17 +1073,6 @@ function resolveActiveTranslationProfile(base) {
   return null
 }
 
-function resolvePythonCommand(scriptRoot) {
-  const resourcesPath = (process.resourcesPath || '').trim()
-  if (resourcesPath) {
-    const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
-    if (fs.existsSync(bundled)) return bundled
-  }
-  const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
-  if (fs.existsSync(venvWin)) return venvWin
-  return 'python'
-}
-
 function runPythonCapture(pythonCmd, args, env) {
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, args, {
@@ -1063,6 +1099,11 @@ function runPythonCapture(pythonCmd, args, env) {
 }
 
 async function ensureOcrPythonRuntime(scriptRoot, base) {
+  // The installed app: into JPLearn Assets, which updates leave alone (audit 13, F2).
+  if (bundledPythonCommand()) {
+    await installFeaturePackages({ assetsDir: base, feature: 'ocr' })
+    return
+  }
   const pythonCmd = resolvePythonCommand(scriptRoot)
   const env = {
     ...process.env,
@@ -2536,7 +2577,13 @@ function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
   const scriptPath = path.join(scriptRoot, 'scripts', 'get_whisper_model.py')
   const pythonCmd = resolvePythonCommand(scriptRoot)
 
-  return new Promise((resolve, reject) => {
+  // faster-whisper itself, which the installed app never had (audit 13, F1). From source it comes
+  // from the environment, as before.
+  const packagesStep = bundledPythonCommand() && !featurePackagesReady(base, 'speech')
+    ? installFeaturePackages({ assetsDir: base, feature: 'speech' })
+    : Promise.resolve()
+
+  return packagesStep.then(() => new Promise((resolve, reject) => {
     const args = [scriptPath, '--tier', tier, ...(downloadOptions.force ? ['--force'] : [])]
     const child = spawn(pythonCmd, args, {
       env: {
@@ -2611,14 +2658,22 @@ function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
             ].join('\n'),
           ]
 
-          const { stdout } = await runPythonCapture(pythonCmd, checkScript, { ...process.env })
+          const speechEnv = envWithFeaturePackages({ ...process.env }, base, ['speech', 'speech-cuda'])
+          const { stdout } = await runPythonCapture(pythonCmd, checkScript, speechEnv)
           const status = JSON.parse(stdout.trim())
 
           if (status.gpu_detected && !status.cuda_ready) {
             // GPU available but CUDA runtime libs missing — try install
-            const { code: pipCode } = await runPythonCapture(pythonCmd, [
-              '-m', 'pip', 'install', '--quiet', 'nvidia-cublas-cu12',
-            ], { ...process.env })
+            // In the installed app, into JPLearn Assets beside faster-whisper (audit 13, F2).
+            const { code: pipCode } = bundledPythonCommand()
+              ? await installFeaturePackages({ assetsDir: base, feature: 'speech-cuda' })
+                .then(() => ({ code: 0 }), (error) => {
+                  console.error('[setup] CUDA runtime packages:', error)
+                  return { code: 1 }
+                })
+              : await runPythonCapture(pythonCmd, [
+                '-m', 'pip', 'install', '--quiet', 'nvidia-cublas-cu12',
+              ], { ...process.env })
 
             if (pipCode === 0 && sender && !sender.isDestroyed()) {
               sender.send('setup:download-progress', {
@@ -2643,7 +2698,7 @@ function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
     })
 
     child.on('error', reject)
-  })
+  }))
 }
 
 async function downloadOcrModel(tier, sender, scriptRoot, options = {}) {
@@ -2687,12 +2742,13 @@ async function downloadOcrModel(tier, sender, scriptRoot, options = {}) {
 
   return new Promise((resolve, reject) => {
     const child = spawn(pythonCmd, [scriptPath, '--tier', tier, '--dest', modelDir], {
-      env: {
+      // It imports paddleocr, which the installed app keeps in JPLearn Assets (audit 13, F2).
+      env: envWithFeaturePackages({
         ...process.env,
         JPLEARN_ASSETS_DIR: base,
         JPLEARN_DOCUMENTS_DIR: base,
         PADDLE_PDX_MODEL_SOURCE: process.env.PADDLE_PDX_MODEL_SOURCE || 'BOS',
-      },
+      }, base, ['ocr']),
       windowsHide: true,
     })
 
@@ -2850,16 +2906,7 @@ function downloadFonts(sender, scriptRoot) {
     return Promise.resolve({ alreadyInstalled: true })
   }
 
-  const pythonCmd = (() => {
-    const resourcesPath = (process.resourcesPath || '').trim()
-    if (resourcesPath) {
-      const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
-      if (fs.existsSync(bundled)) return bundled
-    }
-    const venvWin = path.join(scriptRoot, '.venv', 'Scripts', 'python.exe')
-    if (fs.existsSync(venvWin)) return venvWin
-    return 'python'
-  })()
+  const pythonCmd = resolvePythonCommand(scriptRoot)
 
   return new Promise((resolve, reject) => {
     const args = fontInstallState.installed ? [scriptPath] : [scriptPath, '--force']

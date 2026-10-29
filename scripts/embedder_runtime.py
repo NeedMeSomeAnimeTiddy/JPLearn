@@ -40,13 +40,45 @@ CHATBOT_TIER_TO_EMBEDDER_TIER = {
 _MODEL_CACHE: dict[str, tuple[object, object]] = {}
 
 
-def _documents_base() -> Path:
-    docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
-    return Path(docs_dir) if docs_dir else REPO_ROOT
+def activate_downloaded_packages() -> None:
+    """Make the embedder's downloaded packages importable (scripts/downloaded_packages.py).
+
+    Called lazily, so an embedder installed while the bridge runs is picked up without a restart.
+    """
+    try:
+        from downloaded_packages import activate
+    except ImportError:
+        from scripts.downloaded_packages import activate
+    activate()
+
+
+def model_bases() -> list[Path]:
+    """Where downloaded models may live, most likely first.
+
+    Setup has installed them in the downloads folder (JPLEARN_ASSETS_DIR) since 9ca9cfb; earlier
+    setups wrote to the progress folder. Reading only the progress folder meant a downloaded embedder
+    was never found (audit 13, F4).
+    """
+    bases: list[Path] = []
+    for name in ("JPLEARN_ASSETS_DIR", "JPLEARN_DOCUMENTS_DIR"):
+        value = os.environ.get(name, "").strip()
+        if value and Path(value) not in bases:
+            bases.append(Path(value))
+    bases.append(REPO_ROOT)
+    return bases
+
+
+def first_existing(relative: Path) -> Path | None:
+    for base in model_bases():
+        candidate = base / relative
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _embedder_dir(tier: str) -> Path:
-    return _documents_base() / "models" / "embedders" / tier
+    relative = Path("models") / "embedders" / tier
+    return first_existing(relative) or model_bases()[0] / relative
 
 
 def resolve_embedder_tier_for_chatbot_tier(chatbot_tier: str) -> str | None:
@@ -55,6 +87,7 @@ def resolve_embedder_tier_for_chatbot_tier(chatbot_tier: str) -> str | None:
 
 def is_available(tier: str) -> bool:
     """True if onnxruntime/tokenizers are importable and the model files exist."""
+    activate_downloaded_packages()
     try:
         import onnxruntime  # noqa: F401
         import tokenizers  # noqa: F401

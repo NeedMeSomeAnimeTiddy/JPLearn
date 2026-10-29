@@ -717,8 +717,15 @@ def _migration_0014(conn: sqlite3.Connection) -> None:
 
 
 def _migration_0015(conn: sqlite3.Connection) -> None:
-    """Add non-destructive completion identities for daily-attempt idempotency."""
-    conn.execute("ALTER TABLE daily_game_attempts ADD COLUMN completion_key TEXT")
+    """Add non-destructive completion identities for daily-attempt idempotency.
+
+    The column add is guarded like every other one. It commits on its own (sqlite3 opens no
+    transaction before DDL), so an upgrade from schema 14 cut short after it used to leave the column
+    with the version still 14, and every later start failed on "duplicate column name" (audit 13, F5).
+    """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(daily_game_attempts)")}
+    if "completion_key" not in columns:
+        conn.execute("ALTER TABLE daily_game_attempts ADD COLUMN completion_key TEXT")
     conn.execute(
         """
         UPDATE daily_game_attempts

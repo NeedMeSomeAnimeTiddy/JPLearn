@@ -1,9 +1,11 @@
 // Auto-update wiring via update-electron-app (GitHub Releases update source).
 //
 // Resolves the target repo from JPLEARN_UPDATE_REPO ("owner/repo") or, if
-// unset, from this package's package.json "repository" field. If neither is
-// configured, auto-update is skipped (logged once) rather than guessing a
-// repo — packaged/dev builds still work fine without it.
+// unset, from this package's package.json "repository" field (wired to
+// NeedMeSomeAnimeTiddy/JPLearn in audit 13; Robbie: "wire updates up to github repo").
+// One check at launch and none after (Robbie: "Launch only"); the Settings switch
+// "Check for updates automatically" turns it off. With no published release the
+// service answers 404, which update-electron-app only logs.
 const path = require('node:path')
 
 function resolveRepoSlug() {
@@ -35,8 +37,13 @@ function resolveRepoSlug() {
  * @param {{ isPackaged: boolean, logger?: Console }} options
  * @returns {{ stopUpdates: () => void } | null}
  */
-function initAutoUpdater({ isPackaged, logger = console } = {}) {
+function initAutoUpdater({ isPackaged, logger = console, argv = process.argv } = {}) {
   if (process.env.ELECTRON_DEV === '1' || !isPackaged) {
+    return null
+  }
+  // Squirrel holds a lock on the install during its first run; checking then fails (audit 13 critique).
+  if (argv.includes('--squirrel-firstrun')) {
+    logger.log('[updater] first run after install; no update check this launch')
     return null
   }
 
@@ -49,7 +56,7 @@ function initAutoUpdater({ isPackaged, logger = console } = {}) {
   try {
     // eslint-disable-next-line global-require
     const { updateElectronApp, UpdateSourceType } = require('update-electron-app')
-    return updateElectronApp({
+    const updates = updateElectronApp({
       updateSource: {
         type: UpdateSourceType.ElectronPublicUpdateService,
         repo,
@@ -58,6 +65,13 @@ function initAutoUpdater({ isPackaged, logger = console } = {}) {
       notifyUser: true,
       logger,
     })
+    // The library checks at once and then on an interval; launch only means stopping the interval.
+    // Its own 'ready' listener is registered first, so ours runs after the interval exists.
+    // eslint-disable-next-line global-require
+    const { app } = require('electron')
+    if (app.isReady()) updates.stopUpdates()
+    else app.once('ready', () => updates.stopUpdates())
+    return updates
   } catch (err) {
     logger.log('[updater] initialization failed (non-fatal):', err && err.message ? err.message : err)
     return null

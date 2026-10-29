@@ -19,6 +19,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { resolvePythonCommand } = require('./python_command.cjs')
+const { envWithFeaturePackages } = require('./python_packages.cjs')
 
 // A warm extraction is sub-second on the sample images, so two minutes means
 // "something is wrong" rather than "this is a big image".
@@ -154,7 +155,8 @@ function createOcrRuntime(options = {}) {
     // JPLEARN_DOCUMENTS_DIR, exactly as the old isolated spawn did.
     const proc = spawnFn(pythonCmd, [scriptPath], {
       cwd: repoRoot,
-      env: { ...process.env },
+      // In the installed app, OCR's packages live in JPLearn Assets (audit 13, F2).
+      env: envWithFeaturePackages({ ...process.env }, (process.env.JPLEARN_ASSETS_DIR || '').trim(), ['ocr']),
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     })

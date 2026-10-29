@@ -91,7 +91,9 @@ function launchUninstallCleanupHelper() {
     return
   }
 
-  const docsDir = process.env.JPLEARN_DOCUMENTS_DIR || path.join(os.homedir(), 'Documents', 'JPLearn Progress')
+  // The same folder the app uses, which follows a moved Documents folder; home\Documents missed it,
+  // so "remove learning progress" removed nothing there (audit 13, F7).
+  const docsDir = resolveProgressDocumentsDir()
   // Downloads live apart from progress; the dialog offers both (audit 6 F2).
   const args = [
     '-NoProfile',
@@ -1954,6 +1956,14 @@ async function runStudyJourneySmokeIfEnabled() {
 
   try {
     if (shouldResetDb) {
+      // The reset wiped real progress before 2026-10-26, when a smoke run used the real folder. It
+      // runs only against a folder the caller set apart (audit 13, nit 2).
+      let realProgressDir = null
+      try { realProgressDir = path.join(app.getPath('documents'), 'JPLearn Progress') } catch { /* none */ }
+      const docsDir = path.resolve(process.env.JPLEARN_DOCUMENTS_DIR || '')
+      if (!realProgressDir || docsDir.toLowerCase() === path.resolve(realProgressDir).toLowerCase()) {
+        throw new Error(`Refusing to reset the database in ${docsDir}: set JPLEARN_DOCUMENTS_DIR to a scratch folder`)
+      }
       const resetPayload = await runPythonBridge('reset-db')
       if (!resetPayload || resetPayload.ok !== true) {
         throw new Error(`reset-db returned unexpected payload: ${JSON.stringify(resetPayload)}`)
