@@ -1,7 +1,8 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTutor } from './useTutor'
-import type { TutorDeps, TutorSettingsFields } from './types'
+import type { AssistantChatTurn, TutorDeps, TutorSettingsFields } from './types'
+import { splitSpeechSegments } from '../voice/utils'
 
 // Only the image-decoding step is stubbed: it needs FileReader + Image +
 // canvas, none of which jsdom provides. Everything else in utils stays real.
@@ -53,8 +54,6 @@ function baseDeps(overrides: Partial<TutorDeps> = {}): TutorDeps {
 function installDesktopApi(overrides: Partial<Window['jplearnDesktop']> = {}) {
   window.jplearnDesktop = {
     getAssistantChatHistory: vi.fn(async () => ({ ok: true, turns: [] })),
-    getPreloadedAssistantChatHistory: vi.fn(async () => ({ ok: false, runtimeActive: false, turns: [] })),
-    getAssistantChatRuntimeStatus: vi.fn(async () => ({ loaded: false, loadedAtUtc: null, lastUsedAtUtc: null, inactivityUnloadMs: 0 })),
     getAssistantEvents: vi.fn(async () => ({ ok: true, events: [] })),
     consumeAssistantEvents: vi.fn(async () => ({ ok: true })),
     getAssistantSnapshot: vi.fn(async () => ({ ok: true })),
@@ -121,6 +120,96 @@ describe('useTutor — the two routes it serves in Look it up', () => {
     rerender({ visible: false })
     rerender({ visible: true })
     expect(result.current.assistantChatMessages).toHaveLength(2)
+  })
+
+  it('shows a failed turn as the tutor\'s failure line and drops the question it sent (audit 15, F2)', async () => {
+    const sendAssistantChatMessage = vi.fn(async () => {
+      throw new Error("Error invoking remote method 'assistant-chat:send-message': Error: the model took too long to answer\n  at llm_runtime.cjs:1")
+    })
+    installDesktopApi({ sendAssistantChatMessage } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps({ lookupChatVisible: true })))
+    await act(async () => { await result.current.sendAssistantChat('ねこは何ですか') })
+
+    expect(result.current.assistantChatError).toBe("The tutor couldn't answer: the model took too long to answer")
+    expect(result.current.assistantChatMessages).toEqual([])
+    expect(result.current.assistantChatLoading).toBe(false)
+  })
+
+  it('reads a stopped request as a failed turn too', async () => {
+    const sendAssistantChatMessage = vi.fn(async () => {
+      throw new Error("Error invoking remote method 'assistant-chat:send-message': Error: the request was stopped")
+    })
+    const turns = [
+      { role: 'user', content: 'こんにちは', created_at_utc: '2026-10-26T00:00:00Z' },
+      { role: 'assistant', content: 'こんにちは！', created_at_utc: '2026-10-26T00:00:01Z' },
+    ]
+    installDesktopApi({
+      sendAssistantChatMessage,
+      getAssistantChatHistory: vi.fn(async () => ({ ok: true, turns })),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps({ lookupChatVisible: true })))
+    await waitFor(() => expect(result.current.assistantChatMessages).toHaveLength(2))
+    await act(async () => { await result.current.sendAssistantChat('もう一度') })
+
+    expect(result.current.assistantChatError).toBe("The tutor couldn't answer: the request was stopped")
+    // the earlier exchange stays; only the failed question goes
+    expect(result.current.assistantChatMessages).toEqual(turns)
+  })
+
+  it('does not read the history in while a reply is pending', async () => {
+    const reply = deferred<{ text: string; provider: string }>()
+    const sendAssistantChatMessage = vi.fn(() => reply.promise)
+    const getAssistantChatHistory = vi.fn(async (): Promise<{ ok: boolean; turns: AssistantChatTurn[] }> => ({ ok: true, turns: [] }))
+    installDesktopApi({ sendAssistantChatMessage, getAssistantChatHistory } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result, rerender } = renderHook(
+      ({ visible }) => useTutor(baseSettings(), baseDeps({ lookupChatVisible: visible })),
+      { initialProps: { visible: true } },
+    )
+    await waitFor(() => expect(getAssistantChatHistory).toHaveBeenCalled())
+    act(() => { void result.current.sendAssistantChat('ねこ') })
+    await waitFor(() => expect(sendAssistantChatMessage).toHaveBeenCalled())
+    const before = getAssistantChatHistory.mock.calls.length
+
+    // leaving A QUESTION and coming back is an "opened", but a reply is on its way
+    rerender({ visible: false })
+    rerender({ visible: true })
+    await act(async () => { await Promise.resolve() })
+    expect(getAssistantChatHistory.mock.calls.length).toBe(before)
+    expect(result.current.assistantChatMessages.map((turn) => turn.content)).toEqual(['ねこ'])
+
+    const answered: AssistantChatTurn[] = [
+      { role: 'user', content: 'ねこ', created_at_utc: '2026-10-26T00:00:00Z' },
+      { role: 'assistant', content: 'ねこはcatです。', created_at_utc: '2026-10-26T00:00:01Z' },
+    ]
+    getAssistantChatHistory.mockImplementation(async () => ({ ok: true, turns: answered }))
+    await act(async () => { reply.resolve({ text: 'ねこはcatです。', provider: 'llama.cpp' }) })
+    await waitFor(() => expect(result.current.assistantChatMessages).toEqual(answered))
+  })
+
+  it('speaks only the Japanese parts of a reply, and nothing of a reply with none (audit 15, D3)', async () => {
+    const playVoiceRuntimeAudio = vi.fn(async () => true)
+    const deps = baseDeps({
+      lookupChatVisible: true,
+      voice: {
+        playVoiceRuntimeAudio,
+        cancelAssistantSpeech: vi.fn(),
+        assistantSpeechRunIdRef: { current: 0 },
+        splitSpeechSegments,
+      },
+    })
+    installDesktopApi({
+      sendAssistantChatMessage: vi.fn(async () => ({ text: 'The word is ねこ. It means cat.', provider: 'llama.cpp' })),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings({ assistantChatAudioEnabled: true }), deps))
+    await act(async () => { await result.current.sendAssistantChat('what is ねこ?') })
+    await waitFor(() => expect(playVoiceRuntimeAudio).toHaveBeenCalled())
+    expect(playVoiceRuntimeAudio.mock.calls.map((call) => (call as unknown[])[0])).toEqual(['ねこ.'])
+
+    // replay goes the same way: English only, so silent
+    playVoiceRuntimeAudio.mockClear()
+    await act(async () => { result.current.replayAssistantTurn('It means cat (1).', 'turn-1') })
+    expect(playVoiceRuntimeAudio).not.toHaveBeenCalled()
+    expect(result.current.assistantSpeakingTurnKey).toBeNull()
   })
 
   it('refuses an empty question and one over the length limit without calling the model', async () => {

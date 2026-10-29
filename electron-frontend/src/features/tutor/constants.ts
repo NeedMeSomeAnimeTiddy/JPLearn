@@ -15,6 +15,11 @@ export const ASSISTANT_MAX_TOASTS = 1
 export const OCR_TRANSLATION_FAILED_PREFIX = "Read the text, but couldn't translate it: "
 export const OCR_NO_TRANSLATION_REASON = 'no translation came back'
 
+/* a chat turn failed: shown where the reply would be, never kept in the history (audit 15, F2) */
+export const TUTOR_FAILED_PREFIX = "The tutor couldn't answer: "
+/* an error with no message of its own; one of the main process's own reasons (audit 15, r2 change 5) */
+export const TUTOR_NO_REASON = 'the model stopped with an error'
+
 export const ASSISTANT_TOAST_LIMIT_OPTIONS: Array<{ value: 0 | 1; label: string }> = [
   { value: 0, label: 'Off' },
   { value: 1, label: 'On' },

@@ -68,7 +68,8 @@ export function LookupOverlay({ controller, onOpenKanjiDetail, onOpenDictionary,
   ], [chat?.enabled, ocr?.enabled])
 
   /* THE REPLY ON SCREEN IS THE LATEST ONE, paged. A follow-up replaces it; the earlier turns are
-     kept by the tutor and counted on the note line rather than stacked into a log that scrolls. */
+     kept for this session (not stacked into a log that scrolls), and the last three exchanges go
+     with each question. */
   const lastReply = useMemo(() => {
     const turns = chat?.turns ?? []
     for (let i = turns.length - 1; i >= 0; i--) {

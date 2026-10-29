@@ -55,7 +55,6 @@ const desktopApi = {
   isWindowMaximized: async () => ({ isMaximized: false }),
   closeWindow: async () => ({ ok: true }),
   getAssistantChatHistory: async () => ({ ok: true, turns: [] }),
-  getPreloadedAssistantChatHistory: async () => ({ ok: false, runtimeActive: false, turns: [] }),
   getAssistantChatRuntimeStatus: async () => ({ loaded: false, loadedAtUtc: null, lastUsedAtUtc: null, inactivityUnloadMs: 0 }),
   getAssistantEvents: async () => ({ ok: true, events: [] }),
   consumeAssistantEvents: async () => ({ ok: true }),
