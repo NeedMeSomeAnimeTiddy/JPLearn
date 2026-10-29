@@ -508,6 +508,8 @@ interface AssistantChatOcrTranslationResponse {
   model?: string
   elapsedMs?: number
   coldStart?: boolean
+  /** true when the text was cut to its first 2,400 characters before translating */
+  clipped?: boolean
   languageGate: {
     model: string
     detectedLanguage: string
@@ -857,6 +859,8 @@ interface SetupSystemInfo {
   recommendedOcrTier?: 'standard'
   activeOcrModelTier?: 'standard' | null
   ocrInstalled?: boolean
+  /** OCR translation can run: the translation model and the runner it needs are installed */
+  translationReady?: boolean
   translationModels?: SetupTranslationModelOption[]
   recommendedTranslationTier?: 'qwen_ja_en'
   activeTranslationModelTier?: 'qwen_ja_en' | null

@@ -44,6 +44,7 @@ function baseDeps(overrides: Partial<TutorDeps> = {}): TutorDeps {
     activeSessionId: null,
     activeScript: 'hiragana',
     ocrInstalled: true,
+    translationReady: true,
     onToastNavigate: vi.fn(),
     ...overrides,
   }
@@ -240,6 +241,114 @@ describe('useTutor — the two routes it serves in Look it up', () => {
     firstExtract.reject(new Error('stale OCR failed'))
     await act(async () => { await Promise.resolve() })
 
+    expect(result.current.ocrWorkbenchError).toBeNull()
+    expect(result.current.ocrWorkbenchResult?.fileName).toBe('second.png')
+  })
+
+  it('refuses an image while translation is not ready, with the not-installed sentence', async () => {
+    const extractAssistantChatImageText = vi.fn()
+    installDesktopApi({
+      extractAssistantChatImageText,
+      translateAssistantChatOcrText: vi.fn(),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps({ translationReady: false })))
+    await act(async () => {
+      await result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'sign.png', { type: 'image/png' }))
+    })
+    expect(result.current.ocrWorkbenchError).toBe('Image Translation is not installed. Install it in Settings › Assistant › Image Translation.')
+    expect(extractAssistantChatImageText).not.toHaveBeenCalled()
+  })
+
+  it('publishes the lines read before the translation answers', async () => {
+    const translation = deferred<{ text: string; clipped?: boolean }>()
+    installDesktopApi({
+      extractAssistantChatImageText: vi.fn(async () => ({
+        text: '本日休業', lineCount: 1, lines: [{ text: '本日休業', confidence: 0.98 }],
+      })),
+      translateAssistantChatOcrText: vi.fn(() => translation.promise),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
+    act(() => { void result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'sign.png', { type: 'image/png' })) })
+
+    await waitFor(() => expect(result.current.ocrWorkbenchResult?.japaneseText).toBe('本日休業'))
+    expect(result.current.ocrWorkbenchResult?.englishText).toBe('')
+    expect(result.current.ocrWorkbenchBusy).toBe(true)
+
+    await act(async () => { translation.resolve({ text: 'Closed today.', clipped: true }) })
+    await waitFor(() => expect(result.current.ocrWorkbenchResult?.englishText).toBe('Closed today.'))
+    expect(result.current.ocrWorkbenchResult?.clipped).toBe(true)
+    expect(result.current.ocrWorkbenchBusy).toBe(false)
+  })
+
+  it('reads a translation result with no clipped field as not clipped', async () => {
+    installDesktopApi({
+      extractAssistantChatImageText: vi.fn(async () => ({ text: '日本語', lineCount: 1 })),
+      translateAssistantChatOcrText: vi.fn(async () => ({ text: 'Japanese' })),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
+    await act(async () => {
+      await result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'sign.png', { type: 'image/png' }))
+    })
+    await waitFor(() => expect(result.current.ocrWorkbenchResult?.englishText).toBe('Japanese'))
+    expect(result.current.ocrWorkbenchResult?.clipped).toBe(false)
+  })
+
+  it('keeps the lines when the translation fails, and says why in its first line', async () => {
+    installDesktopApi({
+      extractAssistantChatImageText: vi.fn(async () => ({
+        text: '本日休業', lineCount: 1, lines: [{ text: '本日休業', confidence: 0.98 }],
+      })),
+      translateAssistantChatOcrText: vi.fn(async () => {
+        throw new Error("Error invoking remote method 'assistant-chat:translate-ocr-text': Error: llama.cpp exited early\n  at runner.cjs:12")
+      }),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
+    await act(async () => {
+      await result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'sign.png', { type: 'image/png' }))
+    })
+
+    await waitFor(() => expect(result.current.ocrWorkbenchBusy).toBe(false))
+    expect(result.current.ocrWorkbenchError).toBe("Read the text, but couldn't translate it: llama.cpp exited early")
+    expect(result.current.ocrWorkbenchResult?.lines).toEqual([{ text: '本日休業', confidence: 0.98 }])
+    expect(result.current.ocrWorkbenchResult?.japaneseText).toBe('本日休業')
+    expect(result.current.ocrWorkbenchResult?.englishText).toBe('')
+  })
+
+  it('keeps the lines when the translation comes back empty', async () => {
+    installDesktopApi({
+      extractAssistantChatImageText: vi.fn(async () => ({ text: '本日休業', lineCount: 1 })),
+      translateAssistantChatOcrText: vi.fn(async () => ({ text: '   ' })),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
+    await act(async () => {
+      await result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'sign.png', { type: 'image/png' }))
+    })
+
+    await waitFor(() => expect(result.current.ocrWorkbenchBusy).toBe(false))
+    expect(result.current.ocrWorkbenchError).toBe("Read the text, but couldn't translate it: no translation came back")
+    expect(result.current.ocrWorkbenchResult?.lines.map((line) => line.text)).toEqual(['本日休業'])
+  })
+
+  it('drops a superseded translation failure', async () => {
+    const firstTranslation = deferred<{ text: string }>()
+    const extractAssistantChatImageText = vi.fn()
+      .mockResolvedValueOnce({ text: '一番目', lineCount: 1 })
+      .mockResolvedValueOnce({ text: '二番目', lineCount: 1 })
+    installDesktopApi({
+      extractAssistantChatImageText,
+      translateAssistantChatOcrText: vi.fn()
+        .mockReturnValueOnce(firstTranslation.promise)
+        .mockResolvedValueOnce({ text: 'Second' }),
+    } as unknown as Partial<Window['jplearnDesktop']>)
+    const { result } = renderHook(() => useTutor(baseSettings(), baseDeps()))
+    act(() => { void result.current.handleOcrWorkbenchImageSelected(new File(['a'], 'first.png', { type: 'image/png' })) })
+    await waitFor(() => expect(result.current.ocrWorkbenchResult?.fileName).toBe('first.png'))
+    await act(async () => {
+      await result.current.handleOcrWorkbenchImageSelected(new File(['b'], 'second.png', { type: 'image/png' }))
+    })
+    await waitFor(() => expect(result.current.ocrWorkbenchResult?.englishText).toBe('Second'))
+
+    await act(async () => { firstTranslation.reject(new Error('stale translation failed')) })
     expect(result.current.ocrWorkbenchError).toBeNull()
     expect(result.current.ocrWorkbenchResult?.fileName).toBe('second.png')
   })

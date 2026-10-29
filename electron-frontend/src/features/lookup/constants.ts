@@ -71,6 +71,11 @@ export const LOOKUP_COPY = {
   ocrEmpty: 'Pick a file, paste a screenshot, or drop an image here. The Japanese is read off it and translated as a whole.',
 } as const
 
+/* when the offline dictionary is the missing download, the lookup and the panel say the useful thing
+   rather than the raised thing -- this is the fact that connects the two doors: `,` is where you
+   fix it */
+export const MISSING_DICTIONARY = 'The offline dictionary is not installed — add it from Settings (,)'
+
 /* Long enough that typing a three-kanji word does not fire three searches, short enough that it
    still feels like the answer was already there. The bridge is serial, so every wasted request
    delays the one that matters. */
