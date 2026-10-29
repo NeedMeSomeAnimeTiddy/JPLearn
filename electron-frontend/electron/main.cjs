@@ -295,8 +295,8 @@ const localSetupRuntime = createSetupRuntime()
 const localSpeechRuntime = createSpeechRuntime({ repoRoot })
 const localOcrRuntime = createOcrRuntime({ repoRoot })
 let tutorRuntimePreloadPromise = null
-// the window asked for a tutor warmup this session (the chat while switched on, or scenario practice's AI
-// evaluation, which the learner turns on) and has not unloaded since
+// the chat, while switched on, asked for a tutor warmup this session and has not unloaded since;
+// scenario practice warms the model through its own route and never sets this (audit 15, F6)
 let tutorWarmupRequested = false
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'

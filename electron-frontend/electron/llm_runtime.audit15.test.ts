@@ -197,10 +197,22 @@ describe('the time limits cover the load (F3)', () => {
     releaseLoad?.()
     await vi.advanceTimersByTimeAsync(0)
     expect(runtime.getStatus().loaded).toBe(true)
-    await expect(runtime.evaluateScenarioResponse({ learnerResponse: 'はい' })).resolves.toMatchObject({ ok: true })
 
-    await vi.advanceTimersByTimeAsync(15000) // nobody asks again: the idle unload still runs
+    // nobody asks again: the background load alone armed the idle unload
+    await vi.advanceTimersByTimeAsync(15000)
     expect(runtime.getStatus().loaded).toBe(false)
+  })
+
+  it('judges once the background load has finished', async () => {
+    const adapter = {
+      load: vi.fn(async () => undefined),
+      unload: vi.fn(async () => undefined),
+      infer: vi.fn(async () => ({ text: '{}', provider: 'llama.cpp', model: 'test' })),
+    }
+    const runtime = createTutorChatRuntime({ provider: 'llama.cpp', adapterFactory: () => adapter })
+    await expect(runtime.evaluateScenarioResponse({ learnerResponse: 'はい' })).resolves.toMatchObject({ reason: 'model-warming' })
+    await vi.waitFor(() => expect(runtime.getStatus().loaded).toBe(true))
+    await expect(runtime.evaluateScenarioResponse({ learnerResponse: 'はい' })).resolves.toMatchObject({ ok: true })
   })
 })
 
