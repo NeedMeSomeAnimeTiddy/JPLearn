@@ -341,6 +341,9 @@ export function useTutor(
 
     setOcrWorkbenchBusy(true)
     setOcrWorkbenchError(null)
+    /* the last image's lines go now: they are published before its translation ends, so leaving
+       them would put this image's error beside that image's text (review, finding 5) */
+    setOcrWorkbenchResult(null)
     try {
       const payload = await prepareAssistantChatImagePayload(file)
       if (isStale()) return

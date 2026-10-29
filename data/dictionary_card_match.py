@@ -83,10 +83,11 @@ def card_forms(character: str) -> list[str]:
 
 
 def romaji_key(text: str) -> str:
-    """One spelling for romaji that only differ in style: case, macrons, "m"/"n" before b/m/p,
-    apostrophes and separators."""
+    """One spelling for romaji that only differ in style: case, macrons, long vowels ("ō", "oo" and
+    "ou" are one; "ē", "ee" and "ei"), "m"/"n" before b/m/p, apostrophes and separators."""
     lowered = unicodedata.normalize("NFKC", text).lower().translate(_MACRONS)
     letters = re.sub(r"[^a-z]", "", lowered)
+    letters = letters.replace("oo", "ou").replace("ee", "ei")
     return re.sub(r"m(?=[bmp])", "n", letters)
 
 

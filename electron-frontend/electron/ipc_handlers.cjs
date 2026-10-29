@@ -41,6 +41,7 @@ const {
 } = require('./ipc_security.cjs')
 const { getConfigValue, setConfigValue } = require('./config_store.cjs')
 const { SPEECH_TIERS } = require('./speech_runtime.cjs')
+const { resolveTutorRuntimeFiles } = require('./llm_runtime.cjs')
 
 const WINDOW_DRAG_INTERVAL_MS = 16
 const WINDOW_DRAG_MAX_DURATION_MS = 60_000
@@ -203,16 +204,24 @@ function registerIpcHandlers(options) {
       databaseJob = null
     }
   }
-  // Installing, switching, or removing an OCR model invalidates the warm
-  // PaddleOCR engine held by the persistent OCR process.
   // The tutor runtime, which also translates OCR text, picks its server and model when it is
-  // created; installing, selecting or removing either recreates it (audit 14, F4).
-  const refreshTranslationRuntime = async () => {
+  // created, so a route that changes either recreates it (audit 14, F4). Only when they changed:
+  // recreating it cancels a chat reply or translation in progress (review, finding 4).
+  const tutorRuntimeFiles = () => {
+    const { provider, serverPath, modelPath } = resolveTutorRuntimeFiles()
+    return `${provider}\n${serverPath}\n${modelPath}`
+  }
+  const refreshTranslationRuntime = async (filesBefore = null) => {
+    if (filesBefore !== null && filesBefore === tutorRuntimeFiles()) {
+      return
+    }
     if (typeof options.refreshTutorChatRuntime === 'function') {
       await options.refreshTutorChatRuntime()
     }
   }
 
+  // Installing, switching, or removing an OCR model invalidates the warm
+  // PaddleOCR engine held by the persistent OCR process.
   const refreshOcrRuntime = () => {
     if (typeof options.refreshOcrRuntime === 'function') {
       options.refreshOcrRuntime()
@@ -1704,8 +1713,9 @@ function registerIpcHandlers(options) {
         ? backend
         : undefined
       try {
+        const filesBefore = tutorRuntimeFiles()
         const result = await setupRuntime.downloadLlamaCpp(event.sender, options.repoRoot, safeBackend)
-        await refreshTranslationRuntime()
+        await refreshTranslationRuntime(filesBefore)
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
@@ -1889,8 +1899,9 @@ function registerIpcHandlers(options) {
       }
       const force = Boolean(downloadOptions && typeof downloadOptions === 'object' && downloadOptions.force)
       try {
+        const filesBefore = tutorRuntimeFiles()
         const result = await setupRuntime.downloadTranslationModel(tier, event.sender, options.repoRoot, { force })
-        await refreshTranslationRuntime()
+        await refreshTranslationRuntime(filesBefore)
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
@@ -1904,8 +1915,9 @@ function registerIpcHandlers(options) {
         throw new Error('Invalid translation model tier')
       }
       try {
+        const filesBefore = tutorRuntimeFiles()
         const result = setupRuntime.setActiveTranslationModelTier(tier)
-        await refreshTranslationRuntime()
+        await refreshTranslationRuntime(filesBefore)
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
@@ -1943,9 +1955,10 @@ function registerIpcHandlers(options) {
         // The ocr_qwen_local profile installs the standard OCR model as one of
         // its steps, so it invalidates a warm engine just like the dedicated
         // OCR handlers above.
+        const filesBefore = tutorRuntimeFiles()
         const result = await setupRuntime.applyTranslationProfile(tier, event.sender, options.repoRoot, { force })
         refreshOcrRuntime()
-        await refreshTranslationRuntime()
+        await refreshTranslationRuntime(filesBefore)
         return result
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)

@@ -798,6 +798,8 @@ function resolveOfflineDictionarySqlitePath(configuredPath) {
 // gloss first puts an entry whose gloss is exactly the word near the top; the cap only bounds the
 // read for a very common word ("water" is in a few hundred glosses).
 const OFFLINE_DICTIONARY_CANDIDATE_LIMIT = 2000
+// build_offline_dictionary_sqlite.py keeps the first 240 characters of an entry's joined glosses
+const OFFLINE_DICTIONARY_GLOSS_LIMIT = 240
 
 /**
  * The entry a translation question asks for, from rows of { japanese, reading, gloss, is_common }:
@@ -815,10 +817,14 @@ function selectOfflineDictionaryEntry(rows, key) {
     }
     return text
   }
-  const glossesOf = (row) => String(row.gloss || '')
-    .split(';')
-    .map((gloss) => normalizeAsciiToken(withoutNotes(gloss)))
-    .filter(Boolean)
+  const glossesOf = (row) => {
+    const pieces = String(row.gloss || '').split(';')
+    // a list the index cut at its limit ends in part of a gloss ("car" of "caravan"): not a meaning
+    if (pieces.length > 1 && String(row.gloss).length >= OFFLINE_DICTIONARY_GLOSS_LIMIT) {
+      pieces.pop()
+    }
+    return pieces.map((gloss) => normalizeAsciiToken(withoutNotes(gloss))).filter(Boolean)
+  }
   // The index has no word frequency, so among matches: common words, then the one whose first
   // meaning it is, then the shorter word (犬 before ワン子 for "dog"), then the one with more
   // meanings (the general word: 先生 before 教諭 for "teacher"), then the index's own order.

@@ -187,7 +187,8 @@ const TRANSLATION_PROFILES = {
   ocr_qwen_local: {
     label: 'OCR + Qwen3.5-0.8B-JP',
     badge: 'Recommended',
-    description: 'Installs OCR Standard + local Qwen3.5-0.8B-JP GGUF translation model.',
+    // sizeMb leaves out llama.cpp, which is downloaded only when missing and varies by backend
+    description: 'Installs OCR Standard + local Qwen3.5-0.8B-JP GGUF translation model, and the llama.cpp runner if it is missing.',
     sizeMb: 748,
   },
 }

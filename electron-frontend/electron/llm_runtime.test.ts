@@ -442,6 +442,17 @@ describe('llm runtime', () => {
       })
     })
 
+    sqliteIt('never answers with the cut-off end of a gloss list', async () => {
+      await withDir(async (dir) => {
+        // the index keeps 240 characters, so this common entry's "caravan" survives as "car"
+        const cut = `${'wagon train; '.repeat(17)}travelling party; car`.slice(-240)
+        expect(cut).toHaveLength(240)
+        const runtime = runtimeAt(buildIndex(dir, [['隊商', 'たいしょう', cut, 1], ['車', 'くるま', 'automobile; car', 0]]))
+        expect((await runtime.sendMessage('How do you say "car" in Japanese?')).text).toBe('車 (くるま)')
+        await runtime.unload()
+      })
+    })
+
     sqliteIt('normalises glosses as it normalises the question', async () => {
       await withDir(async (dir) => {
         const runtime = runtimeAt(buildIndex(dir, [

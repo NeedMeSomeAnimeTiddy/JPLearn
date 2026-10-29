@@ -142,6 +142,8 @@ def test_reading_helpers() -> None:
     assert card_readings("!!") == set()
     assert {"kekkon", "kekkonsuru"} <= (card_readings("kekkon (suru)") or set())
     assert romaji_key("shimbun") == romaji_key("shinbun")
+    assert romaji_key("ōkii") == romaji_key("ookii") == romaji_key(kana_to_romaji("おおきい"))
+    assert romaji_key("sensē") == romaji_key("sensee") == romaji_key("sensei")
     assert romaji_key(kana_to_romaji("しんぶん")) == romaji_key("shinbun")
     assert romaji_to_hiragana("itsuka") == "いつか"
     assert romaji_to_hiragana("kitte") == "きって"

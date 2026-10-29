@@ -463,7 +463,7 @@ function LookupAnswerBody({ controller }: { controller: LookupController }) {
         </div>
         <div className="lk-note quiet">
           {status === 'ready' && source === 'loaded_cards'
-            ? 'FROM YOUR OWN DECKS · THE OFFLINE DICTIONARY WOULD ANSWER MORE THAN THIS'
+            ? 'FROM YOUR OWN DECKS · NOT IN THE OFFLINE DICTIONARY'
             : status === 'ready'
               ? `${results.length} RESULT${results.length === 1 ? '' : 'S'} · OFFLINE DICTIONARY`
               : 'A WORD IS ANSWERED FROM THE DICTIONARY, AND FROM THE CARDS YOU ALREADY HAVE'}
