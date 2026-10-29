@@ -13,7 +13,7 @@ const READINESS_COPY: Record<string, { title: string; body: (label: string) => s
   challenging: {
     title: 'Heads up!',
     body: (label) =>
-      `${label} will be more effective once you've made more progress on earlier sections. You can still study it now — it'll just be trickier.`,
+      `${label} will be more effective once you've made more progress on earlier sections. You can still study it now. It'll just be trickier.`,
   },
   advanced: {
     title: 'Just a heads up',

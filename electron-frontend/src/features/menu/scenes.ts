@@ -73,7 +73,7 @@ export const FREE_TALK = {
   jp: '自由会話',
   en: 'FREE TALK',
   glyph: '自',
-  desc: 'No script and no objectives — say anything you like, and the tutor answers, '
+  desc: 'No script and no objectives: say anything you like, and the tutor answers, '
     + 'corrects you, and turns what you got wrong into cards.',
   act: 'START TALKING',
 } as const

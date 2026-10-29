@@ -120,11 +120,11 @@ async function backAtTheMenu(): Promise<void> {
    so one Escape lands on the lanes rather than on the front door. */
 async function backToTheFrontDoor(): Promise<void> {
   for (let i = 0; i < 4; i++) {
-    if (screen.queryByRole('button', { name: /PRACTICE —/i })) return
+    if (screen.queryByRole('button', { name: /PRACTICE:/i })) return
     fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => { expect(document.querySelector('.mn-frame')).toBeTruthy() })
   }
-  await screen.findByRole('button', { name: /PRACTICE —/i })
+  await screen.findByRole('button', { name: /PRACTICE:/i })
 }
 
 async function openMissedWordReview(): Promise<void> {
@@ -178,10 +178,10 @@ describe('Daily Games navigation', () => {
     /* the L1 row's two-step: the first press selects, the second opens. A synthetic `mouseEnter`
        does not stand in for the first, because a hover only counts after a real `pointermove` --
        see `useHoverPick`. */
-    const practice = await screen.findByRole('button', { name: /PRACTICE —/i })
+    const practice = await screen.findByRole('button', { name: /PRACTICE:/i })
     fireEvent.click(practice)
     fireEvent.click(practice)
-    fireEvent.click(await screen.findByRole('button', { name: /DAILY GAMES —/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /DAILY GAMES:/i }))
     expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
     fireEvent.keyDown(window, { key: 'Escape' })
     await backAtTheMenu()
@@ -212,7 +212,7 @@ describe('Daily Games navigation', () => {
     /* ESCAPE STOPS AT THE ROAD, and the road is a menu screen now -- so the thing to assert is not
        that the menu is absent but that it is standing on DAILY rather than back at the front door. */
     expect(await screen.findByRole('button', { name: /^01 CROSSWORD/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /PRACTICE —/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /PRACTICE:/i })).toBeNull()
   })
 
   it('hydrates a deduplicated cross-deck missed-word queue in supplied order without loading the study queue', async () => {

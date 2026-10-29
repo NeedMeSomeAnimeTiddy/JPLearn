@@ -86,7 +86,7 @@ export const ROUND_COPY: Record<PlayableMinigame, RoundCopy> = {
   conjugation_drill: {
     ask: 'PUT IT IN THIS FORM', askJp: '活用',
     work: 'TYPE THE FORM', workJp: '入力',
-    note: 'Type here — it converts to kana as you go.',
+    note: 'Type here. It converts to kana as you go.',
   },
   speech_recall: {
     ask: 'WHAT DOES THIS MEAN?', askJp: '意味',

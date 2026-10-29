@@ -139,11 +139,11 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
               type="button"
               className="lg-row"
               onClick={plate(row.key as SheetKey)}
-              aria-label={`${row.en} — see what it is made of`}
+              aria-label={`${row.en}: see what it is made of`}
             >
               <span className="lg-rowlab"><b>{row.en}</b><i>{row.jp}</i></span>
               {row.value === null ? (
-                <span className="lg-none">—<em>{row.absent}</em></span>
+                <span className="lg-none">―<em>{row.absent}</em></span>
               ) : (
                 <b className="lg-figure">{row.value}<em>{row.unit}</em></b>
               )}
@@ -205,7 +205,7 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
           type="button"
           className="lg-f lg-ach"
           onClick={onOpenAchievements}
-          aria-label={`Achievements — ${earned} of ${total} earned`}
+          aria-label={`Achievements: ${earned} of ${total} earned`}
         >
           <span className="lg-pips" aria-hidden="true">
             {Object.keys(BADGE_METADATA).map((d) => (
@@ -227,7 +227,7 @@ export function Ledger({ summary, xp, onOpenAchievements, onUp }: LedgerProps) {
               aria-label="Close"
               onClick={() => setSheetKey(null)}
             />
-            <div className="lg-sheet" role="dialog" aria-label={`${sheet.en} — the whole of it`}>
+            <div className="lg-sheet" role="dialog" aria-label={`${sheet.en}: the whole of it`}>
               <span className="lg-cap"><b>{sheet.jp} {sheet.en}</b><i>THE WHOLE OF IT</i></span>
               {sheet.strip ? (
                 <>

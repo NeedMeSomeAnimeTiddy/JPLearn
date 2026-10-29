@@ -133,7 +133,7 @@ export interface ScreenshotBodyProps {
 }
 
 function percent(confidence: number): string {
-  return Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : '—'
+  return Number.isFinite(confidence) ? `${Math.round(confidence * 100)}%` : '―'
 }
 
 export function ScreenshotBody({ ocr, fileInputRef, enPages, page, fileNote }: ScreenshotBodyProps) {

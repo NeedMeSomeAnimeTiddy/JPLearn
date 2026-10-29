@@ -32,7 +32,7 @@ export function describeNode(node: ProgressionNodeView): string {
   const progress = node.is_tracked && node.total_count > 0
     ? `, ${node.mastered_count} of ${node.total_count}`
     : node.is_tracked ? '' : `, ${UNTRACKED_NODE_LABEL.toLowerCase()}`
-  return `${node.name} — ${state}${progress}`
+  return `${node.name}: ${state}${progress}`
 }
 
 /** Combine backend state with the learner's own unlock choices. */

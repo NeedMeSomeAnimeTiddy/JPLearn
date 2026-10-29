@@ -1433,7 +1433,7 @@ function createTray(mainWindowRef) {
       // at most that old, and a refresh no longer rebuilds every deck on the worker (audit 7 nit 1).
       const summary = await runPythonBridgeCached('summary')
       const totalDue = remainingDue(summary)
-      tray.setToolTip(totalDue > 0 ? `JPLearn — ${totalDue} cards due` : 'JPLearn')
+      tray.setToolTip(totalDue > 0 ? `JPLearn: ${totalDue} cards due` : 'JPLearn')
       tray.setContextMenu(buildContextMenu(totalDue))
     } catch { /* non-fatal */ }
   }

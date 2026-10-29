@@ -2724,7 +2724,7 @@ function App() {
         <Lanes
           section="DRILLS"
           jp="練習" en="PRACTICE"
-          note="練習 · NOTHING NEW IS TAUGHT HERE — THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU"
+          note="練習 · NOTHING NEW IS TAUGHT HERE. THIS IS WHAT THE PATH HAS ALREADY GIVEN YOU"
           lanes={practiceLanes(summary)}
           onPick={(key) => {
             /* three genuinely different destinations, all of them places the app already has */
@@ -2741,7 +2741,7 @@ function App() {
         <Lanes
           section="READING"
           jp="実践" en="THE WORLD"
-          note="実践 · REAL JAPANESE, NOT EXERCISES — NOTHING IN HERE IS EVER DUE"
+          note="実践 · REAL JAPANESE, NOT EXERCISES. NOTHING IN HERE IS EVER DUE"
           lanes={worldCards}
           onPick={(key) => {
             /* two lanes, two doors the app already has: the passage hub, and the tutor popup
@@ -3034,7 +3034,7 @@ function App() {
                 }}
               >
                 <Trophy size={16} aria-hidden="true" />
-                <span>{meta.name} — {meta.description}</span>
+                <span>{meta.name}: {meta.description}</span>
               </div>
             )
           })}

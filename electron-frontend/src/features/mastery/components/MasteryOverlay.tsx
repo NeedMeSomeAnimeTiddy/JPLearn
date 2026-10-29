@@ -243,7 +243,7 @@ export function MasteryOverlay({
                       {theChar.score} / {CARD_MASTERY_MAX}
                     </s>
                   </>
-                ) : <span>—</span>}
+                ) : <span>―</span>}
               </div>
             </div>
           </div>

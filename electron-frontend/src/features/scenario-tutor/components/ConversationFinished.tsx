@@ -131,7 +131,7 @@ export function ConversationFinished({ tutor, scenario, session, summary }: Conv
                     type="button"
                     className="cv-card"
                     onClick={() => setHot(index)}
-                    aria-label={`Card ${index + 1}: ${draft.front} — ${draft.back}`}
+                    aria-label={`Card ${index + 1}: ${draft.front} (${draft.back})`}
                   >
                     <u aria-hidden="true">{index + 1}</u>
                     <span className="t"><span className="jp" lang="ja">{draft.front}</span><span className="ro">{draft.back}</span></span>

@@ -99,7 +99,7 @@ export function TutorSettingsTab({ settings, setSettings }: TutorSettingsTabProp
         Turn Chat with Tutor off to unload the local model runtime. Tutor voice reads the tutor's replies and the
         characters' lines aloud; Romaji → kana turns what you type into kana as you type it, on Look it up's
         A QUESTION and in a conversation. Set toasts to Off to disable popup notifications.
-        Scenario AI evaluation only takes effect when a local model is installed — Scenario Practice always works
+        Scenario AI evaluation only takes effect when a local model is installed. Scenario Practice always works
         without one, using authored deterministic rules and recovery.
       </p>
     </>

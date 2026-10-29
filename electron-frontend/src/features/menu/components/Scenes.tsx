@@ -67,7 +67,7 @@ export function Scenes({ scenes, onPick, onUp }: ScenesProps) {
               onMouseEnter={() => setAt(i)}
               onFocus={() => setAt(i)}
               onClick={() => onPick(s.id)}
-              aria-label={`${s.en} — with the ${s.role}, ${s.objectives.length} objectives`}
+              aria-label={`${s.en}: with the ${s.role}, ${s.objectives.length} objectives`}
             >
               <span className="g num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
               <span className="t">
@@ -86,7 +86,7 @@ export function Scenes({ scenes, onPick, onUp }: ScenesProps) {
             onMouseEnter={() => setAt(last)}
             onFocus={() => setAt(last)}
             onClick={() => onPick(null)}
-            aria-label={`${FREE_TALK.en} — ${FREE_TALK.desc}`}
+            aria-label={`${FREE_TALK.en}: ${FREE_TALK.desc}`}
           >
             <span className="g" aria-hidden="true">{FREE_TALK.glyph}</span>
             <span className="t">
@@ -128,7 +128,7 @@ export function Scenes({ scenes, onPick, onUp }: ScenesProps) {
               <span className="sc-plate">
                 <span className="sc-cap">WHAT THE TUTOR MARKS YOU ON</span>
                 <span className="sc-obj">
-                  <span className="opt"><s aria-hidden="true" />Nothing — there are no objectives to meet</span>
+                  <span className="opt"><s aria-hidden="true" />Nothing: there are no objectives to meet</span>
                 </span>
                 <span className="sc-foot">WHAT YOU GET WRONG BECOMES CARDS</span>
               </span>

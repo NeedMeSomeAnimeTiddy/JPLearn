@@ -72,7 +72,7 @@ export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
                 onFocus={() => setAt(i)}
                 onClick={() => (level.locked ? refuse() : onStart(m.key))}
                 aria-disabled={level.locked}
-                aria-label={`${m.label} — ${m.description}`}
+                aria-label={`${m.label}: ${m.description}`}
               >
                 <span className="g" aria-hidden="true">{m.mark}</span>
                 <span className="t">
@@ -118,7 +118,7 @@ export function ExamLevel({ level, onStart, onUp }: ExamLevelProps) {
               <span>
                 <span className="jp">文字語彙・文法</span>
                 <span className="en">THE SECTION</span>
-                <b>{sectionPct === null ? '—' : `${sectionPct}%`}</b>
+                <b>{sectionPct === null ? '―' : `${sectionPct}%`}</b>
               </span>
               <span className={sectionPct === null ? 'lv-track none' : 'lv-track'}>
                 {sectionPct === null ? null : <i style={{ width: `${Math.min(100, sectionPct)}%` }} />}

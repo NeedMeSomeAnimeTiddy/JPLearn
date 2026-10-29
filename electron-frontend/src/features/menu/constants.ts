@@ -21,7 +21,7 @@ import type { MenuSection } from './types'
 export const MENU_SECTIONS: readonly MenuSection[] = [
   {
     key: 'STUDY', label: 'THE PATH', jp: '道', glyph: '道', ord: 1,
-    desc: 'The one route from zero — everything new starts here',
+    desc: 'The one route from zero: everything new starts here',
     accent: '#cfa45c',
   },
   {
@@ -31,7 +31,7 @@ export const MENU_SECTIONS: readonly MenuSection[] = [
   },
   {
     key: 'READING', label: 'THE WORLD', jp: '実践', glyph: '実', ord: 3,
-    desc: 'Real Japanese — texts to read, and conversations to hold',
+    desc: 'Real Japanese: texts to read, and conversations to hold',
     accent: '#4f9d6b',
     gate: { feature: 'conversation_mode' },
   },

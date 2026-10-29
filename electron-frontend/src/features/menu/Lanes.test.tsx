@@ -56,7 +56,7 @@ describe('what the practice lanes are made of', () => {
       totals: { total: 46, mastered: 0, due_today: 3, completed_today: 3, remaining_due: 0, deck_count: 1 },
     } as unknown as StudySummaryPayload
     const review = practiceLanes(done)[0]
-    expect(review).toMatchObject({ fig: '—', figLab: 'NOTHING DUE', duty: false })
+    expect(review).toMatchObject({ fig: '―', figLab: 'NOTHING DUE', duty: false })
   })
 
   it('says not-counted-yet for a saved summary from before the bridge sent totals', () => {
@@ -67,12 +67,12 @@ describe('what the practice lanes are made of', () => {
   it('says not-counted-yet rather than zero when there is no summary', () => {
     expect(dueToday(null)).toBeNull()
     const lanes = practiceLanes(null)
-    expect(lanes[0]).toMatchObject({ fig: '—', figLab: 'NOT COUNTED YET', absent: true })
+    expect(lanes[0]).toMatchObject({ fig: '―', figLab: 'NOT COUNTED YET', absent: true })
   })
 
   it('draws a clear day as an absence, not as zero cards due', () => {
     const review = practiceLanes(summary(0, 0))[0]
-    expect(review.fig).toBe('—')
+    expect(review.fig).toBe('―')
     expect(review.figLab).toBe('NOTHING DUE')
     expect(review.absent).toBe(true)
     /* and it stops being an obligation, so it stops wearing the vermilion */

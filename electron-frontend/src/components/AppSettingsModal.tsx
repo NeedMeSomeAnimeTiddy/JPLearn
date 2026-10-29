@@ -334,7 +334,7 @@ export function AppSettingsModal({
                         <span className="settings-icon-entry-label">Auto-hide furigana on mastered cards</span>
                       </button>
                     </div>
-                    <p className="settings-help">When on, kana readings appear above kanji during review. When auto-hide is also enabled, cards you've mastered will hide furigana — helping you graduate from reading aids.</p>
+                    <p className="settings-help">When on, kana readings appear above kanji during review. When auto-hide is also enabled, cards you've mastered will hide furigana, helping you graduate from reading aids.</p>
                   </SettingsCollapsibleSection>
                   <SettingsCollapsibleSection
                     id="cursor"
@@ -368,7 +368,7 @@ export function AppSettingsModal({
                     meta={(
                       <>
                         {models.tutorInstallInfo?.llamaCppInstalled ? 'llama.cpp installed' : 'llama.cpp not installed'}
-                        {' '}· Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{models.tutorInstallInfo?.models.find((model) => model.tier === models.tutorInstallInfo?.recommendedTier)?.label ?? '—'}</strong>
+                        {' '}· Recommended tier: <strong style={{ color: 'var(--text-main)' }}>{models.tutorInstallInfo?.models.find((model) => model.tier === models.tutorInstallInfo?.recommendedTier)?.label ?? '―'}</strong>
                       </>
                     )}
                     collapsed={Boolean(collapsedSettingsSections['tutor-models'])}
@@ -1016,7 +1016,7 @@ export function AppSettingsModal({
                   <SettingsCollapsibleSection
                     id="data-management"
                     title="Data Management"
-                    description="Reset all study progress — review history, streaks, leech data, and locally-tracked scores. This cannot be undone."
+                    description="Reset all study progress: review history, streaks, leech data, and locally-tracked scores. This cannot be undone."
                     collapsed={Boolean(collapsedSettingsSections['data-management'])}
                     onToggle={() => toggleThemeSectionCollapsed('data-management')}
                     className="settings-theme-card"
@@ -1042,7 +1042,7 @@ export function AppSettingsModal({
                         onClick={() => setResetConfirmStep(2)}
                             disabled={resettingDb}
                           >
-                            I understand — continue
+                            I understand, continue
                           </button>
                           <button type="button" onClick={() => setResetConfirmStep(0)} disabled={resettingDb}>
                             Cancel

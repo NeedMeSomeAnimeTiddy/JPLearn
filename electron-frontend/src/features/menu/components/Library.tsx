@@ -99,7 +99,7 @@ export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
                     onMouseEnter={() => hover.pick(view.above + i)}
                     onFocus={() => hover.pick(view.above + i)}
                     onClick={() => (isSel ? onOpen(row.id) : setAt(view.above + i))}
-                    aria-label={`${row.title} by ${row.author} — ${row.words} words, about ${row.minutes} minutes`}
+                    aria-label={`${row.title} by ${row.author}: ${row.words} words, about ${row.minutes} minutes`}
                   >
                     <span
                       className="lb-mark"
@@ -166,7 +166,7 @@ export function Library({ rows, loading, onOpen, onUp }: LibraryProps) {
                   type="button"
                   className="lb-plate"
                   onClick={() => setAt(band.from)}
-                  aria-label={`${band.name} — go to the first of ${band.to - band.from + 1} texts`}
+                  aria-label={`${band.name}: go to the first of ${band.to - band.from + 1} texts`}
                 >
                   <b className="k">{band.kanji}</b>
                   <b className="n">{band.name}</b>

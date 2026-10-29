@@ -116,7 +116,7 @@ export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp 
                       onMouseEnter={() => setWord(i)}
                       onFocus={() => { setWord(i); setAt(0) }}
                       onClick={onStart}
-                      aria-label={`${w.word}, ${w.reading} — ${w.meaning}`}
+                      aria-label={`${w.word}, ${w.reading}: ${w.meaning}`}
                     >
                       <span className="n">{String(i + 1).padStart(2, '0')}</span>
                       <span className="w" lang="ja">{w.word}</span>
@@ -175,7 +175,7 @@ export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp 
                   </b>
                   <span className="fd-gloss">
                     {feed.budget === 0
-                      ? 'No new words today — reviews only.'
+                      ? 'No new words today. Reviews only.'
                       : 'Nothing new is queued. Reviews are not capped.'}
                   </span>
                 </>
@@ -240,7 +240,7 @@ export function Feed({ title, feed, mode, levels, level, onLevel, onStart, onUp 
         </div>
         <div className="hints">
           <span><b>← →</b>Choose<em>選択</em></span>
-          {levels.length > 1 ? <span><b>1–{levels.length}</b>Level<em>級</em></span> : null}
+          {levels.length > 1 ? <span><b>1-{levels.length}</b>Level<em>級</em></span> : null}
           <span><b>ENTER</b>Start<em>開始</em></span>
           <span><b>ESC</b>Back<em>戻る</em></span>
         </div>

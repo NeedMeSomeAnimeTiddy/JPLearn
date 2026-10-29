@@ -141,7 +141,7 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
   {
     key: 'speech_recall',
     title: 'Speech Recall',
-    description: 'Say the meaning aloud — transcribed and graded offline.',
+    description: 'Say the meaning aloud (transcribed and graded offline).',
   },
   {
     key: 'sentence_assembly',
@@ -166,12 +166,12 @@ export const MINIGAMES: Array<{ key: MinigameKey; title: string; description: st
   {
     key: 'listening_audio_first',
     title: 'Recognition',
-    description: 'Hear a word and choose its meaning — character hidden until feedback.',
+    description: 'Hear a word and choose its meaning (character hidden until feedback).',
   },
   {
     key: 'dictation',
     title: 'Dictation',
-    description: 'Hear a word and type it in Japanese — no visual hints.',
+    description: 'Hear a word and type it in Japanese, with no visual hints.',
   },
   {
     key: 'kanji_compound_builder',

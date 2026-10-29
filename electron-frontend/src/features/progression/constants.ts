@@ -44,7 +44,7 @@ export const NODE_DESTINATIONS: Record<string, NodeDestination> = {
  */
 export const LOCKED_NODE_REASON =
   'This part of the course builds on earlier steps you have not finished yet. ' +
-  'You can start it now — it may just be harder without those foundations.'
+  'You can start it now. It may just be harder without those foundations.'
 
 /** Shown instead of a progress figure for nodes nothing can measure yet. */
 export const UNTRACKED_NODE_LABEL = 'Progress not tracked yet'

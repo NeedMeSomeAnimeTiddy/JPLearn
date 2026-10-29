@@ -83,7 +83,7 @@ export function Wall({ onUp }: WallProps) {
                       className={cls.join(' ')}
                       onFocus={() => setAt(index)}
                       onClick={() => setAt(index)}
-                      aria-label={`${s.name} — ${s.earned ? 'earned' : 'not yet'}. ${s.takes}`}
+                      aria-label={`${s.name}: ${s.earned ? 'earned' : 'not yet'}. ${s.takes}`}
                     >
                       {mark ?? <SealIcon size={19} strokeWidth={2.4} aria-hidden="true" />}
                     </button>

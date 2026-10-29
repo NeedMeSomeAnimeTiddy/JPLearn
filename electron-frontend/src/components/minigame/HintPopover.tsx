@@ -234,7 +234,7 @@ export function HintPopover({
             <div className="minigame-hint-popover-footer">
               <LightbulbOff size={11} aria-hidden="true" />
               <span>
-                {isAnswering ? `Stage ${shownStep}/2 — ${hintRevealCount} hint${hintRevealCount !== 1 ? 's' : ''} used` : 'Answer revealed'}
+                {isAnswering ? `Stage ${shownStep}/2, ${hintRevealCount} hint${hintRevealCount !== 1 ? 's' : ''} used` : 'Answer revealed'}
               </span>
             </div>
           </div>

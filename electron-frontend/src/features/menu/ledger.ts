@@ -318,7 +318,7 @@ const n = (v: number) => v.toLocaleString()
 const sessionDay = (iso: string): string => {
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
-    ? '—'
+    ? '―'
     : `${d.getDate()} ${d.toLocaleString('en', { month: 'short' }).toUpperCase()}`
 }
 
@@ -339,7 +339,7 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
         { k: 'FREEZES LEFT', v: n(L.streak.freezes), off: L.streak.freezes === 0 },
         { k: 'ACTIVE DAYS THIS YEAR', v: `${n(L.year.active)} OF ${n(L.year.total)}` },
       ],
-      note: 'A DAY COUNTS ONCE YOU HAVE GRADED ANYTHING AT ALL — THE STREAK IS ABOUT TURNING UP. '
+      note: 'A DAY COUNTS ONCE YOU HAVE GRADED ANYTHING AT ALL. THE STREAK IS ABOUT TURNING UP. '
         + 'A FREEZE COVERS ONE MISSED DAY.',
     }
   }
@@ -347,10 +347,10 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
     return {
       jp: '正答率', en: 'ACCURACY', strip: true, acc: true,
       lines: [
-        { k: 'THIS YEAR', v: L.year.accuracy === null ? '—' : `${L.year.accuracy}%`,
+        { k: 'THIS YEAR', v: L.year.accuracy === null ? '―' : `${L.year.accuracy}%`,
           off: L.year.accuracy === null },
-        { k: 'BEST WEEK', v: s.best === null ? '—' : `${s.best}%`, off: s.best === null },
-        { k: 'WORST WEEK', v: s.worst === null ? '—' : `${s.worst}%`, off: s.worst === null },
+        { k: 'BEST WEEK', v: s.best === null ? '―' : `${s.best}%`, off: s.best === null },
+        { k: 'WORST WEEK', v: s.worst === null ? '―' : `${s.worst}%`, off: s.worst === null },
         { k: 'DAYS COUNTED', v: n(L.year.active) },
       ],
       note: `THE FIGURE ON THE FRONT IS A MEAN OF ${n(L.year.active)} DAYS, NOT A SINGLE NUMBER `
@@ -366,9 +366,9 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
         { k: 'BUSIEST WEEK', v: `${n(s.busiest)} REVIEWS`, off: s.busiest === 0 },
         { k: 'A DAY YOU STUDIED', v: L.year.active
           ? `${n(Math.round(L.year.reviews / L.year.active))} REVIEWS`
-          : '—', off: L.year.active === 0 },
+          : '―', off: L.year.active === 0 },
       ],
-      note: 'THE LAST LINE IS A MEAN OVER THE DAYS YOU TURNED UP, NOT OVER THE YEAR — DIVIDING BY '
+      note: 'THE LAST LINE IS A MEAN OVER THE DAYS YOU TURNED UP, NOT OVER THE YEAR. DIVIDING BY '
         + '364 WOULD MEASURE HOW OFTEN YOU STUDY RATHER THAN HOW MUCH.',
     }
   }
@@ -386,9 +386,9 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
           k: r.key.replace(/_/g, ' ').toUpperCase(),
           v: `${r.error_rate}% OF ${n(r.attempts)}`,
         }))
-        : [{ k: 'NOTHING GOT WRONG YET', v: '—', off: true }],
+        : [{ k: 'NOTHING GOT WRONG YET', v: '―', off: true }],
       note: 'GROUPED BY SCRIPT RATHER THAN BY DECK, AND COUNTED OVER EVERYTHING YOU HAVE EVER '
-        + 'GRADED — NOT A WINDOW. WORST FIRST, IN THE ORDER THE BACKEND RETURNS THEM.',
+        + 'GRADED, NOT A WINDOW. WORST FIRST, IN THE ORDER THE BACKEND RETURNS THEM.',
     }
   }
   if (key === 'drills') {
@@ -400,7 +400,7 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
           k: r.minigame.replace(/_/g, ' ').toUpperCase(),
           v: `${r.accuracy}% OF ${n(r.attempts)}`,
         }))
-        : [{ k: 'NONE PLAYED YET', v: '—', off: true }],
+        : [{ k: 'NONE PLAYED YET', v: '―', off: true }],
       note: rows.length > 6
         ? `THE SIX YOU HAVE PLAYED MOST, OF ${n(rows.length)}. THE FIGURE ON THE PLATE IS EVERY `
           + 'ATTEMPT ACROSS ALL OF THEM, NOT A MEAN OF THESE SIX.'
@@ -417,7 +417,7 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
           v: `${r.accuracy}%`,
           off: !r.goal_met,
         }))
-        : [{ k: 'NONE FINISHED YET', v: '—', off: true }],
+        : [{ k: 'NONE FINISHED YET', v: '―', off: true }],
       note: 'A ROW SET FAINT IS ONE THAT DID NOT REACH ITS TARGET. THE TARGET IS THE ONE THAT WAS '
         + 'SET WHEN THAT SESSION STARTED, NOT THE ONE IN FORCE NOW.',
     }
@@ -432,11 +432,11 @@ export function ledgerSheet(key: SheetKey, L: Ledger): LedgerSheet | null {
         { k: 'ACROSS', v: `${n(d.count)} DECK${d.count === 1 ? '' : 'S'}`, off: d.count === 0 },
         { k: 'DUE TODAY', v: n(d.due), off: d.due === 0 },
         { k: 'DONE TODAY', v: n(d.done), off: d.done === 0 },
-        { k: 'LAST 30 DAYS', v: m ? `${n(m.reviewed)} REVIEWS · ${m.accuracy}%` : '—',
+        { k: 'LAST 30 DAYS', v: m ? `${n(m.reviewed)} REVIEWS · ${m.accuracy}%` : '―',
           off: !m || m.reviewed === 0 },
       ],
-      note: 'MASTERED IS WHAT THE SCHEDULER CALLS MASTERED — THREE CORRECT REVIEWS AND A TWENTY-ONE DAY '
-        + 'INTERVAL — WHICH IS A DIFFERENT FIGURE FROM THE PER-BLOCK PERCENTAGES ON THE PATH.',
+      note: 'MASTERED IS WHAT THE SCHEDULER CALLS MASTERED (THREE CORRECT REVIEWS AND A TWENTY-ONE DAY '
+        + 'INTERVAL), WHICH IS A DIFFERENT FIGURE FROM THE PER-BLOCK PERCENTAGES ON THE PATH.',
     }
   }
   if (key === 'year') {

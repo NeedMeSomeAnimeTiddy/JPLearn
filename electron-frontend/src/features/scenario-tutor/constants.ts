@@ -55,7 +55,7 @@ export const SCENARIO_COPY = {
   micUnsupported: "Speech recording isn't supported in this build. Type your response instead.",
   micFailed: 'Recording failed. Please try again, or type your response instead.',
   sttUnavailable: 'Speech recognition is unavailable in this build. Type your response instead.',
-  sttUnusable: "Didn't catch that — record again or type your response. This attempt wasn't counted.",
+  sttUnusable: "Didn't catch that. Record again or type your response. This attempt wasn't counted.",
   sttFallbackSuffix: 'You can type your response instead.',
   heardPrefix: 'Heard',
   heardHint: 'Edit it if you need to, then submit.',
@@ -70,7 +70,7 @@ export const SCENARIO_COPY = {
   evaluationDeterministicMode:
     'Responses are graded entirely by deterministic rules on this device. Anything the rules can’t place falls back to the scenario’s own recovery line.',
   evaluationAiMode:
-    'Responses are graded by deterministic rules first. Only answers the rules can’t place confidently are passed to an installed local model, which just labels the answer — the scenario script always decides what happens next.',
+    'Responses are graded by deterministic rules first. Only answers the rules can’t place confidently are passed to an installed local model, which just labels the answer. The scenario script always decides what happens next.',
   evaluatingResponse: 'Checking your answer…',
   privacyDisclosure:
     'Speech recognition runs locally on this device. Responses are graded with deterministic rules first; ' +

@@ -120,12 +120,12 @@ describe('a study engine that fails at launch (audit 11, F1)', () => {
 
     /* the control: with the engine still thinking, the snapshot is what shows */
     mount({ getStudySummary: () => new Promise(() => undefined) })
-    expect(await screen.findByLabelText('Streak — 37 days')).toBeTruthy()
+    expect(await screen.findByLabelText('Streak: 37 days')).toBeTruthy()
     cleanup()
 
     mount({ getStudySummary: async () => { throw new Error('Database unavailable: locked') } })
     expect(await screen.findByText(ENGINE_FAILED)).toBeTruthy()
-    expect(screen.queryByLabelText('Streak — 37 days')).toBeNull()
+    expect(screen.queryByLabelText('Streak: 37 days')).toBeNull()
   })
 
   it('treats a missing summary API as a failure, not as a summary', async () => {

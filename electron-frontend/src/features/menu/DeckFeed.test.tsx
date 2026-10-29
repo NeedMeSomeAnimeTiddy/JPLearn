@@ -374,7 +374,7 @@ describe('the words a feed hands over', () => {
     expect(wordKanji(word({ word: '日曜日', unknown_kanji: 1 })).note).toBe('1 OF 2 IS NEW TO YOU')
     expect(wordKanji(word({ word: '一日', unknown_kanji: 0 })).note).toBe('ALL 2 KANJI ARE ONES YOU HAVE MET')
     expect(wordKanji(word({ word: '本', unknown_kanji: 0 })).note).toBe('ITS KANJI IS ONES YOU HAVE MET')
-    expect(wordKanji(word({ word: 'ともだち' })).note).toBe('NO KANJI IN IT — READABLE ON DAY ONE')
+    expect(wordKanji(word({ word: 'ともだち' })).note).toBe('NO KANJI IN IT, READABLE ON DAY ONE')
   })
 
   it('never reports more unknown than the word has characters', () => {

@@ -108,7 +108,7 @@ export function Daily({ onPlay, onUp, dependencies }: DailyProps) {
                     className={classes.join(' ')}
                     onFocus={() => setAt(i)}
                     onClick={() => (i === at ? open.current() : setAt(i))}
-                    aria-label={`${row.no} ${row.en} — ${row.done ? 'done today' : 'not played today'}`}
+                    aria-label={`${row.no} ${row.en}: ${row.done ? 'done today' : 'not played today'}`}
                   >
                     <span className="n">{row.no}</span>
                     <span className="t">
@@ -139,12 +139,12 @@ export function Daily({ onPlay, onUp, dependencies }: DailyProps) {
                       <i key={k} className={k < Math.round((pct / 100) * 12) ? 'got' : ''} />
                     ))}
                   </span>
-                  <b>{sel.pct === null ? '—' : `${sel.pct}%`}</b>
+                  <b>{sel.pct === null ? '―' : `${sel.pct}%`}</b>
                 </span>
 
                 <span className="pa-gate">
                   {sel.done
-                    ? <>PLAYING IT AGAIN <em>CHANGES NOTHING</em> — TODAY IS ALREADY COUNTED</>
+                    ? <>PLAYING IT AGAIN <em>CHANGES NOTHING</em>: TODAY IS ALREADY COUNTED</>
                     : sel.want}
                 </span>
 

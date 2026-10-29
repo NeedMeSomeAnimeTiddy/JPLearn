@@ -84,7 +84,7 @@ export const CAFE_ORDER_SCENARIO: ScenarioDefinition = {
       },
       hints: {
         beginner: [
-          { en: 'Greet them back — any normal greeting works here.' },
+          { en: 'Greet them back. Any normal greeting works here.' },
           { en: 'Say "hello".', ja: 'こんにちは', reading: 'こんにちは', romaji: "kon'nichiwa" },
         ],
         intermediate: [
@@ -498,7 +498,7 @@ export const CAFE_ORDER_SCENARIO: ScenarioDefinition = {
       },
       hints: {
         beginner: [
-          { en: 'They told you the total and asked if that is okay — just agree.' },
+          { en: 'They told you the total and asked if that is okay. Just agree.' },
           { en: 'Say yes, please:', ja: 'はい、お願いします', reading: 'はい、おねがいします', romaji: 'hai, onegaishimasu' },
         ],
         intermediate: [

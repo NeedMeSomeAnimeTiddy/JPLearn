@@ -97,7 +97,7 @@ export function VoiceModelPage({
         <p style={{ fontWeight: 600, margin: '0 0 0.4rem', fontSize: '0.95rem' }}>Speech Recognition (optional)</p>
         <p style={{ opacity: 0.7, lineHeight: 1.5, marginBottom: '0.75rem', fontSize: '0.88rem' }}>
           Lets you answer minigame questions by speaking into your microphone. Runs entirely on
-          your device using a local offline speech model — no internet connection needed once
+          your device using a local offline speech model, with no internet connection needed once
           installed.
         </p>
         <CompactDropdown

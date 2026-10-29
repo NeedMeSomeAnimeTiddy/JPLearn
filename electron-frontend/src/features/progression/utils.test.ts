@@ -58,7 +58,7 @@ describe('progressLabelFor', () => {
 describe('describeNode', () => {
   it('names the stage, its state and its progress', () => {
     const [view] = toNodeViews([node({ status: 'unlocked', mastered_count: 91 })], new Set())
-    expect(describeNode(view)).toBe('Hiragana — in progress, 91 of 104')
+    expect(describeNode(view)).toBe('Hiragana: in progress, 91 of 104')
   })
 
   it('says a finished stage is finished', () => {

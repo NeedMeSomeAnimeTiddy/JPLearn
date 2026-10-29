@@ -234,8 +234,8 @@ export function PassageHubView({
             <span>{word ? 'UNDER THE CURSOR' : 'NOTHING TO STAND ON'}</span><em>語義</em>
           </div>
           <div className="rd-term">
-            <b lang="ja" style={{ fontSize: `${termSize(word?.text ?? '—')}px` }}>
-              {word?.text ?? '—'}
+            <b lang="ja" style={{ fontSize: `${termSize(word?.text ?? '―')}px` }}>
+              {word?.text ?? '―'}
             </b>
             {word ? <i lang="ja">{word.reading}</i> : null}
             {meaning ? <p>{meaning}</p> : null}

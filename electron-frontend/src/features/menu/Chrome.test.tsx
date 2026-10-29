@@ -117,7 +117,7 @@ describe('the chrome layer', () => {
   it('carries the brand and every chip the account can fill', () => {
     render(<MenuChrome crown={crown} />)
     expect(screen.getByText('JPLEARN')).toBeTruthy()
-    expect(screen.getByLabelText('Streak — 4 days')).toBeTruthy()
+    expect(screen.getByLabelText('Streak: 4 days')).toBeTruthy()
     expect(screen.getByLabelText('Level 2')).toBeTruthy()
   })
 

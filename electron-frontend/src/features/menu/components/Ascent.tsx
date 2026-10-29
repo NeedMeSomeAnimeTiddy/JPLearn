@@ -93,8 +93,8 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
                 onClick={() => (rung.state === 'locked' ? refuse() : onOpen(rung.level))}
                 aria-disabled={rung.state === 'locked'}
                 aria-label={rung.opensAt
-                  ? `${rung.id} — locked, opens at ${rung.opensAt.need}% on ${rung.opensAt.id}, which is at ${rung.opensAt.at}%`
-                  : `${rung.id} — ${rung.pct}% ready, ${rung.done} of ${rung.total} cards mastered`}
+                  ? `${rung.id}: locked, opens at ${rung.opensAt.need}% on ${rung.opensAt.id}, which is at ${rung.opensAt.at}%`
+                  : `${rung.id}: ${rung.pct}% ready, ${rung.done} of ${rung.total} cards mastered`}
               >
                 {fill > 0 ? <span className="as-fill" style={{ height: fill }} /> : null}
                 <span className="as-base" />
@@ -127,7 +127,7 @@ export function Ascent({ rungs, loading, onOpen, onUp }: AscentProps) {
             One line, on a ground, in the band the contract leaves for a whole-set statement. */}
         <div className="as-law">
           <b>EACH LEVEL OPENS WHEN THE ONE BELOW IT REACHES {JLPT_UNLOCK_PCT}%</b>
-          <i>A BAR IS MASTERY, NOT STUDY — THREE CORRECT REVIEWS AND A 21-DAY INTERVAL, PER CARD</i>
+          <i>A BAR IS MASTERY, NOT STUDY: THREE CORRECT REVIEWS AND A 21-DAY INTERVAL, PER CARD</i>
         </div>
 
         <div className="back-tab">

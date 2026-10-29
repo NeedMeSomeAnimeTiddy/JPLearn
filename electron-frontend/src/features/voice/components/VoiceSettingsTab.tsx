@@ -237,7 +237,7 @@ export function VoiceSettingsTab({
                 value={settings.voiceSpeed}
                 onChange={(e) => setSettings((prev) => ({ ...prev, voiceSpeed: Number(e.target.value) }))}
                 aria-label={`Voice playback speed: ${settings.voiceSpeed.toFixed(1)}x`}
-                title="Adjust voice playback speed (0.5x–2.0x)"
+                title="Adjust voice playback speed (0.5x-2.0x)"
                 style={{ width: '100%' }}
               />
             </div>
@@ -256,7 +256,7 @@ export function VoiceSettingsTab({
                 disabled={voiceBusy}
                 aria-label={`Use voice ${option.name} (${option.search}) and hear a sample`}
                 aria-pressed={settings.voiceSpeaker === option.id}
-                title={`${option.name} · ${option.search} — click to hear a sample`}
+                title={`${option.name} · ${option.search} (click to hear a sample)`}
               >
                 <span className={`settings-mode-icon-button ${settings.voiceSpeaker === option.id ? 'is-enabled' : ''}`} aria-hidden="true">
                   <Volume2 size={18} strokeWidth={2.25} aria-hidden="true" />

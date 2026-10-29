@@ -88,7 +88,7 @@ export function practiceLanes(summary: StudySummaryPayload | null | undefined): 
       en: 'REVIEW', jp: '復習', glyph: '復',
       desc: 'The cards the scheduler says are due today',
       /* an absence is drawn as an absence: nothing due is not zero cards due, it is a clear day */
-      fig: due === null ? '—' : due > 0 ? String(due) : '—',
+      fig: due === null ? '―' : due > 0 ? String(due) : '―',
       figLab: due === null ? 'NOT COUNTED YET' : due > 0 ? 'CARDS DUE' : 'NOTHING DUE',
       absent: !due,
       foot: due ? 'THE SCHEDULER CHOSE THESE' : 'THE SCHEDULER HAS NOTHING FOR YOU TODAY',

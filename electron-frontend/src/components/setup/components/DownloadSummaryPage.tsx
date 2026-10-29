@@ -50,13 +50,13 @@ export function DownloadSummaryPage({
   return (
     <>
       {needsModel && modelInfo && (
-        <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} — ${formatSize(modelInfo.sizeMb)}`} />
+        <SummaryRow label="AI Tutor model" detail={`${modelInfo.label} (${formatSize(modelInfo.sizeMb)})`} />
       )}
       {needsLlama && (
         <SummaryRow label="llama.cpp runtime" detail={`Local tutor server binary (${LLAMA_BACKEND_OPTIONS.find((option) => option.key === selectedLlamaBackend)?.label ?? selectedLlamaBackend})`} />
       )}
       {needsVoice && (
-        <SummaryRow label="Japanese voice model" detail={voiceModelInfo ? `${voiceModelInfo.label} — ${formatSize(voiceModelInfo.combinedSizeMb)}` : 'Japanese voice model'} />
+        <SummaryRow label="Japanese voice model" detail={voiceModelInfo ? `${voiceModelInfo.label} (${formatSize(voiceModelInfo.combinedSizeMb)})` : 'Japanese voice model'} />
       )}
       {needsFonts && (
         <SummaryRow label="Japanese fonts" detail="~100 MB" />
@@ -65,13 +65,13 @@ export function DownloadSummaryPage({
         <SummaryRow label="Offline dictionary" detail="~30 MB" />
       )}
       {needsSpeech && speechModelInfo && (
-        <SummaryRow label="Speech recognition model" detail={`${speechModelInfo.label} — ${formatSize(speechModelInfo.sizeMb)}`} />
+        <SummaryRow label="Speech recognition model" detail={`${speechModelInfo.label} (${formatSize(speechModelInfo.sizeMb)})`} />
       )}
       {needsTranslationProfile && translationProfileInfo && (
-        <SummaryRow label="OCR translation profile" detail={`${translationProfileInfo.label} — ${formatSize(translationProfileInfo.sizeMb)}`} />
+        <SummaryRow label="OCR translation profile" detail={`${translationProfileInfo.label} (${formatSize(translationProfileInfo.sizeMb)})`} />
       )}
       {!needsModel && !needsVoice && !needsFonts && !needsDictionary && !needsSpeech && !needsTranslationProfile && (
-        <p style={{ opacity: 0.7 }}>Nothing to download — all selected components are already installed.</p>
+        <p style={{ opacity: 0.7 }}>Nothing to download: all selected components are already installed.</p>
       )}
       {sysInfo?.isPackaged && (
         <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
@@ -83,7 +83,7 @@ export function DownloadSummaryPage({
         </div>
       )}
       <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '1.25rem', lineHeight: 1.5 }}>
-        ℹ Your downloads and progress are saved to <strong>Documents\JPLearn\</strong> — they will
+        ℹ Your downloads and progress are saved to <strong>Documents\JPLearn\</strong>. They will
         NOT be deleted if you uninstall or reinstall JPLearn.
       </p>
     </>
