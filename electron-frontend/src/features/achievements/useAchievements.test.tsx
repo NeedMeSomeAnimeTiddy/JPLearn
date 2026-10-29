@@ -24,14 +24,8 @@ function installAchievementsApi(overrides: Partial<Window['jplearnDesktop']> = {
         { descriptor: 'tutorial_complete', node_id: 'tutorial', earned: false },
         { descriptor: 'hiragana_mastered', node_id: 'hiragana', earned: false },
         { descriptor: 'katakana_mastered', node_id: 'katakana', earned: false },
-        { descriptor: 'scripted_conversation_complete', node_id: 'scripted_conv', earned: false },
         { descriptor: 'free_conversation_unlocked', node_id: 'free_conv', earned: false },
         { descriptor: 'reading_unlocked', node_id: 'reading', earned: false },
-        { descriptor: 'jlpt_n5_passed', node_id: 'jlpt_n5', earned: false },
-        { descriptor: 'jlpt_n4_passed', node_id: 'jlpt_n4', earned: false },
-        { descriptor: 'jlpt_n3_passed', node_id: 'jlpt_n3', earned: false },
-        { descriptor: 'jlpt_n2_passed', node_id: 'jlpt_n2', earned: false },
-        { descriptor: 'jlpt_n1_passed', node_id: 'jlpt_n1', earned: false },
       ],
     })),
     ...overrides,
@@ -100,7 +94,9 @@ describe('useAchievements', () => {
           { descriptor: 'tutorial_complete', node_id: 'tutorial', earned: true },
           { descriptor: 'hiragana_mastered', node_id: 'hiragana', earned: true },
           { descriptor: 'katakana_mastered', node_id: 'katakana', earned: false },
-          { descriptor: 'jlpt_n5_passed', node_id: 'jlpt_n5', earned: false },
+          { descriptor: 'free_conversation_unlocked', node_id: 'free_conv', earned: true },
+          /* dropped in audit 12; an older bridge that still sends it must not grow the list */
+          { descriptor: 'jlpt_n5_passed', node_id: 'jlpt_n5', earned: true },
         ],
       })),
     })
@@ -116,7 +112,8 @@ describe('useAchievements', () => {
     expect(byDescriptor.tutorial_complete).toBe(true)
     expect(byDescriptor.hiragana_mastered).toBe(true)
     expect(byDescriptor.katakana_mastered).toBe(false)
-    expect(byDescriptor.jlpt_n5_passed).toBe(false)
+    expect(byDescriptor.free_conversation_unlocked).toBe(true)
+    expect(byDescriptor).not.toHaveProperty('jlpt_n5_passed')
   })
 
   it('does not treat a locked feature as earning its badge even if listed', async () => {

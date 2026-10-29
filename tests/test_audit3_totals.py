@@ -42,7 +42,7 @@ def _counted_slugs() -> list[str]:
 
 
 def test_totals_count_level_and_standalone_decks_once_after_n5_seeding() -> None:
-    assert desktop_bridge.apply_expertise_level("jlpt_n5_foundation")["ok"] is True
+    assert desktop_bridge.apply_known_items(["hiragana", "katakana", "kanji_n5", "vocab_n5"])["ok"] is True
     totals, decks = _summary()
 
     counted = _counted_slugs()
@@ -86,7 +86,7 @@ def _unreviewed_card(slug: str) -> int:
 
 
 def test_card_reviewed_today_is_completed_not_remaining() -> None:
-    assert desktop_bridge.apply_expertise_level("jlpt_n5_foundation")["ok"] is True
+    assert desktop_bridge.apply_known_items(["hiragana", "katakana", "kanji_n5", "vocab_n5"])["ok"] is True
     before, _ = _summary()
     assert before["completed_today"] == 0
     assert before["remaining_due"] == before["due_today"]

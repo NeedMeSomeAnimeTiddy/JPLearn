@@ -73,12 +73,12 @@ describe('what a screen says it is', () => {
 
 describe('the heading slab', () => {
   it('draws the mark, the trail and both scripts', () => {
-    render(<ScreenHead head={screenHead('RECORDS', 'wall')} note="2 / 25 SEALS" />)
+    render(<ScreenHead head={screenHead('RECORDS', 'wall')} note="2 / 19 SEALS" />)
     expect(document.querySelector('.pj-mark')?.textContent).toBe('記')
     expect(document.querySelector('.pj-kick')?.textContent).toBe('YOU')
     expect(document.querySelector('.pj-title b')?.textContent).toBe('ACHIEVEMENTS')
     expect(document.querySelector('.pj-title i')?.textContent).toBe('章')
-    expect(document.querySelector('.pj-note')?.textContent).toBe('2 / 25 SEALS')
+    expect(document.querySelector('.pj-note')?.textContent).toBe('2 / 19 SEALS')
   })
 
   it('carries the section colour, because a stylesheet cannot know it', () => {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
+import type { KnownItem } from './electron'
 import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './test-fixtures/answerQueue'
 
 vi.mock('react-type-animation', () => ({
@@ -40,7 +41,7 @@ const desktopApi = {
   ...fakeAnswerQueue(() => ({ ...DEFAULT_RECORD_RESULT, card_id: 1, repetitions: 0 })),
   startSessionGoal: async () => ({ ok: true, goal: { session_id: 'test', target_items: 10, target_minutes: null, target_accuracy: null, started_at_utc: '2026-01-01T00:00:00+00:00' } }),
   getSessionSummary: async () => ({ ok: true }),
-  applyExpertiseLevel: async (level: string) => ({ ok: true, level, seeded_cards: 0, decks: [] }),
+  applyKnownItems: async (items: KnownItem[]) => ({ ok: true, items, seeded_cards: 0, decks: [] }),
   resetStudyDb: async () => ({ ok: true }),
   getDailyGamesState: async () => ({
     pool: { day: '2026-07-15', algorithm_version: 1, game_seeds: {}, words: [] },

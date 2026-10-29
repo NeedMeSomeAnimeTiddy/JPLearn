@@ -144,12 +144,27 @@ function validateStartupThemeInput(theme) {
   return theme
 }
 
-function validateExpertiseLevelInput(level) {
-  const allowed = new Set(['total_beginner', 'know_hiragana', 'know_kana', 'jlpt_n5_foundation', 'jlpt_n4_foundation', 'jlpt_n3_foundation', 'jlpt_n2_foundation', 'jlpt_n1_foundation'])
-  if (typeof level !== 'string' || !allowed.has(level)) {
-    throw new Error(`Invalid expertise level value: ${String(level)}`)
+// The ticks on onboarding's "What do you already know?" checklist (audit 12, F1). The bridge's
+// KNOWN_ITEM_TO_SLUGS says which decks each one seeds.
+const KNOWN_ITEMS = new Set(['hiragana', 'katakana', 'kanji_n5', 'vocab_n5', 'kanji_n4', 'vocab_n4', 'kanji_n3', 'vocab_n3'])
+
+function validateKnownItemsInput(items) {
+  if (!Array.isArray(items) || items.length > KNOWN_ITEMS.size) {
+    throw new Error('Invalid known items: expected an array of checklist items')
   }
-  return level
+  const known = []
+  for (const item of items) {
+    if (typeof item !== 'string' || !KNOWN_ITEMS.has(item)) {
+      throw new Error(`Invalid known item: ${String(item)}`)
+    }
+    if (!known.includes(item)) known.push(item)
+  }
+  return known
+}
+
+// Onboarding's daily study time: whole minutes, 1 to 240, else not given (audit 12, nit 2).
+function validateDailyMinutesInput(minutes) {
+  return Number.isInteger(minutes) && minutes >= 1 && minutes <= 240 ? String(minutes) : ''
 }
 
 function validateRecordGameResultPayload(payload) {
@@ -1023,7 +1038,8 @@ module.exports = {
   isAllowedRendererUrl,
   isRendererPermissionAllowed,
   validateDeckSlug,
-  validateExpertiseLevelInput,
+  validateKnownItemsInput,
+  validateDailyMinutesInput,
   validateSessionGoalPayload,
   validateSessionId,
   validateOptionalSessionId,

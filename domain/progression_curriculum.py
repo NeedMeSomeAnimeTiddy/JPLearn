@@ -11,6 +11,11 @@ Main path (each node requires the previous to be mastered):
 
 A prerequisite in ``UNMEASURED_NODE_IDS`` only has to be reached instead,
 because nothing can ever mark it mastered (``gate_status``).
+
+Milestone seals follow the same rule: a measured node's seal is earned when it is mastered, an
+unmeasured node's when it is reached. The JLPT steps carry no seal, because reaching Reading opens
+all five at once, so "JLPT N1 Ready" would go to a beginner (audit 12, F3; Robbie: "2 on reach,
+hide 6").
 """
 from __future__ import annotations
 
@@ -147,7 +152,9 @@ _NODES: list[ProgressionNode] = [
         unlock_requirement=_requires_mastered("grammar_n5"),
         mastery_requirement=MasteryRequirement(mastered_ratio=1.0),
         children=("listening",),
-        rewards=_milestone("scripted_conversation_complete"),
+        # No seal: nothing measures scripted conversation, so it could never be earned
+        # (audit 12, F3; Robbie: hide it until something does).
+        rewards=(),
     ),
     ProgressionNode(
         node_id="listening",
@@ -195,7 +202,7 @@ _NODES: list[ProgressionNode] = [
         unlock_requirement=_requires_mastered("reading"),
         mastery_requirement=MasteryRequirement(mastered_ratio=0.9),
         children=("jlpt_n4",),
-        rewards=_milestone("jlpt_n5_passed"),
+        rewards=(),
     ),
     ProgressionNode(
         node_id="jlpt_n4",
@@ -204,7 +211,7 @@ _NODES: list[ProgressionNode] = [
         unlock_requirement=_requires_mastered("jlpt_n5"),
         mastery_requirement=MasteryRequirement(mastered_ratio=0.9),
         children=("jlpt_n3",),
-        rewards=_milestone("jlpt_n4_passed"),
+        rewards=(),
     ),
     ProgressionNode(
         node_id="jlpt_n3",
@@ -213,7 +220,7 @@ _NODES: list[ProgressionNode] = [
         unlock_requirement=_requires_mastered("jlpt_n4"),
         mastery_requirement=MasteryRequirement(mastered_ratio=0.9),
         children=("jlpt_n2",),
-        rewards=_milestone("jlpt_n3_passed"),
+        rewards=(),
     ),
     ProgressionNode(
         node_id="jlpt_n2",
@@ -222,7 +229,7 @@ _NODES: list[ProgressionNode] = [
         unlock_requirement=_requires_mastered("jlpt_n3"),
         mastery_requirement=MasteryRequirement(mastered_ratio=0.9),
         children=("jlpt_n1",),
-        rewards=_milestone("jlpt_n2_passed"),
+        rewards=(),
     ),
     ProgressionNode(
         node_id="jlpt_n1",
@@ -231,7 +238,7 @@ _NODES: list[ProgressionNode] = [
         unlock_requirement=_requires_mastered("jlpt_n2"),
         mastery_requirement=MasteryRequirement(mastered_ratio=0.9),
         children=(),
-        rewards=_milestone("jlpt_n1_passed"),
+        rewards=(),
     ),
 ]
 

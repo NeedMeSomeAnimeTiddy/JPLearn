@@ -2,6 +2,7 @@
 // tests which render <App /> do not each carry their own copy of the bridge stub.
 
 import { DEFAULT_RECORD_RESULT, fakeAnswerQueue } from './answerQueue'
+import type { KnownItem } from '../electron'
 
 export const emptyCurriculumStub = {
   particle_cloze: {
@@ -80,7 +81,7 @@ export const baseDesktopApi = {
       reviewed: 0, correct: 0, accuracy: 0, target_accuracy: null, goal_met: false,
     },
   }),
-  applyExpertiseLevel: async (level: 'total_beginner' | 'know_hiragana' | 'know_kana' | 'jlpt_n5_foundation' | 'jlpt_n4_foundation' | 'jlpt_n3_foundation' | 'jlpt_n2_foundation' | 'jlpt_n1_foundation') => ({ ok: true, level, seeded_cards: 0, decks: [] as string[] }),
+  applyKnownItems: async (items: KnownItem[]) => ({ ok: true, items, seeded_cards: 0, decks: [] as string[] }),
   resetStudyDb: async () => ({ ok: true }),
   minimizeWindow: async () => ({ ok: true }),
   toggleMaximizeWindow: async () => ({ ok: true, isMaximized: false }),

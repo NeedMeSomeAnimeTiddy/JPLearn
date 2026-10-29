@@ -36,10 +36,11 @@ export const NODE_DESTINATIONS: Record<string, NodeDestination> = {
 /**
  * Why opening a still-gated node is worth a confirmation.
  *
- * Mirrors the copy style of the readiness warning that already guards jumping
- * into an advanced section — the point is to inform, never to block. Gating is
- * soft by decision: onboarding can be skipped, so a hard gate would lock out
- * learners who never completed it.
+ * The path is advisory: a gated node informs rather than blocks, because
+ * onboarding can be skipped and a hard gate on the path would lock out learners
+ * who never completed it. The menu is the exception by decision (audit 12): it
+ * locks THE WORLD until Conversation Mode unlocks and THE EXAM until the JLPT
+ * dashboard unlocks.
  */
 export const LOCKED_NODE_REASON =
   'This part of the course builds on earlier steps you have not finished yet. ' +

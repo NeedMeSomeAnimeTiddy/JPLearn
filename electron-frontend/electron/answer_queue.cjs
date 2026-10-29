@@ -45,7 +45,7 @@ function createAnswerQueue(options) {
   let seq = 0
   let drainPromise = null
   let retryTimer = null
-  // Exclusive operations (reset, import, expertise seeding) run one after another on a chain; while any
+  // Exclusive operations (reset, import, onboarding seeding) run one after another on a chain; while any
   // is queued or running the queue sends nothing -- except the drain an import does before it starts.
   let exclusiveWaiting = 0
   let exclusiveTail = Promise.resolve()

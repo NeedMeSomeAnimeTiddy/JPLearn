@@ -316,8 +316,8 @@ def test_seeding_fills_only_cards_without_history() -> None:
         conn.commit()
     before = {row[1]: row for row in _snapshot()["review_states"]}
 
-    response = desktop_bridge.apply_expertise_level("jlpt_n5_foundation")
-    again = desktop_bridge.apply_expertise_level("jlpt_n5_foundation")
+    response = desktop_bridge.apply_known_items(["hiragana", "katakana", "kanji_n5", "vocab_n5"])
+    again = desktop_bridge.apply_known_items(["hiragana", "katakana", "kanji_n5", "vocab_n5"])
 
     after = {row[1]: row for row in _snapshot()["review_states"] if row[0] == deck.name}
     assert after[reviewed] == before[reviewed]

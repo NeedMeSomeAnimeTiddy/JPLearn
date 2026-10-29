@@ -110,7 +110,7 @@ class CardMasteryRepository:
     def seed_full_scores(self, deck_slug: str, card_ids: Collection[int]) -> int:
         """Give each card the full score unless it already has a counter; return how many were added.
 
-        Used by onboarding expertise seeding, for the cards it has just given a mastered schedule.
+        Used by onboarding seeding (`apply_known_items`), for the cards it has just given a mastered schedule.
         A card that already has a counter keeps it.
         """
         slug = _normalize_slug(deck_slug)

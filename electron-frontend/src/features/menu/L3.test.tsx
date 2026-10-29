@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import axe from 'axe-core'
 import type { Passage } from '../passages'
 import type { BadgeEntry } from '../achievements/types'
@@ -159,6 +159,13 @@ describe('the wall', () => {
       expect(moved).toBeGreaterThanOrEqual(0)
       expect(moved).toBeLessThan(flatSeals(groups).length)
     })
+  })
+
+  it('counts nineteen seals', async () => {
+    /* six were dropped in audit 12 (scripted conversation, JLPT N5..N1): nothing measured them */
+    expect(all).toHaveLength(19)
+    render(<Wall onUp={vi.fn()} />)
+    await waitFor(() => expect(document.querySelector('.pj-note')?.textContent).toBe('0 / 19 SEALS'))
   })
 
   it('has no accessibility violations', async () => {

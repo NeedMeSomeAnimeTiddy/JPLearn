@@ -20,7 +20,6 @@ import type {
   RoundState,
   ScriptDeck,
   ScriptKey,
-  SectionReadiness,
   SessionPrefOverrides,
   SettingsTabKey,
   ShortcutSubmenuKey,
@@ -48,7 +47,7 @@ import { dedupeDictionaryCards } from './features/card-notes'
 import { KanjiDetailPanel } from './features/kanji-detail'
 import { PendingAnswersBar } from './features/pending-answers'
 import { BADGE_METADATA } from './features/achievements'
-import { OnboardingWizard } from './features/onboarding'
+import { OnboardingWizard, saveOnboarding } from './features/onboarding'
 import { ReadinessWarningModal } from './components/ReadinessWarningModal'
 import { useKeyboardCheatsheet, KeyboardCheatsheet } from './features/keyboard'
 import { useCommandPalette, CommandPalette } from './features/command-palette'
@@ -73,7 +72,6 @@ import {
   CARD_SCORES_STORAGE_KEY,
   SUMMARY_SNAPSHOT_STORAGE_KEY,
   SESSION_STORAGE_KEY,
-  deriveExpertiseLevelFromChecked,
   EMPTY_SCRIPT_STATS,
   defaultMinigameStatsByScript,
   loadSavedStats,
@@ -214,13 +212,6 @@ function App() {
   const [milestoneToasts, setMilestoneToasts] = useState<Array<{ id: number; descriptor: string }>>([])
   const [studyBlock, setStudyBlock] = useState<StudyBlockPayload | null>(null)
   const [learningPathStatus, setLearningPathStatus] = useState<LearningPathStatus | null>(null)
-  const [warningModal, setWarningModal] = useState<{
-    sectionId: ScriptKey | 'jlpt_prep'
-    label: string
-    readiness: SectionReadiness
-    reason: string
-  } | null>(null)
-  const warnedSectionsRef = useRef<Set<string>>(new Set())
 
   const [kanjiDetailCharacter, setKanjiDetailCharacter] = useState<string | null>(null)
   /* WHICH SHEET OPENED THE CHARACTER, because Escape goes up one level: back to Look it up or to
@@ -1592,11 +1583,11 @@ function App() {
      second instance would be a second round trip answering the same question */
 
 
-  /* ONE DOOR ONTO A DECK, and seven routes now share it: the six digit shortcuts, the titlebar's
-     map tree, the command palette, the curriculum's script destinations, the readiness warning, the
-     hero card with nothing to recommend, and STUDY's own passthrough.
+  /* ONE DOOR ONTO A DECK, and six routes now share it: the six digit shortcuts, the titlebar's
+     map tree, the command palette, the curriculum's script destinations, the hero card with nothing
+     to recommend, and STUDY's own passthrough.
 
-     ALL SEVEN USED TO OPEN THE SCRIPT HUB, which drew the deck's blocks a second time, its five
+     THEY ALL USED TO OPEN THE SCRIPT HUB, which drew the deck's blocks a second time, its five
      levels, seventeen cassettes and four session switches -- and asked, four screens in, the
      questions the menu had already answered. They land on the deck's own screen instead: its block
      chain, or its daily feed for the five levels that are fed rather than unlocked.
@@ -2306,16 +2297,15 @@ function App() {
     }
   }, [])
 
-  // Handles completion of the onboarding form: seeds deck expertise and records
-  // that onboarding finished. No path is chosen — there is one curriculum, and
-  // it comes from JPLEARN_GRAPH (issue #78 Phase 5).
-  const handleOnboardingComplete = useCallback(async (
+  // Handles completion of the onboarding form: seeds the ticked decks as known and records that
+  // onboarding finished (`saveOnboarding` owns the order and reports which stage failed). No path is
+  // chosen — there is one curriculum, and it comes from JPLEARN_GRAPH (issue #78 Phase 5).
+  const handleOnboardingComplete = useCallback((
     checkedItems: Set<string>,
     answers: { goal?: string; dailyMinutes?: number; targetLevel?: string },
-  ) => {
-    const level = deriveExpertiseLevelFromChecked(checkedItems)
-    try {
-      await window.jplearnDesktop?.applyExpertiseLevel(level)
+  ) => saveOnboarding(checkedItems, answers, {
+    applyKnownItems: async (items) => { await window.jplearnDesktop?.applyKnownItems(items) },
+    afterSeeded: async () => {
       // The bridge writes the seeded cards' mastery counters with their schedules (audit 3, F1), so
       // show what it stored rather than computing a copy here that the next launch would discard.
       try {
@@ -2325,15 +2315,12 @@ function App() {
         // The seeding has landed; a failed re-read only delays the bars to the next launch.
       }
       refreshDeckProgressAfterSeedChange()
-    } catch {
-      // Expertise seeding is best-effort; proceed to mark onboarding complete.
-    }
-
-    // One curriculum since issue #78 Phase 5, so onboarding no longer picks a
-    // path — it just records that it finished.
-    const result = await window.jplearnDesktop?.completeOnboarding?.(answers).catch(() => undefined)
-    if (result) setLearningPathStatus(result as LearningPathStatus)
-  }, [refreshDeckProgressAfterSeedChange])
+    },
+    completeOnboarding: async (finished) => {
+      const result = await window.jplearnDesktop?.completeOnboarding?.(finished)
+      if (result) setLearningPathStatus(result as LearningPathStatus)
+    },
+  }), [refreshDeckProgressAfterSeedChange])
 
 
 
@@ -2668,12 +2655,8 @@ function App() {
         onFontSizeSelect={(key) => {
           setSettings((prev) => ({ ...prev, fontSize: key }))
         }}
-        onComplete={(_pathId, checkedItems, answers) => {
-          void handleOnboardingComplete(checkedItems, answers)
-        }}
-        onSkip={(checkedItems, answers) => {
-          void handleOnboardingComplete(checkedItems, answers)
-        }}
+        onComplete={(_pathId, checkedItems, answers) => handleOnboardingComplete(checkedItems, answers)}
+        onSkip={handleOnboardingComplete}
       />
     </>
   }
@@ -3057,9 +3040,9 @@ function App() {
         </div>
       ) : null}
 
-      {/* Gated-node confirmation. Same component and shape as the readiness
-          warning below, because it is the same promise to the learner: this is
-          advice, not a wall. Confirming is remembered per node. */}
+      {/* Gated-node confirmation. It borrows the readiness-warning component because
+          it is the same promise to the learner: this is advice, not a wall.
+          Confirming is remembered per node. */}
       {progression.pending && (
         <ReadinessWarningModal
           sectionLabel={progression.pending.name}
@@ -3074,31 +3057,6 @@ function App() {
             milestoneRequestRef.current = null
             if (fromMenu) routeMilestone(node)
             else openProgressionNode(node)
-          }}
-        />
-      )}
-
-      {/* Readiness warning modal — shown before navigating to a non-recommended section */}
-      {warningModal && (
-        <ReadinessWarningModal
-          sectionLabel={warningModal.label}
-          readiness={warningModal.readiness}
-          reason={warningModal.reason}
-          onCancel={() => setWarningModal(null)}
-          onContinue={() => {
-            const { sectionId } = warningModal
-            warnedSectionsRef.current.add(sectionId)
-            setWarningModal(null)
-            setDictionaryOpen(false)
-            setShowOverview(false)
-            setShowSettings(false)
-
-            if (sectionId === 'jlpt_prep') {
-              openExamLadderRef.current()
-              return
-            }
-
-            openDeckScreenRef.current(sectionId)
           }}
         />
       )}

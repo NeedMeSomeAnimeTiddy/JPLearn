@@ -29,10 +29,11 @@ export interface ProgressionApi {
  * long time without anything rendering it (issue #78 Phase 4). This is the
  * renderer side.
  *
- * Gating is **soft**: a locked node is never unreachable. Opening one asks for
- * confirmation the same way jumping into an advanced section already does, and
- * the choice is remembered so it is asked once per node. That matters because
- * onboarding is skippable — a hard gate would shut out anyone who skipped it.
+ * The path is **advisory**: a locked node is never unreachable from it. Opening
+ * one asks for confirmation, and the choice is remembered so it is asked once
+ * per node. That matters because onboarding is skippable — a hard gate would
+ * shut out anyone who skipped it. The menu is the exception by decision (audit
+ * 12): it locks THE WORLD and THE EXAM until their features unlock.
  */
 export function useProgression(enabled: boolean): ProgressionApi {
   const [nodes, setNodes] = useState<ProgressionNode[]>([])

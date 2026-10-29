@@ -36,8 +36,10 @@ def _scores() -> dict[str, dict[int, int]]:
 # --- F1 --------------------------------------------------------------------------------------
 
 
-def test_claiming_a_level_stores_full_counters_for_every_seeded_card() -> None:
-    response = desktop_bridge.apply_expertise_level("jlpt_n4_foundation")
+def test_claiming_decks_stores_full_counters_for_every_seeded_card() -> None:
+    response = desktop_bridge.apply_known_items(
+        ["hiragana", "katakana", "kanji_n5", "vocab_n5", "kanji_n4", "vocab_n4"]
+    )
     scores = _scores()
 
     for slug in ("hiragana", "katakana", "kanji_n5", "vocab_n5", "kanji_n4", "vocab_n4"):
@@ -54,7 +56,7 @@ def test_seeding_leaves_a_studied_cards_counter_alone() -> None:
     card_id = deck.cards[0].id
     desktop_bridge.record_game_result("hiragana", card_id, False, minigame="meaning_match")
 
-    desktop_bridge.apply_expertise_level("know_hiragana")
+    desktop_bridge.apply_known_items(["hiragana"])
 
     assert _scores()["hiragana"][card_id] == 0
     assert len(_scores()["hiragana"]) == len(deck.cards)
@@ -65,7 +67,7 @@ def test_seeding_keeps_a_counter_a_card_already_has() -> None:
     card_id = ALL_DECKS["hiragana"]().cards[0].id
     CardMasteryRepository().set_deck_scores("hiragana", {card_id: 1})
 
-    desktop_bridge.apply_expertise_level("know_hiragana")
+    desktop_bridge.apply_known_items(["hiragana"])
 
     assert _scores()["hiragana"][card_id] == 1
 
@@ -78,7 +80,7 @@ def test_a_failed_counter_write_rolls_the_seeded_schedules_back(monkeypatch: pyt
 
     monkeypatch.setattr(CardMasteryRepository, "seed_full_scores", fail)
     with pytest.raises(RuntimeError):
-        desktop_bridge.apply_expertise_level("know_hiragana")
+        desktop_bridge.apply_known_items(["hiragana"])
 
     with closing(sqlite3.connect(database.DB_PATH)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM review_states").fetchone()[0] == 0
