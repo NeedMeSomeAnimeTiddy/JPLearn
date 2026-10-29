@@ -2065,6 +2065,31 @@ def test_daily_games_state_shows_the_streak_as_of_the_requested_day(
     assert repository.load_streak_state() == stored
 
 
+def test_daily_games_state_reads_then_a_completion_spend_freezes_once(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Reading the projected streak twice, then completing, consumes each freeze once (audit 16, F6)."""
+    _use_temp_db(tmp_path, monkeypatch)
+    desktop_bridge.record_daily_games_attempt(
+        "2026-07-10", "crossword", "daily", 50, True, 20,
+        (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+    )
+
+    first = desktop_bridge.build_daily_games_state("2026-07-13")
+    second = desktop_bridge.build_daily_games_state("2026-07-13")
+    completed = desktop_bridge.record_daily_games_attempt(
+        "2026-07-13", "crossword", "daily", 50, True, 20,
+        (DailyGameWordOutcome(pool_position=0, outcome="correct"),),
+    )
+
+    assert _daily_streak(first) == _daily_streak(second)
+    assert _daily_streak(first)["current_streak_days"] == 1
+    assert _daily_streak(first)["freezes_available"] == 1
+    assert _daily_streak(completed)["current_streak_days"] == 2
+    assert _daily_streak(completed)["freezes_available"] == 1
+
+
 def test_daily_games_commands_reject_malformed_arguments(tmp_path: Path, monkeypatch) -> None:
     _use_temp_db(tmp_path, monkeypatch)
 

@@ -160,7 +160,7 @@ describe('MatchPairsGame with two words of one meaning (audit 16 F3)', () => {
     expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)).toEqual(['bad', 'on', 'bad'])
   })
 
-  it('keeps score, trail and outcomes together after a mismatch on a meaning whose own character is paired', () => {
+  it('gives a miss on a meaning whose own character is paired to the word that tile will complete', () => {
     vi.useFakeTimers()
     const onComplete = vi.fn()
     render(<MatchPairsGame pairs={blue} isSaving={false} onComplete={onComplete} shell={shell} />)
@@ -169,10 +169,11 @@ describe('MatchPairsGame with two words of one meaning (audit 16 F3)', () => {
     pick('青', 1, true)
     expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)[0]).toBe('on')
 
-    /* then 猫 is tried against that "blue": a genuine mismatch, so 青's word is missed after all */
+    /* then 猫 is tried against that "blue": a genuine mismatch, charged to 猫 and to 青い, the word
+       that "blue" will now complete; 青 stays paired and correct */
     pick('猫', 0, true)
     act(() => { vi.advanceTimersByTime(400) })
-    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)[0]).toBe('bad')
+    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)[0]).toBe('on')
 
     pick('青い', 0, true)
     pick('猫', 2, true)
@@ -180,11 +181,11 @@ describe('MatchPairsGame with two words of one meaning (audit 16 F3)', () => {
     expect(onComplete).toHaveBeenCalledWith({
       score: 1,
       outcomes: [
-        { poolPosition: 0, outcome: 'incorrect' },
-        { poolPosition: 1, outcome: 'correct' },
+        { poolPosition: 0, outcome: 'correct' },
+        { poolPosition: 1, outcome: 'incorrect' },
         { poolPosition: 2, outcome: 'incorrect' },
       ],
     })
-    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)).toEqual(['bad', 'on', 'bad'])
+    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)).toEqual(['on', 'bad', 'bad'])
   })
 })

@@ -36,6 +36,16 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
   const [isResolving, setIsResolving] = useState(false)
   const [status, setStatus] = useState('')
 
+  /* WHOSE MISS A MEANING TILE IS. A tile goes to the word whose pair it will complete: its own word
+     while that word's character is still on the board, otherwise the unpaired word with the same
+     meaning, so a word already paired is never marked missed afterwards (audit 16 review). */
+  function meaningTileOwner(meaningTile: MatchPair): number {
+    const own = pairs.find((tile) => tile.side === 'character' && tile.poolPosition === meaningTile.poolPosition)
+    if (own && !matchedIds.has(own.id)) return meaningTile.poolPosition
+    const other = pairs.find((tile) => tile.side === 'character' && !matchedIds.has(tile.id) && pairsBelongTogether(tile, meaningTile))
+    return other ? other.poolPosition : meaningTile.poolPosition
+  }
+
   function selectPair(pair: MatchPair): void {
     if (isSaving || isResolving || matchedIds.has(pair.id)) return
     if (!selected) {
@@ -53,7 +63,7 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
     const characterTile = selected.side === 'character' ? selected : pair
     const meaningTile = selected.side === 'character' ? pair : selected
     if (!pairsBelongTogether(characterTile, meaningTile)) {
-      setMissedPositions((current) => new Set([...current, selected.poolPosition, pair.poolPosition]))
+      setMissedPositions((current) => new Set([...current, characterTile.poolPosition, meaningTileOwner(meaningTile)]))
       setFlashIds([selected.id, pair.id])
       setStatus(DAILY_GAMES_COPY.matchPairsMismatched.replace('{first}', selected.value).replace('{second}', pair.value))
       window.setTimeout(() => {

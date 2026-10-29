@@ -123,6 +123,7 @@ export function assessRomajiSprintAnswer(
   round: { answer: string; focusText: string; deckSlug?: string },
   given: string,
 ): 'exact' | 'incorrect' {
+  // every vocabulary deck, whatever its level, falls in the section keyed 'vocab_n5'
   const vocabulary = round.deckSlug !== undefined && sectionForDeckSlug(round.deckSlug) === 'vocab_n5'
   const candidates = romajiSprintCandidates(round.answer, round.focusText, { vocabulary })
   const answer = normalizeText(given)
