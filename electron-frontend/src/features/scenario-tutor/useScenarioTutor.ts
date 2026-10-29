@@ -539,7 +539,8 @@ export function useScenarioTutor({
     if (aiEvaluationEnabledRef.current) {
       // Warm the local model so the first uncertain turn isn't paying for a
       // cold start. A failure here changes nothing — evaluation is optional.
-      void window.jplearnDesktop?.preloadAssistantChatRuntime?.().catch(() => {})
+      // Its own route (audit 15, D6): warming a scenario never marks the chat as wanted.
+      void window.jplearnDesktop?.preloadScenarioModel?.().catch(() => {})
     }
   }, [selectedScenario, selectedLevel, beginSession])
 

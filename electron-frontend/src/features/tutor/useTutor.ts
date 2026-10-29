@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
-  AssistantChatRuntimeStatus,
   AssistantChatTurn,
   AssistantEventPayload,
   AssistantToast,
@@ -16,6 +15,8 @@ import {
   ASSISTANT_TOAST_TTL_MS,
   OCR_NO_TRANSLATION_REASON,
   OCR_TRANSLATION_FAILED_PREFIX,
+  TUTOR_FAILED_PREFIX,
+  TUTOR_NO_REASON,
 } from './constants'
 import {
   formatAssistantEventBody,
@@ -36,7 +37,6 @@ export interface UseTutorReturn {
   assistantChatLoading: boolean
   assistantChatError: string | null
   assistantSpeakingTurnKey: string | null
-  assistantChatStatus: AssistantChatRuntimeStatus | null
   clearAssistantChat: () => Promise<void>
   sendAssistantChat: (message: string) => Promise<void>
   replayAssistantTurn: (content: string, turnKey: string) => void
@@ -53,6 +53,9 @@ export interface UseTutorReturn {
   notifyTutorStartupReady: () => void
 }
 
+/* splitSpeechSegments files a run of digits or punctuation under Japanese; it is not Japanese to speak */
+const JAPANESE_SPEECH_CHAR = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/
+
 export function useTutor(
   settings: TutorSettingsFields,
   deps: TutorDeps,
@@ -62,9 +65,6 @@ export function useTutor(
   const [assistantChatLoading, setAssistantChatLoading] = useState(false)
   const [assistantChatError, setAssistantChatError] = useState<string | null>(null)
   const [assistantSpeakingTurnKey, setAssistantSpeakingTurnKey] = useState<string | null>(null)
-  const [assistantChatStatus, setAssistantChatStatus] = useState<AssistantChatRuntimeStatus | null>(null)
-  const [, setAssistantChatWarmup] = useState(false)
-  const [, setAssistantChatFallbackNote] = useState<string | null>(null)
   const [ocrWorkbenchBusy, setOcrWorkbenchBusy] = useState(false)
   const [ocrWorkbenchError, setOcrWorkbenchError] = useState<string | null>(null)
   const [ocrWorkbenchResult, setOcrWorkbenchResult] = useState<OcrWorkbenchResult | null>(null)
@@ -73,8 +73,12 @@ export function useTutor(
   // up stands on A QUESTION.
   const assistantChatOpen = Boolean(deps.lookupChatVisible)
 
-  const assistantChatHistoryHydratedRef = useRef(false)
-  const assistantChatClearTokenRef = useRef(0)
+  /* bumped by every send and every CLEAR: a history read that started before one of them is stale
+     (it lacks the turn just sent, or still has the turns just cleared) and is dropped */
+  const assistantChatHistoryTokenRef = useRef(0)
+  /* a reply is on its way: the main process has not yet appended this exchange, so a history read
+     now would wipe the optimistic user turn (audit 15, r2 change 8) */
+  const assistantChatPendingRef = useRef(false)
   const assistantSeenEventIdsRef = useRef<Set<number>>(new Set())
   const ocrRequestTokenRef = useRef(0)
 
@@ -84,7 +88,10 @@ export function useTutor(
     if (!settings.assistantChatAudioEnabled) {
       return
     }
+    /* ONLY THE JAPANESE IS SPOKEN (Robbie, audit 15): the voice is a Japanese voice, and a reply that
+       explains in English would be read out badly. A reply with no Japanese stays silent. */
     const segments = voice.splitSpeechSegments(text)
+      .filter((segment) => segment.language === 'ja' && JAPANESE_SPEECH_CHAR.test(segment.text))
     if (segments.length <= 0) {
       return
     }
@@ -151,85 +158,29 @@ export function useTutor(
     deps.onToastNavigate(suggestedScript, suggestedGame, suggestedScript !== deps.activeScript)
   }, [deps, trackAssistantToastInteraction])
 
-  const refreshAssistantChatHistory = useCallback(async (): Promise<boolean> => {
+  /* THE HISTORY IS THE MAIN PROCESS'S SESSION ARRAY (audit 15, D5), read when the chat is switched
+     on and when it is opened, never while a reply is pending. */
+  const refreshAssistantChatHistory = useCallback(async (): Promise<void> => {
     const getAssistantChatHistory = window.jplearnDesktop?.getAssistantChatHistory
-    if (!getAssistantChatHistory) {
-      return false
+    if (!getAssistantChatHistory || assistantChatPendingRef.current) {
+      return
     }
-    const clearTokenAtStart = assistantChatClearTokenRef.current
+    const tokenAtStart = assistantChatHistoryTokenRef.current
     try {
       const response = await getAssistantChatHistory(20)
-      if (assistantChatClearTokenRef.current !== clearTokenAtStart) {
-        return false
+      if (assistantChatHistoryTokenRef.current !== tokenAtStart || assistantChatPendingRef.current) {
+        return
       }
       if (response.ok) {
         setAssistantChatMessages(response.turns)
-        return true
       }
-      return false
     } catch {
-      return false
+      // The history shown stays as it was.
     }
   }, [])
-
-  const refreshAssistantChatStatus = useCallback(async (): Promise<AssistantChatRuntimeStatus | null> => {
-    const getAssistantChatRuntimeStatus = window.jplearnDesktop?.getAssistantChatRuntimeStatus
-    if (!getAssistantChatRuntimeStatus) {
-      return null
-    }
-    try {
-      const status = await getAssistantChatRuntimeStatus()
-      setAssistantChatStatus(status)
-      return status
-    } catch {
-      return null
-    }
-  }, [])
-
-  const hydrateAssistantChatFromPreloaded = useCallback(async (): Promise<boolean> => {
-    const getPreloadedAssistantChatHistory = window.jplearnDesktop?.getPreloadedAssistantChatHistory
-    if (!getPreloadedAssistantChatHistory) {
-      return false
-    }
-    const clearTokenAtStart = assistantChatClearTokenRef.current
-    try {
-      const response = await getPreloadedAssistantChatHistory()
-      if (assistantChatClearTokenRef.current !== clearTokenAtStart) {
-        return false
-      }
-      if (!response.ok || !response.runtimeActive) {
-        return false
-      }
-      setAssistantChatMessages(response.turns)
-      assistantChatHistoryHydratedRef.current = true
-      return true
-    } catch {
-      return false
-    }
-  }, [])
-
-  const isAssistantServerActive = useCallback((status: AssistantChatRuntimeStatus | null): boolean => {
-    if (!status?.loaded) {
-      return false
-    }
-    return String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp'
-  }, [])
-
-  const hydrateAssistantChatFromRuntime = useCallback(async (): Promise<boolean> => {
-    const status = await refreshAssistantChatStatus()
-    if (!isAssistantServerActive(status)) {
-      return false
-    }
-    const hydrated = await refreshAssistantChatHistory()
-    if (hydrated) {
-      assistantChatHistoryHydratedRef.current = true
-    }
-    return hydrated
-  }, [isAssistantServerActive, refreshAssistantChatHistory, refreshAssistantChatStatus])
 
   const clearAssistantChat = useCallback(async () => {
-    assistantChatClearTokenRef.current += 1
-    assistantChatHistoryHydratedRef.current = true
+    assistantChatHistoryTokenRef.current += 1
     setAssistantChatMessages([])
     setAssistantChatError(null)
     const clearHistory = window.jplearnDesktop?.clearAssistantChatHistory
@@ -269,38 +220,40 @@ export function useTutor(
       content: message,
       created_at_utc: new Date().toISOString(),
     }
+    assistantChatHistoryTokenRef.current += 1
+    assistantChatPendingRef.current = true
     setAssistantChatMessages((previous) => [...previous, optimisticTurn])
     setAssistantChatLoading(true)
     setAssistantChatError(null)
-    setAssistantChatWarmup(!assistantChatStatus?.loaded)
     try {
-      const response = await sendAssistantChatMessage({
-        message,
-        context: {
-          session_id: deps.activeSessionId ?? '',
-        },
-      })
-      if (response.provider === 'scripted-fallback' || response.provider === 'stub-fallback') {
-        setAssistantChatFallbackNote('Local model unavailable. Scripted coach mode is active for this chat turn.')
-      } else {
-        setAssistantChatFallbackNote(null)
+      let response: Awaited<ReturnType<typeof sendAssistantChatMessage>>
+      try {
+        response = await sendAssistantChatMessage({
+          message,
+          context: {
+            session_id: deps.activeSessionId ?? '',
+          },
+        })
+      } catch (error: unknown) {
+        /* A FAILED TURN IS AN ERROR, NOT A REPLY (audit 15, D2): the question leaves the chat (the
+           main process kept neither half) and the reason stands where the reply would be. A cancel
+           arrives here too, as "the request was stopped". */
+        setAssistantChatMessages((previous) => previous.filter((turn) => turn !== optimisticTurn))
+        const reason = ipcErrorReason(error).split(/\r?\n/)[0].trim()
+        setAssistantChatError(`${TUTOR_FAILED_PREFIX}${reason || TUTOR_NO_REASON}`)
+        return
       }
-      await refreshAssistantChatStatus()
+      // the exchange is in the main process's array now, so the read that shows it may run
+      assistantChatPendingRef.current = false
       await refreshAssistantChatHistory()
       if (response.text) {
         void speakAssistantReply(response.text)
       }
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : 'Unable to send assistant chat message.'
-      if (/llama\.cpp exited with code 130/i.test(detail) || /inference cancelled/i.test(detail)) {
-        setAssistantChatError('Chat inference cancelled.')
-      } else {
-        setAssistantChatError(detail)
-      }
     } finally {
+      assistantChatPendingRef.current = false
       setAssistantChatLoading(false)
     }
-  }, [assistantChatStatus?.loaded, deps.activeSessionId, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled, speakAssistantReply])
+  }, [deps.activeSessionId, refreshAssistantChatHistory, settings.assistantChatEnabled, speakAssistantReply])
 
   const clearOcrWorkbenchResult = useCallback(() => {
     setOcrWorkbenchResult(null)
@@ -429,38 +382,8 @@ export function useTutor(
     if (!settings.assistantChatEnabled) {
       return
     }
-
-    let disposed = false
-
-    const tryHydrate = async (): Promise<void> => {
-      if (assistantChatHistoryHydratedRef.current || disposed) {
-        return
-      }
-      const hydratedFromPreload = await hydrateAssistantChatFromPreloaded()
-      if (hydratedFromPreload || assistantChatHistoryHydratedRef.current) {
-        return
-      }
-      const hydratedFromRuntime = await hydrateAssistantChatFromRuntime()
-      if (hydratedFromRuntime || assistantChatHistoryHydratedRef.current || disposed) {
-        return
-      }
-      const loadedFromStore = await refreshAssistantChatHistory()
-      if (loadedFromStore) {
-        assistantChatHistoryHydratedRef.current = true
-      }
-    }
-
-    void tryHydrate()
-
-    const startupHydrationPollHandle = window.setInterval(() => {
-      void tryHydrate()
-    }, 2000)
-
-    return () => {
-      disposed = true
-      window.clearInterval(startupHydrationPollHandle)
-    }
-  }, [hydrateAssistantChatFromPreloaded, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, settings.assistantChatEnabled])
+    void refreshAssistantChatHistory()
+  }, [refreshAssistantChatHistory, settings.assistantChatEnabled])
 
   // oxlint-disable react-hooks/exhaustive-deps — voice is injected via VoiceDeps, not a stable ref
   useEffect(() => {
@@ -470,55 +393,31 @@ export function useTutor(
     voice.cancelAssistantSpeech()
   }, [assistantChatOpen, settings.assistantChatAudioEnabled, voice.cancelAssistantSpeech])
 
-  // Clears transient chat feedback (error/warmup/fallback banners) whenever
+  // Clears transient chat feedback (the error line) whenever
   // chat stops being the visible activity, for any reason — popup closed,
   // switched to another mode, or back to the menu. Chat messages and the
   // draft input are NOT cleared here; they persist across all of these.
   useEffect(() => {
     if (assistantChatOpen) return
     setAssistantChatError(null)
-    setAssistantChatWarmup(false)
-    setAssistantChatFallbackNote(null)
   }, [assistantChatOpen])
 
   useEffect(() => {
     if (!settings.assistantChatEnabled || !assistantChatOpen) {
       return
     }
-
-    let disposed = false
-
-    async function hydrateAssistantChatPanel(): Promise<void> {
-      await refreshAssistantChatHistory()
-      if (disposed) return
-      await hydrateAssistantChatFromRuntime()
-      if (disposed) return
-    }
-
-    void hydrateAssistantChatPanel()
-
-    const statusPollHandle = window.setInterval(() => {
-      void hydrateAssistantChatFromRuntime()
-    }, 10000)
-
-    return () => {
-      disposed = true
-      window.clearInterval(statusPollHandle)
-    }
-  }, [assistantChatOpen, hydrateAssistantChatFromRuntime, refreshAssistantChatHistory, refreshAssistantChatStatus, settings.assistantChatEnabled])
+    void refreshAssistantChatHistory()
+  }, [assistantChatOpen, refreshAssistantChatHistory, settings.assistantChatEnabled])
 
   useEffect(() => {
     if (settings.assistantChatEnabled) {
       return
     }
 
-    assistantChatHistoryHydratedRef.current = false
     // Chat was just disabled in settings: A QUESTION dims to its no-model
     // state, and nothing it was doing is left running.
     setAssistantChatLoading(false)
-    setAssistantChatWarmup(false)
     setAssistantChatError(null)
-    setAssistantChatFallbackNote(null)
 
     const unloadAssistantChatRuntime = window.jplearnDesktop?.unloadAssistantChatRuntime
     if (!unloadAssistantChatRuntime) {
@@ -680,7 +579,6 @@ export function useTutor(
     assistantChatLoading,
     assistantChatError,
     assistantSpeakingTurnKey,
-    assistantChatStatus,
     clearAssistantChat,
     sendAssistantChat,
     replayAssistantTurn,
