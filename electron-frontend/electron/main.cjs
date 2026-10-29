@@ -5,6 +5,9 @@ const os = require('node:os')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { createBridgeWorker, isWorkerRefusal } = require('./bridge_worker.cjs')
+const { createBridgeReadCache } = require('./bridge_read_cache.cjs')
+// One copy of which Python to launch, shared with the OCR and speech runtimes (audit 11, nit 2).
+const { resolvePythonCommand } = require('./python_command.cjs')
 const { createAnswerQueue, createUnsavedAnswersQuitGuard } = require('./answer_queue.cjs')
 const { registerIpcHandlers } = require('./ipc_handlers.cjs')
 const { createTutorChatRuntime } = require('./llm_runtime.cjs')
@@ -289,7 +292,6 @@ const localVoiceRuntime = createSelectedVoiceRuntime()
 const localSetupRuntime = createSetupRuntime()
 const localSpeechRuntime = createSpeechRuntime({ repoRoot })
 const localOcrRuntime = createOcrRuntime({ repoRoot })
-let tutorRuntimePreloadTriggered = false
 let tutorRuntimePreloadPromise = null
 let preloadedAssistantChatHistory = {
   ok: true,
@@ -297,8 +299,6 @@ let preloadedAssistantChatHistory = {
   runtimeActive: false,
   source: 'startup-none',
 }
-const bridgeReadCache = new Map()
-const bridgeReadInFlight = new Map()
 const THEME_STATE_FILENAME = 'jplearn-startup-theme.json'
 const STARTUP_TELEMETRY_FILENAME = 'startup-telemetry.json'
 const STUDY_JOURNEY_SMOKE_FILENAME = 'study-journey-smoke.json'
@@ -309,7 +309,14 @@ const BRIDGE_READ_CACHE_TTLS_MS = {
   'block-progress': 45000,
   'overview-character-mastery': 45000,
   'study-queue': 12000,
+  /* The startup preload computes these three; the home screen asks for them moments later and
+     takes the preload's result instead of computing them again (audit 11, Robbie: "Keep them,
+     reuse results"). Every write that can change them clears them. */
+  'xp-progress': 15000,
+  recommendations: 15000,
+  'learning-path-status': 15000,
 }
+const bridgeReadCache = createBridgeReadCache({ ttlsMs: BRIDGE_READ_CACHE_TTLS_MS })
 const BRIDGE_REQUEST_TIMEOUT_MS = 30000
 // A single slow request (fsrs-optimize) timing out should not tear down
 // the worker and collaterally reject every unrelated in-flight request. Only
@@ -357,7 +364,6 @@ async function refreshTutorRuntimeAfterSetup() {
     // Best effort only.
   }
   localTutorRuntime = createTutorChatRuntime()
-  tutorRuntimePreloadTriggered = false
   tutorRuntimePreloadPromise = null
   preloadedAssistantChatHistory = {
     ok: true,
@@ -365,11 +371,7 @@ async function refreshTutorRuntimeAfterSetup() {
     runtimeActive: false,
     source: 'setup-runtime-refresh-started',
   }
-  try {
-    await preloadTutorChatStartupData()
-  } catch {
-    // If the runtime cannot start, the assistant will fall back later.
-  }
+  // No warmup here: the window asks for one when the tutor chat is switched on (audit 11, F3).
 }
 
 // voice runtime re-resolves model paths fresh on every
@@ -992,37 +994,6 @@ function resolvePythonBridgeContext() {
   }
 }
 
-function resolvePythonCommand(projectRoot) {
-  const explicit = (process.env.JPLEARN_PYTHON || '').trim()
-  if (explicit) {
-    return explicit
-  }
-
-  // 1. python-build-standalone bundled with the packaged installer
-  //    Located at resources/python-bundle/python/python.exe in the packaged app.
-  const resourcesPath = (typeof process !== 'undefined' && process.resourcesPath) || ''
-  if (resourcesPath) {
-    const bundled = path.join(resourcesPath, 'python-bundle', 'python', 'python.exe')
-    if (fs.existsSync(bundled)) {
-      return bundled
-    }
-  }
-
-  // 2. .venv in the project root (dev)
-  const candidates = process.platform === 'win32'
-    ? [path.join(projectRoot, '.venv', 'Scripts', 'python.exe')]
-    : [path.join(projectRoot, '.venv', 'bin', 'python3'), path.join(projectRoot, '.venv', 'bin', 'python')]
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate
-    }
-  }
-
-  // 3. System Python on PATH
-  return 'python'
-}
-
 function runPythonBridgeOneShot(command) {
   const bridgeContext = resolvePythonBridgeContext()
   const pythonCmd = resolvePythonCommand(bridgeContext.projectRoot)
@@ -1199,66 +1170,17 @@ function runPythonBridgeIsolated(args) {
   return runPythonBridgeWithArgsOneShot(args)
 }
 
-function getBridgeCacheKey(commandOrArgs) {
-  if (Array.isArray(commandOrArgs)) {
-    return commandOrArgs.join('\u001f')
-  }
-  return commandOrArgs
-}
-
-function resolveBridgeReadCacheTtlMs(commandOrArgs) {
-  const command = Array.isArray(commandOrArgs) ? commandOrArgs[0] : commandOrArgs
-  return BRIDGE_READ_CACHE_TTLS_MS[command] || 0
-}
-
-function getCachedBridgeRead(commandOrArgs, loader) {
-  const ttlMs = resolveBridgeReadCacheTtlMs(commandOrArgs)
-  if (ttlMs <= 0) {
-    return loader()
-  }
-
-  const cacheKey = getBridgeCacheKey(commandOrArgs)
-  const cached = bridgeReadCache.get(cacheKey)
-  const now = Date.now()
-  if (cached && cached.expiresAt > now) {
-    return Promise.resolve(cached.payload)
-  }
-
-  const inFlight = bridgeReadInFlight.get(cacheKey)
-  if (inFlight) {
-    return inFlight
-  }
-
-  const promise = Promise.resolve()
-    .then(loader)
-    .then((payload) => {
-      bridgeReadCache.set(cacheKey, {
-        payload,
-        expiresAt: Date.now() + ttlMs,
-      })
-      bridgeReadInFlight.delete(cacheKey)
-      return payload
-    })
-    .catch((error) => {
-      bridgeReadInFlight.delete(cacheKey)
-      throw error
-    })
-
-  bridgeReadInFlight.set(cacheKey, promise)
-  return promise
-}
-
 function runPythonBridgeCached(command) {
-  return getCachedBridgeRead(command, () => runPythonBridge(command))
+  return bridgeReadCache.read(command, () => runPythonBridge(command))
 }
 
 function runPythonBridgeWithArgsCached(args) {
-  return getCachedBridgeRead(args, () => runPythonBridgeWithArgs(args))
+  return bridgeReadCache.read(args, () => runPythonBridgeWithArgs(args))
 }
 
-function clearBridgeReadCaches() {
-  bridgeReadCache.clear()
-  bridgeReadInFlight.clear()
+// With a list of commands, only those reads are forgotten (see bridge_read_cache.cjs).
+function clearBridgeReadCaches(commands) {
+  bridgeReadCache.clear(commands)
 }
 
 function getSafeRestoreBounds(win) {
@@ -1383,64 +1305,81 @@ registerIpcHandlers({
   refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
   refreshOcrRuntime: refreshOcrRuntimeAfterSetup,
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
+  /* The tutor is warmed only when the window asks, and it asks only while the tutor chat is switched
+     on (audit 11, F3; Robbie: "Only if chat is on"). The warmup also reads back the saved chat
+     history, as the launch warmup used to. */
+  preloadTutorChat: () => preloadTutorChatStartupData(),
   reloadLocalFontsForContents,
   getBridgeTelemetrySnapshot,
   stopPythonBridgeWorker,
   setIsQuitting: () => { isQuitting = true },
 })
 
+/* WARM THE TUTOR AND READ BACK ITS SAVED HISTORY, when the window asks (audit 11, F3). Calls that
+   arrive while one is running share it; a later call (the chat switched off and on again, or a new
+   model) runs again, so the runtime the learner ends up with is the one that was warmed. */
 async function preloadTutorChatStartupData() {
-  if (!tutorRuntimePreloadPromise) {
-    tutorRuntimePreloadPromise = (async () => {
-      try {
-        await localTutorRuntime.preload('splash-startup')
-      } catch {
-        preloadedAssistantChatHistory = {
-          ok: true,
-          turns: [],
-          runtimeActive: false,
-          source: 'startup-preload-failed',
-        }
-        return
-      }
-
-      const status = localTutorRuntime.getStatus()
-      const runtimeActive = Boolean(
-        status
-        && status.loaded
-        && String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp',
-      )
-      if (!runtimeActive) {
-        preloadedAssistantChatHistory = {
-          ok: true,
-          turns: [],
-          runtimeActive: false,
-          source: 'startup-runtime-inactive',
-        }
-        return
-      }
-
-      try {
-        const payload = await runPythonBridgeWithArgs(['assistant-chat-history', '20'])
-        const turns = Array.isArray(payload?.turns) ? payload.turns : []
-        preloadedAssistantChatHistory = {
-          ok: true,
-          turns,
-          runtimeActive: true,
-          source: 'startup-preloaded',
-        }
-      } catch {
-        preloadedAssistantChatHistory = {
-          ok: true,
-          turns: [],
-          runtimeActive: true,
-          source: 'startup-history-failed',
-        }
-      }
-    })()
+  if (tutorRuntimePreloadPromise) {
+    return tutorRuntimePreloadPromise
   }
+  const runtime = localTutorRuntime
+  const run = (async () => {
+    let result
+    try {
+      result = await runtime.preload('renderer-startup')
+    } catch (error) {
+      preloadedAssistantChatHistory = {
+        ok: true,
+        turns: [],
+        runtimeActive: false,
+        source: 'startup-preload-failed',
+      }
+      throw error
+    }
 
-  return tutorRuntimePreloadPromise
+    const status = runtime.getStatus()
+    const runtimeActive = Boolean(
+      status
+      && status.loaded
+      && String(status.activeProvider || '').trim().toLowerCase() === 'llama.cpp',
+    )
+    if (!runtimeActive) {
+      preloadedAssistantChatHistory = {
+        ok: true,
+        turns: [],
+        runtimeActive: false,
+        source: 'startup-runtime-inactive',
+      }
+      return result
+    }
+
+    try {
+      const payload = await runPythonBridgeWithArgs(['assistant-chat-history', '20'])
+      const turns = Array.isArray(payload?.turns) ? payload.turns : []
+      preloadedAssistantChatHistory = {
+        ok: true,
+        turns,
+        runtimeActive: true,
+        source: 'startup-preloaded',
+      }
+    } catch {
+      preloadedAssistantChatHistory = {
+        ok: true,
+        turns: [],
+        runtimeActive: true,
+        source: 'startup-history-failed',
+      }
+    }
+    return result
+  })()
+  tutorRuntimePreloadPromise = run
+  try {
+    return await run
+  } finally {
+    if (tutorRuntimePreloadPromise === run) {
+      tutorRuntimePreloadPromise = null
+    }
+  }
 }
 
 function createTray(mainWindowRef) {
@@ -2285,11 +2224,35 @@ async function createWindowWithSplash() {
     updateSplashStatus(splash, 'Finalizing startup...', 'Preparing your first screen...', 92)
   })
 
-  const [, preloadTelemetry] = await Promise.all([
-    rendererStartupPromise,
-    startupBridgePreloadPromise,
-    new Promise((resolve) => setTimeout(resolve, minSplashMs)),
+  /* ONE DEADLINE FOR THE WHOLE SPLASH (audit 11, F4). The preload checks its budget only between
+     tasks, and a task that falls back to a one-shot process has no time limit, so a hung read could
+     keep the splash up for good. Past the deadline the window shows and anything still running is
+     left to finish behind it. */
+  let startupDeadlineTimer = null
+  const startupDeadline = new Promise((resolve) => {
+    startupDeadlineTimer = setTimeout(() => resolve(null), maxStartupWaitMs)
+  })
+  const startupGates = await Promise.race([
+    Promise.all([
+      rendererStartupPromise,
+      startupBridgePreloadPromise,
+      new Promise((resolve) => setTimeout(resolve, minSplashMs)),
+    ]),
+    startupDeadline,
   ])
+  clearTimeout(startupDeadlineTimer)
+  const preloadTelemetry = startupGates
+    ? startupGates[1]
+    : {
+        totalDurationMs: null,
+        taskTimings: [{
+          key: 'startup-deadline',
+          label: 'Startup deadline reached',
+          durationMs: Date.now() - startupSessionStartedAt,
+          ok: false,
+          error: `The window was shown after ${maxStartupWaitMs}ms with startup still running`,
+        }],
+      }
 
   const startupSessionCompletedAt = Date.now()
   const startupSessionMs = startupSessionCompletedAt - startupSessionStartedAt
@@ -2351,10 +2314,6 @@ async function createWindowWithSplash() {
       }
     }, fadeInterval)
 
-    if (!tutorRuntimePreloadTriggered) {
-      tutorRuntimePreloadTriggered = true
-      void preloadTutorChatStartupData().catch(() => undefined)
-    }
   }
 
   win.on('closed', () => {
