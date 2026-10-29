@@ -6,6 +6,54 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-29 — Dictionary, lookup and OCR
+
+**Scope:** Audit 14. Robbie chose "Dictionary, lookup, OCR (Recommended)" over tutor and assistant, and minigames and Daily Games, then ran `/crew-audit`.
+- Covered: the offline dictionary (repository, bridge commands, the tutor's JMdict lookup, install and paths); Look It Up and the Dictionary panel with their IPC routes; the OCR runtime, server, extraction, temp file and screenshot screen; OCR translation; normalisation on lookup keys.
+- Out: OCR package install and pins (audit 13), download integrity (audit 6), the tutor chat.
+
+**Commit audited:** f570104 on main, tree clean.
+
+**Method:**
+- The Auditor read source, the census, git history (085cb63) and the records; no helpers.
+- The lead ran Checks 1-10 locally, read-only, against the repo's dictionary index (the installed app has no dictionary, OCR, tutor model or embedder).
+- Not run: Check 11 (needs an installed embedder).
+- known-answers Part 2 was read at Orient by mistake.
+- Report: `AUDIT-dictionary-lookup-and-ocr-2026-10-29-1-r2.md`; F1's full list `audit14-f1-mismatches.csv`.
+
+### Where each finding went
+- F1, 287 of 1,410 N5/N4 vocabulary cards (165/744, 122/666) carry another dictionary entry, shown as furigana and clues and accepted as typed-recall answers (P0, Checks 1, 2, 10): reported. Check 10: 57 the same word in another spelling, 14 a dropped honorific (wrong reading), 34 a stripped "~" affix (different word), 182 other.
+- F3, the tutor's JMdict query hits a table gone since 085cb63, then parses a 117 MB JSON (2.4 s) in the main process (P2, Checks 5, 6): reported.
+- F4, the screenshot route opens with OCR alone though translation needs llama.cpp and a refreshed runtime; text read is discarded on failure; the active-translation setting is unread (P2): reported.
+- F2, English dictionary search runs the embedding model on the serial bridge (P2, plausible; Check 11 not run): reported; debt row drafted.
+- F5, Look It Up claims to search decks and has no romaji fallback (P3): reported.
+- F6, the Dictionary panel calls a missing dictionary a failed lookup (P3): reported.
+- Nits 1-4: reported.
+- STALE RECORD: this file's audit 5 F1 line ("translations come from the bundled JMdict"); `llm_runtime.cjs:992-993`; ARCHITECTURE §8 B1 omits the embedder.
+- Dropped: none. CONTRADICTS: none.
+
+### Triggers checked
+- DEBT #4: kanji detail is an unlisted caller that rebuilds decks; trigger not measured.
+- ARCH §8 B1/B2: still open; F2 is a new case of B1.
+
+### Inspected and found sound — do not re-derive these
+- IPC validation on the dictionary, kanji, sentence, image and translate routes.
+- The OCR temp file is randomly named and removed on every path.
+- The OCR runtime: single-flight queue, cold and warm time limits, settling only its own request, idle and quit unload; ocr_server survives failed requests; OCR never downloads.
+- Kanji detail falls back to deck data.
+- Look It Up's sequential routes and stale-batch drop.
+- The phrase scan of 60,000 rows; dictionary note keys from the JMdict id.
+- The fallback English search takes 5-58 ms; prefix search stays within 3 ms.
+
+### What this pass could not establish
+- F2's cost with a real embedder (Check 11).
+- How long Electron takes to build F3's index after the parse.
+- No screens were looked at.
+- No test reaches F1's entry choice over real decks, F3's real schema or F4's failure path.
+
+### Coverage, not a finding
+- The last three passes (packaging, progression, startup) did not cover tutor and assistant, JLPT, minigames and Daily Games, the menu and valley, renderer state and settings, passages or handwriting.
+
 ## 2026-10-29 — Packaging, updates and upgrades
 
 **Scope:** Audit 13. Robbie chose "Packaging and upgrades (Recommended)" over JLPT prep, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, reading passages, handwriting, and the whole repository.
