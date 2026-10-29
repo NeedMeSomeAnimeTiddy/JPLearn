@@ -672,6 +672,8 @@ function validateConjugationDrillRequest(payload) {
 const VALID_DAILY_GAMES_TYPES = new Set(['crossword', 'word_search', 'match_pairs', 'typing_blitz'])
 const VALID_DAILY_GAMES_MODES = new Set(['daily', 'practice'])
 const VALID_DAILY_GAMES_OUTCOMES = new Set(['correct', 'incorrect'])
+// One less than DEFAULT_DAILY_POOL_LIMIT in domain/daily_games.py: a pool position is an index
+// into the day's pool. Raise both together; daily_games_pool_size.test.ts holds them to each other.
 const MAX_DAILY_GAMES_POOL_POSITION = 19
 const MAX_DAILY_GAMES_SCORE = 1_000_000_000
 const MAX_DAILY_GAMES_DURATION_SECONDS = 86_400
@@ -1091,6 +1093,7 @@ const BACKUP_WINDOW_STATE_KEYS = Object.freeze([
   'jplearn-desktop-settings-v1',
 ])
 module.exports.BACKUP_WINDOW_STATE_KEYS = BACKUP_WINDOW_STATE_KEYS
+module.exports.MAX_DAILY_GAMES_POOL_POSITION = MAX_DAILY_GAMES_POOL_POSITION
 // Matches MAX_WINDOW_STATE_CHARACTERS in data/whole_backup.py.
 const MAX_BACKUP_WINDOW_STATE_CHARACTERS = 2_000_000
 
