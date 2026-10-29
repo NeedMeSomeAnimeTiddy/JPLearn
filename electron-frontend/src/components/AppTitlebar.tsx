@@ -446,7 +446,7 @@ export function AppTitlebar({
             className={`titlebar-streak-chip titlebar-pomodoro ${pomodoro.display && (pomodoro.display.phase === 'break' || pomodoro.display.phase === 'long-break') ? 'titlebar-pomodoro--break' : ''}`}
             onClick={pomodoro.toggle}
             aria-label={pomodoro.display ? `${pomodoro.display.isRunning ? 'Pause' : 'Resume'} timer (${pomodoro.display.formatted})` : 'Start timer'}
-            title={pomodoro.display ? `${pomodoro.display.phase} — ${pomodoro.display.formatted}` : 'Start timer'}
+            title={pomodoro.display ? `${pomodoro.display.phase}: ${pomodoro.display.formatted}` : 'Start timer'}
           >
             <Clock className="titlebar-streak-icon" strokeWidth={2.1} aria-hidden="true" />
             <span className="titlebar-streak-value titlebar-pomodoro-value">
@@ -491,7 +491,7 @@ export function AppTitlebar({
             <p className="titlebar-streak-details-row">Best: {streak.best_days} days</p>
             <p className="titlebar-streak-details-tip">
               {streak.current_days > 0
-                ? 'Keep it up — review something today!'
+                ? 'Keep it up: review something today!'
                 : 'Complete a session to start your streak.'}
             </p>
             <div className="titlebar-streak-details-divider" />
@@ -499,7 +499,7 @@ export function AppTitlebar({
               <Snowflake className="titlebar-streak-details-freeze-icon" strokeWidth={1.8} aria-hidden="true" />
               {streak.freezes_available > 0
                 ? `${streak.freezes_available} freeze${streak.freezes_available === 1 ? '' : 's'} available`
-                : 'No freezes — study this week to earn one!'}
+                : 'No freezes. Study this week to earn one!'}
             </p>
             <p className="titlebar-streak-details-tip">
               Earn 1 freeze per week (max 3). Each missed day costs 1 freeze. If you have enough freezes, your streak stays alive.
@@ -512,7 +512,7 @@ export function AppTitlebar({
             <button
               type="button"
               className="titlebar-xp-button"
-              title={`Level ${xpProgress.level} — ${xpInLevel} / ${xpLevelCap} XP`}
+              title={`Level ${xpProgress.level}: ${xpInLevel} / ${xpLevelCap} XP`}
               aria-label={`Level ${xpProgress.level}. ${xpPercent}% to next level.`}
               aria-expanded={xpDetailsOpen}
               aria-controls="titlebar-xp-details"

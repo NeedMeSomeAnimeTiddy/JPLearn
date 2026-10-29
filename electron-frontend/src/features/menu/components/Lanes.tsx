@@ -81,7 +81,7 @@ export function Lanes({ section, jp, en, note, lanes, onPick, onUp }: LanesProps
         <ScreenHead head={screenHead(section, null)} />
 
         {/* ─── the ways in, as rows ─────────────────────────────────────────────────────────── */}
-        <div className="pr-run" role="group" aria-label={`${en} — ways in`}>
+        <div className="pr-run" role="group" aria-label={`${en}: ways in`}>
           {lanes.map((lane, index) => {
             const classes = ['pr-lane']
             if (index === at) classes.push('on')
@@ -99,8 +99,8 @@ export function Lanes({ section, jp, en, note, lanes, onPick, onUp }: LanesProps
                 onClick={() => (lane.shut ? refuse() : onPick(lane.key))}
                 aria-disabled={lane.shut}
                 aria-label={lane.shut
-                  ? `${lane.en} — locked, ${lane.opens ?? 'not open yet'}`
-                  : `${lane.en} — ${lane.desc}`}
+                  ? `${lane.en}: locked, ${lane.opens ?? 'not open yet'}`
+                  : `${lane.en}: ${lane.desc}`}
               >
                 <span className="pr-glyph" aria-hidden="true">{lane.glyph}</span>
                 <span className="pr-body">

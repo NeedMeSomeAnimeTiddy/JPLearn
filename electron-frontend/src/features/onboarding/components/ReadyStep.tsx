@@ -18,7 +18,7 @@ export function ReadyStep({ submitting, onStart }: ReadyStepProps) {
           </div>
         </div>
         <p className="obn-path-desc">
-          Start from scratch and build a solid foundation. The app will guide you step by step — no guesswork needed.
+          Start from scratch and build a solid foundation. The app will guide you step by step, with no guesswork needed.
         </p>
         <ol className="obn-path-steps">
           {BEGINNER_PATH_STEPS.map((step, i) => (

@@ -174,7 +174,7 @@ export function TypingBlitzGame({ words, isSaving, onComplete, shell }: TypingBl
                 <i>{answer.word.word.romaji}</i>
                 {answer.correct
                   ? <s>RIGHT</s>
-                  : <s className="typed"><span className="sr-only">You typed </span>{answer.typed || '—'}</s>}
+                  : <s className="typed"><span className="sr-only">You typed </span>{answer.typed || '―'}</s>}
               </li>
             )}
           />

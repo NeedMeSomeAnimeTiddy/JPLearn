@@ -10,17 +10,17 @@ export function isParticleClozeMode(mode: MinigameKey): mode is 'particle_cloze'
 }
 
 export const PARTICLE_EXPLANATIONS: Record<string, { romaji: string; explanation: string }> = {
-  'は': { romaji: 'wa', explanation: 'Topic marker — sets the topic of the sentence' },
-  'が': { romaji: 'ga', explanation: 'Subject marker — marks the subject or adds emphasis' },
-  'を': { romaji: 'wo', explanation: 'Direct object marker — marks what the verb acts on' },
-  'に': { romaji: 'ni', explanation: 'Location/direction/time — marks existence, destination, or when' },
-  'で': { romaji: 'de', explanation: 'Location/means — marks where an action happens or how' },
-  'へ': { romaji: 'e', explanation: 'Direction — marks the direction of movement' },
-  'と': { romaji: 'to', explanation: 'And/with — connects nouns or marks a companion' },
-  'の': { romaji: 'no', explanation: 'Possession/genitive — links nouns together' },
-  'も': { romaji: 'mo', explanation: 'Also/even — adds emphasis or inclusion' },
-  'から': { romaji: 'kara', explanation: 'From/because — marks origin or reason' },
-  'まで': { romaji: 'made', explanation: 'Until/up to — marks endpoint in time or space' },
+  'は': { romaji: 'wa', explanation: 'Topic marker: sets the topic of the sentence' },
+  'が': { romaji: 'ga', explanation: 'Subject marker: marks the subject or adds emphasis' },
+  'を': { romaji: 'wo', explanation: 'Direct object marker: marks what the verb acts on' },
+  'に': { romaji: 'ni', explanation: 'Location/direction/time: marks existence, destination, or when' },
+  'で': { romaji: 'de', explanation: 'Location/means: marks where an action happens or how' },
+  'へ': { romaji: 'e', explanation: 'Direction: marks the direction of movement' },
+  'と': { romaji: 'to', explanation: 'And/with: connects nouns or marks a companion' },
+  'の': { romaji: 'no', explanation: 'Possession/genitive: links nouns together' },
+  'も': { romaji: 'mo', explanation: 'Also/even: adds emphasis or inclusion' },
+  'から': { romaji: 'kara', explanation: 'From/because: marks origin or reason' },
+  'まで': { romaji: 'made', explanation: 'Until/up to: marks endpoint in time or space' },
 }
 
 export function isVibeCheckMode(mode: MinigameKey): mode is 'vibe_check' {

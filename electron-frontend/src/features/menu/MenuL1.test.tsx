@@ -133,7 +133,7 @@ describe('the L1 menu', () => {
     installApi([])
     render(<Harness block={block({ recommendations: [] })} />)
 
-    expect(document.querySelector('.sh-fig b')?.textContent).toBe('—')
+    expect(document.querySelector('.sh-fig b')?.textContent).toBe('―')
     /* scoped to the hero: PRACTICE's own row also says NOTHING DUE when the queue is empty, and
        that is two different true statements rather than one duplicated one */
     expect(document.querySelector('.sh-fig em')?.textContent).toMatch(/nothing due/i)

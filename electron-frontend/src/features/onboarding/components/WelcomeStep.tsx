@@ -18,7 +18,7 @@ export function WelcomeStep({ onReveal }: WelcomeStepProps) {
     phaseRef.current = 'title'
 
     const titleText = 'Welcome to JPLearn'
-    const subText = "Let's take two minutes to personalise your learning journey. Every answer is optional — you can always change things later."
+    const subText = "Let's take two minutes to personalise your learning journey. Every answer is optional. You can always change things later."
     let i = 0
     const timer = setInterval(() => {
       if (phaseRef.current === 'title') {

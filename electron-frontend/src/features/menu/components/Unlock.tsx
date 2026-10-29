@@ -113,7 +113,7 @@ export function Unlock({ moment, onContinue, onGo }: UnlockProps) {
                 type="button"
                 className="un-card is-door"
                 key={card.featureId}
-                aria-label={`${card.name} — open ${where}`}
+                aria-label={`${card.name}: open ${where}`}
                 onClick={() => {
                   /* THE MOMENT IS DISMISSED FIRST. It is an event rather than a place, and
                      `menuLevel` goes to a level nothing matches while it is up -- so navigating

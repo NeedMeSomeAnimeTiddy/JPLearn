@@ -421,7 +421,7 @@ describe('MinigameView — answered', () => {
         },
       },
     )
-    expect(screen.getByText('〜を — direct object marker')).toBeTruthy()
+    expect(screen.getByText('〜を: direct object marker')).toBeTruthy()
     expect(screen.getByText(/Marks the thing the verb acts on/)).toBeTruthy()
   })
 

@@ -248,7 +248,7 @@ export function Deck({
         </div>
         <div className="hints">
           <span><b>↑ ↓</b>Choose<em>選択</em></span>
-          {levels.length > 1 ? <span><b>1–{levels.length}</b>Level<em>級</em></span> : null}
+          {levels.length > 1 ? <span><b>1-{levels.length}</b>Level<em>級</em></span> : null}
           <span><b>ENTER</b>Start<em>開始</em></span>
           <span><b>ESC</b>Back<em>戻る</em></span>
         </div>

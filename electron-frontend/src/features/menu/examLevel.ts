@@ -136,7 +136,7 @@ export function levelDetail(rung: Rung, data: LevelReadiness, lastMock: LastMock
 
 /** what the section line says, which depends on whether a mock has ever been sat */
 export function sectionLine(d: LevelDetail): string {
-  if (d.locked) return 'LOCKED — NO MOCK CAN BE SAT YET'
+  if (d.locked) return 'LOCKED: NO MOCK CAN BE SAT YET'
   if (d.lastMock === null || d.lastMock.projected === null) {
     return `NO MOCK SAT · PASS MARK ${d.section.passMark} OF ${d.section.max}`
   }

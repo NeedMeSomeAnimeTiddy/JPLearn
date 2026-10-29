@@ -29,7 +29,7 @@ export function LevelBar({ deck, levels, at, onPick }: LevelBarProps) {
             type="button"
             className={`lvb-chip${level.key === at ? ' on' : ''}`}
             aria-pressed={level.key === at}
-            aria-label={`${name} — ${pct}% of ${level.total.toLocaleString()} cards`}
+            aria-label={`${name}: ${pct}% of ${level.total.toLocaleString()} cards`}
             onClick={() => onPick(level.key)}
           >
             <s>{index + 1}</s>

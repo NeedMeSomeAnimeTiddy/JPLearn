@@ -438,7 +438,7 @@ export function MinigameView({
     }
     const rows = [
       fill === 'choice'
-        ? { cap: '1–4', en: 'Answer', jp: '回答' }
+        ? { cap: '1-4', en: 'Answer', jp: '回答' }
         : { cap: 'ENTER', en: 'Answer', jp: '回答' },
       { cap: 'H', en: 'Hint', jp: '助言' },
     ]
@@ -752,7 +752,7 @@ export function MinigameView({
        was a canvas, a microphone or a pair of buttons inside the panel. A slab is one line and the
        line has to be the way through. */
     : fill === 'choice'
-      ? { text: '1–4 OR ENTER TO ANSWER', jp: '回答', tone: 'duty' as const }
+      ? { text: '1-4 OR ENTER TO ANSWER', jp: '回答', tone: 'duty' as const }
       : fill === 'typed'
         ? { text: 'ENTER TO ANSWER', jp: '回答', tone: 'duty' as const }
         : roundState.mode === 'sentence_assembly'
@@ -910,7 +910,7 @@ export function MinigameView({
                   roundState.mode === 'romaji_sprint'
                     ? 'Enter romaji'
                     : roundState.mode === 'dictation' || roundState.mode === 'conjugation_drill'
-                      ? 'Type here — it becomes kana'
+                      ? 'Type here (it becomes kana)'
                       : 'Type the meaning'
                 }
                 disabled={isRoundResolving}

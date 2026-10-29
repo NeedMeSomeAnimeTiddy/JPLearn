@@ -111,7 +111,7 @@ export function wordKanji(word: VocabFeedWord): WordKanji {
   const chars = kanjiOf(word.word)
   const unknown = Math.min(word.unknown_kanji, chars.length)
   const note = chars.length === 0
-    ? 'NO KANJI IN IT — READABLE ON DAY ONE'
+    ? 'NO KANJI IN IT, READABLE ON DAY ONE'
     : unknown === 0
       ? `${chars.length === 1 ? 'ITS KANJI IS' : `ALL ${chars.length} KANJI ARE`} ONES YOU HAVE MET`
       : `${unknown} OF ${chars.length} ${unknown === 1 ? 'IS' : 'ARE'} NEW TO YOU`

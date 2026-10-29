@@ -119,7 +119,7 @@ export function Stats({ crown }: StatsProps) {
           type="button"
           className={openStat === 'streak' ? 'stat-chip shu is-open' : 'stat-chip shu'}
           aria-expanded={openStat === 'streak'}
-          aria-label={`Streak — ${crown.streakDays} days`}
+          aria-label={`Streak: ${crown.streakDays} days`}
           onClick={(e) => { e.stopPropagation(); toggleStat('streak', e.currentTarget) }}
         >
           <b>{crown.streakDays}</b> DAY STREAK <span className="jp">連続</span>

@@ -58,7 +58,7 @@ export function TutorModelPage({
     <>
       <p style={{ opacity: 0.75, lineHeight: 1.6, marginBottom: '1rem' }}>
         JPLearn includes an AI tutor you can chat with about Japanese grammar, vocabulary, and
-        pronunciation — running privately on your device, no internet required once set up.
+        pronunciation. It runs privately on your device, with no internet required once set up.
       </p>
       <CompactDropdown
         ariaLabel="Tutor model"

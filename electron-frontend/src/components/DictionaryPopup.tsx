@@ -429,7 +429,7 @@ export function DictionaryPopup({ open, openSignal, seedQuery, cards, onClose, o
         {playFailedFor ? (
           <p className="dictionary-voice-error" role="status">
             <TriangleAlert aria-hidden="true" strokeWidth={2.2} />
-            Couldn't play "{playFailedFor}" — it may not be valid Japanese text, or the voice engine isn't available right now.
+            Couldn't play "{playFailedFor}". It may not be valid Japanese text, or the voice engine isn't available right now.
           </p>
         ) : null}
 

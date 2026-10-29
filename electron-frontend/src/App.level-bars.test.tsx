@@ -94,13 +94,13 @@ describe('the level bars', () => {
     await waitFor(() => expect(getLevelProgress).toHaveBeenCalled())
     openDeck('Kanji')
 
-    await waitFor(() => expect(chipLabels()[0]).toBe('N5 — 50% of 80 cards'))
+    await waitFor(() => expect(chipLabels()[0]).toBe('N5: 50% of 80 cards'))
     expect(chipLabels()).toEqual([
-      'N5 — 50% of 80 cards',
-      'N4 — 3% of 300 cards',
-      'N3 — 0% of 370 cards',
-      'N2 — 0% of 370 cards',
-      'N1 — 0% of 1,200 cards',
+      'N5: 50% of 80 cards',
+      'N4: 3% of 300 cards',
+      'N3: 0% of 370 cards',
+      'N2: 0% of 370 cards',
+      'N1: 0% of 1,200 cards',
     ])
   })
 
@@ -114,7 +114,7 @@ describe('the level bars', () => {
     openDeck('Vocabulary')
 
     /* 700 of 2,800 points is 25% */
-    await waitFor(() => expect(chipLabels()[0]).toBe('N5 — 25% of 700 cards'))
-    expect(chipLabels()[4]).toBe('N1 — 0% of 2,900 cards')
+    await waitFor(() => expect(chipLabels()[0]).toBe('N5: 25% of 700 cards'))
+    expect(chipLabels()[4]).toBe('N1: 0% of 2,900 cards')
   })
 })

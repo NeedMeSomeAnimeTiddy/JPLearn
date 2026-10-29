@@ -1129,7 +1129,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         setSessionScore((value) => value + 1)
         setSessionPoints((value) => value + awardedPoints)
         if ((roundState.mode === 'typed_recall' || roundState.mode === 'speech_recall') && typedAssessment === 'near_miss') {
-          setRoundFeedback(`Close enough — we’ll count it! ${pointsCopy}${comboCopy}.`)
+          setRoundFeedback(`Close enough. We’ll count it! ${pointsCopy}${comboCopy}.`)
         } else if (isImposterMode(roundState.mode)) {
           const nextStage = normalizeCurriculumStage(roundState.curriculumStage + 1)
           setRoundFeedback(`Nice work! ${pointsCopy}${comboCopy}. Stage ${roundState.curriculumStage} → ${nextStage}.`)
@@ -1175,7 +1175,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         } else if (isParticleClozeMode(roundState.mode)) {
           const info = PARTICLE_EXPLANATIONS[roundState.answer]
           setRoundFeedback(info
-            ? `Not quite. The answer is ${roundState.answer} (${info.romaji}) — ${info.explanation}.`
+            ? `Not quite. The answer is ${roundState.answer} (${info.romaji}). ${info.explanation}.`
             : `Not quite. The answer is ${roundState.answer}.`)
         } else if (roundState.mode === 'handwriting' && handwritingOutcome) {
           setRoundFeedback('Character not completed. It counts as a retry.')

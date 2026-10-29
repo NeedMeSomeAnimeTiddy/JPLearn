@@ -137,7 +137,7 @@ async function openThePath(): Promise<void> {
   await screen.findByRole('button', { name: /open shortcuts/i })
   /* HOVER SELECTS, A CLICK ON THE SELECTED ONE GOES -- the mockup's two-step, so a mouse never
      enters a section it only crossed. Two presses is what a keyboard-less caller has. */
-  const path = await screen.findByRole('button', { name: /THE PATH —/i })
+  const path = await screen.findByRole('button', { name: /THE PATH:/i })
   fireEvent.click(path)
   fireEvent.click(path)
   await waitFor(() => expect(document.querySelector('.pa-here')).not.toBeNull())

@@ -449,7 +449,7 @@ export function useScenarioTutor({
     const save = window.jplearnDesktop?.saveScenarioSession
     if (!save) {
       if (sessionTokenRef.current === token) {
-        setPersistenceNote('Scenario history is unavailable in this build — this session was not saved.')
+        setPersistenceNote('Scenario history is unavailable in this build, so this session was not saved.')
         setSessionSave('unavailable')
       }
       return

@@ -152,7 +152,7 @@ export function Drills({
               type="button"
               className={d.key === deckKey ? 'dr-deck on' : 'dr-deck'}
               onClick={() => { onDeck(d.key); setSel((v) => nearestOffered(modes, d.key, v)) }}
-              aria-label={`${d.label} — offers ${d.offers} of ${modes.length} drills`}
+              aria-label={`${d.label}: offers ${d.offers} of ${modes.length} drills`}
             >
               <b>{d.label.toUpperCase()}</b>
               <s>{d.offers} / {modes.length}</s>
@@ -186,7 +186,7 @@ export function Drills({
                   className={['dr-mode', i === sel ? 'on' : '', locked ? 'shut' : '']
                     .filter(Boolean).join(' ')}
                   onClick={() => setSel(i)}
-                  aria-label={`${m.title} — ${m.description}`}
+                  aria-label={`${m.title}: ${m.description}`}
                 >
                   <span className="n">{String(no).padStart(2, '0')}</span>
                   <span className="t">{m.title}</span>
@@ -325,7 +325,7 @@ export function Drills({
         <div className="hints">
           <span><b>↑ ↓</b>Choose<em>選択</em></span>
           <span><b>← →</b>Deck<em>教材</em></span>
-          <span><b>1–3</b>Length<em>長さ</em></span>
+          <span><b>1-3</b>Length<em>長さ</em></span>
           <span><b>L F C</b>Switches<em>設定</em></span>
           <span><b>ENTER</b>Run<em>決定</em></span>
         </div>

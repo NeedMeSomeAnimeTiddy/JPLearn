@@ -72,7 +72,7 @@ function DeckOnlyColumn({ detail }: { detail: KanjiDetailPayload }) {
       {missing.map((label) => (
         /* AN ABSENCE IS A HATCH AND A DASH, NEVER A ZERO -- The Exam's rule for a figure it cannot
            give */
-        <div key={label} className="kx-gh"><em>{label}</em><span aria-label="Not available">—</span></div>
+        <div key={label} className="kx-gh"><em>{label}</em><span aria-label="Not available">―</span></div>
       ))}
       <p className="kx-why">{KANJI_DETAIL_COPY.deckOnly}</p>
       <div className="kx-fix">
@@ -99,7 +99,7 @@ function DictionaryColumn({ detail }: { detail: KanjiDetailPayload }) {
         if (!row.reading) {
           return (
             <div key={`${row.kind}-none`} className="kx-rd none">
-              <u>{row.kind}</u><b>—</b><span>{KANJI_DETAIL_COPY.missingData}</span>
+              <u>{row.kind}</u><b>―</b><span>{KANJI_DETAIL_COPY.missingData}</span>
             </div>
           )
         }
@@ -248,7 +248,7 @@ export function KanjiDetailPanel({ character, onClose, backTo = null }: KanjiDet
                   ))}
                 </div>
               ) : (
-                <div className="kx-gh"><em>PARTS</em><span aria-label="Not available">—</span></div>
+                <div className="kx-gh"><em>PARTS</em><span aria-label="Not available">―</span></div>
               )}
               <div className="mx-kick q kx-kick-gap">
                 <span>STROKE ORDER</span>
@@ -267,7 +267,7 @@ export function KanjiDetailPanel({ character, onClose, backTo = null }: KanjiDet
           </div>
         </div>
         <div className="lk-hint kx-under">
-          {backTo ? `ESC GOES UP ONE LEVEL — BACK TO ${backTo.toUpperCase()}` : 'ESC CLOSES'}
+          {backTo ? `ESC GOES UP ONE LEVEL, BACK TO ${backTo.toUpperCase()}` : 'ESC CLOSES'}
         </div>
       </div>
     </div>,

@@ -41,7 +41,7 @@ export function useModels(): UseModelsReturn {
 
   const formatModelSize = useCallback((sizeMb: number) => {
     if (!Number.isFinite(sizeMb)) {
-      return '—'
+      return '―'
     }
     if (sizeMb >= 1000) {
       return `${(sizeMb / 1000).toFixed(1)} GB`
@@ -51,7 +51,7 @@ export function useModels(): UseModelsReturn {
 
   const formatCombinedModelSize = useCallback((sizeMb: number, embedderSizeMb?: number) => {
     if (!Number.isFinite(sizeMb)) {
-      return '—'
+      return '―'
     }
     if (!embedderSizeMb || !Number.isFinite(embedderSizeMb) || embedderSizeMb <= 0) {
       return formatModelSize(sizeMb)

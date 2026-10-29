@@ -131,7 +131,7 @@ export function PathL2({ nodes, loading, onOpenNode, onUp }: PathL2Props) {
                     onFocus={() => setCursor(Math.min(index, reach))}
                     onClick={() => (index === at ? openRef.current() : setCursor(Math.min(index, reach)))}
                     aria-disabled={!open}
-                    aria-label={`${row.no} ${row.en} — ${stateWord(row, open).replace('済 ', '')}`}
+                    aria-label={`${row.no} ${row.en}: ${stateWord(row, open).replace('済 ', '')}`}
                   >
                     <span className="n">{row.no}</span>
                     <span className="t">

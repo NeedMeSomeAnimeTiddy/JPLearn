@@ -96,7 +96,7 @@ export function worldLanes({ passages, sessions, unlocked, gateOf }: WorldInputs
       key: 'read',
       en: 'READ', jp: '読解', glyph: '読',
       desc: 'Real stories from Aozora Bunko, graded easiest to hardest',
-      fig: passages ? String(passages.length) : '—',
+      fig: passages ? String(passages.length) : '―',
       figLab: passages ? 'TEXTS' : 'NOT COUNTED YET',
       absent: !passages,
       gate: { en: gateLine(readShut, readStep), jp: readStep?.jp ?? '' },
@@ -112,7 +112,7 @@ export function worldLanes({ passages, sessions, unlocked, gateOf }: WorldInputs
     {
       key: 'talk',
       en: 'TALK', jp: '会話', glyph: '会',
-      desc: 'Hold a conversation with someone who answers back — speak it or type it',
+      desc: 'Hold a conversation with someone who answers back: speak it or type it',
       /* TWO, NOT TWELVE. `src/lib/scenarios/index.ts` exports exactly two scenarios, and this is
          the number the app can actually run today. */
       fig: String(scenes), figLab: scenes === 1 ? 'SCENE' : 'SCENES',

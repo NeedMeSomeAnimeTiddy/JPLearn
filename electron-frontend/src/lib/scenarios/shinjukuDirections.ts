@@ -84,7 +84,7 @@ export const SHINJUKU_DIRECTIONS_SCENARIO: ScenarioDefinition = {
       },
       hints: {
         beginner: [
-          { en: 'Get their attention politely first — one word is enough.' },
+          { en: 'Get their attention politely first. One word is enough.' },
           { en: 'Say "excuse me":', ja: 'すみません', reading: 'すみません', romaji: 'sumimasenn' },
         ],
         intermediate: [
@@ -183,7 +183,7 @@ export const SHINJUKU_DIRECTIONS_SCENARIO: ScenarioDefinition = {
       hints: {
         beginner: [
           { en: 'Ask where the south exit of Shinjuku Station is.' },
-          { en: 'Use dochira (which way) — it is politer than doko to a stranger.', ja: '〜はどちらですか', reading: '〜はどちらですか', romaji: '~ ha dochira desu ka' },
+          { en: 'Use dochira (which way). It is politer than doko to a stranger.', ja: '〜はどちらですか', reading: '〜はどちらですか', romaji: '~ ha dochira desu ka' },
           { en: 'The full question:', ja: '新宿駅の南口はどちらですか', reading: 'しんじゅくえきのみなみぐちはどちらですか', romaji: 'shinjuku eki no minamiguchi ha dochira desu ka' },
         ],
         intermediate: [

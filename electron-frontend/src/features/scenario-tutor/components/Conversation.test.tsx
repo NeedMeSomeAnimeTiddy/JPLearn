@@ -165,7 +165,7 @@ describe('Conversation — answering', () => {
     expect(screen.queryByText("kon'nichiwa")).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Need a hint?' }))
-    expect(screen.getByText('Greet them back — any normal greeting works here.')).toBeTruthy()
+    expect(screen.getByText('Greet them back. Any normal greeting works here.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Show another hint' }))
     expect(screen.getByText('こんにちは')).toBeTruthy()
     expect(screen.getByText("kon'nichiwa")).toBeTruthy()

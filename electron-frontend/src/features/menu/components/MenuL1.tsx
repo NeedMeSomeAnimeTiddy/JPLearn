@@ -283,8 +283,8 @@ export function MenuL1({ controller, hero, crown, rows, onOpenSection, onRunHero
                     }}
                     aria-disabled={locked}
                     aria-label={locked
-                      ? `${section.label} — locked, ${lockLine(section) ?? 'not open yet'}`
-                      : `${section.label} — ${row.lab}, ${row.val}`}
+                      ? `${section.label}: locked, ${lockLine(section) ?? 'not open yet'}`
+                      : `${section.label}: ${row.lab}, ${row.val}`}
                   >
                     <span className="st-mark">
                       <span className="st-glyph" aria-hidden="true">{section.glyph}</span>

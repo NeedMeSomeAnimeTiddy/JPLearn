@@ -2694,7 +2694,7 @@ function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
             if (pipCode === 0 && sender && !sender.isDestroyed()) {
               sender.send('setup:download-progress', {
                 id: 'speech', percent: 100, mb: null, totalMb: null, etaSec: null,
-                logMessage: 'CUDA runtime installed — GPU acceleration ready',
+                logMessage: 'CUDA runtime installed, GPU acceleration ready',
               })
             } else if (sender && !sender.isDestroyed()) {
               sender.send('setup:download-progress', {
@@ -3008,7 +3008,7 @@ function createShortcuts({ desktop, startMenu }) {
   const execPath = process.execPath
   const shortcutConfig = {
     target: execPath,
-    description: 'JPLearn — Japanese Learning App',
+    description: 'JPLearn: Japanese Learning App',
     icon: execPath,
     iconIndex: 0,
   }

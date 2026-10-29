@@ -15,12 +15,12 @@ import type { MenuCrown, MenuHero, MenuRow, MenuSectionKey, MenuWeek } from './t
    An unknown token is prettified rather than dropped, so a ninth reason still reads as English. */
 const WHY: Record<string, string> = {
   high_error_rate: 'Your accuracy here has been slipping, so this is worth another pass.',
-  leeches_detected: 'A few items in here keep going wrong — they are worth isolating.',
+  leeches_detected: 'A few items in here keep going wrong. They are worth isolating.',
   new_content_ready: 'This unlocked and you have not started it yet.',
   overdue_reviews: 'These reviews are past due, and a backlog only gets heavier.',
   streak_recovery: 'You have been away, so this is a gentle way back in.',
   progression_milestone: 'This just opened on the path, and it is ready to begin.',
-  weak_retention: 'Content you had learned is starting to fade — a review will hold it.',
+  weak_retention: 'Content you had learned is starting to fade. A review will hold it.',
   balanced_review: 'Nothing is urgent, so this is the ordinary maintenance sweep.',
 }
 
@@ -48,7 +48,7 @@ export function heroFromStudyBlock(block: StudyBlockPayload | null | undefined):
   if (!top) {
     return {
       cap: 'UP NEXT', capJp: '次は',
-      fig: '—', figEm: 'nothing due', figLab: 'RIGHT NOW',
+      fig: '―', figEm: 'nothing due', figLab: 'RIGHT NOW',
       why: block?.session_note
         || 'Nothing is waiting. Starting anything new is the useful move.',
       metaLeft: block?.stage_label || 'READY',
@@ -66,7 +66,7 @@ export function heroFromStudyBlock(block: StudyBlockPayload | null | undefined):
   const drill = MINIGAMES.find((game) => game.key === top.minigame)?.title
   return {
     cap: 'UP NEXT', capJp: '次は',
-    fig: due > 0 ? String(due) : '—',
+    fig: due > 0 ? String(due) : '―',
     figEm: drill && top.section_label ? `${top.section_label} · ${drill}` : top.display_label,
     figLab: due > 0 ? 'CARDS DUE' : 'NEW MATERIAL',
     /* the reason is the bridge's own, in its own words -- the card has to be auditable */
@@ -188,7 +188,7 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
       lab: 'REAL JAPANESE',
       val: 'READ AND TALK',
       /* the one figure on this screen that costs a call to know, so it is drawn as not-counted */
-      kind: 'fig', pct: 0, due: 0, fig: '\u2014', figLab: 'TEXTS TO READ',
+      kind: 'fig', pct: 0, due: 0, fig: '―', figLab: 'TEXTS TO READ',
       slab: 'ENTER THE WORLD \u25b8',
     },
     JLPT: {
@@ -203,7 +203,7 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
       lab: 'DAY STREAK',
       val: streak != null && streak > 0 ? `${streak} DAYS RUNNING` : 'NOT STARTED YET',
       kind: 'fig', pct: 0, due: 0,
-      fig: streak != null ? String(streak) : '\u2014', figLab: 'DAY STREAK, RUNNING',
+      fig: streak != null ? String(streak) : '―', figLab: 'DAY STREAK, RUNNING',
       slab: 'SEE YOUR RECORD \u25b8',
     },
   }

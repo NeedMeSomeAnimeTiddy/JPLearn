@@ -86,7 +86,7 @@ describe('what the world lanes are made of', () => {
 
   it('draws an uncounted library as an absence, never as zero texts', () => {
     const read = build({ passages: null })[0]
-    expect(read.fig).toBe('—')
+    expect(read.fig).toBe('―')
     expect(read.figLab).toBe('NOT COUNTED YET')
     expect(read.absent).toBe(true)
     expect(read.items).toEqual([])

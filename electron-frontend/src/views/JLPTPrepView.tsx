@@ -211,7 +211,7 @@ function ExamRunner({ level, mode, questions, onComplete, onAbort }: ExamRunnerP
       backJp="中止"
       backAria="Abort exam"
       hints={[
-        { cap: '1–4', en: 'Answer', jp: '回答' },
+        { cap: '1-4', en: 'Answer', jp: '回答' },
         { cap: 'ESC', en: 'Abandon', jp: '中止' },
       ]}
       ask={
@@ -231,7 +231,7 @@ function ExamRunner({ level, mode, questions, onComplete, onAbort }: ExamRunnerP
           slab={
             revealed
               ? { text: last ? 'SCORING THE PAPER' : 'NEXT QUESTION', jp: last ? '採点' : '次へ', tone: 'calm' }
-              : { text: '1–4 TO ANSWER', jp: '回答' }
+              : { text: '1-4 TO ANSWER', jp: '回答' }
           }
         >
           <RoundSlips

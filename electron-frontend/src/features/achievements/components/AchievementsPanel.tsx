@@ -19,7 +19,7 @@ function BadgeCard({ entry }: BadgeCardProps) {
         entry.earned ? 'badge-earned' : 'badge-locked',
       )}
       role="listitem"
-      aria-label={`${meta.name}${entry.earned ? ' — earned' : ' — locked'}`}
+      aria-label={`${meta.name}${entry.earned ? ', earned' : ', locked'}`}
     >
       <div className="badge-icon-wrapper">
         <IconComponent

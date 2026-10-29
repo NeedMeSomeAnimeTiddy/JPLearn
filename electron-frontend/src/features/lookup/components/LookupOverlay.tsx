@@ -28,7 +28,7 @@ export interface LookupOverlayProps {
 function mark(status: LookupStatus): string {
   if (status === 'ready') return '·'
   if (status === 'searching') return '…'
-  if (status === 'unavailable') return '—'
+  if (status === 'unavailable') return '―'
   if (status === 'error') return '!'
   if (status === 'empty') return '0'
   return ''
@@ -455,7 +455,7 @@ function LookupAnswerBody({ controller }: { controller: LookupController }) {
             {status === 'empty' ? <Line label="NOTHING" value={reason ?? 'no match'} absent /> : null}
             {shown.map((item) => (
               <span className="lk-line" key={dictionaryItemRenderKey(item)}>
-                <em>{item.romaji || '—'}</em>
+                <em>{item.romaji || '―'}</em>
                 <span className="jp">{item.character}<span style={{ fontSize: 12, opacity: 0.7 }}>{'　'}{item.meaning}</span></span>
               </span>
             ))}

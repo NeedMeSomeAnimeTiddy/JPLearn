@@ -60,7 +60,7 @@ export function statPanelsFrom(crown: MenuCrown): Partial<Record<StatKey, StatPa
     if (crown.lastStudied) rows.push({ label: 'LAST STUDIED', value: crown.lastStudied })
     out.streak = {
       jp: '連続', en: 'STREAK', rows,
-      note: '連続 · A day counts once you have graded anything at all — the streak is about turning up, not about how long you stayed.',
+      note: '連続 · A day counts once you have graded anything at all. The streak is about turning up, not about how long you stayed.',
     }
   }
 
@@ -87,7 +87,7 @@ export function statPanelsFrom(crown: MenuCrown): Partial<Record<StatKey, StatPa
     if (crown.totalXp !== null) rows.push({ label: 'TOTAL XP', value: nf(crown.totalXp) })
     out.level = {
       jp: '階級', en: 'LEVEL', rows,
-      note: '階級 · XP comes off every graded answer — the streak multiplier in the round scoring is what makes a long correct run worth more than the same cards spread over a week.',
+      note: '階級 · XP comes off every graded answer. The streak multiplier in the round scoring is what makes a long correct run worth more than the same cards spread over a week.',
     }
   }
 

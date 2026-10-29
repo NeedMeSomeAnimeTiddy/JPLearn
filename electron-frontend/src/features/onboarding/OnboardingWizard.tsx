@@ -19,7 +19,7 @@ const STEP_TITLES: Record<number, string> = {
 
 const STEP_SUBTITLES: Record<number, string | undefined> = {
   1: undefined,
-  2: 'Choose one — you can change this later.',
+  2: 'Choose one. You can change this later.',
   3: undefined,
   4: 'Tick anything you\'re already confident with. We\'ll skip those so you start where it counts.',
   5: 'Set up your preferred study environment. Everything here can be adjusted later in settings.',

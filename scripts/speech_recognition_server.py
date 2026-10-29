@@ -54,10 +54,10 @@ def _detect_gpu() -> tuple[str, str]:
     except OSError:
         has_gpu = False
     if not has_gpu:
-        print("[speech-server] No GPU detected — using CPU", file=sys.stderr, flush=True)
+        print("[speech-server] No GPU detected, using CPU", file=sys.stderr, flush=True)
         return ("cpu", "int8")
 
-    print("[speech-server] NVIDIA GPU detected — verifying CUDA runtime…", file=sys.stderr, flush=True)
+    print("[speech-server] NVIDIA GPU detected, verifying CUDA runtime…", file=sys.stderr, flush=True)
     try:
         import ctranslate2
         n = ctranslate2.get_cuda_device_count()
@@ -67,7 +67,7 @@ def _detect_gpu() -> tuple[str, str]:
     except Exception as e:
         print(f"[speech-server] CUDA check failed: {e}", file=sys.stderr, flush=True)
 
-    print("[speech-server] CUDA unavailable — using CPU", file=sys.stderr, flush=True)
+    print("[speech-server] CUDA unavailable, using CPU", file=sys.stderr, flush=True)
     return ("cpu", "int8")
 
 

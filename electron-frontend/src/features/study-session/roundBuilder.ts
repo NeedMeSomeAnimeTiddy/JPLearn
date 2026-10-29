@@ -257,7 +257,7 @@ export function buildRound(
       chapterNumber: null,
       chapterLabel: null,
       hintText: script === 'kanji_n5'
-        ? 'Think about how this kanji looks — its structure can help you recall it.'
+        ? 'Think about how this kanji looks: its structure can help you recall it.'
         : exampleSentenceHint,
       dictionarySeedQuery,
       dictionaryNote,
@@ -362,8 +362,8 @@ export function buildRound(
       chapterNumber: curriculumStage,
       chapterLabel: null,
       hintText: readingPassage.length > 0
-        ? `The sentence uses ${card.character} — choose its meaning.`
-        : exampleSentenceHint ?? `This scene features ${card.character} — read as "${card.romaji}".`,
+        ? `The sentence uses ${card.character}: choose its meaning.`
+        : exampleSentenceHint ?? `This scene features ${card.character}, read as "${card.romaji}".`,
       dictionarySeedQuery,
       dictionaryNote,
       promptLabel: surprisePrompt
@@ -552,7 +552,7 @@ export function buildRound(
     chapterNumber: null,
     chapterLabel: null,
     hintText: script === 'kanji_n5'
-      ? 'Think about how this kanji looks — its structure can help you recall it.'
+      ? 'Think about how this kanji looks: its structure can help you recall it.'
       : exampleSentenceHint,
     dictionarySeedQuery,
     dictionaryNote,

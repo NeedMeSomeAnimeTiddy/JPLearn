@@ -31,7 +31,7 @@ const PAGE_SUBTITLES: Record<Page, string | undefined> = {
   1: "Let's get everything set up in a few steps.",
   2: 'Choose a quick setup or configure everything in detail.',
   3: 'Checking your hardware to recommend the best settings.',
-  4: 'Select a model or skip — you can always add one later.',
+  4: 'Select a model or skip. You can always add one later.',
   5: 'Install voice synthesis and optional speech recognition.',
   6: 'Install optional fonts, offline dictionary, and OCR assets.',
   7: 'Review what will be downloaded, then click Start Setup.',

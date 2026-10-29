@@ -362,7 +362,7 @@ describe('what a figure opens onto', () => {
     const empty = buildLedger(summary(null), null, ledgerYear([], TODAY), { earned: 0, total: 19 })
     const s = ledgerSheet('accuracy', empty)!
     expect(s.lines).toHaveLength(4)
-    expect(s.lines.every((l) => l.off || l.v !== '—')).toBe(true)
+    expect(s.lines.every((l) => l.off || l.v !== '―')).toBe(true)
   })
 
   it('carries the 52 weeks on every sheet whose figure is a mean over them', () => {
@@ -412,7 +412,7 @@ describe('the ledger on screen', () => {
   it('counts the nineteen seals the wall shows', async () => {
     render(<Ledger summary={summary({ current_days: 4, best_days: 11, freezes_available: 2 })}
       xp={xp({})} onOpenAchievements={vi.fn()} onUp={vi.fn()} />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Achievements — 0 of 19 earned' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Achievements: 0 of 19 earned' })).toBeTruthy())
   })
 
   it('makes every figure a real button, so the mouse and the keyboard agree', () => {
