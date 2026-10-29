@@ -245,10 +245,24 @@ $progressPath = Join-Path $targetDir 'data'
 
 # Each item lists every folder it covers, including the older places a download used to land
 # (Documents\JPLearn Progress\tts and \models).
+# The Python packages setup downloads for a feature, one folder per interpreter and pin set
+# (python-packages\<tag>\<feature>-<pins>, electron/python_packages.cjs; audit 13).
+function Get-FeaturePackageDirs {
+  param([string[]]$Features)
+  $root = Join-Path $assetsDir 'python-packages'
+  if (-not (Test-Path -LiteralPath $root -PathType Container)) { return @() }
+  @(Get-ChildItem -LiteralPath $root -Directory | ForEach-Object {
+    Get-ChildItem -LiteralPath $_.FullName -Directory | Where-Object {
+      $name = $_.Name -replace '\.partial-.*$', ''
+      $Features -contains ($name -replace '-[0-9a-f]{10}$', '')
+    } | ForEach-Object { $_.FullName }
+  })
+}
+
 $downloadOptions = @(
   @{
     Label = 'Keep tutor models'
-    Paths = @((Join-Path $assetsDir 'models'), (Join-Path $targetDir 'models'))
+    Paths = @((Join-Path $assetsDir 'models'), (Join-Path $targetDir 'models')) + @(Get-FeaturePackageDirs @('embedder'))
   },
   @{
     Label = 'Keep voice (VOICEVOX)'
@@ -256,7 +270,7 @@ $downloadOptions = @(
   },
   @{
     Label = 'Keep speech recognition models'
-    Paths = @((Join-Path $assetsDir 'whisper'))
+    Paths = @((Join-Path $assetsDir 'whisper')) + @(Get-FeaturePackageDirs @('speech', 'speech-cuda'))
   },
   @{
     Label = 'Keep OCR and translation models, tools, fonts'
@@ -267,7 +281,7 @@ $downloadOptions = @(
       (Join-Path $assetsDir 'tools\llama.cpp'),
       (Join-Path $assetsDir 'fonts'),
       (Join-Path $assetsDir 'data\external_sources\offline_dictionary')
-    )
+    ) + @(Get-FeaturePackageDirs @('ocr'))
   }
 )
 $learningOptions = @(

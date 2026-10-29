@@ -117,6 +117,31 @@ describe('settings modal wiring', () => {
     expect(screen.getByRole('button', { name: /download offline dictionary/i })).toBeTruthy()
   })
 
+  it('shows the stored automatic update setting and saves a change as a boolean', async () => {
+    const getConfigValue = vi.fn(async (key: string) => ({ ok: true, key, value: false }))
+    const setConfigValue = vi.fn(async (key: string, value: unknown) => ({ ok: true, key, value }))
+    window.jplearnDesktop = { ...baseDesktopApi, getConfigValue, setConfigValue } as unknown as typeof window.jplearnDesktop
+    await openSettings()
+
+    fireEvent.click(screen.getByRole('tab', { name: /system/i }))
+    // Sections render their children only when expanded; Startup starts collapsed.
+    fireEvent.click(screen.getByRole('button', { name: /^Startup/ }))
+
+    // The stored value (off) replaces the on default once it loads.
+    const off = await screen.findByRole('radio', { name: 'Check for updates automatically: Off' })
+    await waitFor(() => expect(off.getAttribute('aria-checked')).toBe('true'))
+    expect(getConfigValue).toHaveBeenCalledWith('autoUpdateEnabled')
+    expect(screen.getByText('Only installed copies check. Turning this off stops checking straight away.')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Check for updates automatically: On' }))
+
+    expect(setConfigValue).toHaveBeenCalledWith('autoUpdateEnabled', true)
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Check for updates automatically: On' }).getAttribute('aria-checked'))
+        .toBe('true')
+    })
+  })
+
   it('closes from the header button', async () => {
     window.jplearnDesktop = baseDesktopApi
     await openSettings()

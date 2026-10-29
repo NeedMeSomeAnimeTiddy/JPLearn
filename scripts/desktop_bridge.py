@@ -3398,9 +3398,18 @@ def _read_active_chatbot_tier() -> str | None:
     setActiveModelTier), if any. Returns None in dev/test environments where
     no Electron-managed model selection exists yet.
     """
-    docs_dir = os.environ.get("JPLEARN_DOCUMENTS_DIR", "").strip()
-    base = Path(docs_dir) if docs_dir else PROJECT_ROOT
-    state_path = base / "models" / "active-model.json"
+    # Setup writes it in the downloads folder; older setups wrote the progress folder (audit 13, F4).
+    bases = [
+        Path(value)
+        for value in (os.environ.get(name, "").strip() for name in ("JPLEARN_ASSETS_DIR", "JPLEARN_DOCUMENTS_DIR"))
+        if value
+    ] or [PROJECT_ROOT]
+    state_path = next(
+        (path for path in (base / "models" / "active-model.json" for base in bases) if path.exists()),
+        None,
+    )
+    if state_path is None:
+        return None
     try:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

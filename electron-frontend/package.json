@@ -1,7 +1,11 @@
 {
   "name": "electron-frontend",
   "private": true,
-  "version": "0.1.0-beta",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NeedMeSomeAnimeTiddy/JPLearn.git"
+  },
   "productName": "JPLearn",
   "description": "JPLearn desktop frontend built with Electron, React, and TypeScript.",
   "author": "Robbie",
@@ -29,7 +33,7 @@
     "make": "npm run build && electron-forge make",
     "make:win": "npm run build && electron-forge make --platform=win32",
     "bundle:python": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/bundle_python.ps1",
-    "make:release": "npm run fetch:models && npm run bundle:python && cross-env JPLEARN_DOCUMENTS_DIR=$TEMP/jplearn-build-data npm run make:win"
+    "make:release": "npm run fetch:models && npm run bundle:python -- -Force && cross-env JPLEARN_DOCUMENTS_DIR=$TEMP/jplearn-build-data npm run make:win && npm run smoke:packaged"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

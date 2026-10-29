@@ -15,6 +15,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { resolvePythonCommand } = require('./python_command.cjs')
+const { envWithFeaturePackages } = require('./python_packages.cjs')
 
 // A warm transcription of a spoken answer takes well under a second; twenty
 // seconds means something is wrong.
@@ -198,7 +199,8 @@ function createSpeechRuntime(options = {}) {
     const pythonCmd = resolvePythonCommand(repoRoot)
     stderrTail = ''
     const proc = spawnFn(pythonCmd, [scriptPath], {
-      env: { ...process.env, SPEECH_MODEL_DIR: modelDir },
+      // In the installed app, faster-whisper lives in JPLearn Assets (audit 13, F1).
+      env: envWithFeaturePackages({ ...process.env, SPEECH_MODEL_DIR: modelDir }, resolveAssetsBaseDir(), ['speech', 'speech-cuda']),
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     })

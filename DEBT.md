@@ -196,3 +196,15 @@ change that lets recommendations fail while the summary succeeds. The fix is to 
 - **Why not now.** Nothing shows it.
 
 **Trigger:** any screen starts reading `steps`, `readiness` or `suggested_next`.
+
+## 14. An older build opens a newer database without a check
+
+**Recorded 2026-10-29 (audit 13, F6; Robbie: "Keep opening it").** `_apply_migrations` in
+`data/database.py` runs no migration and takes no safety copy when the stored schema version is
+above `LATEST_SCHEMA_VERSION`, and the older build carries on writing. Restore and JSON import refuse
+newer files (`data/whole_backup.py`, `data/deck_portability.py`). Not fixed now: every migration to
+date only adds tables or defaulted columns, so an older build reads a newer file correctly, and no
+app release is published.
+
+**Trigger:** a migration that renames, rekeys, drops or tightens a column or table an older build
+reads or writes, or a published release older than the newest schema.

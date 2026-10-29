@@ -12,6 +12,8 @@
 param(
   [string]$PythonVersion = "3.11",
   [string]$OutputDirectory = "",
+  # Where the Visual C++ runtime DLLs are copied from; System32 by default (see below).
+  [string]$VcRuntimeDirectory = "",
   [switch]$Force
 )
 
@@ -121,11 +123,14 @@ try {
   # as required as psutil is - a psutil-only bundle makes every bridge call fail with
   # ModuleNotFoundError.
   #
-  # The rest of requirements.txt is deliberately left out: pytest is test-only, and
-  # faster-whisper / onnxruntime / tokenizers / huggingface-hub are the optional
-  # components the in-app setup wizard installs on demand. Bundling them would add
-  # hundreds of MB to the installer for features most users never enable.
-  $runtimePackages = @("psutil", "fugashi", "unidic-lite")
+  # Pinned to the versions the tests run with (requirements.txt): an unpinned fugashi
+  # once shipped 1.5.2 against a tested 1.3.0 (audit 13, F3).
+  #
+  # The rest of requirements.txt is deliberately left out: pytest is test-only, and the
+  # optional features' packages (faster-whisper for speech, onnxruntime and tokenizers for
+  # the tutor's embedder, OCR's) are installed by the setup wizard on demand into
+  # JPLearn Assets (electron/python_packages.cjs), outside the app's version folder.
+  $runtimePackages = @("psutil==7.2.2", "fugashi==1.3.0", "unidic-lite==1.0.8")
 
   Write-Host "Installing runtime packages into bundle: $($runtimePackages -join ', ')"
   & $pythonExe -m pip install --disable-pip-version-check --quiet @runtimePackages
@@ -145,6 +150,42 @@ try {
     if (Test-Path $dir) {
       Remove-Item -Recurse -Force $dir
       Write-Host "  removed: $relative"
+    }
+  }
+
+  # The Visual C++ runtime, beside python.exe, where Windows looks first for an extension's DLLs.
+  # python-build-standalone ships vcruntime140*.dll only; the native wheels the optional features
+  # install (onnxruntime, av, cv2, paddle) also need msvcp140*.dll and concrt140.dll, which a clean
+  # Windows does not have (audit 13: every import failed on a bare Windows Server). Copied from the
+  # build machine, which must have the x64 Visual C++ Redistributable installed. App-local copies
+  # are how Microsoft's redistribution terms allow shipping them.
+  Write-Host "Adding the Visual C++ runtime to the bundle..."
+  # vcomp140 is OpenMP, which paddle's mkldnn.dll links.
+  $vcRuntime = @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll", "vcomp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+  # Sysnative is the real System32 from a 32-bit PowerShell, which would otherwise be handed
+  # SysWOW64's 32-bit DLLs.
+  $systemDir = if ([Environment]::Is64BitProcess) { "System32" } else { "Sysnative" }
+  $vcSource = if ($VcRuntimeDirectory) { $VcRuntimeDirectory } else { Join-Path $env:SystemRoot $systemDir }
+  $pythonDir = Split-Path $pythonExe -Parent
+  foreach ($dll in $vcRuntime) {
+    $source = Join-Path $vcSource $dll
+    if (-not (Test-Path -LiteralPath $source)) {
+      throw "$dll is missing from $vcSource; install the x64 Visual C++ Redistributable on this build machine (https://aka.ms/vs/17/release/vc_redist.x64.exe)"
+    }
+    $target = Join-Path $pythonDir $dll
+    if (-not (Test-Path -LiteralPath $target)) {
+      Copy-Item -LiteralPath $source -Destination $target
+      Write-Host "  added: $dll"
+    }
+  }
+  # Newer parts of the runtime some native builds also link (the C++20 extras), copied
+  # when the source has them.
+  foreach ($dll in @("msvcp140_atomic_wait.dll", "msvcp140_codecvt_ids.dll")) {
+    $source = Join-Path $vcSource $dll
+    $target = Join-Path $pythonDir $dll
+    if ((Test-Path -LiteralPath $source) -and -not (Test-Path -LiteralPath $target)) {
+      Copy-Item -LiteralPath $source -Destination $target
+      Write-Host "  added: $dll"
     }
   }
 

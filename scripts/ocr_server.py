@@ -29,6 +29,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.downloaded_packages import activate as _activate_downloaded_packages  # noqa: E402
+
+_activate_downloaded_packages()  # OCR's packages, in the installed app (audit 13, F2)
+
 from scripts.ocr_extraction import extract_assistant_chat_ocr_payload  # noqa: E402
 
 # Node writes requests as UTF-8. A piped stdin otherwise decodes with the Windows ANSI code page

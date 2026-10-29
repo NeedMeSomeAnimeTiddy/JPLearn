@@ -1855,12 +1855,14 @@ function registerIpcHandlers(options) {
       }
     })
 
-    options.ipcMain.handle('setup:uninstall-ocr-model', (event, tier) => {
+    options.ipcMain.handle('setup:uninstall-ocr-model', async (event, tier) => {
       assertTrustedIpcSender(event, trustedSenderOptions())
       if (typeof tier !== 'string' || !['standard'].includes(tier)) {
         throw new Error('Invalid OCR model tier')
       }
       try {
+        // stop first, and wait for it to close: the server holds the packages' DLLs open (audit 13)
+        await options.stopOcrRuntime?.()
         const result = setupRuntime.uninstallOcrModel(tier)
         refreshOcrRuntime()
         return result

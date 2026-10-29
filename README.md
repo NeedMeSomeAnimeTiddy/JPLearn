@@ -101,37 +101,50 @@ steps 2–4 automatically.
 
 ```bash
 cd electron-frontend
-npm run make:win
-# Installer appears at: out/make/squirrel.windows/x64/*Setup.exe
+npm run make:release
+# Installer appears at: out/make/squirrel.windows/x64/JPLearn-Installer.exe
 ```
+
+`make:release` fetches the valley models, rebuilds the bundled Python from scratch with the
+package versions the tests use, builds the installer and then runs the packaged smoke test against
+it. (`npm run make:win` alone builds an installer from whatever `python-bundle/` is lying around.)
 
 Place `electron-frontend/assets/icon.ico` before building to include a custom app icon.
 
-## GitHub Releases
+## Releases and updates
 
-Push a version tag to trigger the release workflow:
+Installed copies check GitHub Releases once at launch (through update.electronjs.org) and offer a
+newer version; Settings > "Check for updates automatically" turns that off. A release needs:
+
+- a tag `v<version>` matching `electron-frontend/package.json`'s `version`, which is a plain
+  `x.y.z` (Squirrel orders prerelease labels such as `beta10` before `beta9`);
+- a normal, published release (the update service skips drafts and prereleases);
+- three files from `electron-frontend/out/make/squirrel.windows/x64/`: `JPLearn-Installer.exe`,
+  `RELEASES` and the `*-full.nupkg`.
+
+The `release.yml` workflow does this on a tag push, but it runs on a self-hosted runner (hosted
+runners are unavailable on this account). The local equivalent, after `npm run make:release`:
 
 ```bash
-git tag v1.0.0 && git push origin v1.0.0
+gh release create v0.1.0 --title "JPLearn v0.1.0" \
+  electron-frontend/out/make/squirrel.windows/x64/JPLearn-Installer.exe \
+  electron-frontend/out/make/squirrel.windows/x64/RELEASES \
+  electron-frontend/out/make/squirrel.windows/x64/jplearn-0.1.0-full.nupkg
 ```
-
-The GitHub Actions workflow builds the installer and publishes a GitHub Release automatically.
-Requires repo → Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests" enabled.
 
 > **Note:** The installer is unsigned. Windows will show a SmartScreen warning on first run —
 > click **More info → Run anyway** to proceed.
 
 ## User data
 
-The installed app stores all user data in `Documents\JPLearn\`:
+The installed app keeps two folders, both outside the install folder an update replaces:
 
 | Folder | Contents |
 |--------|----------|
-| `models\` | GGUF model files |
-| `tts\` | Japanese voice models and curated preset speaker bank |
-| `data\` | SQLite databases (progress, settings) |
+| `Documents\JPLearn Progress\` | the progress database (`data\jplearn.db`), its safety copies and backups |
+| `%LOCALAPPDATA%\JPLearn Assets\` | downloads: tutor and translation models, voice, speech and OCR models, fonts, and the optional features' Python packages (`python-packages\`) |
 
-These files survive uninstall and are detected automatically on reinstall.
+Uninstalling asks which of them to keep.
 
 ## Common Developer Commands
 
