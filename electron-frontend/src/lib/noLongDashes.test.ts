@@ -7,11 +7,11 @@ import { describe, expect, it } from 'vitest'
    colon, full stop or brackets; ranges take a hyphen; an empty value is the Japanese dash ― (U+2015).
    This walks every string literal, template piece and JSX text in the renderer and the main process
    and fails on U+2013 or U+2014, written as the character or as an escape ('\u2014', '&mdash;').
-   Comments are not literals, so they are never read; tests are not walked. The root CLAUDE.md "Key conventions" carries the rule; tests/test_no_long_dashes.py is the
-   Python half. */
+   Comments are not literals, so they are never read; tests are not walked. The root CLAUDE.md
+   "Key conventions" carries the rule; tests/test_no_long_dashes.py is the Python half. */
 
 const LONG_DASH = /[–—]/
-// JSX text keeps its HTML entities undecoded
+// JSX text and attribute strings keep their HTML entities undecoded, and JSX decodes them
 const LONG_DASH_ENTITY = /&(?:mdash|ndash);|&#(?:8211|8212|x201[34]);/i
 // cheap test before a file is parsed: the character, an escape of it, or an entity
 const MAY_HOLD_LONG_DASH = /[–—]|\\u\{?0*201[34]|&(?:mdash|ndash);|&#(?:8211|8212|x201[34]);/i
@@ -51,7 +51,8 @@ function findLongDashes(file: string, source: string): DashHit[] {
       // tested decoded ('\u2014' is a dash) and reported as written, which is what the allowlist matches
       const text = node.getText(sf)
       const shown = node.text
-      if (LONG_DASH.test(shown) || (ts.isJsxText(node) && LONG_DASH_ENTITY.test(shown))) {
+      const jsx = ts.isJsxText(node) || ts.isJsxAttribute(node.parent)
+      if (LONG_DASH.test(shown) || (jsx && LONG_DASH_ENTITY.test(shown))) {
         hits.push({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, text })
       }
     }
@@ -90,9 +91,10 @@ describe('no em or en dashes in shown text', () => {
       "const d = '\\u2014'",
       'const e = <p>A &mdash; B</p>',
       "const f = '\\u2015'",
+      'const g = <p title="A &ndash; B">x</p>',
     ].join('\n')
-    expect(findLongDashes('planted.tsx', planted).map((hit) => hit.line)).toEqual([1, 3, 5, 6, 7])
-    expect(findLongDashes('planted.tsx', planted.replace(/[–—]|\\u2014|&mdash;/g, '―'))).toEqual([])
+    expect(findLongDashes('planted.tsx', planted).map((hit) => hit.line)).toEqual([1, 3, 5, 6, 7, 9])
+    expect(findLongDashes('planted.tsx', planted.replace(/[–—]|\\u2014|&[mn]dash;/g, '―'))).toEqual([])
   })
 
   it('finds none outside the allowlist', () => {
