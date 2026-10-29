@@ -188,7 +188,7 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
       lab: 'REAL JAPANESE',
       val: 'READ AND TALK',
       /* the one figure on this screen that costs a call to know, so it is drawn as not-counted */
-      kind: 'fig', pct: 0, due: 0, fig: '\u2014', figLab: 'TEXTS TO READ',
+      kind: 'fig', pct: 0, due: 0, fig: '―', figLab: 'TEXTS TO READ',
       slab: 'ENTER THE WORLD \u25b8',
     },
     JLPT: {
@@ -203,7 +203,7 @@ export function rowsFrom({ nodes, block, streakDays }: MenuRowSources): Record<M
       lab: 'DAY STREAK',
       val: streak != null && streak > 0 ? `${streak} DAYS RUNNING` : 'NOT STARTED YET',
       kind: 'fig', pct: 0, due: 0,
-      fig: streak != null ? String(streak) : '\u2014', figLab: 'DAY STREAK, RUNNING',
+      fig: streak != null ? String(streak) : '―', figLab: 'DAY STREAK, RUNNING',
       slab: 'SEE YOUR RECORD \u25b8',
     },
   }

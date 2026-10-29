@@ -491,7 +491,7 @@ export function AppTitlebar({
             <p className="titlebar-streak-details-row">Best: {streak.best_days} days</p>
             <p className="titlebar-streak-details-tip">
               {streak.current_days > 0
-                ? 'Keep it up! Review something today!'
+                ? 'Keep it up: review something today!'
                 : 'Complete a session to start your streak.'}
             </p>
             <div className="titlebar-streak-details-divider" />

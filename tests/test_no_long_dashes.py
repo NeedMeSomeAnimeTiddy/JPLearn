@@ -101,6 +101,8 @@ def test_no_long_dashes_outside_the_allowlist() -> None:
                     used.add(entry)
                 else:
                     offenders.append(f"{file}:{line}  {value[:120]!r}")
+    # top level only, on purpose: the Aozora passage CSV in a subfolder has dashes in edition
+    # metadata (底本の親本名1) that nothing reads or shows
     for path in sorted((ROOT / "data" / "external_sources").glob("*.csv")):
         file = path.relative_to(ROOT).as_posix()
         for line, text in find_long_dashes_in_lines(path.read_text(encoding="utf-8")):

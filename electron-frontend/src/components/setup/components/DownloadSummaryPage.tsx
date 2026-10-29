@@ -83,7 +83,7 @@ export function DownloadSummaryPage({
         </div>
       )}
       <p style={{ opacity: 0.55, fontSize: '0.85rem', marginTop: '1.25rem', lineHeight: 1.5 }}>
-        ℹ Your downloads and progress are saved to <strong>Documents\JPLearn\</strong>. They will
+        ℹ Your downloads and progress are saved to <strong>Documents\JPLearn\</strong>, and they will
         NOT be deleted if you uninstall or reinstall JPLearn.
       </p>
     </>

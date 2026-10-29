@@ -6,11 +6,15 @@ import { describe, expect, it } from 'vitest'
 /* No em or en dashes in anything the app shows (Robbie, 2026-10-29). Copy is reworded with a comma,
    colon, full stop or brackets; ranges take a hyphen; an empty value is the Japanese dash ― (U+2015).
    This walks every string literal, template piece and JSX text in the renderer and the main process
-   and fails on U+2013 or U+2014. Comments are not literals, so they are never read; tests are not
-   walked. The root CLAUDE.md "Key conventions" carries the rule; tests/test_no_long_dashes.py is the
+   and fails on U+2013 or U+2014, written as the character or as an escape ('\u2014', '&mdash;').
+   Comments are not literals, so they are never read; tests are not walked. The root CLAUDE.md "Key conventions" carries the rule; tests/test_no_long_dashes.py is the
    Python half. */
 
 const LONG_DASH = /[–—]/
+// JSX text keeps its HTML entities undecoded
+const LONG_DASH_ENTITY = /&(?:mdash|ndash);|&#(?:8211|8212|x201[34]);/i
+// cheap test before a file is parsed: the character, an escape of it, or an entity
+const MAY_HOLD_LONG_DASH = /[–—]|\\u\{?0*201[34]|&(?:mdash|ndash);|&#(?:8211|8212|x201[34]);/i
 const FRONTEND = join(__dirname, '..', '..')
 
 /* Each entry is a literal that matches dashes rather than showing them. `text` is a piece of the
@@ -36,7 +40,7 @@ function isConsoleCall(node: ts.Node): boolean {
 /** Every literal in `source` that holds an em or en dash. Arguments to `console.*` are log lines
  *  for a developer, not copy, so they are skipped. */
 function findLongDashes(file: string, source: string): DashHit[] {
-  if (!LONG_DASH.test(source)) return []
+  if (!MAY_HOLD_LONG_DASH.test(source)) return []
   const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : file.endsWith('.cjs') ? ts.ScriptKind.JS : ts.ScriptKind.TS
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind)
   const hits: DashHit[] = []
@@ -44,8 +48,10 @@ function findLongDashes(file: string, source: string): DashHit[] {
     if (isConsoleCall(node)) return
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node)
       || ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)) {
+      // tested decoded ('\u2014' is a dash) and reported as written, which is what the allowlist matches
       const text = node.getText(sf)
-      if (LONG_DASH.test(text)) {
+      const shown = node.text
+      if (LONG_DASH.test(shown) || (ts.isJsxText(node) && LONG_DASH_ENTITY.test(shown))) {
         hits.push({ file, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, text })
       }
     }
@@ -81,9 +87,12 @@ describe('no em or en dashes in shown text', () => {
       'const b = `${a} – ${a}`',
       "console.warn('a log line — for a developer')",
       'const c = <p>Range 1–5</p>',
+      "const d = '\\u2014'",
+      'const e = <p>A &mdash; B</p>',
+      "const f = '\\u2015'",
     ].join('\n')
-    expect(findLongDashes('planted.tsx', planted).map((hit) => hit.line)).toEqual([1, 3, 5])
-    expect(findLongDashes('planted.tsx', planted.replace(/[–—]/g, '―'))).toEqual([])
+    expect(findLongDashes('planted.tsx', planted).map((hit) => hit.line)).toEqual([1, 3, 5, 6, 7])
+    expect(findLongDashes('planted.tsx', planted.replace(/[–—]|\\u2014|&mdash;/g, '―'))).toEqual([])
   })
 
   it('finds none outside the allowlist', () => {
