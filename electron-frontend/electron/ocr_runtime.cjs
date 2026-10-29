@@ -16,6 +16,7 @@
  */
 
 const fs = require('node:fs')
+const STOP_CLOSE_WAIT_MS = 5000
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { resolvePythonCommand } = require('./python_command.cjs')
@@ -101,12 +102,13 @@ function createOcrRuntime(options = {}) {
     stdoutBuffer = ''
     loadedAtUtc = null
     childHasResponded = false
-    if (!current) return
+    if (!current) return null
     try {
       current.kill()
     } catch {
       // Process may already be gone.
     }
+    return current
   }
 
   function handleStdoutData(chunk) {
@@ -278,6 +280,23 @@ function createOcrRuntime(options = {}) {
       clearUnloadTimer()
       stopChild()
       return { ok: true }
+    },
+
+    // As unload, but resolves once the process has closed (or after a few seconds), so a caller
+    // about to delete files the server holds open is not racing the kill on Windows (audit 13).
+    stop() {
+      clearUnloadTimer()
+      const stopped = stopChild()
+      if (!stopped || stopped.exitCode !== null || stopped.signalCode != null) {
+        return Promise.resolve()
+      }
+      return new Promise((resolve) => {
+        const done = setTimeout(resolve, STOP_CLOSE_WAIT_MS)
+        stopped.once('close', () => {
+          clearTimeout(done)
+          resolve()
+        })
+      })
     },
   }
 }

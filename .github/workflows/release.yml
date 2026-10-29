@@ -224,7 +224,8 @@ jobs:
           # Squirrel's RELEASES and .nupkg: what installed copies update from
           # (update.electronjs.org reads them from this release; audit 13, F8).
           $dir = $installer.DirectoryName
-          $nupkg = Get-ChildItem -Path $dir -Filter "*-full.nupkg" | Select-Object -First 1
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $nupkg = Get-ChildItem -Path $dir -Filter "*-$version-full.nupkg" | Select-Object -First 1
           if (-not $nupkg -or -not (Test-Path "$dir/RELEASES")) {
             Write-Error "RELEASES or the full .nupkg is missing from $dir"
             exit 1

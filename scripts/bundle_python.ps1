@@ -151,6 +151,28 @@ try {
     }
   }
 
+  # The Visual C++ runtime, beside python.exe, where Windows looks first for an extension's DLLs.
+  # python-build-standalone ships vcruntime140*.dll only; the native wheels the optional features
+  # install (onnxruntime, av, cv2, paddle) also need msvcp140*.dll and concrt140.dll, which a clean
+  # Windows does not have (audit 13: every import failed on a bare Windows Server). Copied from the
+  # build machine, which must have the x64 Visual C++ Redistributable installed. App-local copies
+  # are how Microsoft's redistribution terms allow shipping them.
+  Write-Host "Adding the Visual C++ runtime to the bundle..."
+  $vcRuntime = @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+  $system32 = Join-Path $env:SystemRoot "System32"
+  $pythonDir = Split-Path $pythonExe -Parent
+  foreach ($dll in $vcRuntime) {
+    $source = Join-Path $system32 $dll
+    if (-not (Test-Path -LiteralPath $source)) {
+      throw "$dll is missing from $system32; install the x64 Visual C++ Redistributable on this build machine (https://aka.ms/vs/17/release/vc_redist.x64.exe)"
+    }
+    $target = Join-Path $pythonDir $dll
+    if (-not (Test-Path -LiteralPath $target)) {
+      Copy-Item -LiteralPath $source -Destination $target
+      Write-Host "  added: $dll"
+    }
+  }
+
   # Proves the bundle can actually run the bridge before it is packaged. Without
   # this the failure only surfaces as an installed app whose every backend call
   # times out, which is a very expensive way to find a missing dependency.

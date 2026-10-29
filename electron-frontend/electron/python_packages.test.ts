@@ -138,6 +138,27 @@ describe('installFeaturePackages', () => {
     expect(fs.readdirSync(path.join(assets, 'python-packages', 'cp311'))).toEqual([])
   })
 
+  it('runs one install of a feature at a time', async () => {
+    const python = fakeBundle()
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const run = vi.fn(async (_cmd: string, args: string[]) => {
+      if (args.includes('--target')) {
+        await gate
+        fs.mkdirSync(args[args.indexOf('--target') + 1], { recursive: true })
+      }
+      return { code: 0, stdout: '', stderr: '' }
+    })
+
+    const first = packages.installFeaturePackages({ assetsDir: assets, feature: 'speech', run, pythonCmd: python })
+    const second = packages.installFeaturePackages({ assetsDir: assets, feature: 'speech', run, pythonCmd: python })
+    release()
+    const [a, b] = await Promise.all([first, second])
+    expect(a).toBe(b)
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(packages.featurePackagesReady(assets, 'speech')).toBe(true)
+  })
+
   it('lists every folder of a feature for uninstalling', () => {
     fakeBundle()
     const now = readyDir('speech')

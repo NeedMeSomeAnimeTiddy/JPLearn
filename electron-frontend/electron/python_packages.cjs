@@ -25,22 +25,31 @@ const { bundledPythonCommand } = require('./python_command.cjs')
 
 const READY_MARKER = '.ready.json'
 
+// Also what setup installs into a source environment, so the two cannot drift apart.
+const PADDLEOCR_VERSION = '3.7.0'
+const PADDLEPADDLE_VERSION = '3.2.0'
+
 /** What each feature installs, and what must import before it counts as installed. */
 const FEATURE_PACKAGES = {
+  // Every package pinned, dependencies included where they float, to what the source environment
+  // runs: unpinned, the first real install drew newer onnxruntime, tokenizers and numpy than
+  // anything here was tested with (audit 13 check).
   ocr: {
     pins: [
-      'paddlepaddle==3.2.0',
-      'paddleocr==3.7.0',
+      `paddlepaddle==${PADDLEPADDLE_VERSION}`,
+      `paddleocr==${PADDLEOCR_VERSION}`,
+      'paddlex==3.7.2',
       'onnxruntime==1.27.0',
-      'numpy',
-      'Pillow',
-      'opencv-python-headless',
-      'fasttext-wheel',
+      'numpy==1.26.4',
+      'Pillow==12.2.0',
+      'opencv-python-headless==4.11.0.86',
+      'opencv-contrib-python==4.10.0.84',
+      'fasttext-wheel==0.9.2',
     ],
     imports: ['paddleocr', 'onnxruntime', 'numpy', 'PIL', 'cv2', 'fasttext'],
   },
   speech: {
-    pins: ['faster-whisper==1.2.1'],
+    pins: ['faster-whisper==1.2.1', 'ctranslate2==4.8.0', 'av==18.0.0', 'onnxruntime==1.27.0', 'tokenizers==0.22.2'],
     imports: ['faster_whisper'],
   },
   // Only on a machine with an NVIDIA GPU whose CUDA runtime is missing.
@@ -173,7 +182,20 @@ function importProbeScript(dir, imports) {
  *
  * @returns {Promise<{ ok: true, dir: string, installed: boolean }>}
  */
-async function installFeaturePackages({ assetsDir, feature, baseEnv = process.env, run = runPython, pythonCmd = bundledPythonCommand() }) {
+const installsInFlight = new Map()
+
+async function installFeaturePackages(options) {
+  // Two at once (two speech tiers downloading, say) would remove each other's partial folders,
+  // so a second call for the same folder waits on the first.
+  const key = `${options.assetsDir}|${options.feature}`
+  const pending = installsInFlight.get(key)
+  if (pending) return pending
+  const install = installFeaturePackagesOnce(options).finally(() => installsInFlight.delete(key))
+  installsInFlight.set(key, install)
+  return install
+}
+
+async function installFeaturePackagesOnce({ assetsDir, feature, baseEnv = process.env, run = runPython, pythonCmd = bundledPythonCommand() }) {
   if (!pythonCmd) throw new Error('installFeaturePackages is only for the installed app')
   const spec = FEATURE_PACKAGES[feature]
   if (!spec) throw new Error(`Unknown package feature: ${feature}`)
@@ -210,7 +232,12 @@ async function installFeaturePackages({ assetsDir, feature, baseEnv = process.en
   }
 
   fs.writeFileSync(path.join(partial, READY_MARKER), JSON.stringify({ pins: spec.pins, tag }, null, 2))
-  // A target without a marker is an install from before the marker was written; ours to replace.
+  // A target without a marker is a folder an earlier install left half-made; ours to replace.
+  // One with a marker is in use, so ours is the one dropped.
+  if (isReadyDir(target)) {
+    fs.rmSync(partial, { recursive: true, force: true })
+    return { ok: true, dir: target, installed: false }
+  }
   if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true })
   fs.renameSync(partial, target)
   return { ok: true, dir: target, installed: true }
@@ -238,6 +265,8 @@ function featurePackageDirs(assetsDir, feature) {
 
 module.exports = {
   FEATURE_PACKAGES,
+  PADDLEOCR_VERSION,
+  PADDLEPADDLE_VERSION,
   READY_MARKER,
   pythonTag,
   pinsHash,

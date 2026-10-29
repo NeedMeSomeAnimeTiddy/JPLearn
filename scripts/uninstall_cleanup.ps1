@@ -262,7 +262,7 @@ function Get-FeaturePackageDirs {
 $downloadOptions = @(
   @{
     Label = 'Keep tutor models'
-    Paths = @((Join-Path $assetsDir 'models'), (Join-Path $targetDir 'models')) + (Get-FeaturePackageDirs @('embedder'))
+    Paths = @((Join-Path $assetsDir 'models'), (Join-Path $targetDir 'models')) + @(Get-FeaturePackageDirs @('embedder'))
   },
   @{
     Label = 'Keep voice (VOICEVOX)'
@@ -270,7 +270,7 @@ $downloadOptions = @(
   },
   @{
     Label = 'Keep speech recognition models'
-    Paths = @((Join-Path $assetsDir 'whisper')) + (Get-FeaturePackageDirs @('speech', 'speech-cuda'))
+    Paths = @((Join-Path $assetsDir 'whisper')) + @(Get-FeaturePackageDirs @('speech', 'speech-cuda'))
   },
   @{
     Label = 'Keep OCR and translation models, tools, fonts'
@@ -281,7 +281,7 @@ $downloadOptions = @(
       (Join-Path $assetsDir 'tools\llama.cpp'),
       (Join-Path $assetsDir 'fonts'),
       (Join-Path $assetsDir 'data\external_sources\offline_dictionary')
-    ) + (Get-FeaturePackageDirs @('ocr'))
+    ) + @(Get-FeaturePackageDirs @('ocr'))
   }
 )
 $learningOptions = @(

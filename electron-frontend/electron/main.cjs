@@ -1314,6 +1314,7 @@ registerIpcHandlers({
   },
   refreshVoiceRuntime: refreshVoiceRuntimeAfterSetup,
   refreshOcrRuntime: refreshOcrRuntimeAfterSetup,
+  stopOcrRuntime: () => localOcrRuntime.stop(),
   getPreloadedAssistantChatHistory: () => preloadedAssistantChatHistory,
   /* The tutor is warmed only when the window asks, and it asks only while the tutor chat is switched
      on (audit 11, F3; Robbie: "Only if chat is on"). The warmup also reads back the saved chat

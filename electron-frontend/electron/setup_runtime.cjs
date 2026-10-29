@@ -19,6 +19,8 @@ const {
   envWithFeaturePackages,
   installFeaturePackages,
   featurePackageDirs,
+  PADDLEOCR_VERSION,
+  PADDLEPADDLE_VERSION,
 } = require('./python_packages.cjs')
 
 // ── Model catalogue ──────────────────────────────────────────────────────────
@@ -188,8 +190,6 @@ const TRANSLATION_PROFILES = {
     sizeMb: 748,
   },
 }
-const PADDLEOCR_VERSION = '3.7.0'
-const PADDLEPADDLE_VERSION = '3.2.0'
 const ACTIVE_OCR_MODEL_STATE_FILENAME = 'active-ocr-model.json'
 const ACTIVE_TRANSLATION_MODEL_STATE_FILENAME = 'active-translation-model.json'
 const SPEED_TEST_TIMEOUT_MS = 12000
@@ -2644,7 +2644,10 @@ function downloadSpeechModel(tier, sender, scriptRoot, downloadOptions = {}) {
           const checkScript = [
             '-c',
             [
-              'import subprocess as s, json, sys',
+              'import subprocess as s, json, sys, os, site',
+              // the installed app's downloaded packages (audit 13); nothing to add from source
+              'for d in os.environ.get("JPLEARN_PYTHON_PACKAGES", "").split(os.pathsep):',
+              '  if d: site.addsitedir(d)',
               'gpu = s.run(["nvidia-smi"], capture_output=True).returncode == 0',
               'result = {"gpu_detected": gpu, "cuda_ready": False, "cuda_error": None}',
               'if gpu:',
