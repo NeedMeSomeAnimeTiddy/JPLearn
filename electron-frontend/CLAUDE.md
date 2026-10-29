@@ -20,3 +20,5 @@ only when you're actually working here.
   component file.
 - **Square corners.** The UI is square-cornered: no `border-radius` on new components. Robbie's
   ruling (July 2026): it is part of the app's cassette/VHS-hardware look, not an accident of old CSS.
+- **No em or en dashes in shown text** (Robbie, 2026-10-29): see the rule in the root `CLAUDE.md`
+  "Key conventions"; `src/lib/noLongDashes.test.ts` enforces it.

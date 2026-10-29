@@ -84,6 +84,12 @@ size warning for any hand-written file over 2,000 lines (currently `desktop_brid
   (the electron one in particular covers accessibility, performance, and forbidden patterns).
 - Frontend-specific conventions (React 19.2 patterns, feature-module extraction rule, styling)
   live in `electron-frontend/CLAUDE.md` — loaded automatically when working in that directory.
+- **No em or en dashes in anything the app shows** (Robbie, 2026-10-29): on-screen copy, aria
+  labels, study content and messages the app displays. Reword with a comma, colon, full stop or
+  brackets; ranges take a hyphen (`5-58`, `N5-N1`); an empty-value placeholder is the Japanese dash
+  `―` (U+2015). Comments, docs, tests and developer CLI output may keep them; functional dash tables
+  (the Japanese text normalisers) are exempt. Enforced by `electron-frontend/src/lib/noLongDashes.test.ts`
+  and `tests/test_no_long_dashes.py`.
 
 ## Subagent selection (Claude Code)
 
