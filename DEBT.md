@@ -208,3 +208,18 @@ app release is published.
 
 **Trigger:** a migration that renames, rekeys, drops or tightens a column or table an older build
 reads or writes, or a published release older than the newest schema.
+
+## 15. English dictionary search runs the embedding model on the shared bridge
+
+**Recorded 2026-10-29 (audit 14, F2).** `_cmd_dictionary_search` hands in the e5 embedding model
+(`scripts/desktop_bridge.py`, `dictionary_search`), which every tutor tier installs silently
+(`electron/setup_runtime.cjs`). It re-ranks up to 80 glosses per English query with a pure-Python
+mean pool (`scripts/embedder_runtime.py`, `_mean_pool`) on the serial bridge. Look It Up searches
+180 ms after typing stops on its word and phrase routes (`src/features/lookup/useLookup.ts`; audit
+14 stopped the other routes searching), and the Dictionary panel after 90 ms. Not fixed now: no
+install with an embedder exists to measure; without one, an English search takes 5-58 ms (audit 14,
+Check 3).
+
+**Trigger:** a tutor tier is installed with its embedder and a warm English `dictionary-search`
+takes over 300 ms, or the first one after a bridge start takes over 2 s, or a bridge timeout is
+logged while Look It Up or the Dictionary panel is open.
