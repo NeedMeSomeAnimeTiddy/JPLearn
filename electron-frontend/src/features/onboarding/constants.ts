@@ -4,7 +4,7 @@ import type { OnboardingStage } from './types'
 export const BEGINNER_PATH_STEPS = [
   { label: 'Hiragana', note: 'The foundational Japanese syllabary' },
   { label: 'Katakana', note: 'For foreign words and emphasis' },
-  { label: 'N5 Vocabulary', note: 'Core 800-word beginner vocabulary' },
+  { label: 'N5 Vocabulary', note: 'Core ~750-word beginner vocabulary' },
   { label: 'N5 Grammar', note: 'Essential sentence patterns' },
 ]
 
