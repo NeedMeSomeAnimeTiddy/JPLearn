@@ -14,6 +14,8 @@ import {
   ASSISTANT_CHAT_USER_MEDIUM_CHAR_LIMIT,
   ASSISTANT_EVENT_POLL_MS,
   ASSISTANT_TOAST_TTL_MS,
+  OCR_NO_TRANSLATION_REASON,
+  OCR_TRANSLATION_FAILED_PREFIX,
 } from './constants'
 import {
   formatAssistantEventBody,
@@ -23,6 +25,7 @@ import {
   prepareAssistantChatImagePayload,
   sanitizeOcrTranslationText,
 } from './utils'
+import { ipcErrorReason } from '../../lib/ipcErrorReason'
 
 export interface UseTutorReturn {
   /* THE CHAT AND THE IMAGE TRANSLATION ARE LOOK IT UP'S TWO MODEL ROUTES now (A QUESTION and A
@@ -319,7 +322,7 @@ export function useTutor(
       setOcrWorkbenchError('Image Translation is unavailable in this build.')
       return
     }
-    if (!deps.ocrInstalled) {
+    if (!deps.ocrInstalled || !deps.translationReady) {
       setOcrWorkbenchError('Image Translation is not installed. Install it in Settings › Assistant › Image Translation.')
       return
     }
@@ -352,21 +355,6 @@ export function useTutor(
         return
       }
 
-      const translationResponse = await translateAssistantChatOcrText({
-        text: extractedText,
-        sourceLang: 'ja',
-        targetLang: 'en',
-        fastMode: true,
-      })
-      if (isStale()) return
-      const rawEnglishText = (translationResponse?.text ?? '').trim()
-      const finalEnglishText = normalizeTranslationWhitespace(sanitizeOcrTranslationText(rawEnglishText))
-
-      if (!finalEnglishText) {
-        setOcrWorkbenchError('No translation text returned.')
-        return
-      }
-
       const lineCount = Number.isFinite(ocrResponse?.lineCount)
         ? Math.max(0, Math.trunc(ocrResponse.lineCount))
         : extractedText.split(/\n+/).filter(Boolean).length
@@ -382,14 +370,48 @@ export function useTutor(
           }))
         : extractedText.split(/\n+/).filter(Boolean).map((text) => ({ text, confidence: Number.NaN }))
 
-      setOcrWorkbenchResult({
+      /* THE TEXT THAT WAS READ IS KEPT WHATEVER THE TRANSLATION DOES. It is published before the
+         translation is asked for, so a translation that fails leaves the Japanese on screen with the
+         reason above it rather than throwing away what the reader already got. */
+      const readResult: OcrWorkbenchResult = {
         fileName: file.name,
         lineCount,
         japaneseText: extractedText,
-        englishText: finalEnglishText,
+        englishText: '',
         lines,
         imageUrl: `data:${payload.mimeType};base64,${payload.imageBase64}`,
         minConfidence: settings.assistantChatOcrMinConfidence,
+        clipped: false,
+      }
+      setOcrWorkbenchResult(readResult)
+
+      let translationResponse: Awaited<ReturnType<typeof translateAssistantChatOcrText>>
+      try {
+        translationResponse = await translateAssistantChatOcrText({
+          text: extractedText,
+          sourceLang: 'ja',
+          targetLang: 'en',
+          fastMode: true,
+        })
+      } catch (error: unknown) {
+        if (isStale()) return
+        const firstLine = ipcErrorReason(error).split(/\r?\n/)[0].trim()
+        setOcrWorkbenchError(`${OCR_TRANSLATION_FAILED_PREFIX}${firstLine || OCR_NO_TRANSLATION_REASON}`)
+        return
+      }
+      if (isStale()) return
+      const rawEnglishText = (translationResponse?.text ?? '').trim()
+      const finalEnglishText = normalizeTranslationWhitespace(sanitizeOcrTranslationText(rawEnglishText))
+
+      if (!finalEnglishText) {
+        setOcrWorkbenchError(`${OCR_TRANSLATION_FAILED_PREFIX}${OCR_NO_TRANSLATION_REASON}`)
+        return
+      }
+
+      setOcrWorkbenchResult({
+        ...readResult,
+        englishText: finalEnglishText,
+        clipped: translationResponse?.clipped === true,
       })
     } catch (error: unknown) {
       if (isStale()) return
@@ -398,7 +420,7 @@ export function useTutor(
     } finally {
       if (!isStale()) setOcrWorkbenchBusy(false)
     }
-  }, [deps.ocrInstalled, settings.assistantChatOcrMinConfidence])
+  }, [deps.ocrInstalled, deps.translationReady, settings.assistantChatOcrMinConfidence])
 
   useEffect(() => {
     if (!settings.assistantChatEnabled) {

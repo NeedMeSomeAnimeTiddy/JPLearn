@@ -13,6 +13,8 @@ export interface GateInstallInfo {
   llamaCppInstalled: boolean
   models: ReadonlyArray<{ installed: boolean }>
   ocrInstalled?: boolean
+  /** the translation model and the runner it needs; absent reads as not ready */
+  translationReady?: boolean
 }
 
 /* A QUESTION ANSWERS WHEN IT CAN ACTUALLY BE ANSWERED: the build has the chat, Chat with Tutor is
@@ -28,8 +30,17 @@ export function chatGate(runtime: boolean, settingOn: boolean, install: GateInst
 
 export function ocrGate(runtime: boolean, install: GateInstallInfo | null): ModelGate {
   if (!runtime) return { enabled: false, ...LOOKUP_GATE_COPY.ocrNoRuntime }
-  if (!install?.ocrInstalled) return { enabled: false, ...LOOKUP_GATE_COPY.ocrNotInstalled }
+  /* reading the text is half of it: the Image Translation download also brings the runner that
+     translates it, so until both are in, the package is not installed in the sense that matters */
+  if (!install?.ocrInstalled || !install.translationReady) return { enabled: false, ...LOOKUP_GATE_COPY.ocrNotInstalled }
   return { enabled: true, reason: '', help: '' }
+}
+
+/* The offline dictionary is an optional download, and the bridge says so by raising rather than
+   by returning nothing. That distinction is the whole point of the `unavailable` status, so it is
+   recognised here rather than flattened into a generic failure. */
+export function isMissingDictionary(message: string): boolean {
+  return /not installed|not available|no dictionary|index is missing/i.test(message)
 }
 
 /* CJK Unified Ideographs, plus Extension A. Deliberately not the full ideographic range: the

@@ -181,29 +181,32 @@ export function ScreenshotBody({ ocr, fileInputRef, enPages, page, fileNote }: S
             <>
               <div className="lk-reply-who">
                 <span>{result.lines.length} {result.lines.length === 1 ? 'LINE' : 'LINES'}</span>
-                <s>KEEPING LINES ABOVE {Math.round(result.minConfidence * 100)}%</s>
+                <s>LINES UNDER {Math.round(result.minConfidence * 100)}% ARE MARKED</s>
               </div>
               {result.lines.slice(0, LOOKUP_OCR_LINES).map((line, index) => {
-                /* under the filter and still here: the extractor keeps a line that is Japanese
-                   script, and that is exactly the line worth checking against the image */
+                /* under the filter and still here: a line read with low confidence is the one
+                   worth checking against the image */
                 const low = Number.isFinite(line.confidence) && line.confidence < result.minConfidence
                 return (
                   <div key={`${line.text}-${index}`} className={low ? 'lk-ocr-l low' : 'lk-ocr-l'}>
                     <b lang="ja">{line.text}</b>
-                    <s>{percent(line.confidence)}{low ? ' · KEPT, IT IS JAPANESE' : ''}</s>
+                    <s>{percent(line.confidence)}{low ? ' · LOW CONFIDENCE, CHECK IT' : ''}</s>
                   </div>
                 )
               })}
               {result.lines.length > LOOKUP_OCR_LINES ? (
-                <p className="lk-fold">+ {result.lines.length - LOOKUP_OCR_LINES} MORE LINES · ALL OF THEM ARE IN THE ENGLISH</p>
+                <p className="lk-fold">+ {result.lines.length - LOOKUP_OCR_LINES} MORE LINES</p>
               ) : null}
-              <div className="lk-ocr-en">
-                <em>
-                  ENGLISH · THE WHOLE IMAGE
-                  {enPages.length > 1 ? <b>{page + 1} OF {enPages.length} {page + 1 < enPages.length ? '↓' : '↑'}</b> : null}
-                </em>
-                {enPages[page] ?? result.englishText}
-              </div>
+              {/* no English is a translation that failed, and the reason is already above the lines */}
+              {result.englishText ? (
+                <div className="lk-ocr-en">
+                  <em>
+                    {result.clipped ? 'ENGLISH · FIRST PART OF THE TEXT' : 'ENGLISH'}
+                    {enPages.length > 1 ? <b>{page + 1} OF {enPages.length} {page + 1 < enPages.length ? '↓' : '↑'}</b> : null}
+                  </em>
+                  {enPages[page] ?? result.englishText}
+                </div>
+              ) : null}
             </>
           ) : null}
         </div>

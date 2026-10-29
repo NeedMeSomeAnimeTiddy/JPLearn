@@ -11,6 +11,7 @@ import { QuestionBody, ScreenshotBody } from './AssistantBodies'
 import '../../../styles/stage.css'
 import '../lookup.css'
 import { boardScale } from '../../menu/useScreen'
+import { dictionaryItemRenderKey } from '../../card-notes/utils'
 
 export interface LookupOverlayProps {
   controller: LookupController
@@ -453,7 +454,7 @@ function LookupAnswerBody({ controller }: { controller: LookupController }) {
             {status === 'error' ? <Line label="FAILED" value={reason ?? 'unknown error'} absent /> : null}
             {status === 'empty' ? <Line label="NOTHING" value={reason ?? 'no match'} absent /> : null}
             {shown.map((item) => (
-              <span className="lk-line" key={item.note_key || `${item.id}`}>
+              <span className="lk-line" key={dictionaryItemRenderKey(item)}>
                 <em>{item.romaji || '—'}</em>
                 <span className="jp">{item.character}<span style={{ fontSize: 12, opacity: 0.7 }}>{'　'}{item.meaning}</span></span>
               </span>

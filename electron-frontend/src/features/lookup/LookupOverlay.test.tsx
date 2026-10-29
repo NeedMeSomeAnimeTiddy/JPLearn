@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import axe from 'axe-core'
 import type { KanjiDetailPayload } from '../../generated/types'
 import { LookupOverlay } from './components/LookupOverlay'
 import type { LookupAssistant, LookupChat, LookupOcr, LookupRouteKey } from './types'
 import { useLookup } from './useLookup'
-import { LOOKUP_GATE_COPY } from './constants'
+import type { LookupCard } from './useLookup'
+import { LOOKUP_GATE_COPY, LOOKUP_HISTORY_KEY, MISSING_DICTIONARY } from './constants'
 import { chatGate, ocrGate, pageReply } from './utils'
 
 /* The overlay is driven entirely by the controller, so the harness mounts the real hook and drives
@@ -17,10 +18,10 @@ import { chatGate, ocrGate, pageReply } from './utils'
 const onOpenKanjiDetail = vi.fn()
 const onOpenDictionary = vi.fn()
 
-function Harness({ seed = '', route, assistant }: {
-  seed?: string; route?: LookupRouteKey; assistant?: LookupAssistant
+function Harness({ seed = '', route, assistant, cards }: {
+  seed?: string; route?: LookupRouteKey; assistant?: LookupAssistant; cards?: LookupCard[]
 }) {
-  const controller = useLookup()
+  const controller = useLookup(cards)
   return (
     <>
       <button type="button" onClick={() => controller.open(seed, route)}>open lookup</button>
@@ -129,6 +130,9 @@ describe('LookupOverlay', () => {
     await waitFor(() => expect(screen.getByText(/N5/)).toBeTruthy())
     expect(screen.getByText('言')).toBeTruthy()
     expect(screen.getByText('五')).toBeTruthy()
+    /* the kanji route asks about the character, not the dictionary */
+    expect(window.jplearnDesktop.searchDictionary).not.toHaveBeenCalled()
+    expect(window.jplearnDesktop.lookupSentence).not.toHaveBeenCalled()
   })
 
   it('draws a missing download as an absence, not as an empty row', async () => {
@@ -183,7 +187,8 @@ describe('LookupOverlay', () => {
       lookupSentence: vi.fn(track('phrase', { jp: null, en: null, romaji: null })),
     })
 
-    open('語')
+    render(<Harness seed="語" route="word" />)
+    fireEvent.click(screen.getByText('open lookup'))
     await waitFor(() => expect(order.length).toBe(3))
 
     expect(overlapped).toBe(false)
@@ -256,7 +261,9 @@ describe('LookupOverlay', () => {
 
   it('gates A QUESTION on a model actually installed, and A SCREENSHOT on image translation', () => {
     const none = { llamaCppInstalled: true, models: [{ installed: false }], ocrInstalled: false }
-    const some = { llamaCppInstalled: true, models: [{ installed: false }, { installed: true }], ocrInstalled: true }
+    const some = {
+      llamaCppInstalled: true, models: [{ installed: false }, { installed: true }], ocrInstalled: true, translationReady: true,
+    }
     /* the setting alone is not enough: this is what showed an ask field with nothing to answer it */
     expect(chatGate(true, true, none)).toMatchObject({ enabled: false, reason: LOOKUP_GATE_COPY.chatNoModel.reason })
     expect(chatGate(true, true, { ...some, llamaCppInstalled: false }).enabled).toBe(false)
@@ -267,6 +274,15 @@ describe('LookupOverlay', () => {
     expect(ocrGate(true, none)).toMatchObject({ enabled: false, reason: LOOKUP_GATE_COPY.ocrNotInstalled.reason })
     expect(ocrGate(false, some).enabled).toBe(false)
     expect(ocrGate(true, some).enabled).toBe(true)
+  })
+
+  it('opens A SCREENSHOT only when the text can be translated as well as read', () => {
+    const install = { llamaCppInstalled: false, models: [], ocrInstalled: true }
+    /* OCR alone reads the text and then fails to translate it, so it is not installed yet */
+    expect(ocrGate(true, install)).toEqual({ enabled: false, ...LOOKUP_GATE_COPY.ocrNotInstalled })
+    expect(ocrGate(true, { ...install, translationReady: false })).toEqual({ enabled: false, ...LOOKUP_GATE_COPY.ocrNotInstalled })
+    expect(ocrGate(true, { ...install, translationReady: true }).enabled).toBe(true)
+    expect(ocrGate(true, { ...install, ocrInstalled: false, translationReady: true }).enabled).toBe(false)
   })
 
   it('leaves ENTER and ESC to an input method that is still composing', async () => {
@@ -440,8 +456,10 @@ describe('LookupOverlay', () => {
 
     expect(await screen.findByText('3 LINES')).toBeTruthy()
     expect(screen.getByText('98%')).toBeTruthy()
-    expect(screen.getByText('22% · KEPT, IT IS JAPANESE').closest('.lk-ocr-l')?.className).toContain('low')
+    expect(screen.getByText('22% · LOW CONFIDENCE, CHECK IT').closest('.lk-ocr-l')?.className).toContain('low')
+    expect(screen.getByText('LINES UNDER 30% ARE MARKED')).toBeTruthy()
     expect(screen.getByText(/We apologize for the inconvenience/)).toBeTruthy()
+    expect(screen.getByText('ENGLISH')).toBeTruthy()
     expect(screen.getByAltText(/shop-sign\.png/)).toBeTruthy()
   })
 
@@ -512,5 +530,168 @@ describe('LookupOverlay', () => {
       run: (element: Element) => Promise<{ violations: Array<{ id: string }> }>
     }).run(document.querySelector('.lk-open') as Element)
     expect(results.violations).toEqual([])
+  })
+  it('says when only the first part of the text was translated', async () => {
+    installApi()
+    render(<Harness route="ocr" assistant={withModel({}, {
+      result: {
+        fileName: 'page.png', lineCount: 6, japaneseText: '一\n二\n三\n四\n五\n六', englishText: 'One two three.',
+        imageUrl: null, minConfidence: 0.3, clipped: true,
+        lines: ['一', '二', '三', '四', '五', '六'].map((text) => ({ text, confidence: 0.9 })),
+      },
+    })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    expect(await screen.findByText('ENGLISH · FIRST PART OF THE TEXT')).toBeTruthy()
+    expect(screen.queryByText('ENGLISH')).toBeNull()
+    expect(screen.getByText('+ 2 MORE LINES')).toBeTruthy()
+  })
+
+  it('keeps the lines read when the translation failed, with the reason above them and no English box', async () => {
+    installApi()
+    render(<Harness route="ocr" assistant={withModel({}, {
+      error: "Read the text, but couldn't translate it: llama.cpp is not installed",
+      result: {
+        fileName: 'sign.png', lineCount: 1, japaneseText: '本日休業', englishText: '',
+        imageUrl: null, minConfidence: 0.3, clipped: false, lines: [{ text: '本日休業', confidence: 0.98 }],
+      },
+    })} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe("Read the text, but couldn't translate it: llama.cpp is not installed")
+    const line = screen.getByText('本日休業')
+    expect(alert.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.querySelector('.lk-ocr-en')).toBeNull()
+  })
+
+  it('reads romaji as kana when the dictionary has nothing for the letters', async () => {
+    const searchDictionary = vi.fn(async (query: string) => ({
+      query,
+      source: 'offline_dictionary' as const,
+      results: query === 'たべる' ? [{
+        id: 9, source_id: 'ent-1', note_key: 'note:v1:offline_dictionary:jmdict:ent-1', character: '食べる',
+        romaji: 'taberu', meaning: 'to eat', tags: [], example_sentence: null, pitch_accents: [],
+      }] : [],
+    }))
+    installApi({ searchDictionary })
+    open('taberu')
+
+    expect(await screen.findByText('食べる')).toBeTruthy()
+    expect(searchDictionary.mock.calls.map((call) => call[0])).toEqual(['taberu', 'たべる'])
+  })
+
+  it('answers from your cards first, and still shows them when the dictionary is not installed', async () => {
+    installApi({
+      searchDictionary: vi.fn(async () => { throw new Error("Error invoking remote method 'study:search-dictionary': Error: Offline dictionary index is not installed") }),
+    })
+    const cards: LookupCard[] = [
+      { id: 3, character: '学校', romaji: 'gakkou', meaning: 'school', note_key: `note:v1:builtin:${'a'.repeat(64)}` },
+      /* a different card that another deck numbered the same */
+      { id: 3, character: '学生', romaji: 'gakusei', meaning: 'school student' },
+      { id: 4, character: '猫', romaji: 'neko', meaning: 'cat' },
+    ]
+    render(<Harness seed="school" cards={cards} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    const missing = await screen.findByText(MISSING_DICTIONARY)
+    const first = screen.getByText('学校')
+    expect(screen.getByText('学生')).toBeTruthy()
+    expect(screen.queryByText('猫')).toBeNull()
+    expect(missing.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('puts card results before dictionary results', async () => {
+    installApi({
+      searchDictionary: vi.fn(async (query: string) => ({
+        query, source: 'offline_dictionary' as const,
+        results: [{
+          id: 3, source_id: 'ent-2', note_key: 'note:v1:offline_dictionary:jmdict:ent-2', character: '校舎',
+          romaji: 'kousha', meaning: 'school building', tags: [], example_sentence: null, pitch_accents: [],
+        }],
+      })),
+    })
+    render(<Harness seed="school" cards={[{ id: 3, character: '学校', romaji: 'gakkou', meaning: 'school' }]} />)
+    fireEvent.click(screen.getByText('open lookup'))
+
+    const dictionary = await screen.findByText('校舎')
+    const card = screen.getByText('学校')
+    expect(card.compareDocumentPosition(dictionary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('2 RESULTS · OFFLINE DICTIONARY')).toBeTruthy()
+  })
+
+  it('asks the dictionary nothing on A QUESTION, and asks it when the route turns to A WORD', async () => {
+    const searchDictionary = vi.fn(async (query: string) => ({ query, source: 'offline_dictionary' as const, results: [] }))
+    installApi({ searchDictionary })
+    render(<Harness seed="school" route="tutor" assistant={withModel()} />)
+    fireEvent.click(screen.getByText('open lookup'))
+    await waitFor(() => expect(document.querySelector('.lk-open')).not.toBeNull())
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(searchDictionary).not.toHaveBeenCalled()
+    expect(window.jplearnDesktop.lookupSentence).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /A WORD/ }))
+    await waitFor(() => expect(searchDictionary).toHaveBeenCalledWith('school'))
+  })
+})
+
+describe('useLookup', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  function pendingDictionary() {
+    let resolve!: (value: unknown) => void
+    const searchDictionary = vi.fn(() => new Promise((done) => { resolve = done }))
+    const lookupSentence = vi.fn(async () => ({ jp: null, en: null, romaji: null }))
+    installApi({ searchDictionary, lookupSentence })
+    return {
+      searchDictionary, lookupSentence,
+      resolve: () => resolve({ query: 'school', source: 'offline_dictionary', results: [{
+        id: 1, source_id: null, note_key: 'n', character: '学校', romaji: 'gakkou', meaning: 'school',
+        tags: [], example_sentence: null, pitch_accents: [],
+      }] }),
+    }
+  }
+
+  it('drops the batch in flight when the route turns away from the dictionary', async () => {
+    const bridge = pendingDictionary()
+    const { result } = renderHook(() => useLookup())
+    act(() => result.current.open('school'))
+    await waitFor(() => expect(bridge.searchDictionary).toHaveBeenCalledTimes(1))
+
+    act(() => result.current.setActiveRoute('tutor'))
+    await act(async () => { bridge.resolve() })
+
+    expect(result.current.answers.word.status).toBe('idle')
+    expect(result.current.answers.word.results).toEqual([])
+    expect(bridge.lookupSentence).not.toHaveBeenCalled()
+    expect(result.current.busy).toBe(false)
+    expect(window.localStorage.getItem(LOOKUP_HISTORY_KEY)).toBeNull()
+  })
+
+  it('drops the batch in flight when the field is cleared, and keeps it out of the history', async () => {
+    const bridge = pendingDictionary()
+    const { result } = renderHook(() => useLookup())
+    act(() => result.current.open('school'))
+    await waitFor(() => expect(bridge.searchDictionary).toHaveBeenCalledTimes(1))
+
+    act(() => result.current.setQuery(''))
+    await act(async () => { bridge.resolve() })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(result.current.answers.word.status).toBe('idle')
+    expect(bridge.lookupSentence).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem(LOOKUP_HISTORY_KEY)).toBeNull()
+  })
+
+  it('still asks kanji-detail for one kanji off the dictionary routes', async () => {
+    installApi()
+    const { result } = renderHook(() => useLookup())
+    act(() => result.current.open('語', 'tutor'))
+    await waitFor(() => expect(result.current.answers.kanji.status).toBe('ready'))
+    expect(window.jplearnDesktop.getKanjiDetail).toHaveBeenCalledWith('語')
+    expect(window.jplearnDesktop.searchDictionary).not.toHaveBeenCalled()
   })
 })

@@ -173,6 +173,7 @@ export function useModels(): UseModelsReturn {
         recommendedOcrTier: setupInfo.recommendedOcrTier,
         activeOcrModelTier: setupInfo.activeOcrModelTier ?? null,
         ocrInstalled: setupInfo.ocrInstalled ?? false,
+        translationReady: setupInfo.translationReady ?? false,
         translationModels: setupInfo.translationModels ?? [],
         recommendedTranslationTier: setupInfo.recommendedTranslationTier,
         activeTranslationModelTier: setupInfo.activeTranslationModelTier ?? null,

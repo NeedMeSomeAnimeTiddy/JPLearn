@@ -76,13 +76,16 @@ export interface OcrWorkbenchResult {
   fileName: string
   lineCount: number
   japaneseText: string
+  /** empty while the translation is being asked for, and when it failed */
   englishText: string
   /** each line the OCR kept, with its own confidence (the payload has always carried it) */
   lines: OcrWorkbenchLine[]
   /** what was read, as a data URL, so the lines can stand beside the image they came from */
   imageUrl: string | null
-  /** the filter the lines were read with; a line under it was kept because it is Japanese */
+  /** the filter the lines were read with; a line under it is marked as one to check */
   minConfidence: number
+  /** true when only the first part of the text was translated */
+  clipped?: boolean
 }
 
 export interface TutorSettingsFields {
@@ -114,6 +117,8 @@ export interface TutorDeps {
   activeSessionId: string | null
   activeScript: ScriptKey
   ocrInstalled: boolean
+  /** the translation model and its runner are installed; absent reads as not ready */
+  translationReady?: boolean
   /** true while Look it up is standing on A QUESTION -- the chat is on screen there */
   lookupChatVisible?: boolean
   onToastNavigate: (script: ScriptKey, minigame: MinigameKey, differentScript: boolean) => void
