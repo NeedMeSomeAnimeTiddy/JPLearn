@@ -364,7 +364,8 @@ describe('llm runtime', () => {
   })
 
   // Audit 14, F3: the tutor reads the index the build makes (dictionary_entries + dictionary_fts).
-  describe('offline dictionary index', () => {
+  // Each test builds a SQLite index on disk; the Windows build VM took 10-12 s for the first ones.
+  describe('offline dictionary index', { timeout: 30_000 }, () => {
     const fs = require('node:fs')
     const os = require('node:os')
     const path = require('node:path')
