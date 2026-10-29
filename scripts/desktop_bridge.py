@@ -1868,12 +1868,8 @@ def mark_onboarding_pending_handler() -> dict[str, object]:
     again (audit 11, F7; Robbie: "Setup yes, onboarding no"). Study data is never touched.
     """
     init_study_db()
-    if get_setting("onboarding_complete") == "1":
-        pass
-    elif has_study_history():
-        set_setting("onboarding_complete", "1")
-    else:
-        set_setting("onboarding_complete", "0")
+    if get_setting("onboarding_complete") != "1":
+        set_setting("onboarding_complete", "1" if has_study_history() else "0")
     return build_learning_path_status_payload()
 
 

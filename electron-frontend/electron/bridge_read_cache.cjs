@@ -3,10 +3,11 @@
    A read listed in `ttlsMs` is answered from the cache while fresh, and callers asking while it is
    being computed share the one request. Anything else goes straight to its loader.
 
-   Every clear bumps a generation. A read that started before a clear still answers its own callers,
-   but never lands in the cache, and nobody new joins it: without that, a slow read that began
-   before an answer was saved could put the old figures back after the save cleared them (audit 11,
-   design critic M1). */
+   Every clear bumps the generation of the commands it clears (all of them for a full clear). A read
+   that started before a clear of its command still answers its own callers, but never lands in the
+   cache, and nobody new joins it: without that, a slow read that began before an answer was saved
+   could put the old figures back after the save cleared them (audit 11, design critic M1). A clear
+   of some commands leaves every other read alone (audit 11 review, finding 2). */
 
 const KEY_SEPARATOR = '\u001f'
 
@@ -30,7 +31,10 @@ function createBridgeReadCache(options) {
   const cache = new Map()
   /** key -> { promise, generation, command } */
   const inFlight = new Map()
-  let generation = 0
+  let allGeneration = 0
+  /** command -> clears of that command alone */
+  const commandGenerations = new Map()
+  const generationOf = (command) => `${allGeneration}:${commandGenerations.get(command) || 0}`
 
   function read(commandOrArgs, loader) {
     const command = commandOf(commandOrArgs)
@@ -46,15 +50,15 @@ function createBridgeReadCache(options) {
     }
 
     const running = inFlight.get(key)
-    if (running && running.generation === generation) {
+    if (running && running.generation === generationOf(command)) {
       return running.promise
     }
 
-    const startedIn = generation
+    const startedIn = generationOf(command)
     const promise = Promise.resolve()
       .then(loader)
       .then((payload) => {
-        if (startedIn === generation) {
+        if (startedIn === generationOf(command)) {
           cache.set(key, { payload, expiresAt: now() + ttlMs, command })
         }
         return payload
@@ -71,8 +75,14 @@ function createBridgeReadCache(options) {
 
   /** Forget cached reads: all of them, or only those of the commands named. */
   function clear(commands) {
-    generation += 1
     const only = Array.isArray(commands) ? new Set(commands) : null
+    if (only) {
+      for (const command of only) {
+        commandGenerations.set(command, (commandGenerations.get(command) || 0) + 1)
+      }
+    } else {
+      allGeneration += 1
+    }
     for (const map of [cache, inFlight]) {
       for (const [key, entry] of Array.from(map.entries())) {
         if (!only || only.has(entry.command)) {

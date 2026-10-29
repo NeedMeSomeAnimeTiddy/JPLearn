@@ -1067,6 +1067,7 @@ function App() {
   // XP, recommendations and the learning path: fetched on mount, and again after a later summary.
   const refreshHomeData = useHomeData({ setXpProgress, setStudyBlock, setLearningPathStatus })
   const { recordSuccess: recordSummarySuccess, recordFailure: recordSummaryFailure } = studyEngine
+  const refreshProgression = progression.refresh
 
   const loadSummary = useCallback(async () => {
     setLoading(true)
@@ -1077,7 +1078,12 @@ function App() {
       if (!payload) throw new Error('The study engine is not available.')
       setSummary(payload)
       saveSummarySnapshot(payload)
-      if (recordSummarySuccess()) refreshHomeData()
+      // after a failed launch, everything the home screen draws comes back, the map included
+      // (audit 11 review, finding 1)
+      if (recordSummarySuccess()) {
+        refreshHomeData()
+        refreshProgression()
+      }
       if (startupFirstSummaryMsRef.current === null) {
         const firstSummaryMs = Math.round(performance.now() - startupBootMarkRef.current)
         startupFirstSummaryMsRef.current = firstSummaryMs
@@ -1092,28 +1098,11 @@ function App() {
     } finally {
       setLoading(false)
     }
-  }, [recordSummaryFailure, recordSummarySuccess, refreshHomeData])
+  }, [recordSummaryFailure, recordSummarySuccess, refreshHomeData, refreshProgression])
 
   useEffect(() => {
     void loadSummary()
   }, [loadSummary])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // The tutor warms only while the chat is switched on: useTutor asks for it once startup-ready
   // has been sent, and again when the chat is turned back on (audit 11, F3).

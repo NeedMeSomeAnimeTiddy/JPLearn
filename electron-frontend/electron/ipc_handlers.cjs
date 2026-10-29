@@ -983,6 +983,10 @@ function registerIpcHandlers(options) {
   options.ipcMain.handle('assistant-chat:unload', async (event) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     try {
+      // the chat is off now: a new model installed later is not warmed for it (audit 11 review, finding 3)
+      if (typeof options.forgetTutorWarmupRequest === 'function') {
+        options.forgetTutorWarmupRequest()
+      }
       return await tutorRuntime().unload('manual')
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error)

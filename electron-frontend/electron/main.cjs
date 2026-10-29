@@ -293,6 +293,8 @@ const localSetupRuntime = createSetupRuntime()
 const localSpeechRuntime = createSpeechRuntime({ repoRoot })
 const localOcrRuntime = createOcrRuntime({ repoRoot })
 let tutorRuntimePreloadPromise = null
+// the window asked for a tutor warmup this session (only while its chat is on) and has not unloaded since
+let tutorWarmupRequested = false
 let preloadedAssistantChatHistory = {
   ok: true,
   turns: [],
@@ -371,7 +373,12 @@ async function refreshTutorRuntimeAfterSetup() {
     runtimeActive: false,
     source: 'setup-runtime-refresh-started',
   }
-  // No warmup here: the window asks for one when the tutor chat is switched on (audit 11, F3).
+  /* No warmup of its own: the window asks for one when the tutor chat is switched on (audit 11, F3).
+     If it has asked this session and not switched the chat off since, the new runtime (a model the
+     setup wizard just installed, say) is warmed for it, without the caller waiting (review, finding 3). */
+  if (tutorWarmupRequested) {
+    void preloadTutorChatStartupData().catch(() => undefined)
+  }
 }
 
 // voice runtime re-resolves model paths fresh on every
@@ -1308,7 +1315,13 @@ registerIpcHandlers({
   /* The tutor is warmed only when the window asks, and it asks only while the tutor chat is switched
      on (audit 11, F3; Robbie: "Only if chat is on"). The warmup also reads back the saved chat
      history, as the launch warmup used to. */
-  preloadTutorChat: () => preloadTutorChatStartupData(),
+  preloadTutorChat: () => {
+    tutorWarmupRequested = true
+    return preloadTutorChatStartupData()
+  },
+  forgetTutorWarmupRequest: () => {
+    tutorWarmupRequested = false
+  },
   reloadLocalFontsForContents,
   getBridgeTelemetrySnapshot,
   stopPythonBridgeWorker,
@@ -2019,7 +2032,8 @@ async function runStudyJourneySmokeIfEnabled() {
   }
 }
 
-async function preloadStartupBridgeData(splash) {
+// taskTimings is filled as each task ends, so a caller that stops waiting still has what finished.
+async function preloadStartupBridgeData(splash, taskTimings = []) {
   updateSplashStatus(splash, 'Loading study data...', 'Preparing your decks and stats...', STARTUP_PRELOAD_PROGRESS_START_PCT)
 
   const startedAt = Date.now()
@@ -2096,7 +2110,6 @@ async function preloadStartupBridgeData(splash) {
     })
   }
 
-  const taskTimings = []
   const totalTasks = preloadTasks.length
 
   for (let index = 0; index < totalTasks; index += 1) {
@@ -2209,7 +2222,8 @@ async function createWindowWithSplash() {
     win.once('ready-to-show', resolve)
   })
 
-  const startupBridgePreloadPromise = preloadStartupBridgeData(splash).catch(() => ({
+  const preloadTaskTimings = []
+  const startupBridgePreloadPromise = preloadStartupBridgeData(splash, preloadTaskTimings).catch(() => ({
     totalDurationMs: null,
     taskTimings: [],
   }))
@@ -2245,7 +2259,8 @@ async function createWindowWithSplash() {
     ? startupGates[1]
     : {
         totalDurationMs: null,
-        taskTimings: [{
+        // the tasks that finished, then the deadline (audit 11 review, finding 5)
+        taskTimings: [...preloadTaskTimings, {
           key: 'startup-deadline',
           label: 'Startup deadline reached',
           durationMs: Date.now() - startupSessionStartedAt,

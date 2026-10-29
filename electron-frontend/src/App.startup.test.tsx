@@ -87,6 +87,30 @@ describe('a study engine that fails at launch (audit 11, F1)', () => {
     expect(getStudySummary).toHaveBeenCalledTimes(2)
   })
 
+  it('a Retry that works also reads the progression map again (audit 11 review, finding 1)', async () => {
+    const summary = await baseDesktopApi.getStudySummary()
+    let engineUp = false
+    const getStudySummary = vi.fn(async () => {
+      if (!engineUp) throw new Error('No module named fugashi')
+      return summary
+    })
+    const getProgressionState = vi.fn(async () => {
+      if (!engineUp) throw new Error('No module named fugashi')
+      return { nodes: [] }
+    })
+    mount({ getStudySummary, getProgressionState })
+
+    expect(await screen.findByText(ENGINE_FAILED)).toBeTruthy()
+    await settle()
+    const callsWhileDown = getProgressionState.mock.calls.length
+
+    engineUp = true
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(screen.queryByText(ENGINE_FAILED)).toBeNull())
+    await waitFor(() => expect(getProgressionState.mock.calls.length).toBeGreaterThan(callsWhileDown))
+  })
+
   it('does not show a saved snapshot as current while the engine has failed', async () => {
     const summary = await baseDesktopApi.getStudySummary()
     saveSummarySnapshot({

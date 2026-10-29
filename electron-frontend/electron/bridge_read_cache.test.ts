@@ -71,6 +71,25 @@ describe('bridge read cache (audit 11)', () => {
     await expect(cache.read('recommendations', async () => 'r2')).resolves.toBe('r2')
   })
 
+  it('a clear of named commands still caches and shares the other reads already running', async () => {
+    const { cache } = createCache()
+    const summary = deferred<string>()
+    const summaryRead = cache.read('summary', () => summary.promise)
+    const recommendations = deferred<string>()
+    const recommendationsRead = cache.read('recommendations', () => recommendations.promise)
+
+    cache.clear(['recommendations'])
+
+    const joined = vi.fn(async () => 'second summary')
+    const joinedRead = cache.read('summary', joined)
+    summary.resolve('s1')
+    recommendations.resolve('old r')
+    await expect(Promise.all([summaryRead, joinedRead, recommendationsRead])).resolves.toEqual(['s1', 's1', 'old r'])
+    expect(joined).not.toHaveBeenCalled()
+    await expect(cache.read('summary', async () => 's2')).resolves.toBe('s1')
+    await expect(cache.read('recommendations', async () => 'new r')).resolves.toBe('new r')
+  })
+
   it('does not cache a failure', async () => {
     const { cache } = createCache()
     await expect(cache.read('summary', async () => { throw new Error('down') })).rejects.toThrow('down')

@@ -148,3 +148,18 @@ hatch, not a performance target.
 **Trigger:** a learner noticing a slow start, `preload.tasks[summary].durationMs` over 2,500 ms in
 `startup-telemetry.json`, or `startupSessionMs` over 5,000 ms. Read those two alongside
 `firstSummaryMs` whenever DEBT #4's trigger is checked.
+
+## 11. Home rows still read as a clear day when their data failed to load
+
+**Recorded 2026-10-29.** Audit 11 replaced the home hero with "JPLearn couldn't start its study
+engine." when the first summary fails, but the rows under it still draw an absence of data as
+finished work. With recommendations missing, the PRACTICE row says "NOTHING DUE"
+(`electron-frontend/src/features/menu/utils.ts`, `rowsFrom`). With the progression read failed,
+`useProgression` stores `nodes=[]`, and the STUDY row says "ALL TRACKED STEPS DONE". A failure of
+recommendations alone, with the summary fine, shows a clear day and no failure hero. Not fixed now:
+while the engine is down, the hero above already says so, and a Retry that works reloads both
+reads. A recommendations-only failure has not been seen.
+
+**Trigger:** a learner seeing "NOTHING DUE" or "ALL TRACKED STEPS DONE" with cards due, or any
+change that lets recommendations fail while the summary succeeds. The fix is to show both rows as
+"not counted" when their read failed, the way `lanes.ts` already draws an uncounted queue.
