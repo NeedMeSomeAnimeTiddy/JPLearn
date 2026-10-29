@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { RoundWork } from '../../round'
 import { DAILY_GAMES_COPY } from '../constants'
 import type { DailyGamesAttemptOutcomeInput, MatchPair, PuzzleShell } from '../types'
-import { pad2 } from '../utils'
+import { pad2, pairsBelongTogether } from '../utils'
 import { PuzzleRound } from './PuzzleRound'
 
 /* ==================================================================================================
@@ -49,8 +49,10 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
       return
     }
     setIsResolving(true)
-    const isMatch = selected.poolPosition === pair.poolPosition
-    if (!isMatch) {
+    /* a word's outcome is decided by its character tile, whichever side was picked first */
+    const characterTile = selected.side === 'character' ? selected : pair
+    const meaningTile = selected.side === 'character' ? pair : selected
+    if (!pairsBelongTogether(characterTile, meaningTile)) {
       setMissedPositions((current) => new Set([...current, selected.poolPosition, pair.poolPosition]))
       setFlashIds([selected.id, pair.id])
       setStatus(DAILY_GAMES_COPY.matchPairsMismatched.replace('{first}', selected.value).replace('{second}', pair.value))
@@ -63,7 +65,7 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
     }
     const nextMatched = new Set([...matchedIds, selected.id, pair.id])
     setMatchedIds(nextMatched)
-    setMadeOrder((current) => [...current, pair.poolPosition])
+    setMadeOrder((current) => [...current, characterTile.poolPosition])
     setSelected(null)
     setIsResolving(false)
     setStatus(DAILY_GAMES_COPY.matchPairsMatched.replace('{value}', selected.value))

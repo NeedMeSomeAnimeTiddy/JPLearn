@@ -94,7 +94,8 @@ describe('buildCrossword', () => {
     const largePool = Array.from({ length: 200 }, (_, index) => ({
       ...words[index % words.length],
       card_id: index,
-      character: `語${index}校`,
+      /* kanji only: a digit would keep the word off the board (audit 16 D2) */
+      character: `語${String.fromCodePoint(0x4E00 + index)}校`,
       meaning: `word ${index}`,
     }))
     const board = buildCrossword(largePool, 8)
@@ -102,6 +103,58 @@ describe('buildCrossword', () => {
     expect(board.work.candidatePlacements).toBeLessThanOrEqual(CROSSWORD_MAX_CANDIDATE_PLACEMENTS)
     expect(board.work.solverSteps).toBeLessThanOrEqual(CROSSWORD_MAX_SOLVER_STEPS)
     expectValidBoard(board, largePool)
+  })
+
+  it('never makes an entry of a word that is not only kana and kanji (audit 16 D2)', () => {
+    const unsolvable = ['いい; よい', 'パート (タイム)', 'こうよう もみじ', '~(て) しまう', '回る、回す']
+    const pool = [...unsolvable, 'いえ', 'よる', 'あい', 'いぬ', 'コーヒー', '人々'].map((character, card_id) => ({
+      ...words[0], card_id, character, meaning: `word ${card_id}`,
+    }))
+    /* seed 2 is the audit's board, which placed いい; よい as a real entry */
+    let playable = 0
+    for (let seed = 0; seed < 64; seed += 1) {
+      const board = buildCrossword(pool, seed)
+      expectValidBoard(board, pool)
+      for (const entry of board.entries) expect(unsolvable).not.toContain(entry.answer)
+      if (!board.isFallback) playable += 1
+    }
+    expect(playable).toBeGreaterThan(0)
+  })
+
+  it('deals the same board as before for a pool of plain words (audit 16 D2)', () => {
+    const summary = (board: ReturnType<typeof buildCrossword>) => board.entries
+      .map((entry) => `${entry.answer} ${entry.direction} ${entry.cells[0].row},${entry.cells[0].column}`)
+    const kanjiPool = Array.from({ length: 40 }, (_, index) => ({
+      ...words[index % words.length],
+      card_id: index,
+      character: `${['学', '校', '門', '前', '日'][index % 5]}${String.fromCodePoint(0x4E00 + index)}${['学', '校', '門', '前', '日'][(index * 3) % 5]}`,
+      meaning: `word ${index}`,
+    }))
+    expect(summary(buildCrossword(words, 117))).toMatchInlineSnapshot(`
+      [
+        "学校 across 4,3",
+        "校門 down 4,4",
+      ]
+    `)
+    expect(summary(buildCrossword(words, 24))).toMatchInlineSnapshot(`
+      [
+        "前日 across 4,3",
+        "門前 down 3,3",
+        "校門 across 3,2",
+      ]
+    `)
+    expect(summary(buildCrossword(kanjiPool, 8))).toMatchInlineSnapshot(`
+      [
+        "練習 across 3,2",
+      ]
+    `)
+    expect(summary(buildCrossword(kanjiPool, 31))).toMatchInlineSnapshot(`
+      [
+        "門丂校 across 4,3",
+        "校丆前 down 4,5",
+        "校丐前 across 6,3",
+      ]
+    `)
   })
 
   it('rejects oversized answer and clue fields before expanding them', () => {
