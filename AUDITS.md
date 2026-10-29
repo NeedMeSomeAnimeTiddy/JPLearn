@@ -6,6 +6,62 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-29 — Packaging, updates and upgrades
+
+**Scope:** Audit 13. Robbie chose "Packaging and upgrades (Recommended)" over JLPT prep, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, reading passages, handwriting, and the whole repository.
+- Covered: forge config and its post-package hook; bundle_python.ps1; updater.cjs; schema versions and migrations; which Python the packaged app and setup run; what ships in resources; the packaged smoke and dev.py --full; progress and downloads locations across versions and the former-location copy; the Squirrel hooks; both workflows.
+- Out: each migration's data correctness (audits 1, 10), the uninstall dialog's selection logic (audit 6), the bridge start and failure display (audits 7, 11), download integrity (audit 6).
+
+**Commit audited:** 3f28c5f on main, tree clean.
+
+**Method:**
+- The Auditor read source, history and the census, and ran nothing. No helpers.
+- The lead ran Checks 1-8, 10 and 11 locally (scratch databases under %TEMP%, confirmed).
+- Not run: Check 9 (a real update in a VM), Checks 12-13.
+- Report: `AUDIT-packaging-and-upgrades-2026-10-29-1-r2.md`.
+
+### Where each finding went
+- F1, speech recognition cannot run in the installed app (P2, Check 1): reported; Q3.
+- F3, local releases ship the 2026-09-05 bundle (fugashi 1.5.2 against 1.3.0 tested), unchecked (P2, Checks 1, 5): reported.
+- F2, OCR's Python packages are lost on every update (P2, plausible; Check 9 not run): reported; Q3.
+- F4, the tutor embedder is never found, the folders being split since 9ca9cfb (P3, Checks 1, 3, 6): reported.
+- F5, migration 15's unguarded column add leaves a database that never opens (P3, Check 2 reproduced): reported.
+- F6, a newer database is opened silently (P3, Check 10): reported; Q2; debt row drafted.
+- F7, the uninstall cleanup uses home\Documents (P3, plausible): reported; debt row drafted.
+- F8, auto-update has no source and no matching release asset (P3, Checks 7, 11; evidence corrected): reported; Q1.
+- Nits 1-2: reported.
+- STALE RECORD: README.md:100-134; release.yml:219,226-228; bundle_python.ps1:124-127.
+- RECORDED: DEBT #6.
+- Dropped:
+  - the former-location copy's home\Documents (no release, no former-location database, Documents not moved; Checks 7, 8);
+  - the topic-to-level migration not run on upgrade;
+  - Squirrel re-creating shortcuts;
+  - the shared user-data folder for dev and installed builds.
+
+### Triggers checked
+- DEBT #6: not fired.
+
+### Inspected and found sound — do not re-derive these
+- Packaging strips every *.db (including -wal and .backup-*) and data/backups.
+- Progress and downloads live outside Squirrel's app-<version> folder and are set before any runtime.
+- The migration plan is checked for gaps; column adds are guarded and defaulted except migration 15; a safety copy precedes an upgrade.
+- Squirrel events exit before the lock and the bridge spawn.
+- The packaged smoke is isolated.
+- The updater never blocks startup.
+- A fresh bundle build fails loudly and probes tokenization.
+- The release workflow forces a fresh bundle; the smoke workflow skips fork pull requests.
+- No app release exists and nothing is installed on Robbie's machine (Checks 4, 7).
+
+### What this pass could not establish
+- A real Squirrel update.
+- Whether restore can be reached when the engine fails.
+- The screens on an OCR or speech import failure.
+- What fugashi 1.5.2 changes at runtime.
+- No test reaches an interrupted migration, a newer database, the Squirrel hooks or setup's pip installs.
+
+### Coverage, not a finding
+- The last three passes (progression, startup, import and export) did not cover tutor and assistant, JLPT, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, renderer state and settings, passages or handwriting.
+
 ## 2026-10-29 — Progression and onboarding
 
 **Scope:** Audit 12. Robbie chose "Progression (Recommended)" over JLPT prep, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, reading passages, handwriting, and the whole repository.
