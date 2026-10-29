@@ -240,6 +240,33 @@ describe('grading an answer (audit 9)', () => {
   })
 })
 
+describe('the missed-word review (audit 16 F1)', () => {
+  it('saves a vocabulary reading typed without its bracketed part as right', async () => {
+    const vocabCard = { ...cards[0], id: 7, character: '勉強', romaji: 'benkyou (suru)', meaning: 'study', tags: ['vocab'] }
+    const recordGameResult = vi.fn(async () => true)
+    const getDeckCards = vi.fn(async () => ({ cards: [vocabCard] }))
+    window.jplearnDesktop = { ...baseDesktopApi, recordGameResult, getDeckCards } as unknown as typeof window.jplearnDesktop
+    /* the review builds Romaji Sprint rounds, whose answer is the card's stored reading */
+    const deps = makeDeps({
+      buildRound: (pool, mode, index) => ({ ...roundFor(pool, index), mode, answer: pool[index].romaji }),
+    })
+    const { result } = renderHook(() => useStudySession(deps))
+
+    await act(async () => {
+      await result.current.startMissedWordReview([
+        { word: { deck_slug: 'vocab_n5', card_id: 7 } },
+      ] as unknown as Parameters<typeof result.current.startMissedWordReview>[0])
+    })
+    expect(result.current.slice.roundState?.mode).toBe('romaji_sprint')
+
+    act(() => { result.current.slice.submitAnswer('benkyou') })
+    await act(async () => {})
+    const saved = (recordGameResult.mock.calls.at(-1) as unknown as [{ isCorrect: boolean; minigame: string }] | undefined)?.[0]
+    expect(saved?.minigame).toBe('romaji_sprint')
+    expect(saved?.isCorrect).toBe(true)
+  })
+})
+
 describe('a session whose goal never started (audit 4 F8)', () => {
   it('clears its save and builds its run report when it ends', async () => {
     const getSessionSummary = vi.fn(baseDesktopApi.getSessionSummary)
