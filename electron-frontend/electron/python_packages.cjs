@@ -232,7 +232,7 @@ async function installFeaturePackagesOnce({ assetsDir, feature, baseEnv = proces
     // OpenCV and PyAV link Windows' own media DLLs, which Windows N editions and Windows Server
     // leave out and nothing can ship in their place (audit 13 check on a bare Server).
     const hint = /DLL load failed while importing (cv2|_core)\b/.test(last)
-      ? ' (this Windows is missing its media components; on an N edition, install the Media Feature Pack from Settings > Apps > Optional features)'
+      ? ' (this Windows is missing its media components; on an N edition, install the Media Feature Pack from Settings > Apps > Optional features; on Windows Server, add the Media Foundation feature)'
       : ''
     throw new Error(`Could not install the ${feature} packages: ${last}${hint}`)
   }
