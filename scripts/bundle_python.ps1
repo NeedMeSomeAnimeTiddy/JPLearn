@@ -12,6 +12,8 @@
 param(
   [string]$PythonVersion = "3.11",
   [string]$OutputDirectory = "",
+  # Where the Visual C++ runtime DLLs are copied from; System32 by default (see below).
+  [string]$VcRuntimeDirectory = "",
   [switch]$Force
 )
 
@@ -159,12 +161,12 @@ try {
   # are how Microsoft's redistribution terms allow shipping them.
   Write-Host "Adding the Visual C++ runtime to the bundle..."
   $vcRuntime = @("msvcp140.dll", "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
-  $system32 = Join-Path $env:SystemRoot "System32"
+  $vcSource = if ($VcRuntimeDirectory) { $VcRuntimeDirectory } else { Join-Path $env:SystemRoot "System32" }
   $pythonDir = Split-Path $pythonExe -Parent
   foreach ($dll in $vcRuntime) {
-    $source = Join-Path $system32 $dll
+    $source = Join-Path $vcSource $dll
     if (-not (Test-Path -LiteralPath $source)) {
-      throw "$dll is missing from $system32; install the x64 Visual C++ Redistributable on this build machine (https://aka.ms/vs/17/release/vc_redist.x64.exe)"
+      throw "$dll is missing from $vcSource; install the x64 Visual C++ Redistributable on this build machine (https://aka.ms/vs/17/release/vc_redist.x64.exe)"
     }
     $target = Join-Path $pythonDir $dll
     if (-not (Test-Path -LiteralPath $target)) {
