@@ -6,6 +6,82 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-29 — Minigames and Daily Games
+
+**Scope:** Audit 16. Robbie chose "Minigames, Daily Games (Recommended)" over JLPT and renderer state
+and ran `/crew-audit minigames and Daily Games`.
+- Covered: `domain/daily_games.py`, `data/daily_games_repository.py`, the daily-games bridge commands
+  and IPC routes, `features/daily-games/`, the daily road, the missed-word review, how minigame and
+  daily results reach XP, mastery, the schedule and queue order, and the crossword clue cache and its
+  caller.
+- Out: clue generation inside the tutor runtime (audit 15), the general graders (audit 9), grammar
+  minigame generator content.
+
+**Commit audited:** 04f453d on main, tree clean.
+
+**Method:**
+- The Auditor read source, blame and the census; no helpers. At Reconcile it read known-answers
+  Part 2, DEBT #9, AUDITS.md, ARCHITECTURE.md and FEATURES.md.
+- The lead ran the checks, read-only:
+  - Check 1, five throwaway vitest cases in the main checkout, each written to pass only when the
+    bug is absent: all five failed as predicted (the SPENT cases with the clock pinned to the
+    fixture's pool day; unpinned, the hook ignores the saved state and the bug hides). A verifier
+    wrote the cases but its sandbox could not install packages.
+  - Checks 2-3, counts over the built vocab_n5..n1 decks: 8,051 cards; 350 readings Romaji Sprint
+    cannot take; 73 stored forms with a space, 334 with `~`, `;` or brackets; 720 cards share a
+    meaning with another.
+  - Check 4, read-only against `C:\Users\Robbie\Documents\JPLearn Progress\data\jplearn.db`:
+    daily_game_attempts 0 rows, daily_crossword_clues 0 rows.
+  - Checks 5-6: `git log -S"missed_words"`; closed issue #62 (no ruling on the review's drill or
+    the streak display).
+- Not run: IME punctuation in a crossword cell; the app.
+- Report: `AUDIT-minigames-and-daily-games-2026-10-29-1-r2.md`.
+
+### Where each finding went
+- F1, the missed-word review grades vocabulary readings in Romaji Sprint, which cannot accept "~ku",
+  "benkyou (suru)" or "iku yuku"; 350 of 8,051 cards, each failure saved as a real failed review
+  (P1): reported; which drill the review uses is asked of Robbie.
+- F2, a crossword entry stored with a space ("good", いい; よい) can never be solved, so that
+  crossword cannot be finished (P2, Check 1c; 73 cards): reported.
+- F3, Match Pairs grades a right match wrong when two dealt words share a meaning ("blue", 青 and
+  青い), writing a 7-day miss signal for both (P2, Check 1d): reported.
+- F4, saving a puzzle re-runs its setup: the result shows 00:00 spent and a practice puzzle is
+  dealt again, with a rare duplicate practice record on retry (P2, Checks 1a and 1a2): reported.
+- F5, the clue cache is used only when its saved set exactly equals the board's entries, so a
+  practice crossword breaks it for the day (P3, Check 1b): reported.
+- F6, the Daily Games streak and freezes shown are as of the last completion, not today (P3):
+  reported; whether a broken streak should show as broken is asked of Robbie.
+- Nits: midnight unmounts a puzzle in progress; `progress.missed_words` and `attempt_count` have no
+  reader in the app; the pool size is restated in `ipc_security.cjs`.
+- STALE RECORD: DEBT #9's bridge line numbers.
+- Debt rows drafted: none.
+
+### Triggers checked
+- DEBT #9: not fired (0 rows in daily_game_attempts).
+
+### Inspected and found sound — do not re-derive these
+- Pool selection is pure and deterministic, never reads fabricated review states, and excludes topic
+  decks.
+- Pools are immutable; every daily-games write is normalised; deck-name keys match review_states.
+- A completed daily attempt is recorded once (partial unique index); record-attempt goes through the
+  worker only; the other daily routes are idempotent under fallback; the attempt write is one
+  transaction; the streak is derived and heals itself.
+- Freeze arithmetic across months is correct.
+- All six daily-games IPC routes validate sender and payload; Python validates again.
+- Daily Games award no XP and leave the schedule alone (#62); their only effect is the intended 7-day
+  miss priority.
+- Clue generation stays off the bridge, never loads a cold model, has 8 s limits and validated output.
+
+### What this pass could not establish
+- How often F2's and F3's words are dealt together in real pools.
+- IME punctuation in crossword cells.
+- The first-of-day pool build cost (review_events has no index).
+- Nothing was looked at in the app.
+
+### Coverage, not a finding
+- The last three passes (tutor and assistant, dictionary and OCR, packaging) did not cover JLPT, the
+  menu and valley, renderer state and settings, reading passages or handwriting.
+
 ## 2026-10-29 — Tutor and assistant
 
 **Scope:** Audit 15. Robbie chose "Tutor and assistant (Recommended)" and ran `/crew-audit` with "tutor and assistant".
