@@ -6,6 +6,68 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-29 — Tutor and assistant
+
+**Scope:** Audit 15. Robbie chose "Tutor and assistant (Recommended)" and ran `/crew-audit` with "tutor and assistant".
+- Covered: the tutor chat (Look It Up's A QUESTION and `useTutor`), the runtime's prompts, context, history, adapters, time limits and cancel as the chat sees them, the translation shortcut in chat, chat history storage and its bridge commands, scenario practice and crossword clues.
+- Out: dictionary, OCR and OCR translation (audit 14), runtime start and stop and the one-request rule (audit 5), setup and downloads (audits 6 and 13).
+
+**Commit audited:** 92eb2f7 on main, tree clean.
+
+**Method:**
+- The Auditor read source, history and blame (cfc985b, cb9b9ba), the census and, at Reconcile, AUDITS.md, DEBT.md, FEATURES.md and ARCHITECTURE.md. No helpers.
+- The lead ran Checks 1-5, 8 and 9 read-only at 92eb2f7:
+  - live database chat tables empty;
+  - system prompt 1,817 characters;
+  - context 915 characters on a scratch copy;
+  - "What's 'dog' in Japanese?" answered Ｓ (エス);
+  - 325 vitest and 14 pytest tests passed.
+- Not run: Check 6 (no tutor model installed) and Check 7 (deferred to the F3 repair).
+- Report: `AUDIT-tutor-and-assistant-2026-10-29-1-r2.md`.
+
+### Where each finding went
+- F1, the tutor answers every message alone while the screen promises follow-ups (P2): reported; Robbie decides.
+- F2, a failed model's canned reply is shown and kept as the tutor's answer (P2): reported.
+- F3, scenario and crossword time limits start after the cold load (P2, plausible): reported.
+- F8, the translation shortcut reads apostrophes as quotes and answers "What's 'dog'…" with Ｓ (P2, confirmed by Check 5): reported.
+- F4, chat history half-removed (P3): reported. It is code-only: Robbie's chat tables are empty.
+- F5, adapter instructions cut by the 3,200-character cap (P3): reported. It fits today with about 50-200 characters of headroom, and `memory_graph` is already cut at 280. Debt row drafted.
+- F6, scenario warmup sets the chat warmup flag (P3): reported. It is a gap in audit 11 F3's fix.
+- F7, scenario judging and clues run on the translation model (P3, plausible): reported; debt row drafted.
+- Nits 1-3: reported.
+- Asked of Robbie: Q1, Japanese-only replies, and English replies replaced by "send it again".
+- STALE RECORD: `FEATURES.md:205`, `FEATURES.md:212`, and the code comments under F1, F3 and F4.
+- RECORDED: DEBT #15, whose scope has grown to per-message chat context; ARCH §8 B1.
+- Dropped: none.
+
+### Triggers checked
+- DEBT #15: not fired (hashed embedder on this install, Check 4). A second caller was found.
+
+### Inspected and found sound — do not re-derive these
+- The chat gate and its no-model copy.
+- CLEAR and send are disabled while a reply is pending.
+- Renderer polls and timers clean up.
+- Turning the chat off unloads and resets.
+- Every model path takes or refuses the one lease and releases it in `finally`.
+- Scenario AI verdicts are shape-checked and token-guarded.
+- Crossword clues are used only as a full checked set.
+- Scenario SRS text is normalised.
+- Authored scenarios are checked by tests.
+- The translation shortcut is offline only, and a plain question answers correctly.
+- The baseline tests in scope pass.
+
+### What this pass could not establish
+- GGUF cold-load times.
+- Judging quality on the translation model.
+- Prompt size on a database with real history.
+- Screens not looked at.
+- The scenario evaluator read at a skim only.
+- Whether session-end coaching events are consumed before a toast can show.
+- Issue #61 not read.
+
+### Coverage, not a finding
+- The last three passes (dictionary and OCR, packaging, progression) did not cover JLPT, minigames and Daily Games, the menu and valley, renderer state and settings, reading passages, or handwriting. No pass has ever covered those six.
+
 ## 2026-10-29 — Dictionary, lookup and OCR
 
 **Scope:** Audit 14. Robbie chose "Dictionary, lookup, OCR (Recommended)" over tutor and assistant, and minigames and Daily Games, then ran `/crew-audit`.
