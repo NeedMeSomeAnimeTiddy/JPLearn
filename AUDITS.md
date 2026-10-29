@@ -62,6 +62,36 @@ are kept in `Z:/Projects/JPLearn/audits`.
 ### Coverage, not a finding
 - The last three passes (progression, startup, import and export) did not cover tutor and assistant, JLPT, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, renderer state and settings, passages or handwriting.
 
+
+### Outcome (branch `audit13-repairs`, merged 3a3527f)
+- Robbie's answers: Q1, typed, "wire updates up to github repo, but don't add a release yet"; Q2
+  "Keep opening it" (DEBT #14); Q3 "In JPLearn Assets"; "Add a switch", checked "Launch only";
+  version "Plain numbers" (0.1.0); the switch's wording as shown. A design critic (Opus) reviewed
+  the design before it was built.
+- F1, F2 fixed (7e21c24, caf163b): the optional features' Python packages go in
+  `JPLearn Assets\python-packages\<tag>\<feature>-<pinhash>`, installed by setup in the installed app
+  only, probed before they count, and reached through `JPLEARN_PYTHON_PACKAGES`; source mode is
+  unchanged. Every package and its floating dependencies are pinned to the source environment.
+- Found while checking, fixed (caf163b, 2365381, 5379cc0, 8f47747): on a clean Windows every native
+  package failed to load. The bundle now carries the Visual C++ runtime, OpenMP included, from the
+  build machine (or `-VcRuntimeDirectory`). A bare Windows Server then loaded the embedder's packages;
+  OpenCV and PyAV still need Windows' media DLLs, which N editions and Server leave out and nothing
+  can ship, so the install error names the Media Feature Pack. Not yet run on a clean Windows 10/11.
+- F3 fixed (7e21c24): `make:release` rebuilds the bundle with `-Force` and the pins, then runs the
+  packaged smoke.
+- F4 fixed (7e21c24): the bridge and embedder read the downloads folder, then the progress folder.
+- F5 fixed (7e21c24): migration 15's column add is guarded; the test reproduces the cut-short upgrade.
+- F6 filed as DEBT #14.
+- F7 fixed (7e21c24): the uninstall cleanup resolves the progress folder as the app does.
+- F8 fixed (7e21c24, fddeff0): updates come from this repository's GitHub Releases, checked once at
+  launch, skipped on Squirrel's first run; Settings has "Check for updates automatically". No release
+  was made. release.yml checks the tag against the version and uploads RELEASES and the full .nupkg.
+- Review fixes (caf163b): the CUDA check sees the downloaded packages; OCR uninstall stops the server
+  first; one install per feature at a time.
+- Checks: pytest on linux-build 1907 passed, 3 skipped, only the known Linux test_conjugation_index
+  failure; on win-build lint, build, a11y (7) and the electron tests (227) pass, test:ui 1996/1999
+  with three load timeouts that pass on rerun. Not run: a real Squirrel install or update.
+
 ## 2026-10-29 — Progression and onboarding
 
 **Scope:** Audit 12. Robbie chose "Progression (Recommended)" over JLPT prep, minigames and Daily Games, dictionary/lookup/OCR, the menu and valley, reading passages, handwriting, and the whole repository.
