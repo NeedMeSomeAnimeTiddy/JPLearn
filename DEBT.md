@@ -163,3 +163,34 @@ reads. A recommendations-only failure has not been seen.
 **Trigger:** a learner seeing "NOTHING DUE" or "ALL TRACKED STEPS DONE" with cards due, or any
 change that lets recommendations fail while the summary succeeds. The fix is to show both rows as
 "not counted" when their read failed, the way `lanes.ts` already draws an uncounted queue.
+
+## 12. XP keeps every correct answer's deduplication key and rewrites them all on each one
+
+**Recorded 2026-10-29 (audit 12, F2).**
+- **What.** Each correct answer adds `correct:{slug}:{card}:{next_review}` to the single
+  `user_xp.applied_dedup_keys_json` row. `_load_user_progress`/`_save_user_progress`
+  (`scripts/desktop_bridge.py`) and `apply_xp` (`domain/level_service.py`) parse, copy, sort and
+  rewrite all of them inside the answer's transaction. Nothing prunes them.
+- **Cost.** Audit 12 Check 2 measured about 1.2 ms per 1,000 keys on each answer save: 68-72 ms at
+  50,000 keys and 121-126 ms at 100,000.
+- **Why not now.** The live database held 1 key on 2026-10-29 (Check 10, read-only).
+- **Fix.** Keep only keys dated within a margin of today, wider than the answer queue's replay
+  window: a correct answer's next review always falls after its review day, and replays are caught
+  by the answer receipt. Behaviour stays identical.
+
+**Trigger:** the stored list passes 20,000 keys (about 25 ms added to each correct answer), or
+`record-result` passes 150 ms on a warm worker (#1).
+
+## 13. The learning path's readiness steps are computed and never shown
+
+**Recorded 2026-10-29 (audit 12, F7).**
+- **What.** `learning-path-status` builds six readiness steps and a suggested next step
+  (`domain/readiness.py`, `build_learning_path_status_payload` in `scripts/desktop_bridge.py`). The
+  renderer reads only `onboarding_complete`. The readiness warning that used them lost its opener in
+  30c6635 and was removed in audit 12.
+- **Wrong if revived.** No step ever becomes "active" (`activate_node` has no caller), so a partly
+  studied prerequisite reads "advanced", which means "not yet started". The never-synced
+  `sentence_examples` would stay the suggested step after Grammar N5.
+- **Why not now.** Nothing shows it.
+
+**Trigger:** any screen starts reading `steps`, `readiness` or `suggested_next`.
