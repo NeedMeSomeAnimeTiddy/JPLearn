@@ -222,7 +222,7 @@ type DeckSlug =
   | 'sentence_examples'
 type ScriptCurriculumSlug = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'grammar_patterns'
 /** A tick on onboarding's "What do you already know?" checklist; the bridge seeds its decks alone. */
-type KnownItem = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'kanji_n4' | 'vocab_n4' | 'kanji_n3' | 'vocab_n3'
+export type KnownItem = 'hiragana' | 'katakana' | 'kanji_n5' | 'vocab_n5' | 'kanji_n4' | 'vocab_n4' | 'kanji_n3' | 'vocab_n3'
 
 interface ScriptDeckPayload {
   slug: string

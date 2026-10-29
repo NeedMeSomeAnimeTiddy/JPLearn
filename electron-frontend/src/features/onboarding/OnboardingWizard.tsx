@@ -105,6 +105,13 @@ export function OnboardingWizard(props: OnboardingWizardProps) {
           showAction ? <ReadyStep submitting={o.submitting} onStart={o.handleStart} /> : null
         )}
       </StepLayout>
+      {/* outside StepLayout, which renders only the typed title until a page is revealed, so a
+          Skip pressed mid-typewriter still shows why it failed */}
+      {o.submitError && (
+        <div className="obn-error" role="alert">
+          {o.submitError}
+        </div>
+      )}
     </WizardShell>
   )
 }

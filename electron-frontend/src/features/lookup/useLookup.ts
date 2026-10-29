@@ -4,6 +4,7 @@ import type {
   KanjiAnswer, LookupAnswers, LookupController, LookupRouteKey, PhraseAnswer, WordAnswer,
 } from './types'
 import { inferRoute, isSingleKanji, loadLookupHistory, rememberLookup } from './utils'
+import { ipcErrorReason } from '../../lib/ipcErrorReason'
 
 const IDLE: LookupAnswers = {
   kanji: { status: 'idle', detail: null, reason: null },
@@ -11,14 +12,8 @@ const IDLE: LookupAnswers = {
   phrase: { status: 'idle', sentence: null, reason: null },
 }
 
-/* Electron wraps anything the main process throws as
-   `Error invoking remote method 'study:search-dictionary': Error: <the real one>`, which is a
-   sentence about IPC rather than about Japanese. The wrapper is peeled off before anyone sees it. */
-const reason = (error: unknown): string => {
-  const raw = error instanceof Error ? error.message : String(error)
-  const unwrapped = raw.replace(/^Error invoking remote method '[^']*':\s*/i, '')
-  return unwrapped.replace(/^(Error|Exception):\s*/i, '').trim() || raw
-}
+/* the IPC wrapper is a sentence about Electron rather than about Japanese, so it is peeled off */
+const reason = ipcErrorReason
 
 /* The offline dictionary is an optional download, and the bridge says so by raising rather than
    by returning nothing. That distinction is the whole point of the `unavailable` status, so it is

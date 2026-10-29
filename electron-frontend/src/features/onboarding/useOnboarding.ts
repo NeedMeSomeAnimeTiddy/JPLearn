@@ -1,6 +1,8 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
-import type { Page, OnboardingAnswers, OnboardingWizardProps } from './types'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import type { Page, OnboardingAnswers, OnboardingFailure, OnboardingWizardProps } from './types'
 import { ALL_PAGES, ALL_PAGES_NO_FEATURES } from './types'
+import { onboardingFailureSentence } from './utils'
+import { ipcErrorReason } from '../../lib/ipcErrorReason'
 
 export function useOnboarding(props: OnboardingWizardProps) {
   const [page, setPage] = useState<Page>(1)
@@ -9,6 +11,8 @@ export function useOnboarding(props: OnboardingWizardProps) {
   const [targetLevel, setTargetLevel] = useState<string | undefined>(undefined)
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const submittingRef = useRef(false)
   const [revealed, setRevealed] = useState(false)
 
   const hasOptionalFeatures =
@@ -68,24 +72,32 @@ export function useOnboarding(props: OnboardingWizardProps) {
     return { goal, dailyMinutes, targetLevel }
   }
 
-  async function handleStart() {
-    if (submitting) return
+  /* LEAVING ONBOARDING SAYS WHY IT COULD NOT (audit 12). A failed save used to be swallowed and
+     Start did nothing; now the reason shows and Start or Skip retries the whole sequence.
+     One attempt at a time: the ref holds back a second press before the re-render can. */
+  async function submit(run: () => Promise<OnboardingFailure | null>) {
+    if (submittingRef.current) return
+    submittingRef.current = true
     setSubmitting(true)
+    setSubmitError(null)
     try {
-      await props.onComplete('complete_beginner', checkedItems, buildAnswers())
+      const failure = await run()
+      if (failure) setSubmitError(onboardingFailureSentence(failure))
+    } catch (error) {
+      // The handler reports its own stages; a throw past it still means onboarding did not finish.
+      setSubmitError(onboardingFailureSentence({ stage: 'complete', message: ipcErrorReason(error) }))
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
 
-  async function handleSkip() {
-    if (submitting) return
-    setSubmitting(true)
-    try {
-      await props.onSkip(checkedItems, buildAnswers())
-    } finally {
-      setSubmitting(false)
-    }
+  function handleStart() {
+    return submit(() => props.onComplete('complete_beginner', checkedItems, buildAnswers()))
+  }
+
+  function handleSkip() {
+    return submit(() => props.onSkip(checkedItems, buildAnswers()))
   }
 
   return {
@@ -102,6 +114,7 @@ export function useOnboarding(props: OnboardingWizardProps) {
     checkedItems,
     toggleItem,
     submitting,
+    submitError,
     actualSteps,
     totalSteps,
     isFirstStep,

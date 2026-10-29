@@ -4408,6 +4408,17 @@ html[data-reduced-motion='true'] *::after {
   margin: 0;
 }
 
+/* A failed save; the same banner as the setup wizard's "Couldn't finish setup" */
+.obn-error {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: color-mix(in oklab, var(--status-error) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--status-error) 35%, transparent);
+  color: var(--status-error);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 /* Path card */
 .obn-path-card {
   border: 1px solid var(--card-border);
