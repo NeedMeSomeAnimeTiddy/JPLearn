@@ -82,6 +82,41 @@ and ran `/crew-audit minigames and Daily Games`.
 - The last three passes (tutor and assistant, dictionary and OCR, packaging) did not cover JLPT, the
   menu and valley, renderer state and settings, reading passages or handwriting.
 
+### Outcome (branch `audit16-repairs`, merged 4cc1ae9)
+- Robbie's answers: F1 "Fix reading check" (keep typing the reading, accept what it means); F3
+  "Accept either"; F6 "Show as of today"; scope "All six and nits". After the design critic: Match
+  Pairs never deals two words written the same; Word Search skips non-kana-and-kanji words like the
+  crossword. A design critic (Astra) asked for rework, then approved revisions 2 and 3 with
+  amendments, all taken.
+- F1 fixed (a4e492d): Romaji Sprint vocabulary rounds accept the forms a reading means: `~` dropped,
+  brackets read from a reviewed list (optional part, alternative word, or label), space-separated
+  alternatives only when the written form lists as many, and a reviewed table for 行く, 何, 毎月,
+  毎年, お金持ち and さぞ. No fragment is accepted; kana and kanji rounds are unchanged.
+- F2 fixed (999adc1): the crossword and Word Search take only words written in kana and kanji; a
+  plain pool's board is unchanged.
+- F3 fixed (999adc1, 7be8a3e): a same-meaning pick counts; two words written the same are never dealt
+  together; a miss on a meaning tile goes to the word that tile will complete, so a word already
+  paired is never marked missed.
+- F4 and the midnight nit fixed (43b2f46): a puzzle session owns a snapshot of its pool from start to
+  close, so saving no longer re-runs setup and midnight no longer unmounts a puzzle in progress.
+- F5 fixed (1047b23): the clue cache serves a saved set that holds every requested position; every
+  check on the board's own clues is kept.
+- F6 fixed (70b1c1b, 7be8a3e): the streak and freezes shown are as of today (a broken streak reads
+  0, a new month shows its freezes, with no history three freezes); display only, the stored streak
+  is never written from it, and repeated reads spend no freeze.
+- Nits: `progress.missed_words` and `attempt_count` left the payload (70b1c1b, 89ca279); the pool size
+  in `ipc_security.cjs` is held to the domain's by a test (2dae603). DEBT #9's line numbers
+  refreshed. No debt rows filed.
+- Review (Opus): approve with nits, then approved 7be8a3e after the Match Pairs miss owner, a
+  comment and a bridge read-read-complete test. Left: two harmless nits.
+- Checks: pytest on linux-build at 1b74b2d 1932 passed, 4 skipped, only the known Linux
+  test_conjugation_index failure (run with fugashi 1.5.2, as 1.3.0 has no Linux 3.12 wheel);
+  arch_check and the generated types clean. On win-build at 7be8a3e lint, build and a11y 7/7 pass;
+  vitest 2164/2165, the one failure a hint test that timed out under load and passes alone; its wait
+  was raised to 5 s (1b74b2d, file checked locally).
+- Not run: the app. No Daily Game has been played on Robbie's install (0 attempts), and no screen was
+  looked at.
+
 ## 2026-10-29 — Tutor and assistant
 
 **Scope:** Audit 15. Robbie chose "Tutor and assistant (Recommended)" and ran `/crew-audit` with "tutor and assistant".
