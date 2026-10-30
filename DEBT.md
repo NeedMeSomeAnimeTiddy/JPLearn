@@ -230,3 +230,24 @@ over 1 s on the bridge.
 memory facts with the same model (`data/study_pipeline.py`, `_format_memory_rollup_v2` and
 `assemble_assistant_chat_context_v2_with_embeddings`): up to 54 encodes a message. Audit 15 removed
 the chat summaries, which took it from 72.
+
+## 17. The Drills record re-reads review history on every save
+
+**Recorded 2026-10-30.** `useDrillRecords` (`electron-frontend/src/features/menu/useDrillRecords.ts`)
+asks the bridge's `minigame-records` again each time the queue of answers being saved empties, and
+the command scans the deck's review history each time. It is uncached because Drills is the only
+caller and the read is small today (audit 17 review, nit 4).
+
+**Trigger:** the `minigame-records` read takes over 50 ms on a profile, or a second screen starts
+reading drill records.
+
+## 18. A fast double change of one preference can show the wrong saved value
+
+**Recorded 2026-10-30.** In `AppSettingsModal.tsx` (`savePreference`) only the latest press of a
+switch may change what is shown. If an older press saves slowly after a newer press was refused,
+the store holds the older value while the switch still shows the one from before both. It needs two
+presses on the same switch inside one save's time with the second refused, so it is left (audit 17
+review follow-up).
+
+**Trigger:** any report of a preference that reads differently after a relaunch, or a third
+preference switch added to the dialog.

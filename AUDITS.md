@@ -57,6 +57,37 @@ the JLPT build first; he then ran `/crew-audit renderer state and settings`.
   re-render (not established).
 - Debt rows drafted: none.
 
+### Outcome (branch `team/0a1c72ca`, merged 0fb67de)
+- Robbie's answers: scope "All seven and nits"; F1 "Per level deck" and best run "Rebuild from
+  history"; Q1 "Reset clears them too"; after the design critic, Settings failures read "Plain,
+  reason underneath" and a preference that fails to save "Snap back and say so". A design critic
+  (Opus) asked for amendments 2-10, all taken.
+- F1 fixed (a69f8b8, 586ee21): Drills reads each mode's record for the level deck on screen from
+  review history (bridge `minigame-records`), best run included; the in-memory minigameStats is gone.
+- F2 fixed (586ee21): Settings model, dictionary, translation, speech, voice and scheduler-reset
+  failures show beside their control in a polite live region, a plain sentence over the main
+  process's reason.
+- F3 fixed (9c15dfe, 586ee21): Settings and the close dialog take, trap and return focus with the
+  shared trap; the tab panels carry the ids their tabs name.
+- F4 fixed (720f2ab): a button in a section header works from the keyboard (user-event test).
+- F5 fixed (586ee21): the window key handler sits behind a latest-value ref, attached once.
+- F6 fixed (a69f8b8, 586ee21): a damaged config file is cleared and recovers; a preference shows a
+  new value only once it is saved, and a failed save snaps back and says so.
+- F7 fixed (a65df24, 586ee21): the config routes take their keys and close values from the store;
+  notificationsEnabled is settable, with no new control.
+- Q1 fixed (586ee21, d3ae73e): Reset all progress clears the progression overrides and the menu
+  unlock mark; ARCHITECTURE.md names those two keys as the exception. S1-S3 refreshed (d3ae73e).
+  N1-N2 fixed (586ee21).
+- Review (Opus): approve with nits; the nits fixed in c4d44db and 9170c0b (Shift+Tab from the panel,
+  a stale save painting over a newer one, a refresh failure shown as the action failing, the drill
+  record kept on a same-deck re-read, sections drawn locked after a reset, a comment, an indent).
+  Left: DEBT #17 (drill record re-read cost) and #18 (a narrow preference save race).
+- Checks: on win-build at c4d44db lint, build, vitest 2235/2235 and a11y 7/7 pass; again at 9170c0b
+  (one comment later) vitest 2233/2235, the two failures a route test that timed out while the VM
+  fetched Electron and a read-count test, both passing alone. pytest on linux-build at 9170c0b 1946
+  passed, 4 skipped, only the known Linux test_conjugation_index failure (fugashi 1.5.2).
+- Not run: the app; no screen was looked at.
+
 ### Triggers checked
 - No DEBT.md row covers renderer state or settings. ARCH §8 D1 open, figures stale. A2 holds.
 
