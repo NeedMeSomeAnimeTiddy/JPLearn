@@ -2800,6 +2800,21 @@ kbd {
   transition: transform 120ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
+/* a tile that only pictures its section (audit 17, F3): the same look, nothing to press */
+span.settings-icon-tile {
+  cursor: default;
+  flex-shrink: 0;
+}
+
+span.settings-icon-tile:active {
+  transform: none;
+}
+
+span.settings-icon-tile:active::after {
+  opacity: 0;
+  animation: none;
+}
+
 .settings-icon-tile::after {
   content: '';
   position: absolute;
@@ -2919,6 +2934,15 @@ kbd {
 
 .settings-collapsible-chevron.is-open {
   transform: rotate(180deg);
+}
+
+/* what stays in view with the section shut, such as a failed header action (audit 17, F2) */
+.settings-collapsible-notice {
+  padding: 0 14px;
+}
+
+.settings-collapsible-notice .settings-failure:not(:empty) {
+  margin: 0 0 12px;
 }
 
 .settings-collapsible-body {
@@ -3250,6 +3274,31 @@ kbd {
   margin: 0;
   color: var(--text-soft);
   font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* a failed Settings action: the plain sentence, then the main process's reason, smaller and muted
+   (audit 17, F2). Empty until something fails; the live region stays in the page either way. */
+.settings-failure:not(:empty) {
+  margin-top: 8px;
+}
+
+.settings-failure-item {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.settings-failure-headline {
+  color: var(--status-error);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.settings-failure-reason {
+  color: var(--text-soft);
+  font-size: 0.72rem;
   line-height: 1.4;
 }
 

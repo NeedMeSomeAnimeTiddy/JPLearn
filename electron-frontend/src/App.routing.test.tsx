@@ -599,3 +599,65 @@ describe('home number-key shortcuts', () => {
     await expectView('daily_games')
   })
 })
+
+/* THE WINDOW'S KEYS ARE HANDLED BY ONE LISTENER, ATTACHED ONCE (audit 17, F5). It used to be
+   re-attached after every App render and was current only because of that; it now reads the
+   latest render through a ref. These walk every state its Escape reads, and check the listener
+   attached at mount is the one still answering. */
+describe('the window key handler, attached once', () => {
+  const isAppListener = (listener: unknown) => String(listener).includes('handleGlobalKeyDownRef')
+
+  it('follows dialogs, the palette, the lookup, the cheatsheet and the menu without being re-attached', async () => {
+    const add = vi.spyOn(window, 'addEventListener')
+    const remove = vi.spyOn(window, 'removeEventListener')
+    render(<App />)
+    await expectView('home')
+    const attached = () => add.mock.calls.filter(([type, listener]) => type === 'keydown' && isAppListener(listener))
+    expect(attached()).toHaveLength(1)
+
+    openDeck('Hiragana')
+    await waitFor(() => expect(menuScreen()).toBe('deck'))
+
+    /* Close options over the deck screen: digits do nothing behind it, Escape closes it and not
+       the menu level under it */
+    fireEvent.click(screen.getByRole('button', { name: 'Close window' }))
+    await screen.findByRole('dialog', { name: 'Close options' })
+    fireEvent.keyDown(window, { key: '2' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Close options' })).toBeNull())
+    expect(menuScreen()).toBe('deck')
+
+    /* the palette: Ctrl+K opens it, Escape shuts it and nothing else */
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    await screen.findByRole('dialog', { name: 'Command palette' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Command palette' })).toBeNull())
+    expect(menuScreen()).toBe('deck')
+
+    /* the lookup: an Escape an input method is composing with is not a shortcut */
+    fireEvent.keyDown(window, { key: '/' })
+    await screen.findByRole('dialog', { name: 'Look it up' })
+    fireEvent.keyDown(window, { key: 'Escape', isComposing: true })
+    expect(screen.getByRole('dialog', { name: 'Look it up' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Look it up' })).toBeNull())
+    expect(menuScreen()).toBe('deck')
+
+    /* the cheatsheet */
+    fireEvent.keyDown(window, { key: '?' })
+    await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Keyboard shortcuts' })).toBeNull())
+    expect(menuScreen()).toBe('deck')
+
+    /* and with nothing open, Escape goes up the menu */
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(menuScreen()).not.toBe('deck'))
+
+    expect(attached()).toHaveLength(1)
+    const listener = attached()[0][1]
+    expect(remove.mock.calls.some(([type, removed]) => type === 'keydown' && removed === listener)).toBe(false)
+    add.mockRestore()
+    remove.mockRestore()
+  })
+})

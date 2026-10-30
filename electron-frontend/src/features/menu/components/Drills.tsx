@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { MinigameKey, MinigameStats, ScriptKey } from '../../../types'
+import type { MinigameKey, ScriptKey } from '../../../types'
+import type { DrillRecords } from '../useDrillRecords'
 import { SESSION_LENGTH_PRESETS } from '../../../constants'
 import {
   drillChapters, drillDecks, drillModes, groupCopy, modeNameSize, modeStep, modeWindow,
@@ -41,10 +42,9 @@ export interface DrillsProps {
      nothing at all, so retiring the hub without them would leave seventeen modes that all look
      runnable and four that quietly fail. Keyed by mode; absent means it can run. */
   lockReasons: Partial<Record<MinigameKey, string>>
-  /* WHAT YOU HAVE DONE WITH EACH MODE ON THIS DECK. `minigameStats` is written after every round
-     and the script hub's cassettes were the only thing that ever read it -- so without this the
-     figure would still be kept and never shown again. */
-  stats: Record<MinigameKey, MinigameStats>
+  /* WHAT YOU HAVE DONE WITH EACH MODE ON THIS DECK, read from review history for the level deck on
+     screen (audit 17, F1; `useDrillRecords`). null until that read answers, or if it fails. */
+  records: DrillRecords | null
   onDeck: (deck: ScriptKey) => void
   onStart: (deck: ScriptKey, mode: MinigameKey) => void
   onUp: () => void
@@ -62,7 +62,7 @@ export interface DrillsProps {
    ================================================================================================== */
 
 export function Drills({
-  deck, slug, session, lockReasons, stats, onDeck, onStart, onUp,
+  deck, slug, session, lockReasons, records, onDeck, onStart, onUp,
 }: DrillsProps) {
   const entered = useEntered()
   const frameRef = useFrameFit()
@@ -77,8 +77,8 @@ export function Drills({
   const win = modeWindow(offered, sel)
   const here = modes[sel]
   const shut = here ? lockReasons[here.key] ?? null : null
-  const record = here ? stats[here.key] : undefined
-  const played = record && record.attempted > 0
+  const record = here && records ? records[here.key] : undefined
+  const played = record !== undefined && record.attempted > 0
 
   /* the three lengths answer to their number and the three switches to their letter, both printed
      on the chip -- the same rule level one's rows and the study screens' level row follow */
@@ -218,13 +218,16 @@ export function Drills({
             <span className="dr-read">
               {/* THE RECORD, WHICH IS THE ONE THING A CATALOGUE CANNOT TELL YOU. Not played is
                   drawn as not played rather than as nought per cent -- a mode you have never
-                  run is not a mode you are bad at. */}
+                  run is not a mode you are bad at. And not known yet is drawn as the empty
+                  placeholder, not as not played, which would be a claim. */}
               <span className="dr-rec">
-                {played ? (
+                {records === null ? (
+                  <span className="none">―</span>
+                ) : played ? (
                   <>
                     <b>{Math.round((record.correct / record.attempted) * 100)}%</b>
                     <i>RIGHT</i>
-                    <b>{record.bestStreak}</b>
+                    <b>{record.bestRun}</b>
                     <i>BEST RUN</i>
                   </>
                 ) : <span className="none">NOT PLAYED ON THIS DECK</span>}

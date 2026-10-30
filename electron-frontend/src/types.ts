@@ -224,16 +224,15 @@ export interface ScriptStats {
   bestStreak: number
 }
 
-export interface MinigameStats {
+/** one drill mode's record on a level deck, read from review history (audit 17, F1) */
+export interface DrillRecord {
   attempted: number
   correct: number
-  currentStreak: number
-  bestStreak: number
-  points: number
+  /** the longest run of right answers in a row, in the order they were given */
+  bestRun: number
 }
 
 export type StatsByScript = Record<ScriptKey, ScriptStats>
-export type MinigameStatsByScript = Record<ScriptKey, Record<MinigameKey, MinigameStats>>
 
 // ── Learning path / guided system ─────────────────────────────────────────
 
@@ -338,6 +337,8 @@ export type AppFontPreset =
   | 'system_ui'
 export type AnimationStyle = 'calm_fade' | 'glide' | 'lively'
 export type SettingsTabKey = 'appearance' | 'assistant' | 'system'
+/** what the window's close button does; `CLOSE_BEHAVIORS` is held to the main process's list by a test */
+export type CloseBehavior = 'ask' | 'tray' | 'quit'
 export type OverviewSectionKey =
   | 'studyActivity'
   | 'sessionHistory'

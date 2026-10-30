@@ -93,7 +93,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
     setDeckCards,
     setCardScores,
     setScriptStats,
-    setMinigameStats,
     setXpProgress,
     setXpToasts,
     setMilestoneToasts,
@@ -1099,24 +1098,6 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
         }
       })
 
-      setMinigameStats((previous) => {
-        const previousGameStats = previous[activeScript][activeGame]
-        const nextGameStreak = isCorrect ? previousGameStats.currentStreak + 1 : 0
-        return {
-          ...previous,
-          [activeScript]: {
-            ...previous[activeScript],
-            [activeGame]: {
-              attempted: previousGameStats.attempted + 1,
-              correct: isCorrect ? previousGameStats.correct + 1 : previousGameStats.correct,
-              currentStreak: nextGameStreak,
-              bestStreak: Math.max(previousGameStats.bestStreak, nextGameStreak),
-              points: isCorrect ? previousGameStats.points + awardedPoints : previousGameStats.points,
-            },
-          },
-        }
-      })
-
       setSessionRounds((value) => value + 1)
       setSessionStreak(nextStreak)
       setSessionBestStreak((value) => Math.max(value, nextStreak))
@@ -1381,8 +1362,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       sessionScore,
       sessionTargetItems,
       setCardScores,
-      setMinigameStats,
-      setScriptStats,
+        setScriptStats,
     ],
   )
 

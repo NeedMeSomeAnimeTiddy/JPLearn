@@ -39,6 +39,7 @@ import type {
   PlayableMinigame,
   ScriptKey,
   SettingsTabKey,
+  CloseBehavior,
   VocabCategory,
   VocabCategorySlug,
   VocabDeckSlug,
@@ -575,6 +576,13 @@ export const SETTINGS_TABS: Array<{ key: SettingsTabKey; label: string; icon: Lu
   { key: 'assistant', label: 'Assistant', icon: MessageCircle },
   { key: 'system', label: 'System', icon: Settings },
 ]
+
+/** the main process's `CLOSE_BEHAVIORS` (`electron/config_store.cjs`), held equal by a test */
+export const CLOSE_BEHAVIORS: readonly CloseBehavior[] = ['ask', 'tray', 'quit']
+
+export function isCloseBehavior(value: unknown): value is CloseBehavior {
+  return typeof value === 'string' && (CLOSE_BEHAVIORS as readonly string[]).includes(value)
+}
 
 export const DEFAULT_INTERLEAVE_WEIGHTS: InterleaveWeights = {
   romaji_sprint: 1,

@@ -9,7 +9,6 @@ import type {
   DeckSlugInput,
   ExplicitReviewItem,
   MinigameKey,
-  MinigameStatsByScript,
   NavDirection,
   PlayableMinigame,
   RoundState,
@@ -73,7 +72,6 @@ export interface StudySessionDeps {
   // ── Progress/gamification writes from the review path ────────────────────
   setCardScores: Dispatch<SetStateAction<CardScores>>
   setScriptStats: Dispatch<SetStateAction<StatsByScript>>
-  setMinigameStats: Dispatch<SetStateAction<MinigameStatsByScript>>
   setXpProgress: Dispatch<SetStateAction<XPProgress | null>>
   setXpToasts: Dispatch<SetStateAction<Array<{ id: number; xp: number; levelBefore?: number; levelAfter?: number }>>>
   setMilestoneToasts: Dispatch<SetStateAction<Array<{ id: number; descriptor: string }>>>

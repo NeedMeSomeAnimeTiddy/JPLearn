@@ -62,7 +62,6 @@ function makeDeps(overrides: Partial<StudySessionDeps> = {}): StudySessionDeps {
     openStudyDeck: vi.fn(),
     setCardScores: vi.fn(),
     setScriptStats: vi.fn(),
-    setMinigameStats: vi.fn(),
     setXpProgress: vi.fn(),
     setXpToasts: vi.fn(),
     setMilestoneToasts: vi.fn(),

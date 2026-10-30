@@ -2,13 +2,13 @@
 // switch (audit 13), which reads and saves its own config value; all other settings state
 // stays owned by App and is passed in. This renders the modal shell and delegates each tab
 // to its existing feature component.
-import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import {
   Activity, ArrowRight, BookText, BrainCircuit, CheckCircle2, Circle, Download, Flame,
   Keyboard, Languages, MessageCircle, Minimize2, Minus, PlayCircle, Power,
   RefreshCw, RotateCcw, Trash2, Upload, X,
 } from 'lucide-react'
-import type { AppSettings, SettingsTabKey } from '../types'
+import type { AppSettings, CloseBehavior, SettingsTabKey } from '../types'
 import type { useTheme } from '../features/theme'
 import type { useVoice } from '../features/voice'
 import type { useCursor } from '../features/cursor'
@@ -19,6 +19,10 @@ import { CursorSettingsTab } from '../features/cursor'
 import { PomodoroSettingsTab, type PomodoroSettingsFields } from '../features/pomodoro'
 import { TutorSettingsTab, clampAssistantChatOcrMinConfidence, type TutorSettingsFields } from '../features/tutor'
 import { SettingsCollapsibleSection } from './SettingsCollapsibleSection'
+import { SettingsFailureLine } from './SettingsFailureLine'
+import { useDialogFocus } from '../hooks/useDialogFocus'
+import { useActionFailures } from '../hooks/useActionFailures'
+import type { SettingsFailure } from '../lib/settingsFailure'
 import {
   SETTINGS_TABS, APP_FONT_OPTIONS, FONT_SIZE_ICON, FONT_SIZE_LABEL, MOTION_STYLE_OPTIONS, MOTION_STYLE_LABEL,
 } from '../constants'
@@ -55,8 +59,10 @@ export interface AppSettingsModalProps {
   resetFSRSWeights: () => void | Promise<void>
   fsrsCustom: boolean
   fsrsResult: { ok: boolean; error?: string; loss_before?: number; loss_after?: number; card_count?: number; log_count?: number } | null
-  closeBehavior: 'ask' | 'tray' | 'quit'
-  setCloseBehavior: Dispatch<SetStateAction<'ask' | 'tray' | 'quit'>>
+  /** why the last reset to default weights failed; null when it has not */
+  fsrsResetFailure: SettingsFailure | null
+  closeBehavior: CloseBehavior
+  setCloseBehavior: Dispatch<SetStateAction<CloseBehavior>>
   autoStartOnLogin: boolean
   setAutoStartOnLogin: Dispatch<SetStateAction<boolean>>
 }
@@ -91,6 +97,7 @@ export function AppSettingsModal({
   resetFSRSWeights,
   fsrsCustom,
   fsrsResult,
+  fsrsResetFailure,
   closeBehavior,
   setCloseBehavior,
   autoStartOnLogin,
@@ -108,6 +115,29 @@ export function AppSettingsModal({
     }).catch(() => { /* use default */ })
   }, [])
 
+  /* A PREFERENCE SHOWS ITS NEW VALUE ONLY ONCE IT IS SAVED (audit 17, F6; Robbie's ruling). The
+     switches used to move first and save in the background with nothing listening, so a failed save
+     left a choice on screen that the next launch would not have. Now a failure leaves the last saved
+     value lit and says so beside it. */
+  const preferenceFailures = useActionFailures()
+  const savePreference = async <V,>(key: 'closeBehavior' | 'autoStartOnLogin' | 'autoUpdateEnabled', value: V, show: (value: V) => void) => {
+    preferenceFailures.clear('save-setting', key)
+    try {
+      await window.jplearnDesktop?.setConfigValue?.(key, value)
+      show(value)
+    } catch (error) {
+      console.warn(`[settings] could not save ${key}:`, error)
+      preferenceFailures.fail('save-setting', key, error)
+    }
+  }
+
+  /* THE DIALOG TAKES, TRAPS AND RETURNS FOCUS (audit 17, F3): it opens on the tab you are on */
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const trapKeys = useDialogFocus(
+    panelRef,
+    (panel) => panel.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'),
+  )
+
   return (
           <div
             className="modal-backdrop settings-backdrop"
@@ -121,6 +151,9 @@ export function AppSettingsModal({
               role="dialog"
               aria-modal="true"
               aria-labelledby="settings-title"
+              ref={panelRef}
+              tabIndex={-1}
+              onKeyDown={trapKeys}
             >
               <div className="crt-vhs-line" />
               <div className="settings-sheet-grabber" aria-hidden="true" />
@@ -164,7 +197,12 @@ export function AppSettingsModal({
                 </div>
 
                 <div className="settings-control-grid">
-                  <div style={{ display: activeSettingsTab === 'appearance' ? undefined : 'none' }}>
+                  <div
+                  role="tabpanel"
+                  id="settings-panel-appearance"
+                  aria-labelledby="settings-tab-appearance"
+                  hidden={activeSettingsTab !== 'appearance'}
+                >
                   <SettingsCollapsibleSection
                     id="theme"
                     title="Theme"
@@ -348,7 +386,12 @@ export function AppSettingsModal({
                     <CursorSettingsTab cursor={cursor} />
                   </SettingsCollapsibleSection>
                 </div>
-                <div style={{ display: activeSettingsTab === 'assistant' ? undefined : 'none' }}>
+                <div
+                  role="tabpanel"
+                  id="settings-panel-assistant"
+                  aria-labelledby="settings-tab-assistant"
+                  hidden={activeSettingsTab !== 'assistant'}
+                >
                   <SettingsCollapsibleSection
                     id="tutor-assistant"
                     title="Tutor Assistant"
@@ -475,6 +518,13 @@ export function AppSettingsModal({
                                 </p>
                               </div>
                             ) : null}
+                            <SettingsFailureLine
+                              failures={[
+                                models.failureOf('download', model.tier),
+                                models.failureOf('select', model.tier),
+                                models.failureOf('uninstall', model.tier),
+                              ]}
+                            />
                           </div>
                         )
                       })}
@@ -505,6 +555,7 @@ export function AppSettingsModal({
                     onToggle={() => toggleThemeSectionCollapsed('offline-dictionary')}
                     className="settings-theme-card"
                     hideChevron
+                    notice={<SettingsFailureLine failures={[models.failureOf('download', 'dictionary')]} />}
                     actions={(
                       <button
                         type="button"
@@ -608,6 +659,7 @@ export function AppSettingsModal({
                                 </p>
                               </div>
                             ) : null}
+                            <SettingsFailureLine failures={[models.failureOf('apply', model.tier)]} />
                           </div>
                         )
                       })}
@@ -652,7 +704,12 @@ export function AppSettingsModal({
                         tutorInstallInfo={models.tutorInstallInfo}
                       />
                 </div>
-                <div style={{ display: activeSettingsTab === 'system' ? undefined : 'none' }}>
+                <div
+                  role="tabpanel"
+                  id="settings-panel-system"
+                  aria-labelledby="settings-tab-system"
+                  hidden={activeSettingsTab !== 'system'}
+                >
                   <SettingsCollapsibleSection
                     id="keyboard-shortcuts"
                     title="Keyboard Shortcuts"
@@ -716,13 +773,9 @@ export function AppSettingsModal({
                     hideChevron
                   >
                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <button
-                        type="button"
-                        className="settings-icon-tile"
-                        aria-label="Close behavior setting"
-                      >
+                      <span className="settings-icon-tile" aria-hidden="true">
                         <Power size={18} strokeWidth={2.1} />
-                      </button>
+                      </span>
                       <div className="settings-control-content">
                         <p className="settings-section-label">When closing the window</p>
                         <div className="settings-animation-grid" role="radiogroup" aria-label="Close behavior options">
@@ -735,10 +788,7 @@ export function AppSettingsModal({
                               key={opt.key}
                               type="button"
                               className={`settings-icon-entry settings-theme-entry ${closeBehavior === opt.key ? 'is-active' : ''}`}
-                              onClick={() => {
-                                setCloseBehavior(opt.key)
-                                void window.jplearnDesktop?.setConfigValue?.('closeBehavior', opt.key)
-                              }}
+                              onClick={() => { void savePreference('closeBehavior', opt.key, setCloseBehavior) }}
                               role="radio"
                               aria-checked={closeBehavior === opt.key}
                               aria-label={`${opt.label}: ${opt.desc}`}
@@ -758,6 +808,7 @@ export function AppSettingsModal({
                               ? 'The window will hide to the system tray. The app keeps running.'
                               : 'The app will fully exit when you close the window.'}
                         </p>
+                        <SettingsFailureLine failures={[preferenceFailures.failureOf('save-setting', 'closeBehavior')]} />
                       </div>
                     </div>
                   </SettingsCollapsibleSection>
@@ -772,9 +823,9 @@ export function AppSettingsModal({
                     hideChevron
                   >
                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <button type="button" className="settings-icon-tile" aria-label="Startup setting">
+                      <span className="settings-icon-tile" aria-hidden="true">
                         <PlayCircle size={18} strokeWidth={2.1} />
-                      </button>
+                      </span>
                       <div className="settings-control-content">
                         <p className="settings-section-label">Auto-start on login</p>
                         <div className="settings-animation-grid" role="radiogroup" aria-label="Auto-start options">
@@ -786,10 +837,7 @@ export function AppSettingsModal({
                               key={String(opt.key)}
                               type="button"
                               className={`settings-icon-entry settings-theme-entry ${autoStartOnLogin === opt.key ? 'is-active' : ''}`}
-                              onClick={() => {
-                                setAutoStartOnLogin(opt.key)
-                                void window.jplearnDesktop?.setConfigValue?.('autoStartOnLogin', opt.key)
-                              }}
+                              onClick={() => { void savePreference('autoStartOnLogin', opt.key, setAutoStartOnLogin) }}
                               role="radio"
                               aria-checked={autoStartOnLogin === opt.key}
                               aria-label={`${opt.label}: ${opt.desc}`}
@@ -807,6 +855,7 @@ export function AppSettingsModal({
                             ? 'JPLearn will launch automatically when you log in to your computer.'
                             : 'JPLearn will only start when you open it manually.'}
                         </p>
+                        <SettingsFailureLine failures={[preferenceFailures.failureOf('save-setting', 'autoStartOnLogin')]} />
                         <p className="settings-section-label">Check for updates automatically</p>
                         <div className="settings-animation-grid" role="radiogroup" aria-label="Automatic update check options">
                           {([
@@ -817,10 +866,7 @@ export function AppSettingsModal({
                               key={String(opt.key)}
                               type="button"
                               className={`settings-icon-entry settings-theme-entry ${autoUpdateEnabled === opt.key ? 'is-active' : ''}`}
-                              onClick={() => {
-                                setAutoUpdateEnabled(opt.key)
-                                void window.jplearnDesktop?.setConfigValue?.('autoUpdateEnabled', opt.key)
-                              }}
+                              onClick={() => { void savePreference('autoUpdateEnabled', opt.key, setAutoUpdateEnabled) }}
                               role="radio"
                               aria-checked={autoUpdateEnabled === opt.key}
                               aria-label={`Check for updates automatically: ${opt.label}`}
@@ -835,6 +881,7 @@ export function AppSettingsModal({
                         <p className="settings-help">
                           Only installed copies check. Turning this off stops checking straight away.
                         </p>
+                        <SettingsFailureLine failures={[preferenceFailures.failureOf('save-setting', 'autoUpdateEnabled')]} />
                       </div>
                     </div>
                   </SettingsCollapsibleSection>
@@ -849,9 +896,9 @@ export function AppSettingsModal({
                     hideChevron
                   >
                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <button type="button" className="settings-icon-tile" aria-label="FSRS optimization">
+                      <span className="settings-icon-tile" aria-hidden="true">
                         <BrainCircuit size={18} strokeWidth={2.1} />
-                      </button>
+                      </span>
                       <div className="settings-control-content">
                         <p className="settings-section-label">Spaced Repetition Weights</p>
                         <p className="settings-help" style={{ marginBottom: 12 }}>
@@ -902,6 +949,7 @@ export function AppSettingsModal({
                             )}
                           </div>
                         )}
+                        <SettingsFailureLine failures={[fsrsResetFailure]} />
                       </div>
                     </div>
                   </SettingsCollapsibleSection>
