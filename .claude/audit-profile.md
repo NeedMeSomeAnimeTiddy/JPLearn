@@ -151,7 +151,7 @@ breaks one is ranked first. Full text, sources and the per-store keys in known-a
 
 - **Per frame, renderer:** `requestAnimationFrame`, the three.js valley render loop and its
   animation callbacks, `motion` animations. Read whether a loop stops when its screen is hidden.
-- **Per render of `App.tsx`:** about 3,300 lines and some 60 `useState` calls (counted 2026-10-26),
+- **Per render of `App.tsx`:** about 3,450 lines and 61 `useState` calls (counted 2026-10-30),
   so state held there re-renders most of the tree; work in render bodies multiplies.
 - **Per answer in a study session:** bridge review call, mastery write, `localStorage` snapshot,
   queue rebuild. A session is 8-20 items; a learner may do many a day.

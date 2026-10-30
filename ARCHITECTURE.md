@@ -232,21 +232,23 @@ lookups will silently miss.
 
 ### The central problem: `App.tsx`
 
-| Metric | Value | At issue #69 filing |
+| Metric | Value (2026-10-30, audit 17) | At issue #69 filing |
 |---|---|---|
-| Total lines | 2,802 | 7,451 |
-| `useState` | 65 | 112 |
-| `useRef` | 24 | 43 |
-| `useCallback` | 56 | 60 |
-| `useMemo` | 23 | 27 |
+| Total lines | 3,444 | 7,451 |
+| `useState` | 61 | 112 |
+| `useRef` | 35 | 43 |
+| `useCallback` | 71 | 60 |
+| `useMemo` | 21 | 27 |
 | `useEffect` | 27 | 34 |
+
+(Counted as call sites in `App.tsx`, comments and the import line left out.)
 
 Issue #69 moved the module-level pure helpers and the two largest JSX blocks out:
 
 - `src/lib/` — `studyPlan`, `progressAggregation`, `roundContent`, `roundScoring`,
   `appStorage`, `deckUtils` (the former lines 111–1586).
-- `src/components/AppTitlebar.tsx` (430 lines) and `src/components/AppSettingsModal.tsx`
-  (913 lines), both presentational: App still owns their state and passes it down.
+- `src/components/AppTitlebar.tsx` (571 lines) and `src/components/AppSettingsModal.tsx`
+  (1,125 lines), both presentational: App still owns their state and passes it down.
 - Types and constants that App.tsx had been redeclaring now come from `src/types.ts` and
   `src/constants.tsx`.
 - `src/features/study-session/` — round builders (phase 4a) and `useStudySession`
@@ -354,10 +356,14 @@ one-time `import-card-scores` adoption of pre-#66 values, gated on the table bei
 That import runs in Python because resolving a legacy `ScriptKey` bucket to the deck that
 owns a card id needs `ALL_DECKS`.
 
-Five localStorage keys still hold renderer-side truth:
-`jplearn-desktop-script-stats-v1`, `jplearn-desktop-settings-v1`,
-`jplearn-desktop-summary-snapshot-v1`, `jplearn-desktop-session-v1`,
-`jplearn-desktop-session-prefs-v1`.
+Ten localStorage keys still hold renderer-side truth (audit 17 map, 2026-10-30):
+`jplearn-desktop-settings-v1`, `jplearn-desktop-theme-migration-v1`,
+`jplearn-desktop-script-stats-v1`, `jplearn-desktop-summary-snapshot-v1`,
+`jplearn-desktop-session-v1`, `jplearn-desktop-session-prefs-v1`,
+`jplearn-progression-overrides-v1`, `jplearn.menu.unlockSeen`, `jplearn.lookup.history`,
+`jplearn-dictionary-history-v1`. The card-score snapshot above is the eleventh key, and is not
+truth. The Drills screen's per-mode record is not among them: it is read from `review_events`
+(audit 17, F1).
 
 Residual worth knowing: `buildStudyPlan` reads deck stats from `summary` (FSRS
 `mastered`) while JLPT progress comes from counter aggregates. Those are two metrics
@@ -560,7 +566,7 @@ Use these rather than inventing new plumbing:
 | Add a backend query | `@dataclass` in `desktop_bridge.py` → `_run_command` branch → `ipc_handlers.cjs` route + validator → `preload.cjs` → regenerate `generated/types.ts` |
 | Add a deck | CSV in `data/external_sources/` → `import_external_lists.py` → builder in `decks.py` with a **verified-disjoint** `id_offset` → `ALL_DECKS` → the IPC allowlist (`VALID_DECK_SLUGS` in `electron-frontend/electron/ipc_security.cjs`) → the startup preload list if it should preload (`STARTUP_PRELOAD_DECK_SLUGS` in `main.cjs`). `tests/test_deck_slug_lists.py` cross-checks them |
 | Add a stateful UI system | new `src/features/<name>/` module, hook-over-context |
-| Add persisted state | migration in `data/database.py` (bump `LATEST_SCHEMA_VERSION`) — **not** a new localStorage key |
+| Add persisted state | migration in `data/database.py` (bump `LATEST_SCHEMA_VERSION`) — **not** a new localStorage key. One written exception (Robbie, audit 17 Q1): two screen marks, UI state rather than learning history, stay in browser storage, `jplearn-progression-overrides-v1` (the path's "open anyway" choices) and `jplearn.menu.unlockSeen` (the menu's last announced unlock); "Reset all progress" clears both |
 | Add a slow backend job | dedicated runtime process, **not** the shared bridge worker |
 
 `SCRIPT_MINIGAMES` now has a single definition in `constants.tsx`; the
@@ -623,7 +629,7 @@ Ranked by risk × cost-to-fix-later. GitHub issue cross-reference in the right c
 
 | # | Finding | Issue |
 |---|---|---|
-| D1 | `App.tsx` is down to 2,880 lines / 67 `useState` — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
+| D1 | `App.tsx` is at 3,444 lines / 61 `useState` (2026-10-30, audit 17) — the pure helpers (`src/lib/`), the titlebar + settings JSX (`src/components/`) and the session state machine (`features/study-session/useStudySession.ts`) are all extracted. What remains is routing: a flat `view` string with inline conditional JSX. | #69 (phase 4c outstanding), #6 (closed, handler boilerplate only) |
 | ~~D2~~ | ~~`desktop_bridge.py` was 6,122 lines mixing OCR, MT, dictionary, deck, and dispatch logic in `scripts/`~~ — now ~3,690. MT deleted (was dead code), dictionary moved to `data/dictionary_repository.py`, dispatch converted to a route table, OCR moved to `scripts/ocr_extraction.py` behind its own process. What remains is deck/JLPT/progression assembly, which belongs in `scripts/` (see §2). | #70, #74 |
 | ~~D3~~ | ~~`arch_check.py` covers only `src`/`domain`/`data`/`ui`; extend `RULES` to `scripts/`.~~ Done — `scripts` is now a checked layer (forbids `→ ui`) with a non-fatal size-warning threshold. | #70 (step 1) |
 | D4 | `data/app.db` + `SRSRepository` are unused by any runtime path but documented in FEATURES.md as live persistence. Either wire or reclassify. | none |
