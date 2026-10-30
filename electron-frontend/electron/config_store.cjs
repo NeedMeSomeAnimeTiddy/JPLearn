@@ -4,6 +4,9 @@
 // electron-store v11+ is ESM-only; this module is CommonJS, so the Store
 // class is loaded lazily via dynamic import() and cached.
 
+// Every key here is settable from the renderer through IPC (`config:set`; ipc_security.cjs takes
+// its allow-list from ALLOWED_KEYS below). A key whose value is not a boolean needs its own value
+// check in setConfigValue (and in validateConfigSetPayload), as closeBehavior has.
 const CONFIG_DEFAULTS = {
   autoUpdateEnabled: true,
   notificationsEnabled: true,
