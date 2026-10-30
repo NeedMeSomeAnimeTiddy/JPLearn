@@ -11,6 +11,8 @@ export interface SettingsCollapsibleSectionProps {
   onToggle: () => void
   className?: string
   actions?: ReactNode
+  /** shown under the header whether or not the section is open, outside the header's button */
+  notice?: ReactNode
   hideChevron?: boolean
   children: ReactNode
 }
@@ -24,10 +26,14 @@ export function SettingsCollapsibleSection({
   onToggle,
   className,
   actions,
+  notice,
   hideChevron,
   children,
 }: SettingsCollapsibleSectionProps) {
   const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    /* ONLY THE HEADER'S OWN KEYS (audit 17, F4). A button in `actions` sits inside this header, and
+       its Enter or Space bubbled here, was cancelled and toggled the section instead of pressing it. */
+    if (event.target !== event.currentTarget) return
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       onToggle()
@@ -59,6 +65,7 @@ export function SettingsCollapsibleSection({
           ) : null}
         </div>
       </div>
+      {notice ? <div className="settings-collapsible-notice">{notice}</div> : null}
       <div id={`${id}-body`} className={`settings-collapsible-body${collapsed ? '' : ' is-open'}`}>
         {!collapsed ? children : null}
       </div>
