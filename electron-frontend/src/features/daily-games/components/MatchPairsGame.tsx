@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { RoundWork } from '../../round'
 import { DAILY_GAMES_COPY } from '../constants'
 import type { DailyGamesAttemptOutcomeInput, MatchPair, PuzzleShell } from '../types'
-import { pad2 } from '../utils'
+import { pad2, pairsBelongTogether } from '../utils'
 import { PuzzleRound } from './PuzzleRound'
 
 /* ==================================================================================================
@@ -36,6 +36,16 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
   const [isResolving, setIsResolving] = useState(false)
   const [status, setStatus] = useState('')
 
+  /* WHOSE MISS A MEANING TILE IS. A tile goes to the word whose pair it will complete: its own word
+     while that word's character is still on the board, otherwise the unpaired word with the same
+     meaning, so a word already paired is never marked missed afterwards (audit 16 review). */
+  function meaningTileOwner(meaningTile: MatchPair): number {
+    const own = pairs.find((tile) => tile.side === 'character' && tile.poolPosition === meaningTile.poolPosition)
+    if (own && !matchedIds.has(own.id)) return meaningTile.poolPosition
+    const other = pairs.find((tile) => tile.side === 'character' && !matchedIds.has(tile.id) && pairsBelongTogether(tile, meaningTile))
+    return other ? other.poolPosition : meaningTile.poolPosition
+  }
+
   function selectPair(pair: MatchPair): void {
     if (isSaving || isResolving || matchedIds.has(pair.id)) return
     if (!selected) {
@@ -49,9 +59,11 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
       return
     }
     setIsResolving(true)
-    const isMatch = selected.poolPosition === pair.poolPosition
-    if (!isMatch) {
-      setMissedPositions((current) => new Set([...current, selected.poolPosition, pair.poolPosition]))
+    /* a word's outcome is decided by its character tile, whichever side was picked first */
+    const characterTile = selected.side === 'character' ? selected : pair
+    const meaningTile = selected.side === 'character' ? pair : selected
+    if (!pairsBelongTogether(characterTile, meaningTile)) {
+      setMissedPositions((current) => new Set([...current, characterTile.poolPosition, meaningTileOwner(meaningTile)]))
       setFlashIds([selected.id, pair.id])
       setStatus(DAILY_GAMES_COPY.matchPairsMismatched.replace('{first}', selected.value).replace('{second}', pair.value))
       window.setTimeout(() => {
@@ -63,7 +75,7 @@ export function MatchPairsGame({ pairs, isSaving, onComplete, shell }: MatchPair
     }
     const nextMatched = new Set([...matchedIds, selected.id, pair.id])
     setMatchedIds(nextMatched)
-    setMadeOrder((current) => [...current, pair.poolPosition])
+    setMadeOrder((current) => [...current, characterTile.poolPosition])
     setSelected(null)
     setIsResolving(false)
     setStatus(DAILY_GAMES_COPY.matchPairsMatched.replace('{value}', selected.value))

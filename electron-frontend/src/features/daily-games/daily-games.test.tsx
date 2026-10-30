@@ -15,7 +15,7 @@ const state: DailyGamesStatePayload = {
     words: [{ deck_slug: 'vocab_n5', deck_name: 'N5 Vocabulary', card_id: 1, character: '猫', romaji: 'neko', meaning: 'cat', source: 'deck' }],
   },
   streak: { last_completed_day: null, current_streak_days: 0, best_streak_days: 0, freezes_available: 0, freeze_month: null },
-  attempts: [], progress: { attempt_count: 0, completed_daily_game_types: [], missed_words: [] },
+  attempts: [], progress: { completed_daily_game_types: [] },
 }
 
 function dependencies(overrides: Partial<DailyGamesSessionDependencies> = {}): DailyGamesSessionDependencies {
@@ -393,7 +393,8 @@ describe('Daily Game lifecycle', () => {
     expect(screen.queryByRole('button', { name: /review missed words/i })).toBeNull()
   })
 
-  it('forwards only misses from the completed attempt instead of aggregate historical misses', async () => {
+  // the bridge sends no missed-word summary (audit 16, N2); the result's misses come from this attempt
+  it('forwards only misses from the completed attempt', async () => {
     const words = [
       { ...state.pool.words[0], card_id: 1, character: '猫', meaning: 'cat' },
       { ...state.pool.words[0], card_id: 2, character: '犬', meaning: 'dog' },
@@ -401,15 +402,8 @@ describe('Daily Game lifecycle', () => {
     ]
     const attemptState = { ...state, pool: { ...state.pool, words } }
     const sequence = buildTypingBlitz(words, 24)
-    const aggregateState = {
-      ...attemptState,
-      progress: {
-        ...attemptState.progress,
-        missed_words: words.map((word, index) => ({ word, miss_count: index + 2 })),
-      },
-    }
     const onReviewMissedWords = vi.fn(async () => undefined)
-    render(<DailyGameSession mode="daily" data={attemptState} dependencies={dependencies({ recordAttempt: async () => aggregateState })} gameType="typing_blitz" onBack={vi.fn()} onReviewMissedWords={onReviewMissedWords} />)
+    render(<DailyGameSession mode="daily" data={attemptState} dependencies={dependencies({ recordAttempt: async () => attemptState })} gameType="typing_blitz" onBack={vi.fn()} onReviewMissedWords={onReviewMissedWords} />)
 
     let input = await screen.findByLabelText(/type the japanese word/i)
     fireEvent.change(input, { target: { value: 'wrong' } })

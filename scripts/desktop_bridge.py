@@ -210,6 +210,7 @@ from domain.daily_games import (  # noqa: E402
     DailyWordPool,
     apply_daily_game_completion,
     daily_game_seed,
+    daily_games_streak_as_of,
     select_daily_word_pool,
 )
 from domain.jlpt_readiness import (  # noqa: E402
@@ -876,15 +877,16 @@ class DailyGamesAttemptPayload:
 
 @dataclass(frozen=True)
 class DailyGamesMissedWordPayload:
+    """A word missed in a puzzle, as the window builds it for the result and the missed-word
+    review. The bridge no longer sends these (audit 16, N2); the type is shared with the window."""
+
     word: DailyGamesWordPayload
     miss_count: int
 
 
 @dataclass(frozen=True)
 class DailyGamesProgressPayload:
-    attempt_count: int
     completed_daily_game_types: list[str]
-    missed_words: list[DailyGamesMissedWordPayload]
 
 
 @dataclass(frozen=True)
@@ -1027,30 +1029,8 @@ def _daily_games_state_payload(
 ) -> DailyGamesStatePayload:
     pool = _ensure_daily_games_pool(pool_day, repository)
     attempts = repository.load_attempts(pool_day)
-    streak = _reconcile_daily_games_streak(repository)
-    words_by_position = dict(enumerate(pool.words))
-    miss_counts: dict[int, int] = {}
-    for attempt in sorted(
-        attempts,
-        key=lambda saved_attempt: (
-            saved_attempt.completed_at_utc,
-            saved_attempt.attempt_id if saved_attempt.attempt_id is not None else -1,
-        ),
-    ):
-        for outcome in attempt.outcomes:
-            if outcome.outcome == "incorrect":
-                miss_counts[outcome.pool_position] = miss_counts.get(outcome.pool_position, 0) + 1
-            else:
-                miss_counts.pop(outcome.pool_position, None)
-
-    missed_words = [
-        DailyGamesMissedWordPayload(
-            word=_daily_games_word_payload(words_by_position[position]),
-            miss_count=miss_counts[position],
-        )
-        for position in sorted(miss_counts)
-        if position in words_by_position
-    ]
+    # what the road shows is as of the requested day; the stored streak is not changed (audit 16, F6)
+    streak = daily_games_streak_as_of(_reconcile_daily_games_streak(repository), pool_day)
     completed_daily_game_types = [
         game_type
         for game_type in _DAILY_GAME_TYPES
@@ -1072,9 +1052,7 @@ def _daily_games_state_payload(
         ),
         attempts=[_daily_games_attempt_payload(attempt) for attempt in attempts],
         progress=DailyGamesProgressPayload(
-            attempt_count=len(attempts),
             completed_daily_game_types=completed_daily_game_types,
-            missed_words=missed_words,
         ),
     )
 

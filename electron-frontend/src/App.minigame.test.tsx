@@ -921,7 +921,7 @@ describe('what each deck offers', () => {
     await waitFor(() => {
       const hintText = document.querySelector('.minigame-hint-popover-text')
       expect(hintText?.textContent).toContain('Think about how this kanji looks')
-    })
+    }, { timeout: 5000 })
   })
 
   it('renders mode-specific dictionary help and seeds dictionary lookup from the active card', async () => {

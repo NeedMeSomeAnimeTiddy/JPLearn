@@ -88,3 +88,104 @@ describe('MatchPairsGame', () => {
     expect(screen.getByRole('button', { name: 'bird' }).classList.contains('on')).toBe(true)
   })
 })
+
+describe('MatchPairsGame with two words of one meaning (audit 16 F3)', () => {
+  function tilesFor(words: Array<[number, string, string]>): MatchPair[] {
+    return words.flatMap(([poolPosition, character, meaning]) => {
+      const word = { character, meaning } as MatchPair['word']
+      return [
+        { id: `${poolPosition}-character`, poolPosition, side: 'character' as const, value: character, word },
+        { id: `${poolPosition}-meaning`, poolPosition, side: 'meaning' as const, value: meaning, word },
+      ]
+    })
+  }
+  /* 青 "blue" and 青い "Blue " read the same once case and spaces are set aside */
+  const blue = tilesFor([[0, '青', 'blue'], [1, '青い', 'Blue '], [2, '猫', 'cat']])
+
+  function pick(characterValue: string, meaningTileIndex: number, characterFirst: boolean) {
+    const character = screen.getByRole('button', { name: characterValue })
+    const meaning = within(screen.getByRole('group', { name: 'Meanings' })).getAllByRole('button')[meaningTileIndex]
+    if (characterFirst) { fireEvent.click(character); fireEvent.click(meaning) }
+    else { fireEvent.click(meaning); fireEvent.click(character) }
+  }
+
+  /* the meaning tiles render in `pairs` order: blue (0), Blue (1), cat (2) */
+  for (const characterFirst of [true, false]) {
+    it(`takes either "blue" for either word and completes with no miss (${characterFirst ? 'character' : 'meaning'} first)`, () => {
+      const onComplete = vi.fn()
+      render(<MatchPairsGame pairs={blue} isSaving={false} onComplete={onComplete} shell={shell} />)
+
+      pick('青', 1, characterFirst)
+      expect(screen.getByRole('status').textContent).not.toMatch(/do not match/)
+      pick('青い', 0, characterFirst)
+      expect(screen.getByRole('status').textContent).not.toMatch(/do not match/)
+      pick('猫', 2, characterFirst)
+
+      expect(onComplete).toHaveBeenCalledOnce()
+      expect(onComplete).toHaveBeenCalledWith({
+        score: 3,
+        outcomes: [
+          { poolPosition: 0, outcome: 'correct' },
+          { poolPosition: 1, outcome: 'correct' },
+          { poolPosition: 2, outcome: 'correct' },
+        ],
+      })
+      expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)).toEqual(['on', 'on', 'on'])
+    })
+  }
+
+  it('keeps a word missed before its cross-pick incorrect', () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    render(<MatchPairsGame pairs={blue} isSaving={false} onComplete={onComplete} shell={shell} />)
+
+    /* a genuine mismatch: 猫 and 青's "blue" */
+    pick('猫', 0, true)
+    expect(screen.getByRole('status').textContent).toContain('猫 and blue do not match')
+    act(() => { vi.advanceTimersByTime(400) })
+
+    pick('青', 1, true)
+    pick('青い', 0, true)
+    pick('猫', 2, true)
+
+    expect(onComplete).toHaveBeenCalledWith({
+      score: 1,
+      outcomes: [
+        { poolPosition: 0, outcome: 'incorrect' },
+        { poolPosition: 1, outcome: 'correct' },
+        { poolPosition: 2, outcome: 'incorrect' },
+      ],
+    })
+    /* the trail follows the character tiles in the order they were paired: 青, 青い, 猫 */
+    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)).toEqual(['bad', 'on', 'bad'])
+  })
+
+  it('gives a miss on a meaning whose own character is paired to the word that tile will complete', () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    render(<MatchPairsGame pairs={blue} isSaving={false} onComplete={onComplete} shell={shell} />)
+
+    /* 青 takes 青い's "Blue", leaving 青's own "blue" on the board */
+    pick('青', 1, true)
+    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)[0]).toBe('on')
+
+    /* then 猫 is tried against that "blue": a genuine mismatch, charged to 猫 and to 青い, the word
+       that "blue" will now complete; 青 stays paired and correct */
+    pick('猫', 0, true)
+    act(() => { vi.advanceTimersByTime(400) })
+    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)[0]).toBe('on')
+
+    pick('青い', 0, true)
+    pick('猫', 2, true)
+
+    expect(onComplete).toHaveBeenCalledWith({
+      score: 1,
+      outcomes: [
+        { poolPosition: 0, outcome: 'correct' },
+        { poolPosition: 1, outcome: 'incorrect' },
+        { poolPosition: 2, outcome: 'incorrect' },
+      ],
+    })
+    expect([...document.querySelectorAll('.rd-ticks i')].map((tick) => tick.className)).toEqual(['on', 'bad', 'bad'])
+  })
+})

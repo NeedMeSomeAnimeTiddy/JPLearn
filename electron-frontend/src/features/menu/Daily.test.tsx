@@ -18,7 +18,7 @@ function state(over: Partial<DailyGamesStatePayload> = {}): DailyGamesStatePaylo
     pool: { day: '2026-07-15', algorithm_version: 1, game_seeds: {}, words: [word] },
     streak: { last_completed_day: null, current_streak_days: 3, best_streak_days: 5, freezes_available: 0, freeze_month: null },
     attempts: [],
-    progress: { attempt_count: 0, completed_daily_game_types: [], missed_words: [] },
+    progress: { completed_daily_game_types: [] },
     ...over,
   } as DailyGamesStatePayload
 }
@@ -112,7 +112,7 @@ describe('Daily', () => {
       onPlay,
       dependencies: deps({
         getState: async () => state({
-          progress: { attempt_count: 1, completed_daily_game_types: ['crossword'], missed_words: [] },
+          progress: { completed_daily_game_types: ['crossword'] },
           attempts: [attempt()],
         } as Partial<DailyGamesStatePayload>),
       }),
@@ -174,7 +174,7 @@ describe('Daily', () => {
     show({
       dependencies: deps({
         getState: async () => state({
-          progress: { attempt_count: 2, completed_daily_game_types: ['crossword', 'word_search'], missed_words: [] },
+          progress: { completed_daily_game_types: ['crossword', 'word_search'] },
         } as Partial<DailyGamesStatePayload>),
       }),
     })

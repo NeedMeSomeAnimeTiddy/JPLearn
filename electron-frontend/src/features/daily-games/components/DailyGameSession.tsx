@@ -32,14 +32,19 @@ const PUZZLE_TEXT: Record<DailyGameType, { title: string; resultsTitle: string; 
   typing_blitz: { title: TYPING_BLITZ_COPY.title, resultsTitle: TYPING_BLITZ_COPY.resultsTitle, dailyResults: TYPING_BLITZ_COPY.dailyResults, practiceResults: TYPING_BLITZ_COPY.practiceResults, saving: TYPING_BLITZ_COPY.saving },
 }
 
-function getAttemptMissedWords(data: DailyGamesStatePayload, attempt: DailyGamesAttemptRequest): DailyGamesMissedWordPayload[] {
+function getAttemptMissedWords(pool: DailyGamesStatePayload['pool'], attempt: DailyGamesAttemptRequest): DailyGamesMissedWordPayload[] {
   return attempt.outcomes.flatMap((outcome) => {
-    const word = data.pool.words[outcome.poolPosition]
+    const word = pool.words[outcome.poolPosition]
     return outcome.outcome === 'incorrect' && word ? [{ word, miss_count: 1 }] : []
   })
 }
 
 export function DailyGameSession({ mode, data, dependencies, gameType, onBack, onStateUpdated, onReviewMissedWords }: DailyGameSessionProps) {
+  /* THE SESSION OWNS ITS POOL. It is taken once, when the puzzle opens, and everything after --
+     the setup, the board, the clues, the attempt, a failed save and its retry, the result -- reads
+     only this. A later `data` (the state a save returns, the next day's pool at midnight) never
+     re-runs the setup or swaps the board under the learner (audit 16, F4 and N1). */
+  const [pool] = useState(() => data.pool)
   const [seed, setSeed] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -61,8 +66,8 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
       startedAt.current = null
       try {
         const nextSeed = mode === 'daily'
-          ? data.pool.game_seeds[gameType]
-          : (await dependencies.createPracticeSeed({ day: data.pool.day, gameType })).seed
+          ? pool.game_seeds[gameType]
+          : (await dependencies.createPracticeSeed({ day: pool.day, gameType })).seed
         if (typeof nextSeed !== 'number') throw new Error(missing)
         if (active) {
           startedAt.current = dependencies.now().getTime()
@@ -77,22 +82,22 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
     }
     void prepare()
     return () => { active = false }
-  }, [data.pool.day, data.pool.game_seeds, dependencies, gameType, mode])
+  }, [pool, dependencies, gameType, mode])
 
   useEffect(() => {
     if (gameType !== 'crossword' || seed === null) {
       setCrosswordBoard(null)
       return
     }
-    const fallbackBoard = buildCrossword(data.pool.words, seed)
+    const fallbackBoard = buildCrossword(pool.words, seed)
     const controller = new AbortController()
     setCrosswordBoard(fallbackBoard)
-    void enrichCrosswordClues(data.pool.day, fallbackBoard, dependencies.crosswordClues ?? {}, controller.signal)
+    void enrichCrosswordClues(pool.day, fallbackBoard, dependencies.crosswordClues ?? {}, controller.signal)
       .then((enrichedBoard) => {
         if (!controller.signal.aborted) setCrosswordBoard(enrichedBoard)
       })
     return () => controller.abort()
-  }, [data.pool.day, data.pool.words, dependencies.crosswordClues, gameType, seed])
+  }, [pool, dependencies.crosswordClues, gameType, seed])
 
   /* THE SPENT CHIP. It counts while the board is in play and stops the moment the puzzle is over,
      so the figure the result shows is the one the attempt is recorded with. */
@@ -112,7 +117,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
     try {
       const nextState = await dependencies.recordAttempt(nextAttempt)
       onStateUpdated?.(nextState)
-      setResult({ score: nextAttempt.score, pairCount: targetCount, isFallback: false, missedWords: getAttemptMissedWords(data, nextAttempt) })
+      setResult({ score: nextAttempt.score, pairCount: targetCount, isFallback: false, missedWords: getAttemptMissedWords(pool, nextAttempt) })
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : unavailable)
     }
@@ -129,7 +134,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
       return
     }
     void recordAttempt({
-      day: data.pool.day,
+      day: pool.day,
       gameType,
       mode,
       score: next.score,
@@ -139,13 +144,13 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
     }, next.targetCount)
   }
 
-  const pairs = useMemo(() => (seed === null ? [] : buildMatchPairs(data.pool.words, seed)), [data.pool.words, seed])
-  const wordSearchBoard = useMemo(() => (seed === null ? null : buildWordSearch(data.pool.words, seed)), [data.pool.words, seed])
-  const typingBlitzWords = useMemo(() => (seed === null ? [] : buildTypingBlitz(data.pool.words, seed)), [data.pool.words, seed])
+  const pairs = useMemo(() => (seed === null ? [] : buildMatchPairs(pool.words, seed)), [pool.words, seed])
+  const wordSearchBoard = useMemo(() => (seed === null ? null : buildWordSearch(pool.words, seed)), [pool.words, seed])
+  const typingBlitzWords = useMemo(() => (seed === null ? [] : buildTypingBlitz(pool.words, seed)), [pool.words, seed])
   const isSaving = attempt !== null && error === null
 
   const head = puzzleHead(gameType)
-  const cap = mode === 'daily' ? fillCopy(PUZZLE_COPY.dailyCap, { count: data.pool.words.length }) : PUZZLE_COPY.practiceCap
+  const cap = mode === 'daily' ? fillCopy(PUZZLE_COPY.dailyCap, { count: pool.words.length }) : PUZZLE_COPY.practiceCap
   const spentChip = { key: 'spent', value: formatClock(spent), label: 'SPENT' }
 
   /* THE ENDING, IN ITS THREE STATES -- saving, the save that failed, and the result. All three are
@@ -246,7 +251,7 @@ export function DailyGameSession({ mode, data, dependencies, gameType, onBack, o
       return <CrosswordGame board={crosswordBoard} isSaving={isSaving} onComplete={completeGame} shell={shell} />
     }
     if (gameType === 'word_search' && wordSearchBoard) {
-      return <WordSearchGame board={wordSearchBoard} words={data.pool.words} isSaving={isSaving} onComplete={completeGame} shell={shell} />
+      return <WordSearchGame board={wordSearchBoard} words={pool.words} isSaving={isSaving} onComplete={completeGame} shell={shell} />
     }
     if (gameType === 'match_pairs' && seed !== null) {
       return <MatchPairsGame pairs={pairs} isSaving={isSaving} onComplete={(next) => completeGame({ ...next, targetCount: pairs.length / 2 })} shell={shell} />

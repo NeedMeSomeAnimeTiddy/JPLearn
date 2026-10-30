@@ -39,6 +39,7 @@ import type { PersistedStudySession } from './persistedSession'
 import { assessConjugationAnswer, assessJapaneseAnswer, formatKanaSpellings } from '../../lib/answerAssessment'
 import { buildConjugationPool } from './conjugationRound'
 import { assessTypedRecallAnswer } from '../../lib/typedRecallAssessment'
+import { assessRomajiSprintAnswer } from '../../lib/romajiSprintAssessment'
 import { HINT_STEP_FULL_ANSWER, type SubmitAnswerOptions } from '../../context/SessionContext'
 import { isGrammarCurriculumMode } from '../../utils'
 import { KANJI_MEANINGS } from '../../lib/kanjiMeanings'
@@ -1057,10 +1058,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
             : roundState.mode === 'dictation'
               ? assessJapaneseAnswer([roundState.answer], answer)
               : roundState.mode === 'romaji_sprint'
-                ? (() => {
-                    const variants = roundState.answer.split('/').map(v => normalizeText(v.trim()))
-                    return variants.some(v => normalizeText(answer) === v) ? 'exact' : 'incorrect'
-                  })()
+                ? assessRomajiSprintAnswer(roundState, answer)
                 : roundState.mode === 'conjugation_drill'
                   ? assessConjugationAnswer(
                     roundState.acceptedAnswers ?? [roundState.answer],
