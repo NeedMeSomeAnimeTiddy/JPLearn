@@ -23,6 +23,13 @@ export interface SummaryTotals {
   deck_count: number
 }
 
+export interface MinigameRecordPayload {
+  mode: string
+  attempted: number
+  correct: number
+  best_run: number
+}
+
 export interface StudyStreak {
   current_days: number
   best_days: number

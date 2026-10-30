@@ -379,6 +379,19 @@ function registerIpcHandlers(options) {
     }
   })
 
+  /* THE DRILLS SCREEN'S RECORD (audit 17, F1): each mode's answers, % right and best run on a level
+     deck, read from review history. One filtered read, so it shares the serial worker. */
+  options.ipcMain.handle('study:get-minigame-records', async (event, slug) => {
+    assertTrustedIpcSender(event, trustedSenderOptions())
+    const validatedSlug = validateDeckSlug(slug)
+    try {
+      return await runPythonBridgeWithArgsRead(['minigame-records', validatedSlug])
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to read drill records: ${detail}`)
+    }
+  })
+
   options.ipcMain.handle('study:search-dictionary', async (event, query) => {
     assertTrustedIpcSender(event, trustedSenderOptions())
     const validatedQuery = validateDictionarySearchQuery(query)

@@ -1,6 +1,7 @@
 // Core payload types are generated from Python dataclasses in desktop_bridge.py.
 // Run: python scripts/generate_ts_types.py
 import type {
+  MinigameRecordPayload,
   DatabaseFileSummary,
   DatabaseRestoreResult,
   ProgressImportResult,
@@ -546,6 +547,7 @@ interface DesktopApi {
   importCardScores?: (legacyScores: Record<string, Record<number, number>>) => Promise<CardMasteryImportPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
+  getMinigameRecords?: (slug: DeckSlug) => Promise<{ records: MinigameRecordPayload[] }>
   getGrammarMinigameData?: (payload: GrammarMinigameRequest) => Promise<GrammarMinigameResponse>
   getConjugationDrillData?: (payload: ConjugationDrillRequest) => Promise<ConjugationDrillResponse>
   getDailyGamesState?: (day: string) => Promise<DailyGamesStatePayload>

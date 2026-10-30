@@ -17,6 +17,7 @@ import subprocess
 import secrets
 from time import perf_counter
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from datetime import date, datetime, timezone
 from pathlib import Path
 import unicodedata
@@ -53,7 +54,7 @@ from data.study_pipeline import (  # noqa: E402
     load_session_summary,
     track_assistant_event_interaction,
 )
-from data.database import load_correct_card_ids, save_state  # noqa: E402
+from data.database import load_correct_card_ids, load_minigame_mode_records, save_state  # noqa: E402
 from domain.vocab_order import (  # noqa: E402
     clamp_budget,
     next_words,
@@ -87,8 +88,8 @@ from domain.blocks import (  # noqa: E402
 )
 from domain.cards import Card, Deck  # noqa: E402
 from domain.distractors import rank_distractor_ids  # noqa: E402
-from domain.decks import ALL_DECKS  # noqa: E402
-from domain.block_mapping import parent_slug_for_category  # noqa: E402
+from domain.decks import ALL_DECKS, CATEGORY_SOURCE_DECKS  # noqa: E402
+from domain.block_mapping import level_for_slug, parent_slug_for_category  # noqa: E402
 from domain.scheduler import ReviewState, get_weights, has_been_reviewed, set_weights as set_scheduler_weights, update  # noqa: E402
 from domain.word_of_the_day import WordOfDay, select_word_of_the_day  # noqa: E402
 from domain.queue_builder import build_study_queue  # noqa: E402
@@ -426,6 +427,16 @@ class SummaryTotals:
 # 2026-10-27: keep Conjugation Training hidden); tests/test_deck_slug_lists.py
 # holds the same set against the IPC allowlist and asserts the two are equal.
 _SUMMARY_UNSERVED_SLUGS = frozenset({"conjugation_training"})
+
+
+@dataclass(frozen=True)
+class MinigameRecordPayload:
+    """One drill mode's record on one level deck: the Drills screen's line (audit 17, F1)."""
+
+    mode: str
+    attempted: int
+    correct: int
+    best_run: int
 
 
 @dataclass(frozen=True)
@@ -3842,6 +3853,61 @@ def _cmd_study_queue(argv: list[str]) -> tuple[int, dict[str, object]]:
     return 0, payload
 
 
+@lru_cache(maxsize=None)
+def _minigame_record_deck_names(level_slug: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Every deck name a level deck's minigame answers were ever recorded under.
+
+    An answer is stored under the deck it was given in. Today a topic view carries its level
+    deck's name, but before #78 each topic was its own deck with its own name, and
+    ``review_events`` keeps those rows under it (``data/category_identity_migration.py``). The
+    retired kanji topics (0b99582) are gone from the registry; they were all named
+    ``Kanji: N<k> · <topic>``, so a prefix finds them. Returns ``(names, prefixes)``.
+    """
+    names = {ALL_DECKS[level_slug]().name}
+    for category_slug, build in CATEGORY_SOURCE_DECKS.items():
+        if parent_slug_for_category(category_slug) == level_slug:
+            names.add(build().name)
+    prefixes: tuple[str, ...] = ()
+    if level_slug.startswith("kanji_n"):
+        prefixes = (f"Kanji: {level_for_slug(level_slug).upper()} · ",)
+    return tuple(sorted(names)), prefixes
+
+
+def build_minigame_records_payload(slug: str) -> dict[str, object]:
+    """Each drill mode's record on ``slug``'s level deck, from review history (audit 17, F1).
+
+    A topic slug answers for its level deck: the Drills screen shows one record per level.
+    """
+    if slug not in ALL_DECKS:
+        raise ValueError(f"Unknown deck slug: {slug}")
+    level_slug = parent_slug_for_category(slug) or slug
+    names, prefixes = _minigame_record_deck_names(level_slug)
+    records = load_minigame_mode_records(names, prefixes)
+    return {
+        "records": [
+            asdict(
+                MinigameRecordPayload(
+                    mode=record.mode,
+                    attempted=record.attempted,
+                    correct=record.correct,
+                    best_run=record.best_run,
+                )
+            )
+            for record in records
+        ]
+    }
+
+
+def _cmd_minigame_records(argv: list[str]) -> tuple[int, dict[str, object]]:
+    if len(argv) < 2:
+        return 2, {"error": "Usage: minigame-records <slug>"}
+    try:
+        payload = build_minigame_records_payload(argv[1])
+    except ValueError as exc:
+        return 2, {"error": str(exc)}
+    return 0, payload
+
+
 def _cmd_grammar_minigame_data(argv: list[str]) -> tuple[int, dict[str, object]]:
     if len(argv) < 2:
         return 2, {
@@ -4412,6 +4478,7 @@ _COMMAND_HANDLERS: dict[str, CommandHandler] = {
     "daily-goal-set": _cmd_daily_goal_set,
     "apply-known-items": _cmd_apply_known_items,
     "study-queue": _cmd_study_queue,
+    "minigame-records": _cmd_minigame_records,
     "grammar-minigame-data": _cmd_grammar_minigame_data,
     "conjugation-drill-data": _cmd_conjugation_drill_data,
     "card-note-get": _cmd_card_note_get,

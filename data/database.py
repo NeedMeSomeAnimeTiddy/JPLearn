@@ -9,14 +9,21 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from collections.abc import Callable, Collection, Generator, Mapping
+from collections.abc import Callable, Collection, Generator, Mapping, Sequence
 from typing import TypedDict, TypeAlias, cast
 
 from domain.activity import ActivitySummary, DailyCount
 from domain.assistant import AssistantEvent, AssistantEventPriority, AssistantMood, AssistantState
 from domain.history import ItemHistoryEvent, RawItemHistoryBucket
 from domain.leech import evaluate_leech_state
-from domain.mistakes import MistakeBreakdownRow, MinigamePerformanceRow, SessionHistoryRow
+from domain.mistakes import (
+    MinigameModeRecord,
+    MinigamePerformanceRow,
+    MistakeBreakdownRow,
+    SessionHistoryRow,
+    minigame_mode_from_tags,
+    summarize_minigame_answers,
+)
 from domain.scheduler import ReviewState
 from domain.session import SessionGoal, SessionSummary
 from domain.streaks import StreakState
@@ -1920,26 +1927,72 @@ def load_minigame_breakdown() -> list[MinigamePerformanceRow]:
             FROM review_events
             WHERE tags_csv LIKE 'minigame,%'
             GROUP BY tags_csv
-            ORDER BY attempts DESC
             """,
         ).fetchall()
 
-    breakdown: list[MinigamePerformanceRow] = []
+    # One row per mode: `minigame,imposter,chapter_2` joins `minigame,imposter` (audit 17, F1).
+    totals: dict[str, tuple[int, int]] = {}
     for row in rows:
-        tags_csv = str(row["tags_csv"] or "")
-        minigame_name = tags_csv.split(",", 1)[1] if "," in tags_csv else tags_csv
-        attempts = int(row["attempts"] or 0)
-        correct = int(row["correct"] or 0)
+        mode = minigame_mode_from_tags(str(row["tags_csv"] or ""))
+        if mode is None:
+            continue
+        attempts, correct = totals.get(mode, (0, 0))
+        totals[mode] = (attempts + int(row["attempts"] or 0), correct + int(row["correct"] or 0))
+
+    breakdown: list[MinigamePerformanceRow] = []
+    for mode, (attempts, correct) in sorted(totals.items(), key=lambda item: (-item[1][0], item[0])):
         accuracy = round((correct / attempts) * 100) if attempts > 0 else 0
         breakdown.append(
             MinigamePerformanceRow(
-                minigame=minigame_name,
+                minigame=mode,
                 attempts=attempts,
                 correct=correct,
                 accuracy=accuracy,
             )
         )
     return breakdown
+
+
+def load_minigame_mode_records(
+    deck_names: Sequence[str],
+    deck_name_prefixes: Sequence[str] = (),
+) -> list[MinigameModeRecord]:
+    """Return each drill mode's record over the review events of the named decks (audit 17, F1).
+
+    ``deck_names`` match exactly and ``deck_name_prefixes`` match the start of the stored name; both
+    are normalised the way every write normalises a deck name. Rows are read in ``id`` order, which
+    is answer order, so a mode's best run is the longest run of correct answers as they were given.
+    Read only.
+    """
+    names = sorted({_normalize_deck_name(name) for name in deck_names if name})
+    prefixes = sorted({_normalize_deck_name(prefix) for prefix in deck_name_prefixes if prefix})
+    if not names and not prefixes:
+        return []
+    clauses: list[str] = []
+    params: list[object] = []
+    if names:
+        clauses.append(f"deck IN ({', '.join('?' for _ in names)})")
+        params.extend(names)
+    for prefix in prefixes:
+        clauses.append("substr(deck, 1, ?) = ?")
+        params.extend([len(prefix), prefix])
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT tags_csv, quality
+            FROM review_events
+            WHERE tags_csv LIKE 'minigame,%' AND ({' OR '.join(clauses)})
+            ORDER BY id
+            """,
+            params,
+        ).fetchall()
+
+    answers: list[tuple[str, bool]] = []
+    for row in rows:
+        mode = minigame_mode_from_tags(str(row["tags_csv"] or ""))
+        if mode is not None:
+            answers.append((mode, int(row["quality"] or 0) >= 3))
+    return summarize_minigame_answers(answers)
 
 
 def load_session_history(limit: int = 8) -> list[SessionHistoryRow]:

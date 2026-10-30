@@ -20,6 +20,7 @@ describe('preload contract', () => {
       "setVocabFeedBudget: (count, slug) => ipcRenderer.invoke('study:set-vocab-feed-budget', count, slug)",
       "getDeckCards: (slug) => ipcRenderer.invoke('study:get-deck-cards', slug)",
       "getStudyQueue: (slug) => ipcRenderer.invoke('study:get-study-queue', slug)",
+      "getMinigameRecords: (slug) => ipcRenderer.invoke('study:get-minigame-records', slug)",
       "getGrammarMinigameData: (payload) => ipcRenderer.invoke('study:get-grammar-minigame-data', payload)",
       "getDailyGamesState: (day) => ipcRenderer.invoke('daily-games:get-state', day)",
       "createDailyGamesPracticeSeed: (payload) => ipcRenderer.invoke('daily-games:create-practice-seed', payload)",

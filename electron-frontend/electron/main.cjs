@@ -2389,13 +2389,18 @@ app.whenReady().then(async () => {
     if (autoUpdateEnabled) {
       initAutoUpdater({ isPackaged: app.isPackaged })
     }
-  } catch { /* non-fatal */ }
+  } catch (error) {
+    // non-fatal, but say so: a settings file that cannot be read skips the update check
+    console.warn('[config] update check skipped:', error instanceof Error ? error.message : String(error))
+  }
 
   // Apply auto-start setting
   try {
     const autoStartOnLogin = await getConfigValue('autoStartOnLogin')
     app.setLoginItemSettings({ openAtLogin: autoStartOnLogin })
-  } catch { /* non-fatal */ }
+  } catch (error) {
+    console.warn('[config] start-with-Windows setting not applied:', error instanceof Error ? error.message : String(error))
+  }
 
   void createWindowWithSplash()
 
