@@ -6,6 +6,77 @@ are kept in `Z:/Projects/JPLearn/audits`.
 
 <!-- New entries go directly below this line. -->
 
+## 2026-10-30 — Renderer state and settings
+
+**Scope:** Audit 17. After audit 16 Robbie picked JLPT, then judged it unfinished and chose to design
+the JLPT build first; he then ran `/crew-audit renderer state and settings`.
+- Covered: App.tsx state and re-renders, types.ts, constants.tsx, AppSettingsModal.tsx and
+  SettingsCollapsibleSection.tsx, config_store.cjs, every browser-storage key (writer, reader,
+  SQLite overlap, old, absent and corrupt copies), settings defaults and migrations, renderer timers
+  and listeners, swallowed renderer catches, and Settings dialog keyboard and focus.
+- Out: Daily Games (16), tutor chat (15), onboarding and progression logic (12), startup (11),
+  import, export and backup logic (10), the valley render loop, JLPT.
+
+**Commit audited:** b066f20 on main, tree clean.
+
+**Method:**
+- The Auditor read source, git history and the census, with two read-only Explore helpers (timer and
+  listener cleanup; swallowed catches). At Reconcile it read known-answers Part 2, AUDITS.md,
+  DEBT.md, ARCHITECTURE.md §4, §8 and line 563, and FEATURES.md.
+- The lead ran, at b066f20 in the main checkout with a throwaway test file since recycled:
+  - Check 2: a rejected tutor download ends as an unhandled rejection with no message shown;
+  - Check 3: focus is not in the Settings dialog on open, and the tabs' aria-controls name no
+    element;
+  - Check 6: `conf` throws SyntaxError on a damaged config, and clearInvalidConfig defaults to false;
+  - Check 8: `git log -S` shows minigameStats was never persisted;
+  - Check 9: no closed issue on Settings focus or minigame stats.
+- Not run: Check 4 (user-event is not installed and jsdom cannot activate a button), Checks 1 and 5
+  (optional), Check 7 (launch-gated profiler).
+- Report: `AUDIT-renderer-state-and-settings-2026-10-30-1-r2.md`.
+
+### Where each finding went
+- F1, the Drills screen's per-mode record is never saved, so it reads "NOT PLAYED ON THIS DECK" after
+  every relaunch while SQLite holds the results (P2, confirmed): reported.
+- F2, Settings model actions and the FSRS reset discard their errors (P2, Check 2): reported.
+- F3, the Settings dialog does not take, trap or return focus; its tabs' aria-controls dangle (P2,
+  Check 3): reported.
+- F4, the Offline Dictionary Download button cannot be pressed with Enter or Space (P3, plausible):
+  reported.
+- F5, the global keyboard handler stays fresh only through an unmemoised function (P3): reported.
+- F6, a damaged `jplearn-config.json` disables config reads and writes for the run (P3, Check 6):
+  reported. The r1 debt row was withdrawn because Check 6 met its trigger.
+- F7, config keys and values are entered in four places; the notifications setting is unreachable
+  (P3): reported.
+- Nits N1-N2: reported.
+- Q1, the progression "open anyway" overrides and the menu unlock mark live in browser storage
+  against ARCHITECTURE.md:563, and "Reset all progress" clears neither: asked of Robbie.
+- STALE RECORD: S1 App.tsx and AppSettingsModal size figures (ARCH §4, §8 D1,
+  electron-frontend/CLAUDE.md, electron.instructions.md); S2 ARCH §4 "five localStorage keys" (ten);
+  S3 electron.instructions.md lists `features/background/`.
+- Dropped: a saved-prefs script crash (ScriptKey unchanged in history); the per-second focus-timer
+  re-render (not established).
+- Debt rows drafted: none.
+
+### Triggers checked
+- No DEBT.md row covers renderer state or settings. ARCH §8 D1 open, figures stale. A2 holds.
+
+### Inspected and found sound — do not re-derive these
+- Browser-storage settings and SQLite user_settings do not overlap.
+- loadSettings falls back to defaults; theme fields are normalised; the theme migration runs once.
+- Every renderer listener, interval and IPC subscription in scope has a matching cleanup.
+- Card-score adoption runs once, into an empty table only.
+- config_store validates key, type and close-behaviour value.
+- Deck-load timeouts and in-flight de-duplication.
+- The session save is shape-checked and dropped when unreadable.
+
+### What this pass could not establish
+- F4 in a real browser; App re-render cost while the focus timer runs or a slider is dragged.
+- Nothing was launched.
+
+### Coverage, not a finding
+- The last three passes (minigames and Daily Games, tutor, dictionary and OCR) did not cover the menu
+  and valley, JLPT, reading passages or handwriting; none of those has had a pass.
+
 ## 2026-10-29 — Minigames and Daily Games
 
 **Scope:** Audit 16. Robbie chose "Minigames, Daily Games (Recommended)" over JLPT and renderer state
