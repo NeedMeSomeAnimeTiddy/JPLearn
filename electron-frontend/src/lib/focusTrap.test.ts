@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import type { KeyboardEvent } from 'react'
-import { getFocusableElements, trapFocus, isReducedMotionPreferred } from './focusTrap'
+import { canRestoreFocusTo, getFocusableElements, trapFocus, isReducedMotionPreferred } from './focusTrap'
 
 function makeKeyboardEvent(key: string, shiftKey = false): KeyboardEvent {
   return { key, shiftKey, preventDefault: vi.fn() } as unknown as KeyboardEvent
@@ -110,5 +110,36 @@ describe('isReducedMotionPreferred', () => {
   it('returns false when neither signal indicates a preference', () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia
     expect(isReducedMotionPreferred()).toBe(false)
+  })
+})
+
+/* audit 17, F3: Settings keeps its inactive tab panels mounted under `hidden` */
+describe('getFocusableElements, out of reach', () => {
+  afterEach(() => { document.body.innerHTML = '' })
+
+  it('skips controls inside a hidden or inert block, and disabled ones matched by tabindex', () => {
+    const container = document.createElement('div')
+    container.innerHTML = [
+      '<button id="shown">a</button>',
+      '<div hidden><button id="in-hidden">b</button></div>',
+      '<div inert><input id="in-inert" /></div>',
+      '<button id="disabled-tabbable" disabled tabindex="0">c</button>',
+      '<fieldset disabled><input id="in-disabled-set" tabindex="0" /></fieldset>',
+      '<div tabindex="0" id="plain">d</div>',
+    ].join('')
+    document.body.appendChild(container)
+    expect(getFocusableElements(container).map((element) => element.id)).toEqual(['shown', 'plain'])
+  })
+
+  it('restores focus only to something still in the page and in reach', () => {
+    const container = document.createElement('div')
+    container.innerHTML = '<button id="ok">a</button><div hidden><button id="gone-hidden">b</button></div>'
+    document.body.appendChild(container)
+    expect(canRestoreFocusTo(document.getElementById('ok'))).toBe(true)
+    expect(canRestoreFocusTo(document.getElementById('gone-hidden'))).toBe(false)
+    const detached = document.createElement('button')
+    expect(canRestoreFocusTo(detached)).toBe(false)
+    expect(canRestoreFocusTo(document.body)).toBe(false)
+    expect(canRestoreFocusTo(null)).toBe(false)
   })
 })

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X, Minimize2, Power } from 'lucide-react'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 
 interface CloseConfirmDialogProps {
   isOpen: boolean
@@ -8,10 +9,20 @@ interface CloseConfirmDialogProps {
   onClose: () => void
 }
 
-export function CloseConfirmDialog({ isOpen, onMinimizeToTray, onQuit, onClose }: CloseConfirmDialogProps) {
+export function CloseConfirmDialog({ isOpen, ...props }: CloseConfirmDialogProps) {
   const [remember, setRemember] = useState(false)
 
   if (!isOpen) return null
+  return <CloseConfirmPanel {...props} remember={remember} setRemember={setRemember} />
+}
+
+/* mounted only while open, so mounting is what takes focus and unmounting what returns it */
+function CloseConfirmPanel({ onMinimizeToTray, onQuit, onClose, remember, setRemember }: Omit<CloseConfirmDialogProps, 'isOpen'> & {
+  remember: boolean
+  setRemember: (remember: boolean) => void
+}) {
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const trapKeys = useDialogFocus(panelRef)
 
   return (
     <div
@@ -27,6 +38,9 @@ export function CloseConfirmDialog({ isOpen, onMinimizeToTray, onQuit, onClose }
         aria-modal="true"
         aria-label="Close options"
         style={{ maxWidth: '380px', padding: '1.5rem' }}
+        ref={panelRef}
+        tabIndex={-1}
+        onKeyDown={trapKeys}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Close JPLearn?</h2>

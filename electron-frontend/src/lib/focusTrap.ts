@@ -9,12 +9,27 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+/* A CONTROL INSIDE A `hidden` OR `inert` BLOCK IS NOT IN THE TAB ORDER, nor is a disabled one that
+   only matched by an explicit tabindex (audit 17, F3): Settings keeps its inactive tab panels
+   mounted under `hidden`, and Tab must not wrap onto them. */
+function isOutOfReach(element: HTMLElement): boolean {
+  return element.closest('[hidden], [inert]') !== null || element.matches(':disabled')
+}
+
 export function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((element) => (
-    !element.hidden
+    !isOutOfReach(element)
     && element.getAttribute('aria-hidden') !== 'true'
     && element.tabIndex >= 0
   ))
+}
+
+/** Whether focus can go back to `element`: still in the page, not hidden, not inert. */
+export function canRestoreFocusTo(element: Element | null): element is HTMLElement {
+  return element instanceof HTMLElement
+    && element !== document.body
+    && element.isConnected
+    && !isOutOfReach(element)
 }
 
 /** Traps Tab/Shift+Tab focus cycling within `container`. Returns true if it handled the event. */
