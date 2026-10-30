@@ -1,6 +1,7 @@
 // Core payload types are generated from Python dataclasses in desktop_bridge.py.
 // Run: python scripts/generate_ts_types.py
 import type {
+  MinigameRecordPayload,
   DatabaseFileSummary,
   DatabaseRestoreResult,
   ProgressImportResult,
@@ -546,6 +547,7 @@ interface DesktopApi {
   importCardScores?: (legacyScores: Record<string, Record<number, number>>) => Promise<CardMasteryImportPayload>
   getDeckCards: (slug: DeckSlug) => Promise<ScriptDeckPayload>
   getStudyQueue: (slug: DeckSlug) => Promise<StudyQueueResponse>
+  getMinigameRecords?: (slug: DeckSlug) => Promise<{ records: MinigameRecordPayload[] }>
   getGrammarMinigameData?: (payload: GrammarMinigameRequest) => Promise<GrammarMinigameResponse>
   getConjugationDrillData?: (payload: ConjugationDrillRequest) => Promise<ConjugationDrillResponse>
   getDailyGamesState?: (day: string) => Promise<DailyGamesStatePayload>
@@ -566,12 +568,14 @@ interface DesktopApi {
   getConfigValue?: {
     (key: 'autoStartOnLogin'): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'autoUpdateEnabled'): Promise<{ ok: boolean; key: string; value: boolean }>
+    (key: 'notificationsEnabled'): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'closeBehavior'): Promise<{ ok: boolean; key: string; value: string }>
     (key: string): Promise<{ ok: boolean; key: string; value: unknown }>
   }
   setConfigValue?: {
     (key: 'autoStartOnLogin', value: boolean): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'autoUpdateEnabled', value: boolean): Promise<{ ok: boolean; key: string; value: boolean }>
+    (key: 'notificationsEnabled', value: boolean): Promise<{ ok: boolean; key: string; value: boolean }>
     (key: 'closeBehavior', value: string): Promise<{ ok: boolean; key: string; value: string }>
     (key: string, value: unknown): Promise<{ ok: boolean; key: string; value: unknown }>
   }

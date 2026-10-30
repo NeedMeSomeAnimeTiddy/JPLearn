@@ -17,7 +17,7 @@ import {
 } from './drills'
 import { MINIGAMES, SCRIPT_MINIGAMES, SESSION_LENGTH_PRESETS } from '../../constants'
 import type { LevelReadiness, ReadinessPayload, Rung } from './ascent'
-import type { MinigameKey, MinigameStats } from '../../types'
+import type { DrillRecords } from './useDrillRecords'
 
 const passage = (id: string, words: number, difficulty: number) => ({
   id, title: id, title_reading: id, author: '作者',
@@ -290,9 +290,8 @@ describe('the drills', () => {
       lives: false, focus: false, confidence: false, ...acts,
     },
     lockReasons: {},
-    stats: Object.fromEntries(
-      MINIGAMES.map((m) => [m.key, { attempted: 0, correct: 0, currentStreak: 0, bestStreak: 0, points: 0 }]),
-    ) as Record<MinigameKey, MinigameStats>,
+    /* loaded, and nothing played on this deck */
+    records: {} as DrillRecords | null,
     onDeck: vi.fn(),
     onStart: vi.fn(),
     onUp: vi.fn(),
@@ -463,6 +462,27 @@ describe('the drills', () => {
       const { container } = road({ onStart })
       fireEvent.keyDown(container.querySelector('.mn-open') as Element, { key: 'Enter' })
       expect(onStart).toHaveBeenCalledWith('kanji_n5', firstMode)
+    })
+  })
+
+  describe('the record, read from review history (audit 17, F1)', () => {
+    const firstMode = drillModes()[0].key
+    const line = (container: HTMLElement) => container.querySelector('.dr-rec')?.textContent ?? ''
+
+    it('draws the placeholder, not a claim, until the record has been read', () => {
+      const { container } = road({ records: null })
+      expect(line(container)).toBe('―')
+      expect(line(container)).not.toContain('NOT PLAYED')
+    })
+
+    it('says not played only once the read says so', () => {
+      const { container } = road({ records: {} })
+      expect(line(container)).toBe('NOT PLAYED ON THIS DECK')
+    })
+
+    it('shows the share right and the best run from history', () => {
+      const { container } = road({ records: { [firstMode]: { attempted: 8, correct: 6, bestRun: 4 } } })
+      expect(line(container)).toBe('75%RIGHT4BEST RUN')
     })
   })
 

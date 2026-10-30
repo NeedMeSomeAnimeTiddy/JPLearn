@@ -18,12 +18,11 @@ applyTo: "electron-frontend/**/*"
 
 ```
 src/
-├── App.tsx              (6,238 lines — orchestrator: imports hooks, wires JSX, routing/state)
+├── App.tsx              (3,444 lines on 2026-10-30 — orchestrator: imports hooks, wires JSX, routing/state)
 ├── components/              Shared UI components (DictionaryPopup, SetupWizard, etc.)
 │   └── setup/               SetupWizard sub-components (types, utils, styles, 7 components)
 ├── features/                Self-contained feature modules (hook-over-context pattern)
 │   ├── theme/               useTheme hook + ThemeSettingsTab + preset/custom editors
-│   ├── background/          useBackground hook + BackgroundSettingsTab
 │   ├── tutor/               useTutor hook + 5 components (ChatPanel, OcrWorkbench, etc.)
 │   ├── voice/               useVoice hook + VoiceSettingsTab
 │   └── models/              useModels hook (download/install/select lifecycle)

@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { TutorInstallInfo, TutorModelTier, TranslationProfileTier } from './types'
+import { useActionFailures, type ActionFailures } from '../../hooks/useActionFailures'
+import { afterSuccess } from '../../lib/settingsFailure'
 
 export interface UseModelsReturn {
   tutorInstallInfo: TutorInstallInfo | null
@@ -23,6 +25,8 @@ export interface UseModelsReturn {
   uninstallTutorModel: (tier: TutorModelTier) => Promise<void>
   downloadOfflineDictionary: () => Promise<void>
   applyTranslationProfile: (tier: TranslationProfileTier) => Promise<void>
+  /** why the last try of an action on a tier (or `'dictionary'`) failed; the actions never reject */
+  failureOf: ActionFailures['failureOf']
 }
 
 export function useModels(): UseModelsReturn {
@@ -38,6 +42,10 @@ export function useModels(): UseModelsReturn {
   const [translationProfileProgress, setTranslationProfileProgress] = useState<number>(0)
   const [translationProfileMethod, setTranslationProfileMethod] = useState<string | null>(null)
   const translationProfileTierRef = useRef<TranslationProfileTier | null>(null)
+  /* AN ACTION THAT FAILS SAYS SO (audit 17, F2). Each one catches, and keeps what the main process
+     said beside the control that failed; the buttons `void` these, so nothing reaches the window as
+     an unhandled rejection. */
+  const { failureOf, clear: clearFailure, fail } = useActionFailures()
 
   const formatModelSize = useCallback((sizeMb: number) => {
     if (!Number.isFinite(sizeMb)) {
@@ -194,14 +202,20 @@ export function useModels(): UseModelsReturn {
     setTutorDownloadingTier(tier)
     setTutorDownloadProgress({ percent: 0, mb: null, totalMb: null })
     setTutorDownloadMethod(null)
+    clearFailure('download', tier)
     try {
-      await downloadModel(tier)
-      await refreshTutorInstallInfo()
+      try {
+        await downloadModel(tier)
+      } catch (error) {
+        fail('download', tier, error)
+        return
+      }
+      await afterSuccess('download', refreshTutorInstallInfo)
     } finally {
       setTutorDownloadingTier(null)
       setTutorDownloadProgress(null)
     }
-  }, [refreshTutorInstallInfo, tutorDownloadingTier])
+  }, [clearFailure, fail, refreshTutorInstallInfo, tutorDownloadingTier])
 
   const selectTutorModel = useCallback(async (tier: TutorModelTier) => {
     const setActiveTutorModel = window.jplearnDesktop?.setActiveTutorModel
@@ -209,13 +223,19 @@ export function useModels(): UseModelsReturn {
       return
     }
     setTutorModelActionTier(tier)
+    clearFailure('select', tier)
     try {
-      await setActiveTutorModel(tier)
-      await refreshTutorInstallInfo()
+      try {
+        await setActiveTutorModel(tier)
+      } catch (error) {
+        fail('select', tier, error)
+        return
+      }
+      await afterSuccess('switch', refreshTutorInstallInfo)
     } finally {
       setTutorModelActionTier(null)
     }
-  }, [refreshTutorInstallInfo, tutorModelActionTier])
+  }, [clearFailure, fail, refreshTutorInstallInfo, tutorModelActionTier])
 
   const uninstallTutorModel = useCallback(async (tier: TutorModelTier) => {
     const uninstallModel = window.jplearnDesktop?.uninstallTutorModel
@@ -223,13 +243,19 @@ export function useModels(): UseModelsReturn {
       return
     }
     setTutorModelActionTier(tier)
+    clearFailure('uninstall', tier)
     try {
-      await uninstallModel(tier)
-      await refreshTutorInstallInfo()
+      try {
+        await uninstallModel(tier)
+      } catch (error) {
+        fail('uninstall', tier, error)
+        return
+      }
+      await afterSuccess('removal', refreshTutorInstallInfo)
     } finally {
       setTutorModelActionTier(null)
     }
-  }, [refreshTutorInstallInfo, tutorModelActionTier])
+  }, [clearFailure, fail, refreshTutorInstallInfo, tutorModelActionTier])
 
   const downloadOfflineDictionary = useCallback(async () => {
     const downloadDictionary = window.jplearnDesktop?.downloadDictionary
@@ -239,14 +265,20 @@ export function useModels(): UseModelsReturn {
     setDictionaryDownloading(true)
     setDictionaryProgress(0)
     setDictionaryDownloadMethod(null)
+    clearFailure('download', 'dictionary')
     try {
-      await downloadDictionary()
-      await refreshTutorInstallInfo()
+      try {
+        await downloadDictionary()
+      } catch (error) {
+        fail('download', 'dictionary', error)
+        return
+      }
+      await afterSuccess('download', refreshTutorInstallInfo)
     } finally {
       setDictionaryDownloading(false)
       setDictionaryProgress(0)
     }
-  }, [dictionaryDownloading, refreshTutorInstallInfo])
+  }, [clearFailure, dictionaryDownloading, fail, refreshTutorInstallInfo])
 
   const applyTranslationProfile = useCallback(async (tier: TranslationProfileTier) => {
     const applyProfile = window.jplearnDesktop?.applyTranslationProfile
@@ -257,15 +289,21 @@ export function useModels(): UseModelsReturn {
     setTranslationProfileApplyingTier(tier)
     setTranslationProfileProgress(0)
     setTranslationProfileMethod(null)
+    clearFailure('apply', tier)
     try {
-      await applyProfile(tier, { force: true })
-      await refreshTutorInstallInfo()
+      try {
+        await applyProfile(tier, { force: true })
+      } catch (error) {
+        fail('apply', tier, error)
+        return
+      }
+      await afterSuccess('apply', refreshTutorInstallInfo)
     } finally {
       translationProfileTierRef.current = null
       setTranslationProfileApplyingTier(null)
       setTranslationProfileProgress(0)
     }
-  }, [refreshTutorInstallInfo, translationProfileApplyingTier])
+  }, [clearFailure, fail, refreshTutorInstallInfo, translationProfileApplyingTier])
 
   return {
     tutorInstallInfo,
@@ -289,5 +327,6 @@ export function useModels(): UseModelsReturn {
     uninstallTutorModel,
     downloadOfflineDictionary,
     applyTranslationProfile,
+    failureOf,
   }
 }

@@ -4,6 +4,7 @@ import type { VoiceSettingsFields } from '../types'
 import type { Dispatch, SetStateAction } from 'react'
 import { VOICE_SAMPLE_LINE } from '../constants'
 import { SettingsCollapsibleSection } from '../../../components/SettingsCollapsibleSection'
+import { SettingsFailureLine } from '../../../components/SettingsFailureLine'
 
 interface VoiceSettingsTabProps {
   voice: UseVoiceReturn
@@ -53,6 +54,7 @@ export function VoiceSettingsTab({
     voiceEngineDownloadProgress,
     voiceEngineDownloadMethod,
     downloadVoiceEngineModel,
+    failureOf,
   } = voice
 
   const voiceStatus = voice.lastVoiceSynthesis ? { lastError: undefined as string | undefined } : null
@@ -170,6 +172,13 @@ export function VoiceSettingsTab({
                     </p>
                   </div>
                 ) : null}
+                <SettingsFailureLine
+                  failures={[
+                    failureOf('download', model.tier),
+                    failureOf('select', model.tier),
+                    failureOf('uninstall', model.tier),
+                  ]}
+                />
               </div>
             )
           })}
@@ -360,6 +369,7 @@ export function VoiceSettingsTab({
                     </p>
                   </div>
                 ) : null}
+                <SettingsFailureLine failures={[failureOf('install', model.tier)]} />
               </div>
             )
           })}

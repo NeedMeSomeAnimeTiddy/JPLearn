@@ -6,6 +6,7 @@ import type {
   BlockInfo,
   BlockProgressPayload,
   CardScores,
+  CloseBehavior,
   DeckSlugInput,
   KanjiDeckSlug,
   VocabDeckSlug,
@@ -13,7 +14,6 @@ import type {
   JlptLevel,
   LearningPathStatus,
   MinigameKey,
-  MinigameStatsByScript,
   OverviewCategoryBlocks,
   OverviewKanjiCard,
   PlayableMinigame,
@@ -54,7 +54,7 @@ import { useCommandPalette, CommandPalette } from './features/command-palette'
 import { useLookup, LookupOverlay, isTypingTarget, chatGate, ocrGate, type LookupAssistant } from './features/lookup'
 import { flyHome, flyToSection } from './valley/flights'
 import {
-  useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock,
+  useMenuL1, useWorldData, useReadiness, useDeckBlocks, useLastMock, useDrillRecords,
   MenuL1, PathL2, Lanes, Ascent, Ledger, Scenes, Wall, Library, ExamLevel, Drills, Daily, Deck, Feed,
   Unlock,
   MenuChrome, leaveBoard, cancelLeaving,
@@ -73,7 +73,6 @@ import {
   SUMMARY_SNAPSHOT_STORAGE_KEY,
   SESSION_STORAGE_KEY,
   EMPTY_SCRIPT_STATS,
-  defaultMinigameStatsByScript,
   loadSavedStats,
   loadSettings,
   loadCardScores,
@@ -83,6 +82,7 @@ import {
   BACKUP_WINDOW_STATE_KEYS,
 } from './lib/appStorage'
 import { backupFailureMessage, importSummaryMessage } from './lib/backupMessages'
+import { settingsFailure, type SettingsFailure } from './lib/settingsFailure'
 import { emptyCardScores, hasAnyCardScore, toSectionScores } from './lib/cardScores'
 import {
   normalizeDeckCards,
@@ -136,6 +136,7 @@ import {
   FONT_SIZE_LABEL,
   APP_FONT_OPTIONS,
   isAppFontPreset,
+  isCloseBehavior,
 } from './constants'
 
 const STUDY_QUEUE_CACHE_TTL_MS = 45000
@@ -183,7 +184,6 @@ function App() {
   const [gameError, setGameError] = useState<string | null>(null)
 
   const [scriptStats, setScriptStats] = useState<StatsByScript>(() => loadSavedStats())
-  const [minigameStats, setMinigameStats] = useState<MinigameStatsByScript>(() => defaultMinigameStatsByScript())
   const [cardScores, setCardScores] = useState<CardScores>(() => loadCardScores())
   const [overviewBlocks, setOverviewBlocks] = useState<Partial<Record<'hiragana' | 'katakana', BlockInfo[]>>>({})
   const [overviewCategoryBlocks, setOverviewCategoryBlocks] = useState<OverviewCategoryBlocks>({
@@ -699,7 +699,6 @@ function App() {
     openStudyDeck,
     setCardScores,
     setScriptStats,
-    setMinigameStats,
     setXpProgress,
     setXpToasts,
     setMilestoneToasts,
@@ -956,8 +955,12 @@ function App() {
     return request
   }, [])
 
+  /* A STORAGE WRITE THAT THROWS (quota, a denied store) IS NOT AN APP ERROR (audit 17, N2): every
+     other writer already catches, and these three reached the error boundary instead. */
   useEffect(() => {
-    window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(scriptStats))
+    try {
+      window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(scriptStats))
+    } catch { /* the in-memory stats stand; the next write tries again */ }
   }, [scriptStats])
 
   // Mastery counters live in SQLite since issue #66. localStorage is written only
@@ -965,7 +968,9 @@ function App() {
   // no longer a source of truth, and `hydrateCardScoresFromDb` below overwrites
   // whatever it held once the bridge answers.
   useEffect(() => {
-    window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(cardScores))
+    try {
+      window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(cardScores))
+    } catch { /* only the warm-start snapshot is missed; SQLite holds the counters */ }
   }, [cardScores])
 
   // One-time adoption of pre-#66 counters, then hydrate from the database.
@@ -1002,7 +1007,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    try {
+      window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    } catch { /* the settings still apply to this window below */ }
     document.documentElement.dataset.fontSize = settings.fontSize
     document.documentElement.dataset.appFont = settings.appFont
     document.documentElement.dataset.reducedMotion = String(settings.reducedMotion)
@@ -1653,6 +1660,9 @@ function App() {
     [menuPath.screen, examRungs, examRung],
   )
   const lastMock = useLastMock(examLevelId)
+  const drillRecords = useDrillRecords(
+    view === 'home' && menuLevel === 3 && menuPath.screen === 'drills' ? activeDeckSlug : null,
+  )
 
   const examDetail = useMemo(() => {
     const rung = examRungs.find((r) => r.level === examRung)
@@ -1662,169 +1672,174 @@ function App() {
     return levelDetail(rung, data, lastMock.mock)
   }, [examRungs, examRung, exam.readiness, lastMock.mock])
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent): void {
-      /* A KEY AN INPUT METHOD IS STILL COMPOSING WITH IS NEVER A SHORTCUT. Its ESC drops the
-         candidate and its ENTER picks the kanji -- closing Look it up, the kanji sheet or a screen
-         on that ESC would throw the half-typed word away. 229 is what browsers report for them. */
-      if (event.isComposing || event.keyCode === 229) return
-      const target = event.target as HTMLElement
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+  /* THE WINDOW'S KEYS, READ FRESH ON EVERY PRESS (audit 17, F5). The handler reads a dozen values
+     its effect never listed, and stayed current only because `menuPath` happened to change identity
+     on every render. It now lives behind a latest-value ref, as `leaveKanjiDetailRef` does, and the
+     listener is attached once. */
+  const handleGlobalKeyDownRef = useRef<(event: KeyboardEvent) => void>(() => {})
+  handleGlobalKeyDownRef.current = function handleKeyDown(event: KeyboardEvent): void {
+    /* A KEY AN INPUT METHOD IS STILL COMPOSING WITH IS NEVER A SHORTCUT. Its ESC drops the
+       candidate and its ENTER picks the kanji -- closing Look it up, the kanji sheet or a screen
+       on that ESC would throw the half-typed word away. 229 is what browsers report for them. */
+    if (event.isComposing || event.keyCode === 229) return
+    const target = event.target as HTMLElement
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
 
-      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
-        event.preventDefault()
-        commandPalette.toggle()
-        return
-      }
+    if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+      event.preventDefault()
+      commandPalette.toggle()
+      return
+    }
 
-      if ((event.ctrlKey || event.metaKey) && event.key === ',') {
-        event.preventDefault()
-        /* the no-model routes say CTRL+, OPENS SETTINGS, and settings opens under the scrim */
-        lookup.close()
-        if (showSettings) {
-          setShowSettings(false)
-        } else {
-          setDictionaryOpen(false)
-          setShowOverview(false)
-          setShowSettings(true)
-        }
-        return
-      }
-
-      /* `/` OPENS THE LOOKUP FROM ANYWHERE, and `,` opens settings the same way. Both are bare
-         keys because that is what the menu was designed around -- and both are ignored the moment
-         anything is being typed into, which is the same guard `?` already uses for the keyboard
-         cheatsheet. Ctrl+, keeps working; this adds a door, it does not move one. */
-      if (!isTypingTarget(event.target) && (event.key === '/' || event.key === ',')) {
-        event.preventDefault()
-        if (event.key === '/') {
-          if (lookup.isOpen) lookup.close()
-          else {
-            setShowSettings(false)
-            lookup.open()
-          }
-          return
-        }
-        lookup.close()
-        if (showSettings) {
-          setShowSettings(false)
-        } else {
-          setDictionaryOpen(false)
-          setShowOverview(false)
-          setShowSettings(true)
-        }
-        return
-      }
-
-      if (event.key === 'Escape') {
-        /* topmost first: the lookup covers everything else while it is open */
-        if (lookup.isOpen) {
-          lookup.close()
-          return
-        }
-
-        if (kanjiDetailCharacter) {
-          leaveKanjiDetailRef.current()
-          return
-        }
-
-        if (showCloseDialog) {
-          setShowCloseDialog(false)
-          return
-        }
-
-        if (commandPalette.isOpen) {
-          commandPalette.close()
-          return
-        }
-
-        if (keyboardCheatsheetOpen) {
-          closeKeyboardCheatsheet()
-          return
-        }
-
-        if (shortcutMenuOpen) {
-          setShortcutMenuOpen(false)
-          setActiveShortcutFlyout(null)
-          return
-        }
-
-
-        if (showSettings) {
-          setShowSettings(false)
-          return
-        }
-
-        // An in-progress missed-word review returns to the Daily Games hub
-        // before Escape is allowed to leave the minigame view at all.
-        if (view === 'minigame' && explicitReviewItemsRef.current) {
-          returnToDailyGames()
-          return
-        }
-
-        /* THE CONVERSATION KEEPS ITS OWN ESCAPE: it asks before it leaves, so it is not a key
-           that takes the menu up a level underneath it. */
-        if (conversationUpRef.current) {
-          return
-        }
-
-        /* THE TREE FIRST, THEN THE FLAT MAP. Inside the menu, Escape means "up one level"; the
-           `up()` boolean is what stops it becoming a key that silently does nothing at the root,
-           where it must fall through to the app's own parent chain instead. */
-        if (view === 'home' && leaveMenuLevel()) {
-          return
-        }
-
-        const parentView = VIEW_PARENT[view]
-        if (parentView) {
-          navigate(parentView, 'back')
-          return
-        }
-
-        if (showOverview) {
-          setShowOverview(false)
-          return
-        }
-      }
-
-      if (showSettings || showCloseDialog || commandPalette.isOpen || isInput) return
-      /* and the digits do not leave a conversation for a deck */
-      if (conversationUpRef.current) return
-
-      if (event.key === '6') {
-        setDictionaryOpen(false)
-        setShowOverview(true)
+    if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+      event.preventDefault()
+      /* the no-model routes say CTRL+, OPENS SETTINGS, and settings opens under the scrim */
+      lookup.close()
+      if (showSettings) {
         setShowSettings(false)
-        void loadSummary()
+      } else {
+        setDictionaryOpen(false)
+        setShowOverview(false)
+        setShowSettings(true)
+      }
+      return
+    }
+
+    /* `/` OPENS THE LOOKUP FROM ANYWHERE, and `,` opens settings the same way. Both are bare
+       keys because that is what the menu was designed around -- and both are ignored the moment
+       anything is being typed into, which is the same guard `?` already uses for the keyboard
+       cheatsheet. Ctrl+, keeps working; this adds a door, it does not move one. */
+    if (!isTypingTarget(event.target) && (event.key === '/' || event.key === ',')) {
+      event.preventDefault()
+      if (event.key === '/') {
+        if (lookup.isOpen) lookup.close()
+        else {
+          setShowSettings(false)
+          lookup.open()
+        }
+        return
+      }
+      lookup.close()
+      if (showSettings) {
+        setShowSettings(false)
+      } else {
+        setDictionaryOpen(false)
+        setShowOverview(false)
+        setShowSettings(true)
+      }
+      return
+    }
+
+    if (event.key === 'Escape') {
+      /* topmost first: the lookup covers everything else while it is open */
+      if (lookup.isOpen) {
+        lookup.close()
+        return
+      }
+
+      if (kanjiDetailCharacter) {
+        leaveKanjiDetailRef.current()
+        return
+      }
+
+      if (showCloseDialog) {
+        setShowCloseDialog(false)
+        return
+      }
+
+      if (commandPalette.isOpen) {
+        commandPalette.close()
+        return
+      }
+
+      if (keyboardCheatsheetOpen) {
+        closeKeyboardCheatsheet()
+        return
+      }
+
+      if (shortcutMenuOpen) {
         setShortcutMenuOpen(false)
         setActiveShortcutFlyout(null)
         return
       }
 
-      if (view === 'home') {
-        /* 1 THROUGH 5 REACH THE MENU FIRST, AND ONLY GET HERE IF IT DID NOT WANT THEM.
-           These six jumped straight into a script hub, which was right when home was the flat deck
-           grid. Home is the menu now, every row carries a printed 01..05, and `MenuL1` reads those
-           numbers to move its cursor -- but its listener is on its own subtree while this one is on
-           the window, so the menu selected a row and this fired immediately after and left the menu
-           entirely. Pressing 2 on the front door landed you in Katakana.
-           `preventDefault` could not stop that; `stopPropagation` does, and `MenuL1` now calls it.
-           The block stays because it is still the route in from anywhere the menu is not listening
-           -- a study surface, or `test-entry.ts`, which dispatches these on the window by design.
-           Where they LAND has changed with the hub: the deck's own screen in the menu. */
-        const deckOf: Partial<Record<string, ScriptKey>> = {
-          1: 'hiragana', 2: 'katakana', 3: 'kanji_n5',
-          4: 'vocab_n5', 5: 'grammar_patterns', 7: 'sentence_examples',
-        }
-        const wanted = deckOf[event.key]
-        if (wanted) openDeckScreenRef.current(wanted)
+
+      if (showSettings) {
+        setShowSettings(false)
+        return
+      }
+
+      // An in-progress missed-word review returns to the Daily Games hub
+      // before Escape is allowed to leave the minigame view at all.
+      if (view === 'minigame' && explicitReviewItemsRef.current) {
+        returnToDailyGames()
+        return
+      }
+
+      /* THE CONVERSATION KEEPS ITS OWN ESCAPE: it asks before it leaves, so it is not a key
+         that takes the menu up a level underneath it. */
+      if (conversationUpRef.current) {
+        return
+      }
+
+      /* THE TREE FIRST, THEN THE FLAT MAP. Inside the menu, Escape means "up one level"; the
+         `up()` boolean is what stops it becoming a key that silently does nothing at the root,
+         where it must fall through to the app's own parent chain instead. */
+      if (view === 'home' && leaveMenuLevel()) {
+        return
+      }
+
+      const parentView = VIEW_PARENT[view]
+      if (parentView) {
+        navigate(parentView, 'back')
+        return
+      }
+
+      if (showOverview) {
+        setShowOverview(false)
+        return
       }
     }
 
-    // oxlint-disable react-hooks/exhaustive-deps — tutor from useTutor hook is not a stable ref
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [closeKanjiDetail, kanjiDetailCharacter, loadSummary, shortcutMenuOpen, showOverview, showSettings, view, menuPath])
+    if (showSettings || showCloseDialog || commandPalette.isOpen || isInput) return
+    /* and the digits do not leave a conversation for a deck */
+    if (conversationUpRef.current) return
+
+    if (event.key === '6') {
+      setDictionaryOpen(false)
+      setShowOverview(true)
+      setShowSettings(false)
+      void loadSummary()
+      setShortcutMenuOpen(false)
+      setActiveShortcutFlyout(null)
+      return
+    }
+
+    if (view === 'home') {
+      /* 1 THROUGH 5 REACH THE MENU FIRST, AND ONLY GET HERE IF IT DID NOT WANT THEM.
+         These six jumped straight into a script hub, which was right when home was the flat deck
+         grid. Home is the menu now, every row carries a printed 01..05, and `MenuL1` reads those
+         numbers to move its cursor -- but its listener is on its own subtree while this one is on
+         the window, so the menu selected a row and this fired immediately after and left the menu
+         entirely. Pressing 2 on the front door landed you in Katakana.
+         `preventDefault` could not stop that; `stopPropagation` does, and `MenuL1` now calls it.
+         The block stays because it is still the route in from anywhere the menu is not listening
+         -- a study surface, or `test-entry.ts`, which dispatches these on the window by design.
+         Where they LAND has changed with the hub: the deck's own screen in the menu. */
+      const deckOf: Partial<Record<string, ScriptKey>> = {
+        1: 'hiragana', 2: 'katakana', 3: 'kanji_n5',
+        4: 'vocab_n5', 5: 'grammar_patterns', 7: 'sentence_examples',
+      }
+      const wanted = deckOf[event.key]
+      if (wanted) openDeckScreenRef.current(wanted)
+    }
+  }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => handleGlobalKeyDownRef.current(event)
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const streak = useMemo(
     () => summary?.streak ?? { current_days: 0, best_days: 0, freezes_available: 0 },
@@ -2157,6 +2172,8 @@ function App() {
       // resetStudyDb clears card_mastery_scores in the same transaction as
       // review_states, so this only has to drop the renderer's snapshot — the two
       // are no longer reconciled by hand (issue #66).
+      // The database is reset by now, so from here a storage write that throws must not stop the
+      // live state being cleared (audit 17, Q1): each store below catches its own.
       const emptyScores: CardScores = emptyCardScores()
       const emptyStats: StatsByScript = {
         hiragana: { ...EMPTY_SCRIPT_STATS },
@@ -2166,13 +2183,21 @@ function App() {
         grammar_patterns: { ...EMPTY_SCRIPT_STATS },
         sentence_examples: { ...EMPTY_SCRIPT_STATS },
       }
-      window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
-      window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
-      window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
-      window.localStorage.removeItem(SESSION_STORAGE_KEY)
+      try {
+        window.localStorage.setItem(CARD_SCORES_STORAGE_KEY, JSON.stringify(emptyScores))
+        window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(emptyStats))
+        window.localStorage.removeItem(SUMMARY_SNAPSHOT_STORAGE_KEY)
+        window.localStorage.removeItem(SESSION_STORAGE_KEY)
+      } catch { /* the in-memory copies are cleared below, and the next writes replace these */ }
+      /* THE TWO SCREEN MARKS GO TOO (audit 17, Q1; Robbie: Reset clears them): the path's "open
+         anyway" choices and the menu's last announced unlock. Each hook drops its key, its live
+         state and any read still on its way; progression first, so the menu's feature read that
+         follows is judged against the reset nodes. */
+      progression.resetOverrides()
+      menu.resetUnlockMark()
+      drillRecords.refresh()
       setCardScores(emptyScores)
       setScriptStats(emptyStats)
-      setMinigameStats(defaultMinigameStatsByScript())
       session.resetSessionForDbReset()
       setGameError(null)
       setShowSettings(false)
@@ -2198,7 +2223,7 @@ function App() {
       setResettingDb(false)
     }
   // oxlint-disable react-hooks/exhaustive-deps — session is rebuilt each render; its actions are stable
-  }, [loadSummary, refreshDeckProgressAfterSeedChange])
+  }, [loadSummary, refreshDeckProgressAfterSeedChange, progression.resetOverrides, menu.resetUnlockMark, drillRecords.refresh])
 
   const loadFSRSStatus = useCallback(async () => {
     try {
@@ -2225,12 +2250,18 @@ function App() {
     }
   }, [])
 
+  /* A FAILED RESET SAYS SO (audit 17, F2) and leaves `fsrsCustom` as it was: the personalised
+     weights are still the ones in use until a reset succeeds. */
+  const [fsrsResetFailure, setFsrsResetFailure] = useState<SettingsFailure | null>(null)
   const resetFSRSWeights = useCallback(async () => {
+    setFsrsResetFailure(null)
     try {
       await window.jplearnDesktop?.resetFSRSWeights?.()
       setFsrsCustom(false)
       setFsrsResult(null)
-    } catch { /* ignore */ }
+    } catch (err) {
+      setFsrsResetFailure(settingsFailure('reset-scheduler', err))
+    }
   }, [])
 
   const minimizeWindow = useCallback(() => {
@@ -2254,13 +2285,13 @@ function App() {
   }, [showSettings, loadFSRSStatus])
 
   const [showCloseDialog, setShowCloseDialog] = useState(false)
-  const [closeBehavior, setCloseBehavior] = useState<'ask' | 'tray' | 'quit'>('ask')
+  const [closeBehavior, setCloseBehavior] = useState<CloseBehavior>('ask')
   const [autoStartOnLogin, setAutoStartOnLogin] = useState(false)
 
   useEffect(() => {
     void window.jplearnDesktop?.getConfigValue?.('closeBehavior')?.then((result) => {
-      if (result && typeof result.value === 'string' && ['ask', 'tray', 'quit'].includes(result.value)) {
-        setCloseBehavior(result.value as 'ask' | 'tray' | 'quit')
+      if (result && isCloseBehavior(result.value)) {
+        setCloseBehavior(result.value)
       }
     }).catch(() => { /* use default */ })
     void window.jplearnDesktop?.getConfigValue?.('autoStartOnLogin')?.then((result) => {
@@ -2280,23 +2311,31 @@ function App() {
     }
   }, [closeBehavior])
 
-  const handleCloseMinimizeToTray = useCallback((remember: boolean) => {
-    setShowCloseDialog(false)
-    void window.jplearnDesktop?.minimizeToTray?.()
-    if (remember) {
-      void window.jplearnDesktop?.setConfigValue?.('closeBehavior', 'tray')
-      setCloseBehavior('tray')
+  /* "REMEMBER MY CHOICE" IS SAVED BEFORE IT IS BELIEVED (audit 17, F6): the choice holds only once
+     the store has it, and Quit waits for the save so the app does not end with it in flight. A
+     failed save is logged; the window is already going, so there is nowhere left to say so. */
+  const rememberCloseBehavior = useCallback(async (value: CloseBehavior) => {
+    try {
+      await window.jplearnDesktop?.setConfigValue?.('closeBehavior', value)
+      setCloseBehavior(value)
+    } catch (err) {
+      console.warn('[settings] could not save closeBehavior:', err)
     }
   }, [])
 
+  const handleCloseMinimizeToTray = useCallback((remember: boolean) => {
+    setShowCloseDialog(false)
+    void window.jplearnDesktop?.minimizeToTray?.()
+    if (remember) void rememberCloseBehavior('tray')
+  }, [rememberCloseBehavior])
+
   const handleCloseQuit = useCallback((remember: boolean) => {
     setShowCloseDialog(false)
-    void window.jplearnDesktop?.quitApp?.()
-    if (remember) {
-      void window.jplearnDesktop?.setConfigValue?.('closeBehavior', 'quit')
-      setCloseBehavior('quit')
-    }
-  }, [])
+    void (async () => {
+      if (remember) await rememberCloseBehavior('quit')
+      void window.jplearnDesktop?.quitApp?.()
+    })()
+  }, [rememberCloseBehavior])
 
   // Handles completion of the onboarding form: seeds the ticked decks as known and records that
   // onboarding finished (`saveOnboarding` owns the order and reports which stage failed). No path is
@@ -2786,10 +2825,9 @@ function App() {
             toggleConfidence: session.slice.toggleConfidence,
           }}
           lockReasons={minigameLockReasons}
-          /* WHAT THE CASSETTES CARRIED AND THE ROAD DID NOT. Per-mode accuracy and best run are
-             the one fact the hub showed that nothing else in the app does; `minigameStats` is
-             still written after every round, and this is the only thing that reads it. */
-          stats={minigameStats[activeScript]}
+          /* WHAT THE CASSETTES CARRIED AND THE ROAD DID NOT: per-mode accuracy and best run, now
+             read from review history for this level deck (audit 17, F1) */
+          records={drillRecords.records}
           onDeck={(deck) => {
             /* THE ROAD'S DECK IS THE APP'S DECK. It used to be local state that committed only on
                start -- fine while the hero's one claim was a name, wrong now the slab draws a
@@ -3349,6 +3387,7 @@ function App() {
           resetFSRSWeights={resetFSRSWeights}
           fsrsCustom={fsrsCustom}
           fsrsResult={fsrsResult}
+          fsrsResetFailure={fsrsResetFailure}
           closeBehavior={closeBehavior}
           setCloseBehavior={setCloseBehavior}
           autoStartOnLogin={autoStartOnLogin}

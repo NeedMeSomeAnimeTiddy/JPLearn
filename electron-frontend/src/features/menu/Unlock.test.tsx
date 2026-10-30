@@ -260,6 +260,50 @@ describe('the mark, through the hook that owns it', () => {
     await waitFor(() => expect(result.current.pendingUnlocks).toEqual([]))
   })
 
+  it('forgets the mark and what was waiting when progress is reset (audit 17, Q1)', async () => {
+    window.localStorage.setItem(UNLOCK_SEEN_KEY, T1)
+    const getFeatureState = install([feature({ unlocked_at: T2 })])
+    const { result } = renderHook(() => useMenuL1(true))
+    await waitFor(() => expect(result.current.pendingUnlocks).toHaveLength(1))
+
+    /* after a reset the database has relocked everything; the read it makes again is a first look */
+    getFeatureState.mockImplementation(async () => ({ features: [feature({ is_unlocked: false, unlocked_at: null })] }))
+    act(() => result.current.resetUnlockMark())
+    expect(result.current.pendingUnlocks).toEqual([])
+    /* drawn locked, the fresh-start state, not open, until the read answers */
+    expect(result.current.unlocked).toEqual(new Set())
+    expect(result.current.isLocked({ gate: { feature: 'conversation_mode' } } as unknown as Parameters<typeof result.current.isLocked>[0])).toBe(true)
+    await waitFor(() => expect(getFeatureState).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(result.current.unlocked).toEqual(new Set()))
+    expect(result.current.pendingUnlocks).toEqual([])
+    expect(window.localStorage.getItem(UNLOCK_SEEN_KEY)).not.toBe(T1)
+  })
+
+  it('drops a feature read still on its way when progress is reset', async () => {
+    let answer: (payload: { features: FeatureStatusPayload[] }) => void = () => {}
+    const getFeatureState = vi.fn(() => new Promise<{ features: FeatureStatusPayload[] }>((resolve) => { answer = resolve }))
+    window.jplearnDesktop = { getFeatureState } as unknown as Window['jplearnDesktop']
+    window.localStorage.setItem(UNLOCK_SEEN_KEY, T1)
+    const { result } = renderHook(() => useMenuL1(true))
+    const stale = answer
+    act(() => result.current.resetUnlockMark())
+    await waitFor(() => expect(getFeatureState).toHaveBeenCalledTimes(2))
+    /* the read from before the reset still says something unlocked after the old mark */
+    await act(async () => { stale({ features: [feature({ unlocked_at: T2 })] }) })
+    expect(result.current.pendingUnlocks).toEqual([])
+    expect(result.current.unlocked).toEqual(new Set())
+  })
+
+  it('still clears the live mark when storage refuses the removal', async () => {
+    install([feature({ unlocked_at: T2 })])
+    window.localStorage.setItem(UNLOCK_SEEN_KEY, T1)
+    const { result } = renderHook(() => useMenuL1(true))
+    await waitFor(() => expect(result.current.pendingUnlocks).toHaveLength(1))
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('denied') })
+    act(() => result.current.resetUnlockMark())
+    expect(result.current.pendingUnlocks).toEqual([])
+  })
+
   it('asks again when the progression has just been re-synced', async () => {
     /* the features are EVALUATED AGAINST the progression, and only the progression's own two
        commands write those node rows -- so a feature read that lands first in the serial bridge is

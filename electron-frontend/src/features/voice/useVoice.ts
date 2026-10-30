@@ -5,6 +5,8 @@ import { FIXED_JAPANESE_VOICE_OPTIONS } from './constants'
 import { splitSpeechSegments } from './utils'
 import { AmbientAudioController } from '../../lib/ambientAudio'
 import { parseProgressMethod } from '../tutor'
+import { useActionFailures, type ActionFailures } from '../../hooks/useActionFailures'
+import { afterSuccess } from '../../lib/settingsFailure'
 
 export type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra'
 export type VoiceEngineTier = '0.6b'
@@ -73,6 +75,8 @@ export interface UseVoiceReturn {
   voiceEngineDownloadProgress: number
   voiceEngineDownloadMethod: string | null
   downloadVoiceEngineModel: (tier: VoiceEngineTier) => Promise<void>
+  /** why the last try of a speech or voice action on a tier failed; the actions never reject */
+  failureOf: ActionFailures['failureOf']
 }
 
 export function useVoice(
@@ -93,6 +97,8 @@ export function useVoice(
   const [voiceEngineDownloadingTier, setVoiceEngineDownloadingTier] = useState<VoiceEngineTier | null>(null)
   const [voiceEngineDownloadProgress, setVoiceEngineDownloadProgress] = useState(0)
   const [voiceEngineDownloadMethod, setVoiceEngineDownloadMethod] = useState<string | null>(null)
+  /* each action catches and keeps its reason beside its row (audit 17, F2), as `useModels` does */
+  const { failureOf, clear: clearFailure, fail } = useActionFailures()
 
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null)
   const ambientAudioRef = useRef<AmbientAudioController | null>(null)
@@ -269,14 +275,20 @@ export function useVoice(
     setSpeechDownloadingTier(tier)
     setSpeechDownloadProgress(0)
     setSpeechDownloadMethod(null)
+    clearFailure('download', tier)
     try {
-      await downloadModel(tier, options)
-      await deps.refreshTutorInstallInfo()
+      try {
+        await downloadModel(tier, options)
+      } catch (error) {
+        fail('download', tier, error)
+        return
+      }
+      await afterSuccess('download', deps.refreshTutorInstallInfo)
     } finally {
       setSpeechDownloadingTier(null)
       setSpeechDownloadProgress(0)
     }
-  }, [deps, speechDownloadingTier])
+  }, [clearFailure, deps, fail, speechDownloadingTier])
 
   const selectSpeechModel = useCallback(async (tier: SpeechTier) => {
     const setActiveSpeechModel = window.jplearnDesktop?.setActiveSpeechModel
@@ -284,13 +296,19 @@ export function useVoice(
       return
     }
     setSpeechModelActionTier(tier)
+    clearFailure('select', tier)
     try {
-      await setActiveSpeechModel(tier)
-      await deps.refreshTutorInstallInfo()
+      try {
+        await setActiveSpeechModel(tier)
+      } catch (error) {
+        fail('select', tier, error)
+        return
+      }
+      await afterSuccess('switch', deps.refreshTutorInstallInfo)
     } finally {
       setSpeechModelActionTier(null)
     }
-  }, [deps, speechModelActionTier])
+  }, [clearFailure, deps, fail, speechModelActionTier])
 
   const uninstallSpeechModel = useCallback(async (tier: SpeechTier) => {
     const uninstallModel = window.jplearnDesktop?.uninstallSpeechModel
@@ -298,13 +316,19 @@ export function useVoice(
       return
     }
     setSpeechModelActionTier(tier)
+    clearFailure('uninstall', tier)
     try {
-      await uninstallModel(tier)
-      await deps.refreshTutorInstallInfo()
+      try {
+        await uninstallModel(tier)
+      } catch (error) {
+        fail('uninstall', tier, error)
+        return
+      }
+      await afterSuccess('removal', deps.refreshTutorInstallInfo)
     } finally {
       setSpeechModelActionTier(null)
     }
-  }, [deps, speechModelActionTier])
+  }, [clearFailure, deps, fail, speechModelActionTier])
 
   const downloadVoiceEngineModel = useCallback(async (tier: VoiceEngineTier) => {
     const downloadVoiceEngine = window.jplearnDesktop?.downloadVoiceEngine
@@ -314,18 +338,23 @@ export function useVoice(
     setVoiceEngineDownloadingTier(tier)
     setVoiceEngineDownloadProgress(0)
     setVoiceEngineDownloadMethod(null)
+    clearFailure('install', tier)
     try {
-      await downloadVoiceEngine(tier)
-      await deps.refreshTutorInstallInfo()
-      const preloadVoice = window.jplearnDesktop?.preloadVoice
-      if (preloadVoice) {
-        await preloadVoice(settings.voiceSpeaker)
+      try {
+        await downloadVoiceEngine(tier)
+      } catch (error) {
+        fail('install', tier, error)
+        return
       }
+      await afterSuccess('install', async () => {
+        await deps.refreshTutorInstallInfo()
+        await window.jplearnDesktop?.preloadVoice?.(settings.voiceSpeaker)
+      })
     } finally {
       setVoiceEngineDownloadingTier(null)
       setVoiceEngineDownloadProgress(0)
     }
-  }, [deps, settings.voiceSpeaker, voiceEngineDownloadingTier])
+  }, [clearFailure, deps, fail, settings.voiceSpeaker, voiceEngineDownloadingTier])
 
   useEffect(() => {
     void refreshVoiceStatus()
@@ -431,6 +460,7 @@ export function useVoice(
     voiceEngineDownloadProgress,
     voiceEngineDownloadMethod,
     downloadVoiceEngineModel,
+    failureOf,
   }
 }
 

@@ -90,6 +90,8 @@ export interface MenuController {
   pendingUnlocks: FeatureStatusPayload[]
   /** stop announcing them, and remember the mark that says so */
   dismissUnlocks: (mark: string) => void
+  /** Reset all progress: forget the mark, what was waiting to be announced and what was read */
+  resetUnlockMark: () => void
 }
 
 /* ==================================================================================================

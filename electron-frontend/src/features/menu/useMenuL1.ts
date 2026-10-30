@@ -46,6 +46,8 @@ export function useMenuL1(
   /* what this surface has already announced. Read once and then held, because the mark is written
      on dismissal and re-reading storage mid-flight would race that write. */
   const seenRef = useRef<string | null | undefined>(undefined)
+  /* bumped by a reset, so a feature read already on its way is dropped and the menu asks again */
+  const [revision, setRevision] = useState(0)
 
   useEffect(() => {
     if (!enabled) return
@@ -82,7 +84,7 @@ export function useMenuL1(
         if (alive) setUnlocked(null)
       })
     return () => { alive = false }
-  }, [enabled, nodes])
+  }, [enabled, nodes, revision])
 
   /* DISMISSING IS WHAT ADVANCES THE MARK, not showing. A moment that was drawn and never seen --
      the app closed, the window lost -- should still be waiting next time. */
@@ -90,6 +92,19 @@ export function useMenuL1(
     seenRef.current = mark
     try { window.localStorage.setItem(UNLOCK_SEEN_KEY, mark) } catch { /* private mode */ }
     setPendingUnlocks([])
+  }, [])
+
+  /* RESET ALL PROGRESS CLEARS THE MARK (audit 17, Q1; Robbie's ruling). With no mark the next read
+     stores a fresh one and announces nothing, exactly as on a first run. */
+  const resetUnlockMark = useCallback(() => {
+    try { window.localStorage.removeItem(UNLOCK_SEEN_KEY) } catch { /* private mode */ }
+    seenRef.current = undefined
+    setPendingUnlocks([])
+    setFeatures([])
+    /* nothing unlocked, which is what a reset leaves; null would draw every gated section open
+       until the read answers */
+    setUnlocked(new Set())
+    setRevision((value) => value + 1)
   }, [])
 
   const setActive = useCallback((index: number) => {
@@ -118,7 +133,7 @@ export function useMenuL1(
   }, [unlocked])
 
   return useMemo<MenuController>(
-    () => ({ active, setActive, step, unlocked, isLocked, gateOf, pendingUnlocks, dismissUnlocks }),
-    [active, setActive, step, unlocked, isLocked, gateOf, pendingUnlocks, dismissUnlocks],
+    () => ({ active, setActive, step, unlocked, isLocked, gateOf, pendingUnlocks, dismissUnlocks, resetUnlockMark }),
+    [active, setActive, step, unlocked, isLocked, gateOf, pendingUnlocks, dismissUnlocks, resetUnlockMark],
   )
 }

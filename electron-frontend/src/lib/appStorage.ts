@@ -1,5 +1,5 @@
 import type {
-  AppSettings, CardScores, LastSessionPrefs, MinigameStats, MinigameStatsByScript,
+  AppSettings, CardScores, LastSessionPrefs,
   ScriptStats, StatsByScript, StudySummaryPayload,
 } from '../types'
 import type { CustomTheme, ThemeScope } from '../features/theme/types'
@@ -9,7 +9,8 @@ import {
 } from '../features/theme/utils'
 import { DEFAULT_VOICE_SPEED } from '../features/voice'
 import { clampAssistantChatOcrMinConfidence, isAssistantToastLimit } from '../features/tutor'
-import { isAppFontPreset } from '../constants'
+import { FONT_SIZE_ORDER, MOTION_STYLE_OPTIONS, isAppFontPreset } from '../constants'
+import { CURSOR_MODE_OPTIONS, CURSOR_SIZE_OPTIONS, CURSOR_THEME_OPTIONS } from '../features/cursor/constants'
 // From constants.ts, not the feature barrel: constants.ts imports only a type, so no cycle back here.
 import { PROGRESSION_OVERRIDES_STORAGE_KEY } from '../features/progression/constants'
 
@@ -78,14 +79,6 @@ export const EMPTY_SCRIPT_STATS: ScriptStats = {
   bestStreak: 0,
 }
 
-export const EMPTY_MINIGAME_STATS: MinigameStats = {
-  attempted: 0,
-  correct: 0,
-  currentStreak: 0,
-  bestStreak: 0,
-  points: 0,
-}
-
 export function defaultStatsByScript(): StatsByScript {
   return {
     hiragana: { ...EMPTY_SCRIPT_STATS },
@@ -94,125 +87,6 @@ export function defaultStatsByScript(): StatsByScript {
     vocab_n5: { ...EMPTY_SCRIPT_STATS },
     grammar_patterns: { ...EMPTY_SCRIPT_STATS },
     sentence_examples: { ...EMPTY_SCRIPT_STATS },
-  }
-}
-
-export function defaultMinigameStatsByScript(): MinigameStatsByScript {
-  return {
-    hiragana: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    katakana: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    kanji_n5: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    vocab_n5: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    grammar_patterns: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
-    sentence_examples: {
-      romaji_sprint: { ...EMPTY_MINIGAME_STATS },
-      meaning_match: { ...EMPTY_MINIGAME_STATS },
-      character_match: { ...EMPTY_MINIGAME_STATS },
-      stroke_order: { ...EMPTY_MINIGAME_STATS },
-      handwriting: { ...EMPTY_MINIGAME_STATS },
-      typed_recall: { ...EMPTY_MINIGAME_STATS },
-      speech_recall: { ...EMPTY_MINIGAME_STATS },
-      sentence_assembly: { ...EMPTY_MINIGAME_STATS },
-      particle_cloze: { ...EMPTY_MINIGAME_STATS },
-      vibe_check: { ...EMPTY_MINIGAME_STATS },
-      imposter: { ...EMPTY_MINIGAME_STATS },
-      listening_audio_first: { ...EMPTY_MINIGAME_STATS },
-      dictation: { ...EMPTY_MINIGAME_STATS },
-      kanji_compound_builder: { ...EMPTY_MINIGAME_STATS },
-      context_cloze: { ...EMPTY_MINIGAME_STATS },
-      conjugation_drill: { ...EMPTY_MINIGAME_STATS },
-      interleave_mix: { ...EMPTY_MINIGAME_STATS },
-    },
   }
 }
 
@@ -268,6 +142,29 @@ export function defaultSettings(): AppSettings {
     pomodoroLongBreakMinutes: 15,
     pomodoroSessionsBeforeLongBreak: 4,
     pomodoroShowTimerInHud: true,
+  }
+}
+
+/* EVERY FIELD IS CHECKED ON ITS OWN (audit 17, N1). A stored value of the wrong shape falls back to
+   its default alone, and its neighbours keep what was saved: a bad `fontSize` used to pass straight
+   through and throw when Settings looked it up. */
+const isOneOf = <T,>(options: readonly T[], value: unknown): value is T => options.includes(value as T)
+
+function wholeNumberIn(value: unknown, min: number, max: number, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : fallback
+}
+
+function booleanOr(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function loadCursorSettings(stored: unknown, defaults: AppSettings['cursor']): AppSettings['cursor'] {
+  const cursor = stored && typeof stored === 'object' ? stored as Partial<Record<keyof AppSettings['cursor'], unknown>> : {}
+  return {
+    mode: isOneOf(CURSOR_MODE_OPTIONS.map((option) => option.key), cursor.mode) ? cursor.mode : defaults.mode,
+    theme: isOneOf(CURSOR_THEME_OPTIONS.map((option) => option.key), cursor.theme) ? cursor.theme : defaults.theme,
+    size: isOneOf(CURSOR_SIZE_OPTIONS.map((option) => option.value), cursor.size) ? cursor.size : defaults.size,
+    color: typeof cursor.color === 'string' || cursor.color === null ? cursor.color : defaults.color,
   }
 }
 
@@ -380,6 +277,20 @@ export function loadSettings(): AppSettings {
         typeof parsed.ambientAudioEnabled === 'boolean'
           ? parsed.ambientAudioEnabled
           : defaults.ambientAudioEnabled,
+      fontSize: isOneOf(FONT_SIZE_ORDER, parsed.fontSize) ? parsed.fontSize : defaults.fontSize,
+      motionStyle: isOneOf(MOTION_STYLE_OPTIONS.map((option) => option.key), parsed.motionStyle)
+        ? parsed.motionStyle
+        : defaults.motionStyle,
+      reducedMotion: booleanOr(parsed.reducedMotion, defaults.reducedMotion),
+      cursor: loadCursorSettings(parsed.cursor, defaults.cursor),
+      pomodoroEnabled: booleanOr(parsed.pomodoroEnabled, defaults.pomodoroEnabled),
+      pomodoroWorkMinutes: wholeNumberIn(parsed.pomodoroWorkMinutes, 1, 120, defaults.pomodoroWorkMinutes),
+      pomodoroBreakMinutes: wholeNumberIn(parsed.pomodoroBreakMinutes, 1, 30, defaults.pomodoroBreakMinutes),
+      pomodoroLongBreakMinutes: wholeNumberIn(parsed.pomodoroLongBreakMinutes, 1, 60, defaults.pomodoroLongBreakMinutes),
+      pomodoroSessionsBeforeLongBreak: wholeNumberIn(
+        parsed.pomodoroSessionsBeforeLongBreak, 1, 10, defaults.pomodoroSessionsBeforeLongBreak,
+      ),
+      pomodoroShowTimerInHud: booleanOr(parsed.pomodoroShowTimerInHud, defaults.pomodoroShowTimerInHud),
     }
   } catch {
     return defaultSettings()

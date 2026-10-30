@@ -20,6 +20,11 @@ export interface ProgressionApi {
   confirmOpen: () => ProgressionNodeView | null
   cancelOpen: () => void
   refresh: () => void
+  /**
+   * Reset all progress: forget every "open anyway" choice and any confirmation waiting, drop a
+   * read still on its way, and read the graph again.
+   */
+  resetOverrides: () => void
 }
 
 /**
@@ -100,5 +105,18 @@ export function useProgression(enabled: boolean): ProgressionApi {
   const cancelOpen = useCallback(() => setPendingId(null), [])
   const refresh = useCallback(() => setRevision((value) => value + 1), [])
 
-  return { nodes: views, current, loading, pending, requestOpen, confirmOpen, cancelOpen, refresh }
+  /* RESET ALL PROGRESS CLEARS THESE TOO (audit 17, Q1; Robbie's ruling). They are a screen mark
+     kept in browser storage, and "this will erase everything" used to leave them. The new revision
+     is what drops a read already on its way: its effect is cleaned up before it can land. */
+  const resetOverrides = useCallback(() => {
+    try {
+      window.localStorage.removeItem(PROGRESSION_OVERRIDES_STORAGE_KEY)
+    } catch { /* storage refused: the live state is still cleared */ }
+    setOverrides(new Set())
+    setPendingId(null)
+    setNodes([])
+    setRevision((value) => value + 1)
+  }, [])
+
+  return { nodes: views, current, loading, pending, requestOpen, confirmOpen, cancelOpen, refresh, resetOverrides }
 }
