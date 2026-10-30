@@ -1128,7 +1128,10 @@ function validateAnalyticsExportType(type) {
   return type
 }
 
-const VALID_CONFIG_KEYS = new Set(['autoUpdateEnabled', 'closeBehavior', 'autoStartOnLogin'])
+/* ONE LIST OF CONFIG KEYS AND CLOSE VALUES, the store's own (audit 17, F7). This copy had drifted:
+   `notificationsEnabled` was stored and read by main but could not be set from the renderer.
+   `config_store.cjs` loads electron-store lazily, so requiring it here pulls in no Electron. */
+const { ALLOWED_KEYS: VALID_CONFIG_KEYS, CLOSE_BEHAVIORS } = require('./config_store.cjs')
 
 function validateConfigKey(key) {
   if (typeof key !== 'string' || !VALID_CONFIG_KEYS.has(key)) {
@@ -1143,7 +1146,7 @@ function validateConfigSetPayload(payload) {
   }
   const key = validateConfigKey(payload.key)
   if (key === 'closeBehavior') {
-    if (typeof payload.value !== 'string' || !['ask', 'tray', 'quit'].includes(payload.value)) {
+    if (typeof payload.value !== 'string' || !CLOSE_BEHAVIORS.includes(payload.value)) {
       throw new Error(`Invalid config value for key: ${key}. Must be 'ask', 'tray', or 'quit'.`)
     }
     return { key, value: payload.value }

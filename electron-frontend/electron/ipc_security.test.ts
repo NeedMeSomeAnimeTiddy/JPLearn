@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 const {
   assertTrustedIpcSender,
@@ -30,6 +30,8 @@ const {
   validateScenarioSessionSavePayload,
   validateScenarioSrsCardSavePayload,
   validateScenarioEvaluationRequest,
+  validateConfigKey,
+  validateConfigSetPayload,
 } = require('./ipc_security.cjs')
 
 const ANSWER_ID = '0b6f1c1e-3f7a-4c1e-9d55-1a2b3c4d5e6f'
@@ -541,5 +543,76 @@ describe('payload bounds (audit 8 F3)', () => {
     expect(validateTranscribeSpeechPayload({ ...base, language: 'ja' }).language).toBe('ja')
     expect(validateTranscribeSpeechPayload({ ...base, language: 'fr' }).language).toBe('ja')
     expect(validateTranscribeSpeechPayload({ ...base }).language).toBe('ja')
+  })
+})
+
+/* ONE LIST OF CONFIG KEYS (audit 17, F7). The route takes its keys and close values from the store,
+   so every key the store holds can be set from the renderer, and nothing else can. Driven through
+   the registered `config:set` / `config:get` handlers over a store held in memory. */
+describe('config routes', () => {
+  const configStore = require('./config_store.cjs')
+  const { registerIpcHandlers } = require('./ipc_handlers.cjs')
+
+  class MemoryStore {
+    data: Record<string, unknown>
+    constructor(options: { defaults: Record<string, unknown> }) { this.data = { ...options.defaults } }
+    get(key: string, fallback: unknown) { return key in this.data ? this.data[key] : fallback }
+    set(key: string, value: unknown) { this.data[key] = value }
+  }
+
+  const trusted = () => {
+    const mainFrame = { url: 'file:///index.html' }
+    return { sender: { id: 1, mainFrame }, senderFrame: mainFrame }
+  }
+  const register = () => {
+    const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>()
+    registerIpcHandlers({
+      ipcMain: { handle: (channel: string, handler: (...args: unknown[]) => Promise<unknown>) => handlers.set(channel, handler) },
+      isDev: false,
+      appPageUrl: 'file:///index.html',
+      getWindowFromSender: () => ({ id: 1, isDestroyed: () => false }),
+      runPythonBridge: async () => ({}),
+    })
+    return { set: handlers.get('config:set')!, get: handlers.get('config:get')! }
+  }
+
+  beforeEach(() => configStore._setStoreClassLoaderForTests(async () => MemoryStore))
+  afterEach(() => configStore._setStoreClassLoaderForTests(null))
+
+  it('accepts exactly the keys the store holds, notifications included', () => {
+    expect(new Set(Object.keys(configStore.CONFIG_DEFAULTS))).toEqual(new Set(['autoUpdateEnabled', 'notificationsEnabled', 'closeBehavior', 'autoStartOnLogin']))
+    for (const key of Object.keys(configStore.CONFIG_DEFAULTS)) {
+      expect(validateConfigKey(key)).toBe(key)
+    }
+    expect(() => validateConfigKey('theme')).toThrow(/Invalid config key/)
+  })
+
+  it('sets and reads back every key through the routes', async () => {
+    const { set, get } = register()
+    const values: Record<string, unknown> = {
+      autoUpdateEnabled: false, notificationsEnabled: false, closeBehavior: 'tray', autoStartOnLogin: false,
+    }
+    for (const [key, value] of Object.entries(values)) {
+      await expect(set(trusted(), { key, value })).resolves.toEqual({ ok: true, key, value })
+      await expect(get(trusted(), key)).resolves.toEqual({ ok: true, key, value })
+    }
+  })
+
+  it('still refuses a malformed value, an unknown key and an untrusted sender', async () => {
+    const { set, get } = register()
+    await expect(set(trusted(), { key: 'notificationsEnabled', value: 'no' })).rejects.toThrow(/Invalid config value/)
+    await expect(set(trusted(), { key: 'closeBehavior', value: 'minimise' })).rejects.toThrow(/Must be 'ask', 'tray', or 'quit'/)
+    await expect(set(trusted(), { key: 'theme', value: true })).rejects.toThrow(/Invalid config key/)
+    await expect(set(trusted(), null)).rejects.toThrow(/Invalid config set payload/)
+    const strangerFrame = { url: 'https://example.com' }
+    const stranger = { sender: { id: 1, mainFrame: strangerFrame }, senderFrame: strangerFrame }
+    await expect(set(stranger, { key: 'notificationsEnabled', value: false })).rejects.toThrow(/untrusted URL/)
+    await expect(get(stranger, 'notificationsEnabled')).rejects.toThrow(/untrusted URL/)
+  })
+
+  it('takes the close values from the store', () => {
+    for (const value of configStore.CLOSE_BEHAVIORS) {
+      expect(validateConfigSetPayload({ key: 'closeBehavior', value })).toEqual({ key: 'closeBehavior', value })
+    }
   })
 })
