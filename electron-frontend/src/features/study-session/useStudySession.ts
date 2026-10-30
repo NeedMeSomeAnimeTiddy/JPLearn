@@ -1362,7 +1362,7 @@ export function useStudySession(deps: StudySessionDeps): StudySessionApi {
       sessionScore,
       sessionTargetItems,
       setCardScores,
-        setScriptStats,
+      setScriptStats,
     ],
   )
 

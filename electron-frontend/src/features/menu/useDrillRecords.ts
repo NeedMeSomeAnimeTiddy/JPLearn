@@ -42,27 +42,42 @@ export function toDrillRecords(rows: readonly MinigameRecordPayload[]): DrillRec
 
 const ignore = (): void => {}
 
+interface Shown {
+  slug: DeckSlugInput
+  /** the reset this record was read after; a later reset retires it */
+  reset: number
+  records: DrillRecords
+}
+
 export function useDrillRecords(slug: DeckSlugInput | null): DrillRecordsState {
-  const [records, setRecords] = useState<DrillRecords | null>(null)
-  const [generation, setGeneration] = useState(0)
-  const refresh = useCallback(() => setGeneration((value) => value + 1), [])
+  const [shown, setShown] = useState<Shown | null>(null)
+  /* a re-read of the same deck after a save keeps the record on screen until the new one lands;
+     a reset retires it at once, as a deck change does */
+  const [reread, setReread] = useState(0)
+  const [reset, setReset] = useState(0)
+  const refresh = useCallback(() => setReset((value) => value + 1), [])
 
   useAnswerOutcomes({
     onSaved: ignore,
     onRejected: ignore,
-    onQueueChanged: (_snapshot, emptied) => { if (emptied) refresh() },
+    onQueueChanged: (_snapshot, emptied) => { if (emptied) setReread((value) => value + 1) },
   })
 
   useEffect(() => {
-    setRecords(null)
     const read = window.jplearnDesktop?.getMinigameRecords
     if (!slug || !read) return undefined
     let latest = true
     void read(slug)
-      .then((payload) => { if (latest) setRecords(toDrillRecords(payload?.records ?? [])) })
-      .catch(() => { /* the record line keeps the placeholder; the rest of the screen stands */ })
+      .then((payload) => {
+        if (latest) setShown({ slug, reset, records: toDrillRecords(payload?.records ?? []) })
+      })
+      .catch(() => {
+        /* the record line goes back to the placeholder; the rest of the screen stands */
+        if (latest) setShown(null)
+      })
     return () => { latest = false }
-  }, [slug, generation])
+  }, [slug, reset, reread])
 
+  const records = shown && shown.slug === slug && shown.reset === reset ? shown.records : null
   return { records, refresh }
 }

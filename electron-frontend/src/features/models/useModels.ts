@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { TutorInstallInfo, TutorModelTier, TranslationProfileTier } from './types'
 import { useActionFailures, type ActionFailures } from '../../hooks/useActionFailures'
+import { afterSuccess } from '../../lib/settingsFailure'
 
 export interface UseModelsReturn {
   tutorInstallInfo: TutorInstallInfo | null
@@ -203,10 +204,13 @@ export function useModels(): UseModelsReturn {
     setTutorDownloadMethod(null)
     clearFailure('download', tier)
     try {
-      await downloadModel(tier)
-      await refreshTutorInstallInfo()
-    } catch (error) {
-      fail('download', tier, error)
+      try {
+        await downloadModel(tier)
+      } catch (error) {
+        fail('download', tier, error)
+        return
+      }
+      await afterSuccess('download', refreshTutorInstallInfo)
     } finally {
       setTutorDownloadingTier(null)
       setTutorDownloadProgress(null)
@@ -221,10 +225,13 @@ export function useModels(): UseModelsReturn {
     setTutorModelActionTier(tier)
     clearFailure('select', tier)
     try {
-      await setActiveTutorModel(tier)
-      await refreshTutorInstallInfo()
-    } catch (error) {
-      fail('select', tier, error)
+      try {
+        await setActiveTutorModel(tier)
+      } catch (error) {
+        fail('select', tier, error)
+        return
+      }
+      await afterSuccess('switch', refreshTutorInstallInfo)
     } finally {
       setTutorModelActionTier(null)
     }
@@ -238,10 +245,13 @@ export function useModels(): UseModelsReturn {
     setTutorModelActionTier(tier)
     clearFailure('uninstall', tier)
     try {
-      await uninstallModel(tier)
-      await refreshTutorInstallInfo()
-    } catch (error) {
-      fail('uninstall', tier, error)
+      try {
+        await uninstallModel(tier)
+      } catch (error) {
+        fail('uninstall', tier, error)
+        return
+      }
+      await afterSuccess('removal', refreshTutorInstallInfo)
     } finally {
       setTutorModelActionTier(null)
     }
@@ -257,10 +267,13 @@ export function useModels(): UseModelsReturn {
     setDictionaryDownloadMethod(null)
     clearFailure('download', 'dictionary')
     try {
-      await downloadDictionary()
-      await refreshTutorInstallInfo()
-    } catch (error) {
-      fail('download', 'dictionary', error)
+      try {
+        await downloadDictionary()
+      } catch (error) {
+        fail('download', 'dictionary', error)
+        return
+      }
+      await afterSuccess('download', refreshTutorInstallInfo)
     } finally {
       setDictionaryDownloading(false)
       setDictionaryProgress(0)
@@ -278,10 +291,13 @@ export function useModels(): UseModelsReturn {
     setTranslationProfileMethod(null)
     clearFailure('apply', tier)
     try {
-      await applyProfile(tier, { force: true })
-      await refreshTutorInstallInfo()
-    } catch (error) {
-      fail('apply', tier, error)
+      try {
+        await applyProfile(tier, { force: true })
+      } catch (error) {
+        fail('apply', tier, error)
+        return
+      }
+      await afterSuccess('apply', refreshTutorInstallInfo)
     } finally {
       translationProfileTierRef.current = null
       setTranslationProfileApplyingTier(null)

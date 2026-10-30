@@ -84,6 +84,8 @@ describe('useDrillRecords', () => {
     expect(desktop.getMinigameRecords).toHaveBeenCalledTimes(1)
     act(() => desktop.queue(0))
     expect(desktop.getMinigameRecords).toHaveBeenCalledTimes(2)
+    /* the record on screen stays until the new one lands, rather than flicking to the placeholder */
+    expect(result.current.records?.imposter).toEqual({ attempted: 1, correct: 1, bestRun: 1 })
     await act(async () => { desktop.reads[1].resolve([row('imposter', 2, 2, 2)]) })
     expect(result.current.records?.imposter).toEqual({ attempted: 2, correct: 2, bestRun: 2 })
   })
@@ -124,6 +126,21 @@ describe('useDrillRecords', () => {
       desktop.reads[0].resolve([row('imposter', 1, 0, 0)])
     })
     expect(result.current.records?.imposter).toEqual({ attempted: 5, correct: 5, bestRun: 5 })
+  })
+
+  it('drops a shown record at once on a reset and on a deck change', async () => {
+    const desktop = fakeDesktop()
+    const { result, rerender } = renderHook(({ slug }) => useDrillRecords(slug), {
+      initialProps: { slug: 'kanji_n3' as DeckSlugInput },
+    })
+    await act(async () => { desktop.reads[0].resolve([row('imposter', 4, 4, 4)]) })
+    expect(result.current.records).not.toBeNull()
+    act(() => result.current.refresh())
+    expect(result.current.records).toBeNull()
+    await act(async () => { desktop.reads[1].resolve([row('imposter', 4, 4, 4)]) })
+    expect(result.current.records).not.toBeNull()
+    rerender({ slug: 'kanji_n2' })
+    expect(result.current.records).toBeNull()
   })
 
   it('drops a read still on its way when progress is reset', async () => {

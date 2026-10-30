@@ -276,6 +276,27 @@ describe('a preference shows its new value only once it is saved (F6)', () => {
     warn.mockRestore()
   })
 
+  it('lets a slow refusal of an older choice leave a newer saved choice alone', async () => {
+    let refuseOlder: () => void = () => {}
+    const setConfigValue = vi.fn((key: string, value: unknown) => (value === 'quit'
+      ? new Promise((_resolve, reject) => { refuseOlder = () => reject(new Error('EPERM')) })
+      : Promise.resolve({ ok: true, key, value })))
+    const getConfigValue = vi.fn(async (key: string) => ({ ok: true, key, value: key === 'closeBehavior' ? 'ask' : false }))
+    window.jplearnDesktop = { ...baseDesktopApi, getConfigValue, setConfigValue } as unknown as typeof window.jplearnDesktop
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await openSettings()
+    fireEvent.click(screen.getByRole('tab', { name: /system/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Window Close Behavior/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /^Quit:/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Minimize:/ }))
+    await waitFor(() => expect(screen.getByRole('radio', { name: /^Minimize:/ }).getAttribute('aria-checked')).toBe('true'))
+    refuseOlder()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByText("COULDN'T SAVE THIS SETTING. TRY AGAIN.")).toBeNull()
+    expect(screen.getByRole('radio', { name: /^Minimize:/ }).getAttribute('aria-checked')).toBe('true')
+    warn.mockRestore()
+  })
+
   it('shows the new value once the save has landed', async () => {
     let finish: () => void = () => {}
     const setConfigValue = vi.fn((key: string, value: unknown) => new Promise((resolve) => {
@@ -369,6 +390,23 @@ describe('the Settings dialog takes, traps and returns focus (F3)', () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /control panel/i })).toBeNull())
     expect(document.activeElement).toBe(opener)
+  })
+
+  it('keeps Shift+Tab inside when the sheet itself has focus, in Settings and in Close options', async () => {
+    window.jplearnDesktop = baseDesktopApi
+    const { user, dialog } = await openFromTitlebar()
+    dialog.focus()
+    await user.tab({ shift: true })
+    const settingsControls = getFocusableElements(dialog)
+    expect(document.activeElement).toBe(settingsControls[settingsControls.length - 1])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close window' }))
+    const options = await screen.findByRole('dialog', { name: 'Close options' })
+    await waitFor(() => expect(options.contains(document.activeElement)).toBe(true))
+    options.focus()
+    await user.tab({ shift: true })
+    const optionControls = getFocusableElements(options)
+    expect(document.activeElement).toBe(optionControls[optionControls.length - 1])
   })
 
   it('lets Close options over it own focus, and hands it back to Settings', async () => {

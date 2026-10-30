@@ -131,6 +131,18 @@ describe('getFocusableElements, out of reach', () => {
     expect(getFocusableElements(container).map((element) => element.id)).toEqual(['shown', 'plain'])
   })
 
+  it('wraps Shift+Tab to the last control when the panel itself has focus', () => {
+    const container = document.createElement('div')
+    container.tabIndex = -1
+    container.innerHTML = '<button id="one">a</button><button id="two">b</button>'
+    document.body.appendChild(container)
+    container.focus()
+    const event = makeKeyboardEvent('Tab', true)
+    expect(trapFocus(event, container)).toBe(true)
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(document.activeElement?.id).toBe('two')
+  })
+
   it('restores focus only to something still in the page and in reach', () => {
     const container = document.createElement('div')
     container.innerHTML = '<button id="ok">a</button><div hidden><button id="gone-hidden">b</button></div>'

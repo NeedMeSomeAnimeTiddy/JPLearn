@@ -270,7 +270,9 @@ describe('the mark, through the hook that owns it', () => {
     getFeatureState.mockImplementation(async () => ({ features: [feature({ is_unlocked: false, unlocked_at: null })] }))
     act(() => result.current.resetUnlockMark())
     expect(result.current.pendingUnlocks).toEqual([])
-    expect(result.current.unlocked).toBeNull()
+    /* drawn locked, the fresh-start state, not open, until the read answers */
+    expect(result.current.unlocked).toEqual(new Set())
+    expect(result.current.isLocked({ gate: { feature: 'conversation_mode' } } as unknown as Parameters<typeof result.current.isLocked>[0])).toBe(true)
     await waitFor(() => expect(getFeatureState).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(result.current.unlocked).toEqual(new Set()))
     expect(result.current.pendingUnlocks).toEqual([])
@@ -289,7 +291,7 @@ describe('the mark, through the hook that owns it', () => {
     /* the read from before the reset still says something unlocked after the old mark */
     await act(async () => { stale({ features: [feature({ unlocked_at: T2 })] }) })
     expect(result.current.pendingUnlocks).toEqual([])
-    expect(result.current.unlocked).toBeNull()
+    expect(result.current.unlocked).toEqual(new Set())
   })
 
   it('still clears the live mark when storage refuses the removal', async () => {

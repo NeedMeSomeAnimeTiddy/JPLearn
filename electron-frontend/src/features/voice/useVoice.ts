@@ -6,6 +6,7 @@ import { splitSpeechSegments } from './utils'
 import { AmbientAudioController } from '../../lib/ambientAudio'
 import { parseProgressMethod } from '../tutor'
 import { useActionFailures, type ActionFailures } from '../../hooks/useActionFailures'
+import { afterSuccess } from '../../lib/settingsFailure'
 
 export type SpeechTier = 'fast' | 'balanced' | 'high' | 'ultra'
 export type VoiceEngineTier = '0.6b'
@@ -276,10 +277,13 @@ export function useVoice(
     setSpeechDownloadMethod(null)
     clearFailure('download', tier)
     try {
-      await downloadModel(tier, options)
-      await deps.refreshTutorInstallInfo()
-    } catch (error) {
-      fail('download', tier, error)
+      try {
+        await downloadModel(tier, options)
+      } catch (error) {
+        fail('download', tier, error)
+        return
+      }
+      await afterSuccess('download', deps.refreshTutorInstallInfo)
     } finally {
       setSpeechDownloadingTier(null)
       setSpeechDownloadProgress(0)
@@ -294,10 +298,13 @@ export function useVoice(
     setSpeechModelActionTier(tier)
     clearFailure('select', tier)
     try {
-      await setActiveSpeechModel(tier)
-      await deps.refreshTutorInstallInfo()
-    } catch (error) {
-      fail('select', tier, error)
+      try {
+        await setActiveSpeechModel(tier)
+      } catch (error) {
+        fail('select', tier, error)
+        return
+      }
+      await afterSuccess('switch', deps.refreshTutorInstallInfo)
     } finally {
       setSpeechModelActionTier(null)
     }
@@ -311,10 +318,13 @@ export function useVoice(
     setSpeechModelActionTier(tier)
     clearFailure('uninstall', tier)
     try {
-      await uninstallModel(tier)
-      await deps.refreshTutorInstallInfo()
-    } catch (error) {
-      fail('uninstall', tier, error)
+      try {
+        await uninstallModel(tier)
+      } catch (error) {
+        fail('uninstall', tier, error)
+        return
+      }
+      await afterSuccess('removal', deps.refreshTutorInstallInfo)
     } finally {
       setSpeechModelActionTier(null)
     }
@@ -330,14 +340,16 @@ export function useVoice(
     setVoiceEngineDownloadMethod(null)
     clearFailure('install', tier)
     try {
-      await downloadVoiceEngine(tier)
-      await deps.refreshTutorInstallInfo()
-      const preloadVoice = window.jplearnDesktop?.preloadVoice
-      if (preloadVoice) {
-        await preloadVoice(settings.voiceSpeaker)
+      try {
+        await downloadVoiceEngine(tier)
+      } catch (error) {
+        fail('install', tier, error)
+        return
       }
-    } catch (error) {
-      fail('install', tier, error)
+      await afterSuccess('install', async () => {
+        await deps.refreshTutorInstallInfo()
+        await window.jplearnDesktop?.preloadVoice?.(settings.voiceSpeaker)
+      })
     } finally {
       setVoiceEngineDownloadingTier(null)
       setVoiceEngineDownloadProgress(0)

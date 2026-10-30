@@ -101,7 +101,9 @@ export function useMenuL1(
     seenRef.current = undefined
     setPendingUnlocks([])
     setFeatures([])
-    setUnlocked(null)
+    /* nothing unlocked, which is what a reset leaves; null would draw every gated section open
+       until the read answers */
+    setUnlocked(new Set())
     setRevision((value) => value + 1)
   }, [])
 

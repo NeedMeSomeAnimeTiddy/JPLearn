@@ -24,6 +24,17 @@ export interface SettingsFailure {
   reason: string
 }
 
+/* WHAT RUNS AFTER AN ACTION HAS SUCCEEDED (re-reading what is installed, warming the voice) is
+   not the action. If it fails the action still happened, so it is logged and never shown as the
+   action failing. */
+export async function afterSuccess(what: string, step: () => Promise<unknown>): Promise<void> {
+  try {
+    await step()
+  } catch (error) {
+    console.warn(`[settings] ${what} succeeded; the step after it failed:`, error)
+  }
+}
+
 export function settingsFailure(kind: SettingsActionKind, error: unknown): SettingsFailure {
   /* a reason is someone else's text, so an em or en dash in it is turned into a comma before it is
      shown (the app shows none) */

@@ -45,7 +45,10 @@ export function trapFocus(event: KeyboardEvent, container: HTMLElement): boolean
   const first = focusable[0]
   const last = focusable[focusable.length - 1]
   const activeElement = document.activeElement
-  if (event.shiftKey && (activeElement === first || !container.contains(activeElement))) {
+  /* the panel itself holds focus after a click on its empty sheet; Shift+Tab from there would
+     otherwise leave for the page behind, so it wraps to the last control as from outside */
+  const onPanel = activeElement === container
+  if (event.shiftKey && (activeElement === first || onPanel || !container.contains(activeElement))) {
     event.preventDefault()
     last.focus()
     return true

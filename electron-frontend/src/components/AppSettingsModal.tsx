@@ -120,14 +120,20 @@ export function AppSettingsModal({
      left a choice on screen that the next launch would not have. Now a failure leaves the last saved
      value lit and says so beside it. */
   const preferenceFailures = useActionFailures()
+  /* ONLY THE LATEST PRESS OF A SWITCH SPEAKS FOR IT. A slow answer to an older choice, saved or
+     refused, must not paint over the newer one that has already landed. */
+  const preferenceAttemptsRef = useRef<Partial<Record<string, number>>>({})
   const savePreference = async <V,>(key: 'closeBehavior' | 'autoStartOnLogin' | 'autoUpdateEnabled', value: V, show: (value: V) => void) => {
+    const attempt = (preferenceAttemptsRef.current[key] ?? 0) + 1
+    preferenceAttemptsRef.current[key] = attempt
+    const isLatest = () => preferenceAttemptsRef.current[key] === attempt
     preferenceFailures.clear('save-setting', key)
     try {
       await window.jplearnDesktop?.setConfigValue?.(key, value)
-      show(value)
+      if (isLatest()) show(value)
     } catch (error) {
       console.warn(`[settings] could not save ${key}:`, error)
-      preferenceFailures.fail('save-setting', key, error)
+      if (isLatest()) preferenceFailures.fail('save-setting', key, error)
     }
   }
 
